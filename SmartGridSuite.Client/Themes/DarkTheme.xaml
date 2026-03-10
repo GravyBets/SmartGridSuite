@@ -1,0 +1,107 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:media="clr-namespace:System.Windows.Media.Imaging;assembly=PresentationCore">
+
+    <!-- =========================
+         DARK THEME
+         ========================= -->
+
+    <!-- App + cards -->
+    <SolidColorBrush x:Key="AppBackground" Color="#151C2B"/>
+    <SolidColorBrush x:Key="CardBackground" Color="#1F2838"/>
+    <SolidColorBrush x:Key="CardBorder" Color="#34415C"/>
+
+    <!-- DataGrid -->
+    <SolidColorBrush x:Key="DataGridHeaderBg" Color="#222C3F"/>
+    <SolidColorBrush x:Key="DataGridHeaderBorder" Color="#34415C"/>
+    <SolidColorBrush x:Key="DataGridRowHoverBg" Color="#14FFFFFF"/>
+    <SolidColorBrush x:Key="DataGridRowSelectedBg" Color="#22007ACC"/>
+
+    <!-- Optional “depth” -->
+    <DropShadowEffect x:Key="CardShadow"
+                  Color="#000000"
+                  BlurRadius="16"
+                  ShadowDepth="2"
+                  Opacity="0.35"/>
+
+
+    <!-- Surfaces used inside cards -->
+    <SolidColorBrush x:Key="SurfaceBg" Color="#222C3F"/>
+    <SolidColorBrush x:Key="SurfaceBorder" Color="#34415C"/>
+
+    <!-- Text -->
+    <SolidColorBrush x:Key="TextPrimary" Color="#ECEFF4"/>
+    <SolidColorBrush x:Key="TextSecondary" Color="#C2CCDE"/>
+    <SolidColorBrush x:Key="WatermarkText" Color="#9AA6BC"/>
+
+    <!-- Input (TextBox) border colors -->
+    <SolidColorBrush x:Key="InputBorderHover" Color="#7C879A"/>
+    <SolidColorBrush x:Key="InputBorderFocus" Color="#3B82F6"/>
+
+    <!-- Primary button hover/pressed -->
+    <SolidColorBrush x:Key="PrimaryBgHover" Color="#2747A6"/>
+    <SolidColorBrush x:Key="PrimaryBgPressed" Color="#223D93"/>
+
+    <!-- Primary brand (calmer dark blue) -->
+    <SolidColorBrush x:Key="PrimaryBg" Color="#3B82F6"/>
+    <SolidColorBrush x:Key="PrimaryBorder" Color="#1E40AF"/>
+
+    <!-- Tile background (subtle fill so buttons aren’t washed out) -->
+    <SolidColorBrush x:Key="TileFill" Color="#252F44"/>
+    <SolidColorBrush x:Key="TileFillHover" Color="#324061"/>
+    <SolidColorBrush x:Key="TileFillPressed" Color="#2A3650"/>
+
+    <!-- Compat keys (some styles still reference these names) -->
+    <SolidColorBrush x:Key="TileHoverBg" Color="#202A3B"/>
+    <SolidColorBrush x:Key="TilePressedBg" Color="#162033"/>
+
+    <!-- Tabs (dark theme) -->
+    <SolidColorBrush x:Key="TabBg" Color="#1F2838"/>
+    <SolidColorBrush x:Key="TabBgSelected" Color="#2A3650"/>
+    <SolidColorBrush x:Key="TabBgHover" Color="#324061"/>
+
+    <!-- List surfaces (dark) -->
+    <SolidColorBrush x:Key="ListBg" Color="#151C2B"/>
+    <SolidColorBrush x:Key="ListBorder" Color="#34415C"/>
+    <SolidColorBrush x:Key="ListHoverBg" Color="#2A3650"/>
+    <SolidColorBrush x:Key="ListSelectedBg" Color="#324061"/>
+    <SolidColorBrush x:Key="ListItemSelectedBorder" Color="#3B4A68"/>
+    <SolidColorBrush x:Key="ListItemHoverBg" Color="#324061"/>
+
+    <SolidColorBrush x:Key="TabPillSelectedBg" Color="#2A3650"/>
+
+    <!-- Inner Tabs -->
+    <SolidColorBrush x:Key="InnerTabBg" Color="#1F2838"/>
+    <SolidColorBrush x:Key="InnerTabSelectedBg" Color="#2A3650"/>
+    <SolidColorBrush x:Key="InnerTabHoverBg" Color="#324061"/>
+
+    <!-- Summary / validation highlight -->
+    <SolidColorBrush x:Key="MissingRefBg" Color="#3A1B1B"/>
+    <!-- deep muted red fill -->
+    <SolidColorBrush x:Key="MissingRefBgHover" Color="#4A2020"/>
+    <!-- slightly stronger on hover -->
+    <SolidColorBrush x:Key="MissingRefBorder" Color="#F87171"/>
+    <!-- softer red outline -->
+
+    <!-- Issue/Retrun Toggle Pill -->
+    <SolidColorBrush x:Key="DangerText" Color="#FCA5A5"/>
+    <SolidColorBrush x:Key="DangerBorder" Color="#F87171"/>
+    <SolidColorBrush x:Key="DangerBg" Color="#3A1B1B"/>
+    <SolidColorBrush x:Key="DangerBgHover" Color="#4A2020"/>
+
+    <!-- Issue/Return "Return Text"-->
+    <SolidColorBrush x:Key="ReturnText" Color="#ECEFF4"/>
+
+    <!-- Overlays / Misc -->
+    <SolidColorBrush x:Key="HoverOverlay" Color="#14FFFFFF"/>
+    <SolidColorBrush x:Key="PressedOverlay" Color="#22FFFFFF"/>
+    <SolidColorBrush x:Key="BorderHover" Color="#475569"/>
+
+    <!-- Fluent Ribbon -->
+    <SolidColorBrush x:Key="Fluent.Ribbon.Brushes.RibbonBackgroundBrush" Color="#151C2B"/>
+    <SolidColorBrush x:Key="Fluent.Ribbon.Brushes.RibbonBorderBrush" Color="#34415C"/>
+    <SolidColorBrush x:Key="Fluent.Ribbon.Brushes.RibbonTabItemForegroundBrush" Color="#C2CCDE"/>
+    <SolidColorBrush x:Key="Fluent.Ribbon.Brushes.RibbonTabItemSelectedForegroundBrush" Color="#ECEFF4"/>
+
+
+</ResourceDictionary>

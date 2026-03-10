@@ -1,0 +1,118 @@
+﻿<Window x:Class="SmartGridSuite.Client.Views.Administration.TruckEditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        Title="Truck"
+        Width="400"
+        Height="440"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Truck Details"
+                       FontSize="22"
+                       FontWeight="Bold"
+                       Margin="0,0,0,14"
+                       Foreground="{DynamicResource TextPrimary}"/>
+
+            <GroupBox Header="Basic Information"
+                      Foreground="{DynamicResource TextPrimary}">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="14"/>
+
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="14"/>
+
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="14"/>
+
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Truck # -->
+                    <TextBlock Grid.Row="0"
+                               Style="{DynamicResource FormLabelStyle}"
+                               Text="Truck #"
+                               Margin="4,0,0,4"/>
+
+                    <TextBox Grid.Row="1"
+                             x:Name="TruckNumberTextBox"
+                             Height="30"/>
+
+                    <!-- Style -->
+                    <TextBlock Grid.Row="3"
+                               Style="{DynamicResource FormLabelStyle}"
+                               Text="Style"
+                               Margin="4,0,0,4"/>
+
+                    <ComboBox x:Name="TruckStyleComboBox"
+                              Grid.Row="4"
+                              Width="240"
+                              Height="30"
+                              HorizontalAlignment="Left"
+                              SelectedValuePath="Id"
+                              TextSearch.TextPath="Name">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <!-- Add Style -->
+                    <Button Grid.Row="6"
+                            Content="Add Style"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Width="100"
+                            Height="30"
+                            HorizontalAlignment="Left"
+                            Click="AddStyle_Click"/>
+
+                    <!-- In Service -->
+                    <TextBlock Grid.Row="8"
+                               Style="{DynamicResource FormLabelStyle}"
+                               Text="In Service"                               
+                               Margin="4,0,0,4"/>
+
+                    <ComboBox Grid.Row="9"
+                              x:Name="InServiceComboBox"
+                              Width="140"
+                              Height="30"
+                              HorizontalAlignment="Left"
+                              SelectedIndex="0">
+                        <ComboBoxItem Content="Yes"/>
+                        <ComboBoxItem Content="No"/>
+                    </ComboBox>
+                </Grid>
+            </GroupBox>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Cancel"
+                    Width="100"
+                    Height="34"
+                    Margin="0,0,8,0"
+                    Click="Cancel_Click"/>
+
+            <Button Content="Save"
+                    Style="{DynamicResource PrimaryButtonStyle}"
+                    Width="100"
+                    Height="34"
+                    Click="Save_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

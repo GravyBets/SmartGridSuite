@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36616.10
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartGridSuite.Api", "SmartGridSuite.Api\SmartGridSuite.Api.csproj", "{9D120261-381C-409F-A1AD-6E8FF62D6DD5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartGridSuite.Contracts", "SmartGridSuite.Contracts\SmartGridSuite.Contracts.csproj", "{C43EE9F5-A9AF-495F-9EC7-69A9916483C1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartGridSuite.Client", "SmartGridSuite.Client\SmartGridSuite.Client.csproj", "{F5AF60F6-9C23-D12A-AD64-8DD6540C1AFB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9D120261-381C-409F-A1AD-6E8FF62D6DD5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9D120261-381C-409F-A1AD-6E8FF62D6DD5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9D120261-381C-409F-A1AD-6E8FF62D6DD5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9D120261-381C-409F-A1AD-6E8FF62D6DD5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C43EE9F5-A9AF-495F-9EC7-69A9916483C1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C43EE9F5-A9AF-495F-9EC7-69A9916483C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C43EE9F5-A9AF-495F-9EC7-69A9916483C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C43EE9F5-A9AF-495F-9EC7-69A9916483C1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F5AF60F6-9C23-D12A-AD64-8DD6540C1AFB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F5AF60F6-9C23-D12A-AD64-8DD6540C1AFB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F5AF60F6-9C23-D12A-AD64-8DD6540C1AFB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F5AF60F6-9C23-D12A-AD64-8DD6540C1AFB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7615DD01-625C-4831-BEE3-3352D7BEBD2B}
+	EndGlobalSection
+EndGlobal

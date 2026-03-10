@@ -1,0 +1,139 @@
+﻿<Fluent:RibbonWindow x:Class="SmartGridSuite.Client.Views.DispatcherShellWindow"
+                     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:Fluent="urn:fluent-ribbon"
+                     Title="Smart Grid Suite - Dispatcher"
+                     WindowState="Maximized"
+                     WindowStartupLocation="CenterScreen"
+                     Background="{DynamicResource AppBackground}">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- =======================
+             RIBBON
+             ======================= -->
+        <Fluent:Ribbon Grid.Row="0" Margin="0,0,0,14">
+
+            <Fluent:Ribbon.QuickAccessItems>
+                <Fluent:QuickAccessMenuItem Header="Save" ToolTip="Save"/>
+                <Fluent:QuickAccessMenuItem Header="Refresh" ToolTip="Refresh"/>
+                <Fluent:QuickAccessMenuItem Header="Export" ToolTip="Export"/>
+            </Fluent:Ribbon.QuickAccessItems>
+
+            <Fluent:Ribbon.Menu>
+                <Fluent:Backstage Header="File">
+                    <Fluent:BackstageTabControl>
+                        <Fluent:BackstageTabItem Header="Settings">
+                            <Grid Margin="18">
+                                <TextBlock Text="Settings (later)"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           FontSize="16"/>
+                            </Grid>
+                        </Fluent:BackstageTabItem>
+
+                        <Fluent:BackstageTabItem Header="About">
+                            <Grid Margin="18">
+                                <TextBlock Text="About (later)"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           FontSize="16"/>
+                            </Grid>
+                        </Fluent:BackstageTabItem>
+                    </Fluent:BackstageTabControl>
+                </Fluent:Backstage>
+            </Fluent:Ribbon.Menu>
+
+            <Fluent:RibbonTabItem Header="Dispatching">
+                <Fluent:RibbonGroupBox Header="Assignments">
+                    <Fluent:Button Header="Current Assignments"/>
+                    <Fluent:Button Header="Drivers"/>
+                </Fluent:RibbonGroupBox>
+
+                <Fluent:RibbonGroupBox Header="Routing">
+                    <Fluent:Button Header="Route Optimize"/>
+                    <Fluent:Button Header="Mapping"/>
+                </Fluent:RibbonGroupBox>
+
+                <Fluent:RibbonGroupBox Header="Tickets">
+                    <Fluent:Button Header="Create Ticket"/>
+                    <Fluent:Button Header="Export"/>
+                </Fluent:RibbonGroupBox>
+            </Fluent:RibbonTabItem>
+
+            <Fluent:RibbonTabItem Header="Tools">
+                <Fluent:RibbonGroupBox Header="Utilities">
+                    <Fluent:Button Header="Diagnostics"/>
+                    <Fluent:Button Header="Ping / SNMP"/>
+                </Fluent:RibbonGroupBox>
+            </Fluent:RibbonTabItem>
+
+        </Fluent:Ribbon>
+
+        <!-- =======================
+             BODY
+             ======================= -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="NavCol" Width="260"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT NAV -->
+            <Border Grid.Column="0"
+                    Style="{StaticResource Card}"
+                    Padding="0">
+                <DockPanel LastChildFill="True">
+
+                    <!-- Header -->
+                    <Button x:Name="NavHeaderBtn"
+                            DockPanel.Dock="Top"
+                            Style="{StaticResource NavHeaderButtonStyle}"
+                            Margin="12,12,12,8"
+                            Content="☰  Navigation"
+                            Click="ToggleNav_Click"/>
+
+                    <!-- Expanded list -->
+                    <ListBox x:Name="NavListExpanded"
+                             SelectionChanged="NavList_SelectionChanged"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             ItemContainerStyle="{StaticResource NavItemCleanStyle}">
+                        <ListBoxItem Tag="Dashboard" Content="Dashboard"/>
+                        <ListBoxItem Tag="Tasks" Content="Tasks"/>
+                        <ListBoxItem Tag="Tickets" Content="Tickets"/>
+                        <ListBoxItem Tag="Technicians" Content="Technicians"/>
+                    </ListBox>
+
+                    <!-- Collapsed list -->
+                    <ListBox x:Name="NavListCollapsed"
+                             SelectionChanged="NavList_SelectionChanged"
+                             BorderThickness="0"
+                             Background="Transparent"
+                             ItemContainerStyle="{StaticResource NavItemCleanStyle}"
+                             Visibility="Collapsed">
+                        <ListBoxItem Tag="Dashboard" ToolTip="Dashboard" Content="D"/>
+                        <ListBoxItem Tag="Tasks" ToolTip="Tasks" Content="T"/>
+                        <ListBoxItem Tag="Tickets" ToolTip="Tickets" Content="🎫"/>
+                        <ListBoxItem Tag="Technicians" ToolTip="Technicians" Content="👷"/>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1"
+                          Width="12"
+                          Background="Transparent"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          ShowsPreview="True"/>
+
+            <!-- Pane host -->
+            <ContentControl x:Name="MainPaneHost"
+                            Grid.Column="2"/>
+        </Grid>
+    </Grid>
+</Fluent:RibbonWindow>

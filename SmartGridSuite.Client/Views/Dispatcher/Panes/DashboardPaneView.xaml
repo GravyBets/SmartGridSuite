@@ -1,0 +1,19 @@
+﻿<UserControl x:Class="SmartGridSuite.Client.Views.Dispatcher.Panes.DashboardPaneView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+        <TextBlock Text="Dashboard"
+                   FontWeight="Bold"
+                   Foreground="{DynamicResource TextSecondary}"
+                   Margin="2,0,0,10"/>
+
+        <Border Background="{DynamicResource SurfaceBg}"
+                BorderBrush="{DynamicResource SurfaceBorder}"
+                BorderThickness="1.5"
+                CornerRadius="12"
+                Padding="12">
+            <TextBlock Text="(Dashboard widgets go here)"
+                       Foreground="{DynamicResource TextPrimary}"/>
+        </Border>
+    </StackPanel>
+</UserControl>

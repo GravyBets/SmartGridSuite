@@ -1,0 +1,21 @@
+﻿<Application x:Class="SmartGridSuite.Client.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="Views/ModuleLauncherWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                
+                <!-- REQUIRED for Fluent.Ribbon -->
+                <ResourceDictionary Source="pack://application:,,,/Fluent;Component/Themes/Generic.xaml"/>
+
+                <!-- Controls (always on) -->
+                <ResourceDictionary Source="Themes/Controls.xaml"/>
+
+                <!-- Theme (swap later) -->
+                <ResourceDictionary Source="Themes/LightTheme.xaml"/>
+
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
