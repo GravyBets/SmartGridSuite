@@ -42,5 +42,21 @@ namespace SmartGridSuite.Client.Services
             var res = await _api.PostAsync<CreateTicketRequest, CreateTicketResponse>("api/tickets", req, ct);
             return res?.Id ?? 0;
         }
+
+        public async Task<List<SapQueueImportPreviewResultRow>> PreviewSapQueueImportAsync(
+        SapQueueImportPreviewRequest req, CancellationToken ct = default)
+        {
+            return await _api.PostAsync<SapQueueImportPreviewRequest, List<SapQueueImportPreviewResultRow>>(
+                       "api/tickets/sap-import/preview", req, ct)
+                   ?? new();
+        }
+
+        public async Task<SapQueueImportCommitResponse> CommitSapQueueImportAsync(
+            SapQueueImportCommitRequest req, CancellationToken ct = default)
+        {
+            return await _api.PostAsync<SapQueueImportCommitRequest, SapQueueImportCommitResponse>(
+                       "api/tickets/sap-import/commit", req, ct)
+                   ?? new SapQueueImportCommitResponse(0, 0, 0, new());
+        }
     }
 }

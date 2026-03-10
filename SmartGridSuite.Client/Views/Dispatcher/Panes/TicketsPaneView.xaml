@@ -109,6 +109,14 @@
                                 Content="Refresh"
                                 Click="Refresh_Click"/>
 
+                        <Button Style="{StaticResource SecondaryButtonStyle}"
+                                Height="34"
+                                MinWidth="145"
+                                Padding="14,0"
+                                Margin="0,0,10,0"
+                                Content="Import SAP Queue"
+                                Click="ImportSapQueue_Click"/>
+
                         <Button Style="{StaticResource PrimaryButtonStyle}"
                                 Height="34"
                                 MinWidth="120"

@@ -90,7 +90,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             TicketsGrid.ItemsSource = TicketsView;
 
-            StatusFilter.ItemsSource = new[] { "All", "Open", "Assigned", "In Progress", "Waiting Dispatch", "Closed" };
+            StatusFilter.ItemsSource = new[]
+                {
+                    "All",
+                    "Needs Review",
+                    "Open",
+                    "Assigned",
+                    "In Progress",
+                    "Waiting Dispatch",
+                    "Closed"
+                };
             StatusFilter.SelectedIndex = 0;
 
             DateRangeFilter.ItemsSource = new[]
@@ -384,6 +393,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     TicketsGrid.ScrollIntoView(found);
                 }
             }
+        }
+
+        private async void ImportSapQueue_Click(object sender, RoutedEventArgs e)
+        {
+            var win = new SapQueueImportWindow(_ticketsApi)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (win.ShowDialog() == true)
+                await LoadTicketsFromApiAsync();
         }
 
         private void AssignTech_Click(object sender, RoutedEventArgs e)

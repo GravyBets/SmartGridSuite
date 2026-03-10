@@ -70,14 +70,11 @@ namespace SmartGridSuite.Api.Controllers
             if (string.IsNullOrWhiteSpace(req.Site)) return BadRequest("Site required");
             if (string.IsNullOrWhiteSpace(req.Problem)) return BadRequest("Problem required");
 
-            // Notification: treat blank as NULL
             string? notif = string.IsNullOrWhiteSpace(req.Notification) ? null : req.Notification.Trim();
 
-            // if provided, must be 10 digits
             if (notif is not null && !Regex.IsMatch(notif, @"^\d{10}$"))
                 return BadRequest("Notification must be 10 digits when provided");
 
-            // Friendly duplicate check (lets UI show message without parsing DB errors)
             if (notif is not null)
             {
                 var exists = await _db.Tickets.AsNoTracking().AnyAsync(t => t.Notification == notif);
@@ -85,7 +82,6 @@ namespace SmartGridSuite.Api.Controllers
                     return Conflict($"A ticket already exists with Notification {notif}.");
             }
 
-            // Work order optional, 9 digits if provided
             var wo = (req.WorkOrder ?? "").Trim();
             if (!string.IsNullOrWhiteSpace(wo) && !Regex.IsMatch(wo, @"^\d{9}$"))
                 return BadRequest("WorkOrder must be 9 digits when provided");
@@ -101,7 +97,7 @@ namespace SmartGridSuite.Api.Controllers
             {
                 Site = req.Site.Trim(),
                 NotificationName = (req.NotificationName ?? "").Trim(),
-                Notification = notif, // <-- NULL when blank
+                Notification = notif,
 
                 Status = status,
                 AssignedTech = assignedTech,
@@ -127,7 +123,6 @@ namespace SmartGridSuite.Api.Controllers
             }
             catch (DbUpdateException ex)
             {
-                // Safety net in case two dispatchers submit the same notification simultaneously
                 var msg = ex.InnerException?.Message ?? ex.Message;
                 if (msg.Contains("Duplicate", StringComparison.OrdinalIgnoreCase))
                     return Conflict($"A ticket already exists with Notification {notif}.");
@@ -136,6 +131,367 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             return Ok(new CreateTicketResponse(entity.Id));
+        }
+
+        [HttpPost("sap-import/preview")]
+        public async Task<ActionResult<List<SapQueueImportPreviewResultRow>>> PreviewSapImport(
+            [FromBody] SapQueueImportPreviewRequest req)
+        {
+            var rows = req.Rows ?? new List<SapQueueImportPreviewRow>();
+            if (rows.Count == 0)
+                return Ok(new List<SapQueueImportPreviewResultRow>());
+
+            var incomingNotifications = rows
+                .Select(r => NormalizeNotification(r.Notification))
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList()!;
+
+            var existingNotifications = new HashSet<string>(
+                await _db.Tickets.AsNoTracking()
+                    .Where(t => t.Notification != null && incomingNotifications.Contains(t.Notification!))
+                    .Select(t => t.Notification!)
+                    .ToListAsync(),
+                StringComparer.OrdinalIgnoreCase);
+
+            var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var result = new List<SapQueueImportPreviewResultRow>();
+
+            foreach (var row in rows)
+            {
+                var rawNotification = (row.Notification ?? "").Trim();
+                var notif = NormalizeNotification(rawNotification);
+                var workOrder = NormalizeWorkOrder(row.WorkOrder);
+                var description = (row.Description ?? "").Trim();
+                var parsedSite = TryParseSiteFromDescription(description);
+
+                string status;
+                string message;
+
+                if (string.IsNullOrWhiteSpace(notif))
+                {
+                    status = "Invalid";
+                    message = "Notification must be exactly 10 digits.";
+                }
+                else if (!seenInFile.Add(notif))
+                {
+                    status = "Invalid";
+                    message = "Duplicate notification appears more than once in this import file.";
+                }
+                else if (existingNotifications.Contains(notif))
+                {
+                    status = "Already Exists";
+                    message = $"Notification {notif} already exists.";
+                }
+                else if (row.NotificationDate is null)
+                {
+                    status = "Invalid";
+                    message = "Notif.date is missing or invalid.";
+                }
+                else if (string.IsNullOrWhiteSpace(description))
+                {
+                    status = "Invalid";
+                    message = "Description is required.";
+                }
+                else if (!string.IsNullOrWhiteSpace(row.WorkOrder) && string.IsNullOrWhiteSpace(workOrder))
+                {
+                    status = "Invalid";
+                    message = "Work Order must be exactly 9 digits when provided.";
+                }
+                else
+                {
+                    status = "Ready";
+                    message = string.IsNullOrWhiteSpace(parsedSite)
+                        ? "Site not detected — will import blank site and Needs Review."
+                        : $"Site parsed as {parsedSite}.";
+                }
+
+                result.Add(new SapQueueImportPreviewResultRow(
+                    RowNumber: row.RowNumber,
+                    Notification: rawNotification,
+                    WorkOrder: string.IsNullOrWhiteSpace(workOrder) ? row.WorkOrder?.Trim() : workOrder,
+                    NotificationDate: row.NotificationDate,
+                    Description: description,
+                    ParsedSite: parsedSite,
+                    ImportStatus: status,
+                    Message: message
+                ));
+            }
+
+            return Ok(result);
+        }
+
+        [HttpPost("sap-import/commit")]
+        public async Task<ActionResult<SapQueueImportCommitResponse>> CommitSapImport(
+            [FromBody] SapQueueImportCommitRequest req)
+        {
+            var rows = req.Rows ?? new List<SapQueueImportCommitRow>();
+            var createdBy = string.IsNullOrWhiteSpace(req.CreatedBy) ? "Unknown" : req.CreatedBy.Trim();
+            var importTime = DateTime.Now;
+
+            if (rows.Count == 0)
+            {
+                return Ok(new SapQueueImportCommitResponse(
+                    ImportedCount: 0,
+                    AlreadyExistsCount: 0,
+                    InvalidCount: 0,
+                    Rows: new()));
+            }
+
+            var incomingNotifications = rows
+                .Select(r => NormalizeNotification(r.Notification))
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList()!;
+
+            var existingNotifications = new HashSet<string>(
+                await _db.Tickets.AsNoTracking()
+                    .Where(t => t.Notification != null && incomingNotifications.Contains(t.Notification!))
+                    .Select(t => t.Notification!)
+                    .ToListAsync(),
+                StringComparer.OrdinalIgnoreCase);
+
+            var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var results = new List<SapQueueImportCommitResultRow>();
+            int imported = 0;
+            int alreadyExists = 0;
+            int invalid = 0;
+
+            foreach (var row in rows)
+            {
+                var rawNotification = (row.Notification ?? "").Trim();
+                var notif = NormalizeNotification(rawNotification);
+                var workOrder = NormalizeWorkOrder(row.WorkOrder);
+                var description = (row.Description ?? "").Trim();
+                var parsedSite = string.IsNullOrWhiteSpace(row.ParsedSite)
+                    ? TryParseSiteFromDescription(description)
+                    : row.ParsedSite.Trim();
+
+                if (string.IsNullOrWhiteSpace(notif))
+                {
+                    invalid++;
+                    results.Add(new SapQueueImportCommitResultRow(
+                        row.RowNumber,
+                        rawNotification,
+                        "Invalid",
+                        "Notification must be exactly 10 digits.",
+                        null));
+                    continue;
+                }
+
+                if (!seenInFile.Add(notif))
+                {
+                    invalid++;
+                    results.Add(new SapQueueImportCommitResultRow(
+                        row.RowNumber,
+                        notif,
+                        "Invalid",
+                        "Duplicate notification appears more than once in this import file.",
+                        null));
+                    continue;
+                }
+
+                if (existingNotifications.Contains(notif))
+                {
+                    alreadyExists++;
+                    results.Add(new SapQueueImportCommitResultRow(
+                        row.RowNumber,
+                        notif,
+                        "Already Exists",
+                        $"Notification {notif} already exists.",
+                        null));
+                    continue;
+                }
+
+                if (row.NotificationDate == default)
+                {
+                    invalid++;
+                    results.Add(new SapQueueImportCommitResultRow(
+                        row.RowNumber,
+                        notif,
+                        "Invalid",
+                        "Notif.date is missing or invalid.",
+                        null));
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(description))
+                {
+                    invalid++;
+                    results.Add(new SapQueueImportCommitResultRow(
+                        row.RowNumber,
+                        notif,
+                        "Invalid",
+                        "Description is required.",
+                        null));
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(row.WorkOrder) && string.IsNullOrWhiteSpace(workOrder))
+                {
+                    invalid++;
+                    results.Add(new SapQueueImportCommitResultRow(
+                        row.RowNumber,
+                        notif,
+                        "Invalid",
+                        "Work Order must be exactly 9 digits when provided.",
+                        null));
+                    continue;
+                }
+
+                var entity = new TicketEntity
+                {
+                    Site = parsedSite,
+                    NotificationName = "",
+                    Notification = notif,
+
+                    Status = "Needs Review",
+                    AssignedTech = "(Unassigned)",
+
+                    CreatedAt = row.NotificationDate,
+                    LastActivityAt = importTime,
+
+                    CurrentWorkOrder = string.IsNullOrWhiteSpace(workOrder) ? null : workOrder,
+                    WorkOrderClass = null,
+                    GroupCode = "",
+                    PriorityDays = 0,
+
+                    Problem = description,
+                    Notes = null,
+                    CreatedBy = createdBy,
+                    Summary = description
+                };
+
+                try
+                {
+                    _db.Tickets.Add(entity);
+                    await _db.SaveChangesAsync();
+
+                    existingNotifications.Add(notif);
+                    imported++;
+
+                    results.Add(new SapQueueImportCommitResultRow(
+                        row.RowNumber,
+                        notif,
+                        "Imported",
+                        string.IsNullOrWhiteSpace(parsedSite)
+                            ? "Imported with blank site. Dispatch review required."
+                            : $"Imported with parsed site {parsedSite}.",
+                        entity.Id));
+                }
+                catch (DbUpdateException ex)
+                {
+                    _db.Entry(entity).State = EntityState.Detached;
+
+                    var msg = ex.InnerException?.Message ?? ex.Message;
+                    if (msg.Contains("Duplicate", StringComparison.OrdinalIgnoreCase))
+                    {
+                        existingNotifications.Add(notif);
+                        alreadyExists++;
+
+                        results.Add(new SapQueueImportCommitResultRow(
+                            row.RowNumber,
+                            notif,
+                            "Already Exists",
+                            $"Notification {notif} already exists.",
+                            null));
+                    }
+                    else
+                    {
+                        invalid++;
+
+                        results.Add(new SapQueueImportCommitResultRow(
+                            row.RowNumber,
+                            notif,
+                            "Invalid",
+                            "Import failed for this row.",
+                            null));
+                    }
+                }
+            }
+
+            return Ok(new SapQueueImportCommitResponse(
+                ImportedCount: imported,
+                AlreadyExistsCount: alreadyExists,
+                InvalidCount: invalid,
+                Rows: results));
+        }
+
+        private static string? NormalizeNotification(string? raw)
+        {
+            var s = (raw ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(s))
+                return null;
+
+            if (Regex.IsMatch(s, @"^\d{10}$"))
+                return s;
+
+            if (decimal.TryParse(s, out var num))
+            {
+                var truncated = decimal.Truncate(num);
+                if (num == truncated)
+                {
+                    var normalized = truncated.ToString("0");
+                    if (Regex.IsMatch(normalized, @"^\d{10}$"))
+                        return normalized;
+                }
+            }
+
+            return null;
+        }
+
+        private static string? NormalizeWorkOrder(string? raw)
+        {
+            var s = (raw ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(s))
+                return null;
+
+            if (Regex.IsMatch(s, @"^\d{9}$"))
+                return s;
+
+            if (decimal.TryParse(s, out var num))
+            {
+                var truncated = decimal.Truncate(num);
+                if (num == truncated)
+                {
+                    var normalized = truncated.ToString("0");
+                    if (Regex.IsMatch(normalized, @"^\d{9}$"))
+                        return normalized;
+                }
+            }
+
+            return null;
+        }
+
+        private static string TryParseSiteFromDescription(string? description)
+        {
+            var text = (description ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(text))
+                return "";
+
+            var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            AddSiteMatches(candidates, text, @"(?<![A-Za-z0-9])(G\d{4})(?![A-Za-z0-9])");
+            AddSiteMatches(candidates, text, @"(?<![A-Za-z0-9])(\d{4}MR)(?![A-Za-z0-9])");
+            AddSiteMatches(candidates, text, @"(?<![A-Za-z0-9])(RX\d{4})(?![A-Za-z0-9])");
+
+            return candidates.Count == 1
+                ? candidates.First().ToUpperInvariant()
+                : "";
+        }
+
+        private static void AddSiteMatches(HashSet<string> candidates, string text, string pattern)
+        {
+            foreach (Match match in Regex.Matches(text, pattern, RegexOptions.IgnoreCase))
+            {
+                if (match.Groups.Count > 1)
+                {
+                    var value = match.Groups[1].Value.Trim();
+                    if (!string.IsNullOrWhiteSpace(value))
+                        candidates.Add(value.ToUpperInvariant());
+                }
+            }
         }
     }
 }
