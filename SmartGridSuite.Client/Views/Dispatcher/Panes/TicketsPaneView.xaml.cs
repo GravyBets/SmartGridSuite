@@ -294,12 +294,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                                      s.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
 
             return match(t.Site) ||
+                   match(t.NotificationName) ||
                    match(t.Notification) ||
                    match(t.CurrentWorkOrder) ||
                    match(t.WorkOrderClassLabel) ||
+                   match(t.GroupCode) ||
                    match(t.Status) ||
                    match(t.AssignedTech) ||
-                   match(t.Summary);
+                   match(t.Problem) ||
+                   match(t.Summary) ||
+                   match(t.Notes) ||
+                   match(t.CreatedBy);
         }
 
         private void RefreshView() => TicketsView?.Refresh();
@@ -332,11 +337,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (SelectedTicket == null)
             {
                 DetailsPanel.Visibility = Visibility.Collapsed;
+                DetailsSplitter.Visibility = Visibility.Collapsed;
+                DetailsSplitterCol.Width = new GridLength(0);
                 DetailsCol.Width = new GridLength(0);
             }
             else
             {
-                DetailsCol.Width = new GridLength(460);
+                DetailsSplitterCol.Width = new GridLength(10);
+                DetailsCol.Width = new GridLength(440);
+                DetailsSplitter.Visibility = Visibility.Visible;
                 DetailsPanel.Visibility = Visibility.Visible;
             }
         }
@@ -394,15 +403,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             MessageBox.Show("Add Note (later: POST /visits/{id}/notes and bump LastActivityAt).", "Add Note");
         }
 
-        
+
         private void UpdateCustomDateVisibility()
         {
             var sel = DateRangeFilter?.SelectedItem as string ?? "All";
             bool isCustom = sel == "Custom";
 
-            CustomDatePanel.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+            var spacerWidth = isCustom ? new GridLength(12) : new GridLength(0);
+            var dateWidth = isCustom ? new GridLength(140) : new GridLength(0);
 
-            // Handy default when switching to Custom
+            InlineDateSpacer1Col.Width = spacerWidth;
+            InlineFromCol.Width = dateWidth;
+            InlineDateSpacer2Col.Width = spacerWidth;
+            InlineToCol.Width = dateWidth;
+            InlineDateSpacer3Col.Width = spacerWidth;
+
+            InlineDateSpacer1Col2.Width = spacerWidth;
+            InlineFromCol2.Width = dateWidth;
+            InlineDateSpacer2Col2.Width = spacerWidth;
+            InlineToCol2.Width = dateWidth;
+            InlineDateSpacer3Col2.Width = spacerWidth;
+
+            FromDateLabel.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+            ToDateLabel.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+
+            FromDatePicker.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+            ToDatePicker.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+
             if (isCustom && FromDatePicker.SelectedDate == null && ToDatePicker.SelectedDate == null)
             {
                 ToDatePicker.SelectedDate = DateTime.Today;
@@ -410,9 +437,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private void CustomDate_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
+        private void InlineCustomDate_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressFilterEvents) return;
+
+            var sel = DateRangeFilter?.SelectedItem as string ?? "All";
+            if (sel != "Custom")
+                return;
 
             ScheduleApiReload();
         }
