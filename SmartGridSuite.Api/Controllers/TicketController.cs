@@ -343,7 +343,7 @@ namespace SmartGridSuite.Api.Controllers
                 var entity = new TicketEntity
                 {
                     Site = parsedSite,
-                    NotificationName = "",
+                    NotificationName = description,
                     Notification = notif,
 
                     Status = "Needs Review",
@@ -357,7 +357,7 @@ namespace SmartGridSuite.Api.Controllers
                     GroupCode = "",
                     PriorityDays = 0,
 
-                    Problem = description,
+                    Problem = "",
                     Notes = null,
                     CreatedBy = createdBy,
                     Summary = description
