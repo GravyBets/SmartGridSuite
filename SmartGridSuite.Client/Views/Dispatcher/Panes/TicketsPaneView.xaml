@@ -4,50 +4,17 @@
 
     <UserControl.Resources>
 
-        <Style x:Key="MiniIconButton" TargetType="Button">
-            <Setter Property="Width" Value="28"/>
-            <Setter Property="Height" Value="28"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Margin" Value="6,0,0,0"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="ToolTipService.ShowDuration" Value="4000"/>
-        </Style>
-
-        <Style x:Key="CopyGlyph" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
-            <Setter Property="Text" Value="&#xE8C8;"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-        </Style>
-
-        <Style x:Key="TrimCellText" TargetType="{x:Type TextBlock}">
-            <Setter Property="TextWrapping" Value="NoWrap"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <Style x:Key="WoBadge" TargetType="Border">
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="8,3"/>
-            <Setter Property="Margin" Value="8,0,0,0"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
         <Style x:Key="FilterLabelText" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="Opacity" Value="0.88"/>
             <Setter Property="Margin" Value="2,0,0,0"/>
         </Style>
 
         <Style x:Key="DetailLabelText" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
@@ -56,6 +23,63 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="Margin" Value="0,0,0,14"/>
+        </Style>
+
+        <Style x:Key="DetailCopyButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="MinWidth" Value="72"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="TrimCellText" TargetType="{x:Type TextBlock}">
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="SummaryCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Margin" Value="0,0,0,0"/>
+        </Style>
+
+        <Style x:Key="SummaryValueTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+
+        <Style x:Key="SummaryLabelTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
+
+        <Style x:Key="StatusCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <Style x:Key="TicketsGridColumnHeaderStyle"
+               TargetType="DataGridColumnHeader"
+               BasedOn="{StaticResource ThemedDataGridColumnHeaderStyle}">
+            <Setter Property="Height" Value="Auto"/>
+            <Setter Property="Padding" Value="12,9,12,10"/>
+            <Setter Property="VerticalContentAlignment" Value="Top"/>
+        </Style>
+
+        <Style x:Key="TicketsGridRowStyle"
+               TargetType="DataGridRow"
+               BasedOn="{StaticResource ThemedDataGridRowStyle}">
+            <Setter Property="MinHeight" Value="54"/>
         </Style>
 
     </UserControl.Resources>
@@ -67,7 +91,7 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Combined header + filters card -->
+        <!-- Top card -->
         <Border Grid.Row="0"
                 Style="{StaticResource Card}"
                 Padding="16">
@@ -76,8 +100,8 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="14"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="6"/>
-                    <RowDefinition Height="Auto"/>                    
+                    <RowDefinition Height="14"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- Header -->
@@ -93,7 +117,7 @@
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource TextPrimary}"/>
 
-                        <TextBlock Text="Site visits / service events tied to notifications. Never delete—close for history."
+                        <TextBlock Text="Queue, filtering, and service history"
                                    Margin="0,4,0,0"
                                    Foreground="{DynamicResource TextSecondary}"/>
                     </StackPanel>
@@ -101,132 +125,258 @@
                     <StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Top">
-                        <Button Style="{StaticResource SecondaryButtonStyle}"
-                                Height="34"
-                                MinWidth="105"
-                                Padding="14,0"
+                        <Button Content="Refresh"
                                 Margin="0,0,10,0"
-                                Content="Refresh"
                                 Click="Refresh_Click"/>
 
-                        <Button Style="{StaticResource SecondaryButtonStyle}"
-                                Height="34"
-                                MinWidth="145"
-                                Padding="14,0"
+                        <Button Content="Import SAP Queue"
                                 Margin="0,0,10,0"
-                                Content="Import SAP Queue"
                                 Click="ImportSapQueue_Click"/>
 
-                        <Button Style="{StaticResource PrimaryButtonStyle}"
-                                Height="34"
-                                MinWidth="120"
-                                Padding="14,0"
-                                Content="New Ticket"
+                        <Button Content="New Ticket"
+                                Style="{StaticResource PrimaryButtonStyle}"
                                 Click="NewTicket_Click"/>
                     </StackPanel>
                 </Grid>
 
-                <!-- Filter labels -->
+                <!-- Filters -->
                 <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="6"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="170"/>
-                        <ColumnDefinition x:Name="InlineDateSpacer1Col" Width="0"/>
-                        <ColumnDefinition x:Name="InlineFromCol" Width="0"/>
-                        <ColumnDefinition x:Name="InlineDateSpacer2Col" Width="0"/>
-                        <ColumnDefinition x:Name="InlineToCol" Width="0"/>
-                        <ColumnDefinition x:Name="InlineDateSpacer3Col" Width="0"/>
-                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="180"/>
+                        <ColumnDefinition x:Name="CustomFromSpacerCol" Width="0"/>
+                        <ColumnDefinition x:Name="CustomFromCol" Width="0"/>
+                        <ColumnDefinition x:Name="CustomToSpacerCol" Width="0"/>
+                        <ColumnDefinition x:Name="CustomToCol" Width="0"/>
                         <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="160"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0"
+                    <!-- Labels -->
+                    <TextBlock Grid.Row="0"
+                               Grid.Column="0"
                                Text="Search"
                                Style="{StaticResource FilterLabelText}"/>
 
-                    <TextBlock Grid.Column="2"
-                               Text="Date Range"
+                    <TextBlock Grid.Row="0"
+                               Grid.Column="2"
+                               Grid.ColumnSpan="5"
+                               Text="Created Date"
                                Style="{StaticResource FilterLabelText}"/>
 
-                    <TextBlock x:Name="FromDateLabel"
-                               Grid.Column="4"
-                               Text="From"
-                               Style="{StaticResource FilterLabelText}"
-                               Visibility="Collapsed"/>
-
-                    <TextBlock x:Name="ToDateLabel"
-                               Grid.Column="6"
-                               Text="To"
-                               Style="{StaticResource FilterLabelText}"
-                               Visibility="Collapsed"/>
-
-                    <TextBlock Grid.Column="8"
+                    <TextBlock Grid.Row="0"
+                               Grid.Column="8"
                                Text="Status"
                                Style="{StaticResource FilterLabelText}"/>
 
-                    <TextBlock Grid.Column="10"
+                    <TextBlock Grid.Row="0"
+                               Grid.Column="10"
                                Text="Tech"
                                Style="{StaticResource FilterLabelText}"/>
-                </Grid>
 
-                <!-- Filters -->
-                <Grid Grid.Row="4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="170"/>
-                        <ColumnDefinition x:Name="InlineDateSpacer1Col2" Width="0"/>
-                        <ColumnDefinition x:Name="InlineFromCol2" Width="0"/>
-                        <ColumnDefinition x:Name="InlineDateSpacer2Col2" Width="0"/>
-                        <ColumnDefinition x:Name="InlineToCol2" Width="0"/>
-                        <ColumnDefinition x:Name="InlineDateSpacer3Col2" Width="0"/>
-                        <ColumnDefinition Width="150"/>
-                        <ColumnDefinition Width="12"/>
-                        <ColumnDefinition Width="150"/>
-                    </Grid.ColumnDefinitions>
-
+                    <!-- Controls -->
                     <TextBox x:Name="SearchBox"
+                             Grid.Row="2"
                              Grid.Column="0"
                              Style="{StaticResource ModernWatermarkTextBox}"
-                             Tag="Search site, notification, WO, tech, notes, serial..."
+                             Tag="Search site, Notification, WO, Tech, Notes, Serial #..."
                              Height="36"
                              TextChanged="SearchBox_TextChanged"/>
 
                     <ComboBox x:Name="DateRangeFilter"
+                              Grid.Row="2"
                               Grid.Column="2"
                               Height="36"
                               SelectionChanged="Filters_SelectionChanged"/>
 
                     <DatePicker x:Name="FromDatePicker"
-                                Style="{DynamicResource ModernDatePicker}"
+                                Grid.Row="2"
                                 Grid.Column="4"
+                                Style="{DynamicResource ModernDatePicker}"
                                 Height="36"
-                                VerticalAlignment="Center"
                                 Visibility="Collapsed"
                                 SelectedDateChanged="InlineCustomDate_SelectedDateChanged"/>
 
                     <DatePicker x:Name="ToDatePicker"
-                                Style="{DynamicResource ModernDatePicker}"
+                                Grid.Row="2"
                                 Grid.Column="6"
+                                Style="{DynamicResource ModernDatePicker}"
                                 Height="36"
-                                VerticalAlignment="Center"
                                 Visibility="Collapsed"
                                 SelectedDateChanged="InlineCustomDate_SelectedDateChanged"/>
 
-                    <ComboBox x:Name="StatusFilter"
-                              Grid.Column="8"
-                              Height="36"
-                              SelectionChanged="Filters_SelectionChanged"/>
+                    <Grid Grid.Row="2"
+                          Grid.Column="8">
+                        <Button x:Name="StatusFilterButton"
+                                Height="36"
+                                Padding="12,0"
+                                HorizontalContentAlignment="Stretch"
+                                Click="StatusFilterButton_Click">
+                            <DockPanel LastChildFill="True">
+                                <TextBlock Text="{Binding SelectedStatusesSummary}"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           VerticalAlignment="Center"/>
+
+                                <TextBlock DockPanel.Dock="Right"
+                                           Margin="10,0,0,0"
+                                           Text="▾"
+                                           FontSize="14"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Button>
+
+                        <Popup x:Name="StatusPopup"
+                               Placement="Bottom"
+                               PlacementTarget="{Binding ElementName=StatusFilterButton}"
+                               VerticalOffset="6"
+                               AllowsTransparency="True"
+                               StaysOpen="False"
+                               PopupAnimation="Fade">
+                            <Border Background="{DynamicResource CardBackground}"
+                                    BorderBrush="{DynamicResource CardBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="12"
+                                    Width="240">
+                                <StackPanel>
+                                    <ItemsControl ItemsSource="{Binding StatusOptions}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Content="{Binding Name}"
+                                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                          Style="{StaticResource StatusCheckBoxStyle}"
+                                                          Checked="StatusOption_Changed"
+                                                          Unchecked="StatusOption_Changed"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <Border Height="1"
+                                            Margin="0,4,0,10"
+                                            Background="{DynamicResource CardBorder}"/>
+
+                                    <StackPanel Orientation="Horizontal"
+                                                HorizontalAlignment="Right">
+                                        <Button Content="All Open"
+                                                Height="30"
+                                                MinWidth="80"
+                                                Padding="10,0"
+                                                Margin="0,0,8,0"
+                                                Click="SelectAllOpenStatuses_Click"/>
+
+                                        <Button Content="All"
+                                                Height="30"
+                                                MinWidth="64"
+                                                Padding="10,0"
+                                                Click="SelectAllStatuses_Click"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
+                    </Grid>
 
                     <ComboBox x:Name="TechFilter"
+                              Grid.Row="2"
                               Grid.Column="10"
                               Height="36"
                               SelectionChanged="Filters_SelectionChanged"/>
+
+                    <Button Grid.Row="2"
+                            Grid.Column="12"
+                            Content="Clear Filters"
+                            Height="36"
+                            Padding="14,0"
+                            Click="ClearFilters_Click"/>
                 </Grid>
 
-                
+                <!-- Summary strip -->
+                <UniformGrid Grid.Row="4"
+             Rows="1"
+             Columns="8">
+                    <Border Style="{StaticResource SummaryCardStyle}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding VisibleTicketCount}"
+                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Showing"
+                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SummaryCardStyle}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding TotalLoadedTicketCount}"
+                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Loaded"
+                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SummaryCardStyle}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding NeedsReviewCount}"
+                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Needs Review"
+                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SummaryCardStyle}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding OpenCount}"
+                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Open"
+                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SummaryCardStyle}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding AssignedCount}"
+                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Assigned"
+                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SummaryCardStyle}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding InProgressCount}"
+                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="In Progress"
+                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SummaryCardStyle}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding WaitingDispatchCount}"
+                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Waiting Dispatch"
+                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SummaryCardStyle}" Margin="0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding ClosedCount}"
+                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Closed"
+                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
             </Grid>
         </Border>
 
@@ -252,17 +402,13 @@
                     <DockPanel Grid.Row="0">
                         <TextBlock Text="Ticket List"
                                    FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextPrimary}"
-                                   DockPanel.Dock="Left"/>
-
-                        <TextBlock Text="Select a ticket to view details"
-                                   Foreground="{DynamicResource TextSecondary}"
-                                   DockPanel.Dock="Right"/>
+                                   Foreground="{DynamicResource TextPrimary}"/>                        
                     </DockPanel>
 
                     <DataGrid Grid.Row="2"
                               x:Name="TicketsGrid"
                               Style="{StaticResource ThemedDataGridStyle}"
+                              RowStyle="{StaticResource TicketsGridRowStyle}"                              
                               AutoGenerateColumns="False"
                               HeadersVisibility="Column"
                               IsReadOnly="True"
@@ -270,6 +416,10 @@
                               SelectionChanged="TicketsGrid_SelectionChanged">
 
                         <DataGrid.Columns>
+
+                            <DataGridTextColumn Header="Created"
+                                                Width="130"
+                                                Binding="{Binding CreatedAt, StringFormat={}{0:MM/dd/yy HH:mm}}"/>
 
                             <DataGridTextColumn Header="Last Activity"
                                                 Width="130"
@@ -280,70 +430,27 @@
                                                 Binding="{Binding Site}"
                                                 ElementStyle="{StaticResource TrimCellText}"/>
 
-                            <DataGridTemplateColumn Header="Notification" Width="170">
+                            <DataGridTextColumn Header="Notification"
+                                                Width="160"
+                                                Binding="{Binding Notification}"
+                                                ElementStyle="{StaticResource TrimCellText}"/>
+
+                            <DataGridTemplateColumn Header="Work Order"
+                                                    Width="180">
+
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <DockPanel LastChildFill="True">
-                                            <Button DockPanel.Dock="Right"
-                                                    Style="{StaticResource MiniIconButton}"
-                                                    ToolTip="Copy Notification"
-                                                    Tag="{Binding Notification}"
-                                                    Click="CopyNotification_Click">
-                                                <TextBlock Style="{StaticResource CopyGlyph}"/>
-                                            </Button>
+                                        <StackPanel Margin="0,6">
+                                            <TextBlock Text="{Binding CurrentWorkOrder}"
+                                                       Style="{StaticResource TrimCellText}"
+                                                       Foreground="{DynamicResource TextPrimary}"/>
 
-                                            <TextBlock Text="{Binding Notification}"
-                                                       Style="{StaticResource TrimCellText}"/>
-                                        </DockPanel>
-                                    </DataTemplate>
-                                </DataGridTemplateColumn.CellTemplate>
-                            </DataGridTemplateColumn>
-
-                            <DataGridTemplateColumn Header="Work Order" Width="235">
-                                <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <DockPanel LastChildFill="True">
-
-                                            <Button DockPanel.Dock="Right"
-                                                    ToolTip="Copy Work Order"
-                                                    Tag="{Binding CurrentWorkOrder}"
-                                                    Click="CopyWorkOrder_Click">
-                                                <Button.Style>
-                                                    <Style TargetType="Button" BasedOn="{StaticResource MiniIconButton}">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding CurrentWorkOrder}" Value="">
-                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Button.Style>
-                                                <TextBlock Style="{StaticResource CopyGlyph}"/>
-                                            </Button>
-
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding CurrentWorkOrder}"
-                                                           Style="{StaticResource TrimCellText}"/>
-
-                                                <Border>
-                                                    <Border.Style>
-                                                        <Style TargetType="Border" BasedOn="{StaticResource WoBadge}">
-                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding CurrentWorkOrder}" Value="">
-                                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-
-                                                    <TextBlock Text="{Binding WorkOrderClassLabel}"
-                                                               Foreground="{DynamicResource TextSecondary}"
-                                                               FontSize="12"
-                                                               VerticalAlignment="Center"/>
-                                                </Border>
-                                            </StackPanel>
-                                        </DockPanel>
+                                            <TextBlock Text="{Binding WorkOrderClassLabel}"
+                                                       Margin="0,2,0,0"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondary}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
@@ -395,6 +502,7 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
+                        <!-- Header -->
                         <Grid Grid.Row="0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -429,6 +537,7 @@
                             </Button>
                         </Grid>
 
+                        <!-- Actions -->
                         <StackPanel Grid.Row="2"
                                     Orientation="Horizontal">
                             <Button Content="Assign Tech"
@@ -449,145 +558,136 @@
                                     Click="EditTicket_Click"/>
                         </StackPanel>
 
-                        <ScrollViewer Grid.Row="4"
-                                      VerticalScrollBarVisibility="Auto">
-                            <StackPanel>
+                        <!-- Content -->
+                        <Grid Grid.Row="4">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="14"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-                                <TextBlock Text="Ticket Information"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimary}"
-                                           Margin="0,0,0,12"/>
-
+                            <!-- Ticket info -->
+                            <Border Grid.Row="0"
+                                    Background="{DynamicResource CardBackground}"
+                                    BorderBrush="{DynamicResource CardBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="14">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="18"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
+                                    <!-- Left info column -->
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Problem / Issue"
+                                                   Style="{StaticResource DetailLabelText}"/>
+                                        <TextBlock Text="{Binding SelectedTicket.Problem}"
+                                                   Style="{StaticResource DetailValueText}"/>
+
+                                        <TextBlock Text="Notification Name"
+                                                   Style="{StaticResource DetailLabelText}"/>
+                                        <TextBlock Text="{Binding SelectedTicket.NotificationName}"
+                                                   Style="{StaticResource DetailValueText}"/>
+
+                                        <TextBlock Text="Notification #"
+                                                   Style="{StaticResource DetailLabelText}"/>
+                                        <Grid Margin="0,0,0,14">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Text="{Binding SelectedTicket.Notification}"
+                                                       Foreground="{DynamicResource TextPrimary}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,0,10,0"/>
+
+                                            <Button Grid.Column="1"
+                                                    Style="{StaticResource DetailCopyButtonStyle}"
+                                                    Content="Copy"
+                                                    Tag="{Binding SelectedTicket.Notification}"
+                                                    Click="CopyDetailValue_Click"/>
+                                        </Grid>
+
+                                        <TextBlock Text="Work Order"
+                                                   Style="{StaticResource DetailLabelText}"/>
+                                        <Grid Margin="0,0,0,14">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Text="{Binding SelectedTicket.CurrentWorkOrder}"
+                                                       Foreground="{DynamicResource TextPrimary}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,0,10,0"/>
+
+                                            <Button Grid.Column="1"
+                                                    Style="{StaticResource DetailCopyButtonStyle}"
+                                                    Content="Copy"
+                                                    Tag="{Binding SelectedTicket.CurrentWorkOrder}"
+                                                    Click="CopyDetailValue_Click"/>
+                                        </Grid>
+
+                                        <TextBlock Text="Work Order Type"
+                                                   Style="{StaticResource DetailLabelText}"/>
+                                        <TextBlock Text="{Binding SelectedTicket.WorkOrderClassLabel}"
+                                                   Style="{StaticResource DetailValueText}"/>
+                                    </StackPanel>
+
+                                    <!-- Right info column -->
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Work Order Code"
+                                                   Style="{StaticResource DetailLabelText}"/>
+                                        <TextBlock Text="{Binding SelectedTicket.GroupCode}"
+                                                   Style="{StaticResource DetailValueText}"/>
+
+                                        <TextBlock Text="Priority"
+                                                   Style="{StaticResource DetailLabelText}"/>
+                                        <TextBlock Text="{Binding SelectedTicket.PriorityLabel}"
+                                                   Style="{StaticResource DetailValueText}"/>
+
+                                        <TextBlock Text="Created By"
+                                                   Style="{StaticResource DetailLabelText}"/>
+                                        <TextBlock Text="{Binding SelectedTicket.CreatedBy}"
+                                                   Style="{StaticResource DetailValueText}"/>
+
+                                        <TextBlock Text="Created"
+                                                   Style="{StaticResource DetailLabelText}"/>
+                                        <TextBlock Text="{Binding SelectedTicket.CreatedAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"
+                                                   Style="{StaticResource DetailValueText}"/>
+
+                                        <TextBlock Text="Last Activity"
+                                                   Style="{StaticResource DetailLabelText}"/>
+                                        <TextBlock Text="{Binding SelectedTicket.LastActivityAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"
+                                                   Style="{StaticResource DetailValueText}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Notes -->
+                            <Border Grid.Row="2"
+                                    Background="{DynamicResource CardBackground}"
+                                    BorderBrush="{DynamicResource CardBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="12"
+                                    Padding="14">
+                                <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="10"/>
+                                        <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
 
-                                    <TextBlock Grid.Row="0" Grid.Column="0"
-                                               Text="Problem / Issue"
-                                               Style="{StaticResource DetailLabelText}"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="1"
-                                               Text="{Binding SelectedTicket.Problem}"
-                                               Style="{StaticResource DetailValueText}"/>
+                                    <TextBlock Text="Notes"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}"/>
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0"
-                                               Text="Notification Name"
-                                               Style="{StaticResource DetailLabelText}"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="1"
-                                               Text="{Binding SelectedTicket.NotificationName}"
-                                               Style="{StaticResource DetailValueText}"/>
-
-                                    <TextBlock Grid.Row="2" Grid.Column="0"
-                                               Text="Notification"
-                                               Style="{StaticResource DetailLabelText}"/>
-                                    <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,14">
-                                        <Button DockPanel.Dock="Right"
-                                                Style="{StaticResource MiniIconButton}"
-                                                ToolTip="Copy Notification"
-                                                Tag="{Binding SelectedTicket.Notification}"
-                                                Click="CopyNotification_Click">
-                                            <TextBlock Style="{StaticResource CopyGlyph}"/>
-                                        </Button>
-
-                                        <TextBlock Text="{Binding SelectedTicket.Notification}"
-                                                   Foreground="{DynamicResource TextPrimary}"
-                                                   TextWrapping="Wrap"/>
-                                    </DockPanel>
-
-                                    <TextBlock Grid.Row="3" Grid.Column="0"
-                                               Text="Work Order"
-                                               Style="{StaticResource DetailLabelText}"/>
-                                    <DockPanel Grid.Row="3" Grid.Column="1" Margin="0,0,0,14">
-                                        <Button DockPanel.Dock="Right"
-                                                ToolTip="Copy Work Order"
-                                                Tag="{Binding SelectedTicket.CurrentWorkOrder}"
-                                                Click="CopyWorkOrder_Click">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource MiniIconButton}">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding SelectedTicket.CurrentWorkOrder}" Value="">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                            <TextBlock Style="{StaticResource CopyGlyph}"/>
-                                        </Button>
-
-                                        <TextBlock Text="{Binding SelectedTicket.CurrentWorkOrder}"
-                                                   Foreground="{DynamicResource TextPrimary}"
-                                                   TextWrapping="Wrap"/>
-                                    </DockPanel>
-
-                                    <TextBlock Grid.Row="4" Grid.Column="0"
-                                               Text="Work Order Type"
-                                               Style="{StaticResource DetailLabelText}"/>
-                                    <TextBlock Grid.Row="4" Grid.Column="1"
-                                               Text="{Binding SelectedTicket.WorkOrderClassLabel}"
-                                               Style="{StaticResource DetailValueText}"/>
-
-                                    <TextBlock Grid.Row="5" Grid.Column="0"
-                                               Text="Work Order Code"
-                                               Style="{StaticResource DetailLabelText}"/>
-                                    <TextBlock Grid.Row="5" Grid.Column="1"
-                                               Text="{Binding SelectedTicket.GroupCode}"
-                                               Style="{StaticResource DetailValueText}"/>
-
-                                    <TextBlock Grid.Row="6" Grid.Column="0"
-                                               Text="Priority"
-                                               Style="{StaticResource DetailLabelText}"/>
-                                    <TextBlock Grid.Row="6" Grid.Column="1"
-                                               Text="{Binding SelectedTicket.PriorityLabel}"
-                                               Style="{StaticResource DetailValueText}"/>
-
-                                    <TextBlock Grid.Row="7" Grid.Column="0"
-                                               Text="Created By"
-                                               Style="{StaticResource DetailLabelText}"/>
-                                    <TextBlock Grid.Row="7" Grid.Column="1"
-                                               Text="{Binding SelectedTicket.CreatedBy}"
-                                               Style="{StaticResource DetailValueText}"/>
-
-                                    <TextBlock Grid.Row="8" Grid.Column="0"
-                                               Text="Created"
-                                               Style="{StaticResource DetailLabelText}"/>
-                                    <TextBlock Grid.Row="8" Grid.Column="1"
-                                               Text="{Binding SelectedTicket.CreatedAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"
-                                               Style="{StaticResource DetailValueText}"/>
-
-                                    <TextBlock Grid.Row="9" Grid.Column="0"
-                                               Text="Last Activity"
-                                               Style="{StaticResource DetailLabelText}"/>
-                                    <TextBlock Grid.Row="9" Grid.Column="1"
-                                               Text="{Binding SelectedTicket.LastActivityAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"
-                                               Style="{StaticResource DetailValueText}"/>
-                                </Grid>
-
-                                <TextBlock Text="Notes"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimary}"
-                                           Margin="0,6,0,10"/>
-
-                                <Border Background="{DynamicResource CardBackground}"
-                                        BorderBrush="{DynamicResource CardBorder}"
-                                        BorderThickness="1"
-                                        CornerRadius="12"
-                                        Padding="12">
-                                    <TextBox Text="{Binding SelectedTicket.Notes}"
+                                    <TextBox Grid.Row="2"
+                                             Text="{Binding SelectedTicket.Notes}"
                                              TextWrapping="Wrap"
                                              AcceptsReturn="True"
                                              IsReadOnly="True"
@@ -595,11 +695,10 @@
                                              Background="Transparent"
                                              Foreground="{DynamicResource TextSecondary}"
                                              VerticalScrollBarVisibility="Auto"
-                                             MinHeight="140"/>
-                                </Border>
-
-                            </StackPanel>
-                        </ScrollViewer>
+                                             MinHeight="220"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
                     </Grid>
                 </Border>
             </Grid>

@@ -13,7 +13,7 @@ namespace SmartGridSuite.Client.Views
         {
             InitializeComponent();
 
-            // Keep current behavior aligned with nav order: 0 = Dashboard
+            // Default selection = Dashboard
             SelectNavIndex(0);
         }
 
@@ -94,8 +94,8 @@ namespace SmartGridSuite.Client.Views
             _navCollapsed = !_navCollapsed;
 
             NavCol.Width = _navCollapsed
-                ? new GridLength(72)
-                : new GridLength(260);
+                ? new GridLength(88)
+                : new GridLength(280);
 
             NavListExpanded.Visibility = _navCollapsed
                 ? Visibility.Collapsed
@@ -105,9 +105,24 @@ namespace SmartGridSuite.Client.Views
                 ? Visibility.Visible
                 : Visibility.Collapsed;
 
-            NavHeaderBtn.Content = _navCollapsed
-                ? "☰"
-                : "☰  Navigation";
+            NavSectionLabel.Visibility = _navCollapsed
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+            HomeButtonExpanded.Visibility = _navCollapsed
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+            HomeButtonCollapsed.Visibility = _navCollapsed
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void HomeButton_Click(object sender, RoutedEventArgs e)
+        {
+            var home = new ModuleLauncherWindow();
+            home.Show();
+            Close();
         }
     }
 }

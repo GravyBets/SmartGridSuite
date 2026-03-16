@@ -24,6 +24,29 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
+        private IEnumerable<TechnicianDto> AllTechnicians =>
+    Board.Unassigned
+         .Concat(Board.Trucks.SelectMany(t => t.Technicians))
+         .GroupBy(t => t.Id)
+         .Select(g => g.First());
+
+        public int OnDutyCount => AllTechnicians.Count(t => t.IsOnShift);
+
+        public int OffDutyCount => AllTechnicians.Count(t => !t.IsOnShift);
+
+        public int AssignedCount => Board.Trucks.Sum(t => t.Technicians.Count);
+
+        public int UnassignedCount => Board.Unassigned.Count;
+
+        private void RefreshBoardMetrics()
+        {
+            OnPropertyChanged(nameof(Board));
+            OnPropertyChanged(nameof(OnDutyCount));
+            OnPropertyChanged(nameof(OffDutyCount));
+            OnPropertyChanged(nameof(AssignedCount));
+            OnPropertyChanged(nameof(UnassignedCount));
+        }
+
         private readonly HttpClient _http;
 
         private bool _busyLoading;
@@ -89,9 +112,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 var dto = await _http.GetFromJsonAsync<TruckBoardDto>($"api/trucks/board?date={d}");
 
                 Board = TruckBoardVm.FromDto(dto);
-                OnPropertyChanged(nameof(Board));
+                RefreshBoardMetrics();
 
-                SetStatus($"Loaded {Board.Unassigned.Count} unassigned, {Board.Trucks.Count} trucks.");
+                SetStatus($"Loaded {Board.Unassigned.Count} available, {Board.Trucks.Count} trucks.");
             }
             catch (Exception ex)
             {
@@ -115,15 +138,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             if (_unassignedVisible)
             {
-                UnassignedColumn.Width = new GridLength(340);
+                UnassignedColumn.Width = new GridLength(320);
                 UnassignedCard.Visibility = Visibility.Visible;
-                ToggleUnassignedBtn.Content = "Hide Unassigned";
+                ToggleUnassignedBtn.Content = "Hide Available";
             }
             else
             {
                 UnassignedColumn.Width = new GridLength(0);
                 UnassignedCard.Visibility = Visibility.Collapsed;
-                ToggleUnassignedBtn.Content = "Show Unassigned";
+                ToggleUnassignedBtn.Content = "Show Available";
             }
         }
 
@@ -202,6 +225,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     Board.InsertSorted(truck.Technicians, tech);
                 }
             }
+            RefreshBoardMetrics();
         }
 
         private void EnqueueMove(MoveTechnicianRequest req)
