@@ -4,8 +4,8 @@ using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
-using SmartGridSuite.Contracts.Technicians;
-using SmartGridSuite.Contracts.Trucks;
+using SmartGridSuite.Contracts.Administration.Technicians;
+using SmartGridSuite.Contracts.Administration.Trucks;
 
 namespace SmartGridSuite.Api.Controllers;
 

@@ -1,8 +1,9 @@
 ﻿#nullable enable
+using SmartGridSuite;
 using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 
-namespace SmartGridSuite.Contracts.Technicians;
+namespace SmartGridSuite.Contracts.Administration.Technicians;
 
 public sealed class CreateTechnicianRequest
 {

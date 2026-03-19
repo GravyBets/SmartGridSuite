@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
-using SmartGridSuite.Contracts.Technicians;
+using SmartGridSuite.Contracts.Administration.Technicians;
 
 namespace SmartGridSuite.Api.Controllers;
 

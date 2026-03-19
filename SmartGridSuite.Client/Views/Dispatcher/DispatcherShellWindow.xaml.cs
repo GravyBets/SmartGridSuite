@@ -72,7 +72,7 @@ namespace SmartGridSuite.Client.Views
                     break;
 
                 case "Tasks":
-                    MainPaneHost.Content = new TasksPaneView();
+                    MainPaneHost.Content = new TaskPaneView();
                     break;
 
                 case "Tickets":

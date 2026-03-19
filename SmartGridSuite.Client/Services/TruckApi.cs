@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using SmartGridSuite.Contracts.Trucks;
+using SmartGridSuite.Contracts.Administration.Trucks;
 
 namespace SmartGridSuite.Client.Services
 {

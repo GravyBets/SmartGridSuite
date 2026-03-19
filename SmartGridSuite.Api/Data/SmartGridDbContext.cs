@@ -17,7 +17,11 @@ namespace SmartGridSuite.Api.Data
         public virtual DbSet<TechnicianWorkdayOverrideEntity> TechnicianWorkdayOverrides { get; set; }
         public virtual DbSet<TruckEntity> Trucks { get; set; }
         public virtual DbSet<TruckRosterEntity> TruckRosters { get; set; }        
-        public virtual DbSet<TruckStyleEntity> TruckStyles { get; set; }        
+        public virtual DbSet<TruckStyleEntity> TruckStyles { get; set; }
+
+        public DbSet<TicketStatusEntity> TicketStatuses { get; set; }
+
+        public DbSet<TicketTaskCategoryEntity> TicketTaskCategories { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -45,6 +49,11 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.AssignedCrewId).HasColumnName("assigned_crew_id");
 
                 e.HasIndex(x => x.AssignedCrewId).HasDatabaseName("ix_tickets_assigned_crew");
+
+                e.Property(x => x.TaskCategoryId).HasColumnName("task_category_id");
+                e.Property(x => x.ActionRequiredOverride).HasColumnName("action_required_override").HasMaxLength(255);
+                
+                e.HasOne(x => x.TaskCategory).WithMany().HasForeignKey(x => x.TaskCategoryId).OnDelete(DeleteBehavior.SetNull);
 
                 e.HasOne(x => x.AssignedCrew)
                  .WithMany(c => c.Tickets)

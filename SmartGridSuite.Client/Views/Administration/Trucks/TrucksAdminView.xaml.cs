@@ -1,5 +1,5 @@
 ﻿using SmartGridSuite.Client.Services;
-using SmartGridSuite.Contracts.Trucks;
+using SmartGridSuite.Contracts.Administration.Trucks;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;

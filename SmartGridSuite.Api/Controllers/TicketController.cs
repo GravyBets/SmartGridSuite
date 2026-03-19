@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Contracts.Tickets;
+using SmartGridSuite.Contracts.Dispatcher;
 using System.Text.RegularExpressions;
 
 namespace SmartGridSuite.Api.Controllers
@@ -21,7 +22,9 @@ namespace SmartGridSuite.Api.Controllers
             [FromQuery] DateTime? from = null,
             [FromQuery] DateTime? to = null)
         {
-            var q = _db.Tickets.AsNoTracking();
+            var q = _db.Tickets
+                .Include(t => t.TaskCategory)
+                .AsNoTracking();
 
             if (!string.IsNullOrWhiteSpace(status))
                 q = q.Where(t => t.Status == status);
@@ -39,8 +42,7 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             var rows = await q
-                .OrderByDescending(t => t.LastActivityAt)
-                .Take(500)
+                .OrderByDescending(t => t.LastActivityAt)                
                 .ToListAsync();
 
             var result = rows.Select(t => new TicketListItemDto(
@@ -49,6 +51,9 @@ namespace SmartGridSuite.Api.Controllers
                 t.NotificationName ?? "",
                 t.Notification ?? "",
                 t.Status,
+                t.TaskCategoryId,
+                t.TaskCategory != null ? t.TaskCategory.Name : null,
+                t.ActionRequiredOverride,
                 t.AssignedTech,
                 t.CreatedAt,
                 t.LastActivityAt,
@@ -63,6 +68,100 @@ namespace SmartGridSuite.Api.Controllers
 
             return Ok(result);
         }
+
+        [HttpGet("dispatch-tasks")]
+        public async Task<ActionResult<List<DispatchTaskListItemDto>>> GetDispatchTasks(CancellationToken ct)
+        {
+            var dispatchStatuses = await _db.TicketStatuses
+                .AsNoTracking()
+                .Where(x => x.IsActive && x.SendToDispatchTasks)
+                .OrderBy(x => x.SortOrder)
+                .Select(x => x.Name)
+                .ToListAsync(ct);
+
+            if (dispatchStatuses.Count == 0)
+                return Ok(new List<DispatchTaskListItemDto>());
+
+            var reviewCategory = await _db.TicketTaskCategories
+                .AsNoTracking()
+                .Where(x => x.IsActive && x.Name == "Review")
+                .Select(x => new
+                {
+                    x.Name,
+                    x.DefaultActionRequired
+                })
+                .FirstOrDefaultAsync(ct);
+
+            var fallbackCategoryName = reviewCategory?.Name ?? "Review";
+            var fallbackActionRequired = reviewCategory?.DefaultActionRequired ?? "Review and update ticket";
+
+            var tickets = await _db.Tickets
+                .Include(t => t.TaskCategory)
+                .AsNoTracking()
+                .Where(t => dispatchStatuses.Contains(t.Status))
+                .OrderByDescending(t => t.LastActivityAt)
+                .ToListAsync(ct);
+
+            var items = tickets
+                .Select(t => MapToDispatchTask(t, fallbackCategoryName, fallbackActionRequired))
+                .ToList();
+
+            return Ok(items);
+        }
+
+        private static DispatchTaskListItemDto MapToDispatchTask(
+                        TicketEntity t,
+                        string fallbackCategoryName,
+                        string fallbackActionRequired)
+        {
+            var hasActiveAssignedCategory =
+                t.TaskCategory != null &&
+                t.TaskCategory.IsActive &&
+                !string.IsNullOrWhiteSpace(t.TaskCategory.Name);
+
+            var categoryName = hasActiveAssignedCategory
+                ? t.TaskCategory!.Name
+                : fallbackCategoryName;
+
+            var actionRequired = !string.IsNullOrWhiteSpace(t.ActionRequiredOverride)
+                ? t.ActionRequiredOverride.Trim()
+                : hasActiveAssignedCategory && !string.IsNullOrWhiteSpace(t.TaskCategory!.DefaultActionRequired)
+                    ? t.TaskCategory.DefaultActionRequired
+                    : fallbackActionRequired;
+
+            return new DispatchTaskListItemDto
+            {
+                OccurredAt = t.LastActivityAt != default ? t.LastActivityAt : t.CreatedAt,
+                Site = t.Site ?? "",
+                Tech = t.AssignedTech ?? "",
+                Notification = t.Notification ?? "",
+                WorkOrder = t.CurrentWorkOrder ?? "",
+                WorkOrderType = NormalizeWorkOrderType(t.WorkOrderClass),
+                ActionRequired = actionRequired,
+                Notes = FirstNonBlank(t.Notes, t.Summary, t.Problem, t.NotificationName),
+                Status = string.IsNullOrWhiteSpace(t.Status) ? "Open" : t.Status,
+                Category = categoryName
+            };
+        }
+
+        private static string NormalizeWorkOrderType(string? workOrderClass)
+        {
+            return string.Equals(workOrderClass, "Cap", StringComparison.OrdinalIgnoreCase)
+                ? "Capital"
+                : "Maintenance";
+        }
+
+        private static string FirstNonBlank(params string?[] values)
+        {
+            foreach (var value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value.Trim();
+            }
+
+            return "";
+        }        
+        
 
         [HttpPost]
         public async Task<ActionResult<CreateTicketResponse>> Create([FromBody] CreateTicketRequest req)
@@ -86,8 +185,37 @@ namespace SmartGridSuite.Api.Controllers
             if (!string.IsNullOrWhiteSpace(wo) && !Regex.IsMatch(wo, @"^\d{9}$"))
                 return BadRequest("WorkOrder must be 9 digits when provided");
 
+            ulong? taskCategoryId = req.TaskCategoryId;
+            string? actionRequiredOverride = string.IsNullOrWhiteSpace(req.ActionRequiredOverride)
+                ? null
+                : req.ActionRequiredOverride.Trim();
+
+            if (taskCategoryId.HasValue)
+            {
+                var categoryExists = await _db.TicketTaskCategories
+                    .AsNoTracking()
+                    .AnyAsync(x => x.Id == taskCategoryId.Value && x.IsActive);
+
+                if (!categoryExists)
+                    return BadRequest("Selected task category is invalid or inactive.");
+            }
+
             var assignedTech = string.IsNullOrWhiteSpace(req.AssignedTech) ? "(Unassigned)" : req.AssignedTech.Trim();
-            var status = assignedTech == "(Unassigned)" ? "Open" : "Assigned";
+
+            var requestedStatus = (req.Status ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(requestedStatus))
+                return BadRequest("Status required");
+
+            var requestedStatusLower = requestedStatus.ToLower();
+
+            var statusEntity = await _db.TicketStatuses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.IsActive && x.Name.ToLower() == requestedStatusLower);
+
+            if (statusEntity == null)
+                return BadRequest("Selected status is invalid or inactive.");
+
+            var status = statusEntity.Name;
 
             var createdBy = string.IsNullOrWhiteSpace(req.CreatedBy) ? "Unknown" : req.CreatedBy.Trim();
 
@@ -110,6 +238,9 @@ namespace SmartGridSuite.Api.Controllers
                 GroupCode = (req.GroupCode ?? "").Trim(),
                 PriorityDays = (byte)Math.Clamp(req.PriorityDays, 0, 255),
 
+                TaskCategoryId = taskCategoryId,
+                ActionRequiredOverride = actionRequiredOverride,
+
                 Problem = req.Problem.Trim(),
                 Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim(),
                 CreatedBy = createdBy,
@@ -131,6 +262,102 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             return Ok(new CreateTicketResponse(entity.Id));
+        }
+
+        [HttpPost("{id:long}/update")]
+        public async Task<ActionResult<UpdateTicketResponse>> Update(long id, [FromBody] UpdateTicketRequest req)
+        {
+            var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id);
+            if (entity == null)
+                return NotFound();
+
+            if (string.IsNullOrWhiteSpace(req.Site))
+                return BadRequest("Site required");
+
+            if (string.IsNullOrWhiteSpace(req.Problem))
+                return BadRequest("Problem required");
+
+            string? notif = string.IsNullOrWhiteSpace(req.Notification) ? null : req.Notification.Trim();
+
+            if (notif is not null && !Regex.IsMatch(notif, @"^\d{10}$"))
+                return BadRequest("Notification must be 10 digits when provided");
+
+            if (notif is not null)
+            {
+                var exists = await _db.Tickets
+                    .AsNoTracking()
+                    .AnyAsync(t => t.Id != id && t.Notification == notif);
+
+                if (exists)
+                    return Conflict($"A ticket already exists with Notification {notif}.");
+            }
+
+            var wo = (req.WorkOrder ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(wo) && !Regex.IsMatch(wo, @"^\d{9}$"))
+                return BadRequest("WorkOrder must be 9 digits when provided");
+
+            ulong? taskCategoryId = req.TaskCategoryId;
+            string? actionRequiredOverride = string.IsNullOrWhiteSpace(req.ActionRequiredOverride)
+                ? null
+                : req.ActionRequiredOverride.Trim();
+
+            if (taskCategoryId.HasValue)
+            {
+                var categoryExists = await _db.TicketTaskCategories
+                    .AsNoTracking()
+                    .AnyAsync(x => x.Id == taskCategoryId.Value && x.IsActive);
+
+                if (!categoryExists)
+                    return BadRequest("Selected task category is invalid or inactive.");
+            }
+
+            var assignedTech = string.IsNullOrWhiteSpace(req.AssignedTech)
+                ? "(Unassigned)"
+                : req.AssignedTech.Trim();
+
+            var requestedStatus = (req.Status ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(requestedStatus))
+                return BadRequest("Status required");
+
+            var requestedStatusLower = requestedStatus.ToLower();
+
+            var statusEntity = await _db.TicketStatuses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.IsActive && x.Name.ToLower() == requestedStatusLower);
+
+            if (statusEntity == null)
+                return BadRequest("Selected status is invalid or inactive.");
+
+            var status = statusEntity.Name;
+
+            entity.Site = req.Site.Trim();
+            entity.NotificationName = (req.NotificationName ?? "").Trim();
+            entity.Notification = notif;
+
+            entity.Status = status;
+            entity.AssignedTech = assignedTech;
+
+            entity.CurrentWorkOrder = string.IsNullOrWhiteSpace(wo) ? null : wo;
+            entity.WorkOrderClass = string.IsNullOrWhiteSpace(wo)
+                ? null
+                : (req.WorkOrderClass ?? "").Trim();
+            entity.GroupCode = string.IsNullOrWhiteSpace(wo)
+                ? ""
+                : (req.GroupCode ?? "").Trim();
+
+            entity.PriorityDays = (byte)Math.Clamp(req.PriorityDays, 0, 255);
+
+            entity.TaskCategoryId = taskCategoryId;
+            entity.ActionRequiredOverride = actionRequiredOverride;
+
+            entity.Problem = req.Problem.Trim();
+            entity.Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim();
+            entity.Summary = req.Problem.Trim();
+            entity.LastActivityAt = DateTime.Now;
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new UpdateTicketResponse(entity.Id));
         }
 
         [HttpPost("sap-import/preview")]
@@ -220,6 +447,7 @@ namespace SmartGridSuite.Api.Controllers
 
             return Ok(result);
         }
+
 
         [HttpPost("sap-import/commit")]
         public async Task<ActionResult<SapQueueImportCommitResponse>> CommitSapImport(
@@ -493,5 +721,8 @@ namespace SmartGridSuite.Api.Controllers
                 }
             }
         }
+
+
+
     }
 }

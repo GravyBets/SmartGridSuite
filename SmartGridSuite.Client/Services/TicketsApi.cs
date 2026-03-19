@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using SmartGridSuite.Contracts.Tickets;
+using SmartGridSuite.Contracts.Dispatcher;
+
 
 namespace SmartGridSuite.Client.Services
 {
@@ -43,6 +45,16 @@ namespace SmartGridSuite.Client.Services
             return res?.Id ?? 0;
         }
 
+        public async Task<long> UpdateTicketAsync(long id, UpdateTicketRequest req, CancellationToken ct = default)
+        {
+            var res = await _api.PostAsync<UpdateTicketRequest, UpdateTicketResponse>(
+                $"api/tickets/{id}/update",
+                req,
+                ct);
+
+            return res?.Id ?? 0;
+        }
+
         public async Task<List<SapQueueImportPreviewResultRow>> PreviewSapQueueImportAsync(
         SapQueueImportPreviewRequest req, CancellationToken ct = default)
         {
@@ -57,6 +69,12 @@ namespace SmartGridSuite.Client.Services
             return await _api.PostAsync<SapQueueImportCommitRequest, SapQueueImportCommitResponse>(
                        "api/tickets/sap-import/commit", req, ct)
                    ?? new SapQueueImportCommitResponse(0, 0, 0, new());
+        }
+
+        public async Task<List<DispatchTaskListItemDto>> GetDispatchTasksAsync(
+    CancellationToken ct = default)
+        {
+            return await _api.GetAsync<List<DispatchTaskListItemDto>>("api/tickets/dispatch-tasks", ct) ?? new();
         }
     }
 }

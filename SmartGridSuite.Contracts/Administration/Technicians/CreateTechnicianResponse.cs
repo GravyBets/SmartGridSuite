@@ -1,5 +1,7 @@
 ﻿#nullable enable
-namespace SmartGridSuite.Contracts.Technicians;
+using SmartGridSuite;
+
+namespace SmartGridSuite.Contracts.Administration.Technicians;
 
 public sealed class CreateTechnicianResponse
 {

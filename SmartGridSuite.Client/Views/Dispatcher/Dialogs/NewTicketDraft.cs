@@ -32,6 +32,13 @@ public sealed class NewTicketDraft : INotifyPropertyChanged
     private string _assignedTo = "";
     public string AssignedTo { get => _assignedTo; set => SetField(ref _assignedTo, value ?? ""); }
 
+    private string _status = "";
+    public string Status
+    {
+        get => _status;
+        set => SetField(ref _status, value ?? "");
+    }
+
     private string _notificationName = "";
     public string NotificationName { get => _notificationName; set => SetField(ref _notificationName, value ?? ""); }
 

@@ -1,4 +1,4 @@
-﻿using SmartGridSuite.Contracts.Technicians;
+﻿using SmartGridSuite.Contracts.Administration.Technicians;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;

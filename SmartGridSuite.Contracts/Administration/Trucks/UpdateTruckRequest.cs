@@ -1,5 +1,7 @@
 ﻿#nullable enable
-namespace SmartGridSuite.Contracts.Trucks;
+using SmartGridSuite;
+
+namespace SmartGridSuite.Contracts.Administration.Trucks;
 
 public sealed class UpdateTruckRequest
 {

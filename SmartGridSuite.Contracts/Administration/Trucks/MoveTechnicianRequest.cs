@@ -1,7 +1,9 @@
 ﻿//WPF drag/drop will call this
 
 #nullable enable
-namespace SmartGridSuite.Contracts.Trucks;
+using SmartGridSuite;
+
+namespace SmartGridSuite.Contracts.Administration.Trucks;
 
 public sealed class MoveTechnicianRequest
 {

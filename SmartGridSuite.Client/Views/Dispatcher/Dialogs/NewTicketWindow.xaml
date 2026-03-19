@@ -5,7 +5,8 @@
         Title="New Ticket"
         Width="1080" Height="760"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResize">
+        ResizeMode="CanResize"
+        Loaded="Window_Loaded">
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
@@ -58,20 +59,77 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Assigned To -->
+                <!-- Assigned To + Status + Task Category + Action Override -->
                 <Grid Margin="0,12,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="110"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Column="0" Text="Assigned To:" VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextSecondary}"/>
-                    <ComboBox x:Name="AssignedToBox"
-                              Grid.Column="1"
-                              Height="34"
-                              IsEditable="True"
-                              Text="{Binding AssignedTo, UpdateSourceTrigger=PropertyChanged}"/>
+                    <!-- Row 1 -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="220"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="Assigned To:"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+
+                        <ComboBox x:Name="AssignedToBox"
+                                  Grid.Column="1"
+                                  HorizontalAlignment="Left"
+                                  Width="260"
+                                  Height="34"
+                                  IsTextSearchEnabled="True"
+                                  SelectedItem="{Binding AssignedTo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                        <TextBlock Grid.Column="3"
+                                   Text="Status:"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+
+                        <ComboBox x:Name="StatusBox"
+                                  Grid.Column="4"
+                                  Height="34"
+                                  SelectedItem="{Binding Status, UpdateSourceTrigger=PropertyChanged}"/>
+                    </Grid>
+
+                    <!-- Row 2 -->
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="260"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="140"/>
+                            <ColumnDefinition Width="320"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="Task Category:"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+
+                        <ComboBox x:Name="TaskCategoryComboBox"
+                                  Grid.Column="1"
+                                  Height="34"/>
+
+                        <TextBlock Grid.Column="3"
+                                   Text="Action Required:"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+
+                        <TextBox x:Name="ActionRequiredOverrideTextBox"
+                                 Grid.Column="4"
+                                 Height="34"
+                                 MaxLength="200"/>
+                    </Grid>
                 </Grid>
 
                 <Separator Margin="0,16,0,16"/>

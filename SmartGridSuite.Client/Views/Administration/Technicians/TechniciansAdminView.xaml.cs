@@ -1,8 +1,8 @@
 ﻿#nullable enable
 using SmartGridSuite.Client.Models.Administration;
 using SmartGridSuite.Client.Services;
-using SmartGridSuite.Contracts.Technicians;
-using SmartGridSuite.Contracts.Trucks;
+using SmartGridSuite.Contracts.Administration.Trucks;
+using SmartGridSuite.Contracts.Administration.Technicians;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;

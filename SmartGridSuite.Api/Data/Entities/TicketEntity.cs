@@ -19,6 +19,11 @@
         public string? Notes { get; set; }
         public string CreatedBy { get; set; } = "";
         public uint? AssignedCrewId { get; set; }
+
+        public ulong? TaskCategoryId { get; set; }
+        public string? ActionRequiredOverride { get; set; }
+
         public virtual CrewEntity? AssignedCrew { get; set; }
+        public virtual TicketTaskCategoryEntity? TaskCategory { get; set; }
     }
 }

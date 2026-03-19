@@ -1,9 +1,15 @@
 ﻿//Just column on the board for One truck + the tech inside it
 
 #nullable enable
-using SmartGridSuite.Contracts.Technicians;
+using SmartGridSuite;
 
-namespace SmartGridSuite.Contracts.Trucks;
+
+//Just column on the board for One truck + the tech inside it
+
+#nullable enable
+using SmartGridSuite.Contracts.Administration.Technicians;
+
+namespace SmartGridSuite.Contracts.Administration.Trucks;
 
 public sealed class TruckColumnDto
 {

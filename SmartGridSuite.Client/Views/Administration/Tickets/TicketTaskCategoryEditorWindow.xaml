@@ -1,0 +1,75 @@
+﻿<Window x:Class="SmartGridSuite.Client.Views.Administration.Tickets.TicketTaskCategoryEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Task Category"
+        Width="520"
+        Height="430"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Category Name"
+                   FontWeight="SemiBold"/>
+        <TextBox Grid.Row="2"
+                 x:Name="NameTextBox"
+                 Height="32"/>
+
+        <TextBlock Grid.Row="4"
+                   Text="Sort Order"
+                   FontWeight="SemiBold"/>
+        <TextBox Grid.Row="6"
+                 x:Name="SortOrderTextBox"
+                 Height="32"/>
+
+        <CheckBox Grid.Row="8"
+                  x:Name="IsActiveCheckBox"
+                  Content="Active"
+                  IsChecked="True"
+                  VerticalAlignment="Top"/>
+
+        <TextBlock Grid.Row="8"
+                   Margin="0,32,0,0"
+                   Text="Default Action Required"
+                   FontWeight="SemiBold"
+                   VerticalAlignment="Top"/>
+
+        <TextBox Grid.Row="8"
+                 x:Name="DefaultActionRequiredTextBox"
+                 Margin="0,56,0,0"
+                 MinHeight="110"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto"
+                 VerticalAlignment="Stretch"/>
+
+        <StackPanel Grid.Row="10"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Cancel"
+                    Width="90"
+                    Height="32"
+                    Margin="0,0,8,0"
+                    IsCancel="True"/>
+
+            <Button Content="Save"
+                    Width="90"
+                    Height="32"
+                    IsDefault="True"
+                    Click="Save_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

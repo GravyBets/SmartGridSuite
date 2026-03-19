@@ -37,6 +37,18 @@ namespace SmartGridSuite.Client.Models.Dispatcher
         private string _groupCode = "";
         public string GroupCode { get => _groupCode; set { _groupCode = value ?? ""; OnPropertyChanged(nameof(GroupCode)); } }
 
+        private string _workOrderType = "";
+        public string WorkOrderType
+        {
+            get => _workOrderType;
+            set
+            {
+                _workOrderType = value ?? "";
+                OnPropertyChanged(nameof(WorkOrderType));
+                OnPropertyChanged(nameof(WorkOrderClassLabel));
+            }
+        }
+
         private int _priorityDays = 5;
         public int PriorityDays { get => _priorityDays; set { _priorityDays = value; OnPropertyChanged(nameof(PriorityDays)); OnPropertyChanged(nameof(PriorityLabel)); } }
 
@@ -50,6 +62,27 @@ namespace SmartGridSuite.Client.Models.Dispatcher
 
         private string _createdBy = "";
         public string CreatedBy { get => _createdBy; set { _createdBy = value ?? ""; OnPropertyChanged(nameof(CreatedBy)); } }
+
+        private ulong? _taskCategoryId;
+        public ulong? TaskCategoryId
+        {
+            get => _taskCategoryId;
+            set { _taskCategoryId = value; OnPropertyChanged(nameof(TaskCategoryId)); }
+        }
+
+        private string _taskCategoryName = "";
+        public string TaskCategoryName
+        {
+            get => _taskCategoryName;
+            set { _taskCategoryName = value ?? ""; OnPropertyChanged(nameof(TaskCategoryName)); }
+        }
+
+        private string _actionRequiredOverride = "";
+        public string ActionRequiredOverride
+        {
+            get => _actionRequiredOverride;
+            set { _actionRequiredOverride = value ?? ""; OnPropertyChanged(nameof(ActionRequiredOverride)); }
+        }
         public string CurrentWorkOrder
         {
             get => _currentWorkOrder;
@@ -73,10 +106,24 @@ namespace SmartGridSuite.Client.Models.Dispatcher
             }
         }
 
-        public string WorkOrderClassLabel =>
-            string.IsNullOrWhiteSpace(CurrentWorkOrder)
-                ? ""
-                : _woClass == WorkOrderClass.Capital ? "Cap." : "Maint.";
+        public string WorkOrderClassLabel
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(CurrentWorkOrder))
+                    return "";
+
+                if (WorkOrderType.Equals("Capital", StringComparison.OrdinalIgnoreCase) ||
+                    WorkOrderType.Equals("Cap", StringComparison.OrdinalIgnoreCase))
+                    return "Cap.";
+
+                if (WorkOrderType.Equals("Distribution", StringComparison.OrdinalIgnoreCase) ||
+                    WorkOrderType.Equals("Dist", StringComparison.OrdinalIgnoreCase))
+                    return "Dist.";
+
+                return "Maint.";
+            }
+        }
 
         private string _summary = "";
         public string Summary { get => _summary; set { _summary = value ?? ""; OnPropertyChanged(nameof(Summary)); } }
