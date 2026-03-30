@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
+using SmartGridSuite.Api.Configuration;
+using SmartGridSuite.Api.Services.ParentSync;
 
 
 namespace SmartGridSuite.Api
@@ -20,6 +22,11 @@ namespace SmartGridSuite.Api
             var conn = builder.Configuration.GetConnectionString("SmartGridDb");
             builder.Services.AddDbContext<SmartGridDbContext>(opt =>
                 opt.UseMySql(conn, ServerVersion.AutoDetect(conn)));
+
+            builder.Services.Configure<ParentDatabaseOptions>(
+                builder.Configuration.GetSection(ParentDatabaseOptions.SectionName));
+
+            builder.Services.AddScoped<ParentSyncService>();
 
             var app = builder.Build();
 

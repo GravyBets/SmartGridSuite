@@ -1,0 +1,170 @@
+﻿using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using SmartGridSuite.Api.Configuration;
+using SmartGridSuite.Api.Data;
+using SmartGridSuite.Api.Services.ParentSync.Models;
+using System.Data;
+using System.Data.Common;
+
+namespace SmartGridSuite.Api.Services.ParentSync
+{
+    public sealed partial class ParentSyncService
+    {
+        private readonly string _connectionString;
+        private readonly SmartGridDbContext _appDb;
+
+        public ParentSyncService(
+            IOptions<ParentDatabaseOptions> options,
+            SmartGridDbContext appDb)
+        {
+            _connectionString = options.Value.ConnectionString;
+            _appDb = appDb;
+        }
+
+        public async Task<int> GetSiteCountAsync(CancellationToken cancellationToken = default)
+        {
+            await using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync(cancellationToken);
+
+            const string sql = "SELECT COUNT(*) FROM [sgc_main].[Site];";
+
+            await using var cmd = new SqlCommand(sql, conn);
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
+
+            return result == null || result == DBNull.Value
+                ? 0
+                : Convert.ToInt32(result);
+        }
+
+        private async Task<Dictionary<string, List<SiteHistoryPreviewRow>>> GetRecentSiteHistoryLookupAsync(
+            IEnumerable<string> siteIds,
+            CancellationToken cancellationToken = default)
+        {
+            var distinctSiteIds = siteIds
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var lookup = new Dictionary<string, List<SiteHistoryPreviewRow>>(StringComparer.OrdinalIgnoreCase);
+
+            if (distinctSiteIds.Count == 0)
+            {
+                return lookup;
+            }
+
+            var conn = _appDb.Database.GetDbConnection();
+            var shouldClose = conn.State != ConnectionState.Open;
+
+            if (shouldClose)
+            {
+                await conn.OpenAsync(cancellationToken);
+            }
+
+            try
+            {
+                await using var cmd = conn.CreateCommand();
+
+                var parameterNames = new List<string>();
+
+                for (var i = 0; i < distinctSiteIds.Count; i++)
+                {
+                    var parameter = cmd.CreateParameter();
+                    parameter.ParameterName = $"@p{i}";
+                    parameter.Value = distinctSiteIds[i];
+                    cmd.Parameters.Add(parameter);
+                    parameterNames.Add(parameter.ParameterName);
+                }
+
+                cmd.CommandText = $"""
+                    SELECT
+                        history_id,
+                        site_id,
+                        visit_date,
+                        primary_tech,
+                        secondary_tech,
+                        narrative
+                    FROM site_history
+                    WHERE site_id IN ({string.Join(", ", parameterNames)})
+                    ORDER BY site_id, visit_date DESC, history_id DESC;
+                    """;
+
+                var allRows = new List<SiteHistoryPreviewRow>();
+
+                await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    allRows.Add(new SiteHistoryPreviewRow
+                    {
+                        HistoryId = GetInt64(reader, "history_id"),
+                        SiteId = GetDbString(reader, "site_id") ?? "",
+                        VisitDate = GetNullableDateTime(reader, "visit_date"),
+                        PrimaryTech = GetDbString(reader, "primary_tech"),
+                        SecondaryTech = GetDbString(reader, "secondary_tech"),
+                        Narrative = GetDbString(reader, "narrative")
+                    });
+                }
+
+                foreach (var group in allRows.GroupBy(x => x.SiteId, StringComparer.OrdinalIgnoreCase))
+                {
+                    lookup[group.Key] = group.ToList();
+                }
+
+                return lookup;
+            }
+            finally
+            {
+                if (shouldClose)
+                {
+                    await conn.CloseAsync();
+                }
+            }
+        }
+
+        private static string? GetString(SqlDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal).Trim();
+        }
+
+        private static decimal? GetDecimal(SqlDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal)
+                ? null
+                : Convert.ToDecimal(reader.GetValue(ordinal));
+        }
+
+        private static string? GetDbString(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal).Trim();
+        }
+
+        private static DateTime? GetNullableDateTime(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal)
+                ? null
+                : Convert.ToDateTime(reader.GetValue(ordinal));
+        }
+
+        private static long GetInt64(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal)
+                ? 0
+                : Convert.ToInt64(reader.GetValue(ordinal));
+        }
+
+        private static int? GetNullableInt32(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+            return reader.IsDBNull(ordinal)
+                ? null
+                : Convert.ToInt32(reader.GetValue(ordinal));
+        }
+    }
+}
