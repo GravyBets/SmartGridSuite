@@ -7,8 +7,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
     public sealed partial class ParentSyncService
     {
         public async Task<SiteDashboardRouteInfo?> GetSiteDashboardRouteInfoAsync(
-            string siteId,
-            CancellationToken cancellationToken = default)
+            string siteId, CancellationToken cancellationToken = default)
         {
             siteId = (siteId ?? "").Trim();
 
@@ -58,8 +57,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
         }
 
         public async Task<object?> GetSiteDashboardAsync(
-            string siteId,
-            CancellationToken cancellationToken = default)
+            string siteId, CancellationToken cancellationToken = default)
         {
             siteId = (siteId ?? "").Trim();
 
@@ -108,5 +106,6 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
             return null;
         }
+
     }
 }
