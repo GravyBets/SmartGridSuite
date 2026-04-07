@@ -56,7 +56,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
             };
         }
 
-        public async Task<object?> GetSiteDashboardAsync(
+        public async Task<SiteDashboardResponse?> GetSiteDashboardAsync(
             string siteId, CancellationToken cancellationToken = default)
         {
             siteId = (siteId ?? "").Trim();
@@ -75,12 +75,26 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
             var dashboardKind = ResolveDashboardKind(route);
 
-            return dashboardKind switch
+            object? data = dashboardKind switch
             {
                 "ams-mr" => await GetAmsMrSiteAsync(siteId, cancellationToken),
                 "dacs" => await GetDacsSiteAsync(siteId, cancellationToken),
+                "rx" => await GetRxSiteAsync(siteId, cancellationToken),
                 "igsd" => await GetIgsdSiteAsync(siteId, cancellationToken),
                 _ => null
+            };
+
+            if (data is null)
+            {
+                return null;
+            }
+
+            return new SiteDashboardResponse
+            {
+                SiteId = siteId,
+                DashboardKind = dashboardKind,
+                Route = route,
+                Data = data
             };
         }
 
@@ -97,6 +111,11 @@ namespace SmartGridSuite.Api.Services.ParentSync
             if (siteType.Contains("DACS") || siteId.StartsWith("DAC"))
             {
                 return "dacs";
+            }
+
+            if (siteType.Contains("RE") || siteId.StartsWith("RX"))
+            {
+                return "rx";
             }
 
             if (siteType.Contains("IG") || siteId.StartsWith("G"))

@@ -44,8 +44,8 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(row);
         }
 
-        [HttpGet("site-dashboard/{siteId}")]
-        public async Task<ActionResult<object>> GetSiteDashboard(
+        [HttpGet("{siteId}")]
+        public async Task<ActionResult<SiteDashboardResponse>> GetSiteDashboard(
             string siteId, CancellationToken cancellationToken = default)
         {
             siteId = (siteId ?? "").Trim();
@@ -133,6 +133,61 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(row);
         }
 
-        
+        //Range Extenders
+        [HttpGet("rx-site/{siteId}")]
+        public async Task<ActionResult<RxSiteDashboardRow>> GetRxSite(
+            string siteId, CancellationToken cancellationToken = default)
+        {
+            siteId = (siteId ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(siteId))
+            {
+                return BadRequest("Site ID is required.");
+            }
+
+            var row = await _parentSyncService.GetRxSiteAsync(siteId, cancellationToken);
+
+            if (row is null)
+            {
+                return NotFound(new { message = $"Site '{siteId}' was not found in sgc_comm.RE." });
+            }
+
+            return Ok(row);
+        }
+
+        //Towers
+        [HttpGet("tower/{topNameId:int}")]
+        public async Task<ActionResult<TowerDashboardRow>> GetTower(
+            int topNameId, CancellationToken cancellationToken = default)
+        {
+            if (topNameId <= 0)
+            {
+                return BadRequest("TopNameId must be greater than zero.");
+            }
+
+            var row = await _parentSyncService.GetTowerAsync(topNameId, cancellationToken);
+
+            if (row is null)
+            {
+                return NotFound(new { message = $"Tower '{topNameId}' was not found in sgc_tnp.TopName." });
+            }
+
+            return Ok(row);
+        }
+
+        [HttpGet("tower-search")]
+        public async Task<ActionResult<List<TowerSearchRow>>> SearchTowers(
+            [FromQuery] string term, [FromQuery] int take = 25, CancellationToken cancellationToken = default)
+        {
+            term = (term ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(term))
+            {
+                return BadRequest("Search term is required.");
+            }
+
+            var rows = await _parentSyncService.SearchTowersAsync(term, take, cancellationToken);
+            return Ok(rows);
+        }
     }
 }
