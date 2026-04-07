@@ -6,7 +6,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
 {
     public sealed partial class ParentSyncService
     {
-        public async Task<AmsMrSiteDashboardRow?> GetAmsMrSiteAsync(
+        public async Task<AmsSiteDashboardRow?> GetAmsMrSiteAsync(
             string siteId, CancellationToken cancellationToken = default)
         {
             siteId = (siteId ?? "").Trim();
@@ -91,7 +91,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 return null;
             }
 
-            var row = new AmsMrSiteDashboardRow
+            var row = new AmsSiteDashboardRow
             {
                 SiteId = GetString(reader, "SiteId") ?? "",
                 SiteStatus = GetString(reader, "SiteStatus"),

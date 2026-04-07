@@ -27,18 +27,18 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<SiteDashboardRouteInfo>> GetSiteDashboardRouteInfo(
             string siteId, CancellationToken cancellationToken = default)
         {
-            siteId = (siteId ?? "").Trim();
+            var normalizedSiteId = NormalizeRequiredText(siteId);
 
-            if (string.IsNullOrWhiteSpace(siteId))
+            if (normalizedSiteId is null)
             {
                 return BadRequest("Site ID is required.");
             }
 
-            var row = await _parentSyncService.GetSiteDashboardRouteInfoAsync(siteId, cancellationToken);
+            var row = await _parentSyncService.GetSiteDashboardRouteInfoAsync(normalizedSiteId, cancellationToken);
 
             if (row is null)
             {
-                return NotFound(new { message = $"Site '{siteId}' was not found in sgc_main.Site." });
+                return NotFound(new { message = $"Site '{normalizedSiteId}' was not found in sgc_main.Site." });
             }
 
             return Ok(row);
@@ -48,18 +48,18 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<SiteDashboardResponse>> GetSiteDashboard(
             string siteId, CancellationToken cancellationToken = default)
         {
-            siteId = (siteId ?? "").Trim();
+            var normalizedSiteId = NormalizeRequiredText(siteId);
 
-            if (string.IsNullOrWhiteSpace(siteId))
+            if (normalizedSiteId is null)
             {
                 return BadRequest("Site ID is required.");
             }
 
-            var dashboard = await _parentSyncService.GetSiteDashboardAsync(siteId, cancellationToken);
+            var dashboard = await _parentSyncService.GetSiteDashboardAsync(normalizedSiteId, cancellationToken);
 
             if (dashboard is null)
             {
-                return NotFound(new { message = $"Site '{siteId}' was not found or is not yet supported." });
+                return NotFound(new { message = $"Site '{normalizedSiteId}' was not found or is not yet supported." });
             }
 
             return Ok(dashboard);
@@ -68,21 +68,21 @@ namespace SmartGridSuite.Api.Controllers
         //AMS
         
         [HttpGet("ams-mr-site/{siteId}")]
-        public async Task<ActionResult<AmsMrSiteDashboardRow>> GetAmsMrSite(
+        public async Task<ActionResult<AmsSiteDashboardRow>> GetAmsMrSite(
             string siteId, CancellationToken cancellationToken = default)
         {
-            siteId = (siteId ?? "").Trim();
+            var normalizedSiteId = NormalizeRequiredText(siteId);
 
-            if (string.IsNullOrWhiteSpace(siteId))
+            if (normalizedSiteId is null)
             {
                 return BadRequest("Site ID is required.");
             }
 
-            var row = await _parentSyncService.GetAmsMrSiteAsync(siteId, cancellationToken);
+            var row = await _parentSyncService.GetAmsMrSiteAsync(normalizedSiteId, cancellationToken);
 
             if (row is null)
             {
-                return NotFound(new { message = $"Site '{siteId}' was not found in sgc_comm.AMS." });
+                return NotFound(new { message = $"Site '{normalizedSiteId}' was not found in sgc_comm.AMS." });
             }
 
             return Ok(row);
@@ -94,18 +94,18 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<DacsSiteDashboardRow>> GetDacsSite(
             string siteId, CancellationToken cancellationToken = default)
         {
-            siteId = (siteId ?? "").Trim();
+            var normalizedSiteId = NormalizeRequiredText(siteId);
 
-            if (string.IsNullOrWhiteSpace(siteId))
+            if (normalizedSiteId is null)
             {
                 return BadRequest("Site ID is required.");
             }
 
-            var row = await _parentSyncService.GetDacsSiteAsync(siteId, cancellationToken);
+            var row = await _parentSyncService.GetDacsSiteAsync(normalizedSiteId, cancellationToken);
 
             if (row is null)
             {
-                return NotFound(new { message = $"Site '{siteId}' was not found in sgc_equip.Radio700." });
+                return NotFound(new { message = $"Site '{normalizedSiteId}' was not found in sgc_equip.Radio700." });
             }
 
             return Ok(row);
@@ -116,18 +116,18 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<IgsdSiteDashboardRow>> GetIgsdSite(
             string siteId, CancellationToken cancellationToken = default)
         {
-            siteId = (siteId ?? "").Trim();
+            var normalizedSiteId = NormalizeRequiredText(siteId);
 
-            if (string.IsNullOrWhiteSpace(siteId))
+            if (normalizedSiteId is null)
             {
                 return BadRequest("Site ID is required.");
             }
 
-            var row = await _parentSyncService.GetIgsdSiteAsync(siteId, cancellationToken);
+            var row = await _parentSyncService.GetIgsdSiteAsync(normalizedSiteId, cancellationToken);
 
             if (row is null)
             {
-                return NotFound(new { message = $"Site '{siteId}' was not found in sgc_comm.IGSD." });
+                return NotFound(new { message = $"Site '{normalizedSiteId}' was not found in sgc_comm.IGSD." });
             }
 
             return Ok(row);
@@ -138,18 +138,18 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<RxSiteDashboardRow>> GetRxSite(
             string siteId, CancellationToken cancellationToken = default)
         {
-            siteId = (siteId ?? "").Trim();
+            var normalizedSiteId = NormalizeRequiredText(siteId);
 
-            if (string.IsNullOrWhiteSpace(siteId))
+            if (normalizedSiteId is null)
             {
                 return BadRequest("Site ID is required.");
             }
 
-            var row = await _parentSyncService.GetRxSiteAsync(siteId, cancellationToken);
+            var row = await _parentSyncService.GetRxSiteAsync(normalizedSiteId, cancellationToken);
 
             if (row is null)
             {
-                return NotFound(new { message = $"Site '{siteId}' was not found in sgc_comm.RE." });
+                return NotFound(new { message = $"Site '{normalizedSiteId}' was not found in sgc_comm.RE." });
             }
 
             return Ok(row);
@@ -179,15 +179,22 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<List<TowerSearchRow>>> SearchTowers(
             [FromQuery] string term, [FromQuery] int take = 25, CancellationToken cancellationToken = default)
         {
-            term = (term ?? "").Trim();
+            var normalizedTerm = NormalizeRequiredText(term);
 
-            if (string.IsNullOrWhiteSpace(term))
+            if (normalizedTerm is null)
             {
                 return BadRequest("Search term is required.");
             }
 
-            var rows = await _parentSyncService.SearchTowersAsync(term, take, cancellationToken);
+            var rows = await _parentSyncService.SearchTowersAsync(normalizedTerm, take, cancellationToken);
+
             return Ok(rows);
+        }
+
+        private static string? NormalizeRequiredText(string? value)
+        {
+            var normalized = (value ?? "").Trim();
+            return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
         }
     }
 }

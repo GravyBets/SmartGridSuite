@@ -1,6 +1,6 @@
 ﻿namespace SmartGridSuite.Api.Services.ParentSync.Models
 {
-    public sealed class AmsMrSiteDashboardRow
+    public sealed class AmsSiteDashboardRow
     {
         public string SiteId { get; init; } = "";
         public string? SiteStatus { get; init; }
