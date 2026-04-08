@@ -1,5 +1,6 @@
 ﻿using Microsoft.Data.SqlClient;
 using SmartGridSuite.Api.Services.ParentSync.Models;
+using SmartGridSuite.Contracts.SiteDashboard;
 using System.Data;
 
 namespace SmartGridSuite.Api.Services.ParentSync
@@ -7,10 +8,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
     public sealed partial class ParentSyncService
     {
 
-        private const string DashboardKindAmsMr = "ams-mr";
-        private const string DashboardKindDacs = "dacs";
-        private const string DashboardKindRx = "rx";
-        private const string DashboardKindIgsd = "igsd";
+        
 
         public async Task<SiteDashboardRouteInfo?> GetSiteDashboardRouteInfoAsync(
             string siteId, CancellationToken cancellationToken = default)
@@ -91,10 +89,10 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
             object? data = dashboardKind switch
             {
-                DashboardKindAmsMr => await GetAmsMrSiteAsync(siteId, cancellationToken),
-                DashboardKindDacs => await GetDacsSiteAsync(siteId, cancellationToken),
-                DashboardKindRx => await GetRxSiteAsync(siteId, cancellationToken),
-                DashboardKindIgsd => await GetIgsdSiteAsync(siteId, cancellationToken),
+                SiteDashboardKinds.AmsMr => await GetAmsMrSiteAsync(siteId, cancellationToken),
+                SiteDashboardKinds.Dacs => await GetDacsSiteAsync(siteId, cancellationToken),
+                SiteDashboardKinds.Rx => await GetRxSiteAsync(siteId, cancellationToken),
+                SiteDashboardKinds.Igsd => await GetIgsdSiteAsync(siteId, cancellationToken),
                 _ => null
             };
 
@@ -119,22 +117,22 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
             if (siteType.Contains("AMS") || siteId.EndsWith("MR"))
             {
-                return DashboardKindAmsMr;
+                return SiteDashboardKinds.AmsMr;
             }
 
             if (siteType.Contains("DACS") || siteId.StartsWith("DAC"))
             {
-                return DashboardKindDacs;
+                return SiteDashboardKinds.Dacs;
             }
 
             if (siteType.Contains("RE") || siteId.StartsWith("RX"))
             {
-                return DashboardKindRx;
+                return SiteDashboardKinds.Rx;
             }
 
             if (siteType.Contains("IG") || siteId.StartsWith("G"))
             {
-                return DashboardKindIgsd;
+                return SiteDashboardKinds.Igsd;
             }
 
             return null;

@@ -184,6 +184,34 @@
                                 </StackPanel>
                             </Grid>
                         </ListBoxItem>
+
+                        <ListBoxItem Tag="Site Dashboard">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Style="{StaticResource NavBadgeStyle}">
+                                    <TextBlock Text="S"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="14"/>
+                                </Border>
+
+                                <StackPanel Grid.Column="1"
+                                            Margin="10,0,0,0">
+                                    <TextBlock Text="Site Dashboard"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}"/>
+                                    <TextBlock Text="Crews, pairings, and trucks"
+                                               Margin="0,2,0,0"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondary}"/>
+                                </StackPanel>
+                            </Grid>
+                        </ListBoxItem>
                     </ListBox>
 
                     <!-- Collapsed nav -->
@@ -226,6 +254,15 @@
                         <ListBoxItem Tag="Technicians" ToolTip="Truck Assignments">
                             <Border Style="{StaticResource NavBadgeStyle}">
                                 <TextBlock Text="👷"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="14"/>
+                            </Border>
+                        </ListBoxItem>
+
+                        <ListBoxItem Tag="Site Dashboard" ToolTip="Site Dashboard">
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <TextBlock Text="S"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
                                            FontSize="14"/>

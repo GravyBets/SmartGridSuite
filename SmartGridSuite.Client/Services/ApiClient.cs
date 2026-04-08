@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SmartGridSuite.Contracts.SiteDashboard;
+using System;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading;
@@ -35,9 +36,7 @@ namespace SmartGridSuite.Client.Services
             => _http.GetFromJsonAsync<T>(path, ct);
 
         public async Task<TResponse?> PostAsync<TRequest, TResponse>(
-            string path,
-            TRequest body,
-            CancellationToken ct = default)
+            string path, TRequest body, CancellationToken ct = default)
         {
             using var resp = await _http.PostAsJsonAsync(path, body, ct);
 
@@ -53,9 +52,7 @@ namespace SmartGridSuite.Client.Services
         }
 
         public async Task PutAsync<TRequest>(
-            string path,
-            TRequest body,
-            CancellationToken ct = default)
+            string path, TRequest body, CancellationToken ct = default)
         {
             using var resp = await _http.PutAsJsonAsync(path, body, ct);
 
@@ -66,6 +63,34 @@ namespace SmartGridSuite.Client.Services
 
                 throw new ApiException((int)resp.StatusCode, text);
             }
+        }
+
+        public async Task<SiteDashboardResponseDto?> GetSiteDashboardAsync(string siteId, CancellationToken cancellationToken = default)
+        {
+            siteId = (siteId ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(siteId))
+            {
+                return null;
+            }
+
+            return await _http.GetFromJsonAsync<SiteDashboardResponseDto>(
+                $"api/site-dashboard/{Uri.EscapeDataString(siteId)}",
+                cancellationToken);
+        }
+
+        public async Task<SiteDashboardRouteInfoDto?> GetSiteDashboardRouteInfoAsync(string siteId, CancellationToken cancellationToken = default)
+        {
+            siteId = (siteId ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(siteId))
+            {
+                return null;
+            }
+
+            return await _http.GetFromJsonAsync<SiteDashboardRouteInfoDto>(
+                $"api/site-dashboard/site-dashboard-route/{Uri.EscapeDataString(siteId)}",
+                cancellationToken);
         }
     }
 }

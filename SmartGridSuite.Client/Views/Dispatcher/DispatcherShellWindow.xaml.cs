@@ -1,6 +1,8 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using SmartGridSuite.Client.Views.Dispatcher.Panes;
+using System.Text.Json;
+using SmartGridSuite.Client.Services;
 
 namespace SmartGridSuite.Client.Views
 {
@@ -9,12 +11,15 @@ namespace SmartGridSuite.Client.Views
         private bool _navCollapsed;
         private bool _syncingNav;
 
+        private readonly ApiClient _api = new("https://localhost:7140");
+
         public DispatcherShellWindow()
         {
             InitializeComponent();
 
             // Default selection = Dashboard
             SelectNavIndex(0);
+
         }
 
         private void SelectNavIndex(int index)
@@ -83,6 +88,10 @@ namespace SmartGridSuite.Client.Views
                     MainPaneHost.Content = new TechniciansPaneView();
                     break;
 
+                case "Site Dashboard":
+                    MainPaneHost.Content = new SiteDashboardPaneView();
+                    break;
+
                 default:
                     MainPaneHost.Content = new DashboardPaneView();
                     break;
@@ -124,5 +133,7 @@ namespace SmartGridSuite.Client.Views
             home.Show();
             Close();
         }
+
+       
     }
 }
