@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Configuration;
+using SmartGridSuite.Api.Data;
+using SmartGridSuite.Api.Services;
 using SmartGridSuite.Api.Services.ParentSync;
 
 
@@ -27,6 +28,8 @@ namespace SmartGridSuite.Api
                 builder.Configuration.GetSection(ParentDatabaseOptions.SectionName));
 
             builder.Services.AddScoped<ParentSyncService>();
+
+            builder.Services.AddScoped<SnmpPollingService>();
 
             var app = builder.Build();
 

@@ -2,6 +2,7 @@
 using System.Windows.Controls;
 using SmartGridSuite.Client.Services;
 using SmartGridSuite.Client.Views.Administration.Tickets;
+using SmartGridSuite.Client.Views.Administration.SNMP;
 
 namespace SmartGridSuite.Client.Views.Administration
 {
@@ -12,6 +13,7 @@ namespace SmartGridSuite.Client.Views.Administration
         private readonly TechniciansAdminView _techniciansView;
         private readonly TrucksAdminView _trucksView;
         private readonly TicketsAdminView _ticketsView;
+        private readonly SnmpAdminView _snmpView;
 
         public AdministrationShellWindow()
         {
@@ -22,6 +24,7 @@ namespace SmartGridSuite.Client.Views.Administration
             _techniciansView = new TechniciansAdminView(_api);
             _trucksView = new TrucksAdminView(_api);
             _ticketsView = new TicketsAdminView(_api);
+            _snmpView = new SnmpAdminView(_api);
 
             NavigationListBox.SelectedIndex = 0;
         }
@@ -44,6 +47,10 @@ namespace SmartGridSuite.Client.Views.Administration
                 case "Tickets":
                     ShowTickets();
                     break;
+
+                case "SNMP":
+                    ShowSNMP();
+                    break;
             }
         }
 
@@ -62,9 +69,21 @@ namespace SmartGridSuite.Client.Views.Administration
             ShowView(_ticketsView);
         }
 
+        private void ShowSNMP()
+        {
+            ShowView(_snmpView);
+        }
+
         private void ShowView(UserControl view)
         {
             AdminContentHost.Content = view;
+        }
+
+        private void HomeButton_Click(object sender, RoutedEventArgs e)
+        {
+            var home = new ModuleLauncherWindow();
+            home.Show();
+            Close();
         }
     }
 }

@@ -67,6 +67,9 @@ namespace SmartGridSuite.Api.Mappings
                 TopName = source.TopName,
                 TopDescription = source.TopDescription,
                 TopSector = source.TopSector,
+                TopVip = source.TopVip,
+                TopIpA = source.TopIpA,
+                TopIpB = source.TopIpB,
 
                 StreetNo = source.StreetNo,
                 StreetName = source.StreetName,
@@ -145,6 +148,9 @@ namespace SmartGridSuite.Api.Mappings
                 TopName = source.TopName,
                 TopDescription = source.TopDescription,
                 TopSector = source.TopSector,
+                TopVip = source.TopVip,
+                TopIpA = source.TopIpA,
+                TopIpB = source.TopIpB,
 
                 StreetNo = source.StreetNo,
                 StreetName = source.StreetName,
@@ -197,6 +203,9 @@ namespace SmartGridSuite.Api.Mappings
                 TopName = source.TopName,
                 TopDescription = source.TopDescription,
                 TopSector = source.TopSector,
+                TopVip = source.TopVip,
+                TopIpA = source.TopIpA,
+                TopIpB = source.TopIpB,
 
                 StreetNo = source.StreetNo,
                 StreetName = source.StreetName,

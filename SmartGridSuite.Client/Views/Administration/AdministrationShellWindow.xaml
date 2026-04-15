@@ -21,6 +21,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- Header -->
@@ -65,8 +66,53 @@
                                    FontWeight="SemiBold"/>
                     </ListBoxItem>
 
-                    
+                    <ListBoxItem Tag="SNMP">
+                        <TextBlock Text="SNMP"
+                                   Padding="8,0,0,2"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"/>
+                    </ListBoxItem>
                 </ListBox>
+
+                <!-- Home button -->
+                <StackPanel Grid.Row="2"
+                            Margin="6,0,6,10">
+                    <Border Height="1"
+                            Margin="4,0,4,12"
+                            Background="{DynamicResource CardBorder}"/>
+
+                    <Button x:Name="HomeButton"
+                            Style="{StaticResource NavRailFooterButtonStyle}"
+                            Click="HomeButton_Click">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="36"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <TextBlock Text="⌂"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1"
+                                        Margin="10,0,0,0"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="Home"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Text="Back to start screen"
+                                           Margin="0,2,0,0"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 

@@ -109,10 +109,80 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(items);
         }
 
+        [HttpGet("by-site/{siteId}")]
+        public async Task<ActionResult<List<TicketListItemDto>>> GetBySite(string siteId, CancellationToken ct)
+        {
+            siteId = (siteId ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(siteId))
+                return Ok(new List<TicketListItemDto>());
+
+            var normalizedSiteId = siteId
+                .Replace("_", "")
+                .Replace("-", "")
+                .Replace(" ", "")
+                .Trim()
+                .ToUpperInvariant();
+
+            var rows = await _db.Tickets
+                .Include(t => t.TaskCategory)
+                .AsNoTracking()
+                .Where(t =>
+                    t.Site != null &&
+                    t.Site.Replace("_", "").Replace("-", "").Replace(" ", "").ToUpper() == normalizedSiteId)
+                .OrderByDescending(t => t.LastActivityAt)
+                .ToListAsync(ct);
+
+            var result = rows.Select(t => new TicketListItemDto(
+                t.Id,
+                t.Site,
+                t.NotificationName ?? "",
+                t.Notification ?? "",
+                t.Status,
+                t.TaskCategoryId,
+                t.TaskCategory != null ? t.TaskCategory.Name : null,
+                t.ActionRequiredOverride,
+                t.AssignedTech,
+                t.CreatedAt,
+                t.LastActivityAt,
+                t.CurrentWorkOrder ?? "",
+                string.IsNullOrWhiteSpace(t.WorkOrderClass) ? "Maint" : t.WorkOrderClass!,
+                t.GroupCode,
+                t.PriorityDays,
+                t.Problem,
+                t.Notes ?? "",
+                t.CreatedBy
+            )).ToList();
+
+            return Ok(result);
+        }
+
+        [HttpPost("{id:long}/request-capital")]
+        public async Task<ActionResult<UpdateTicketResponse>> RequestCapital(long id, CancellationToken ct)
+        {
+            var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+            if (entity == null)
+                return NotFound();
+
+            var awaitingCapitalStatus = await _db.TicketStatuses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.IsActive && x.Name.ToLower() == "awaiting capital",
+                    ct);
+
+            if (awaitingCapitalStatus == null)
+                return BadRequest("Status 'Awaiting Capital' is missing or inactive.");
+
+            entity.Status = awaitingCapitalStatus.Name;
+            entity.LastActivityAt = DateTime.Now;
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(new UpdateTicketResponse(entity.Id));
+        }
+
         private static DispatchTaskListItemDto MapToDispatchTask(
-                        TicketEntity t,
-                        string fallbackCategoryName,
-                        string fallbackActionRequired)
+                        TicketEntity t, string fallbackCategoryName, string fallbackActionRequired)
         {
             var hasActiveAssignedCategory =
                 t.TaskCategory != null &&
@@ -721,8 +791,6 @@ namespace SmartGridSuite.Api.Controllers
                 }
             }
         }
-
-
 
     }
 }

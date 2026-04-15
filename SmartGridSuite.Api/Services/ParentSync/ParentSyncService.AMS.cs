@@ -38,9 +38,13 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 enc.SN          AS EnclosureSerialNumber,
                 enc.Model       AS EnclosureModel,
 
-                tn.TopName      AS TopName,
                 tn.Descr        AS TopDescription,
+                tn.TopName      AS TopName,
                 ts.Sector       AS TopSector,
+                ts.VIP          AS TopVip,
+                ts.IPa          AS TopIpA,
+                ts.IPb          AS TopIpB,
+
 
                 addr.StreetNo,
                 addr.StreetName,
@@ -120,6 +124,9 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 TopName = GetString(reader, "TopName"),
                 TopDescription = GetString(reader, "TopDescription"),
                 TopSector = GetString(reader, "TopSector"),
+                TopVip = GetString(reader, "TopVip"),
+                TopIpA = GetString(reader, "TopIpA"),
+                TopIpB = GetString(reader, "TopIpB"),
 
                 StreetNo = GetString(reader, "StreetNo"),
                 StreetName = GetString(reader, "StreetName"),

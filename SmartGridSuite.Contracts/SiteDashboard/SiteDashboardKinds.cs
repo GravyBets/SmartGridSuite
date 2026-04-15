@@ -2,9 +2,9 @@
 {
     public static class SiteDashboardKinds
     {
-        public const string AmsMr = "ams-mr";
-        public const string Dacs = "dacs";
-        public const string Rx = "rx";
-        public const string Igsd = "igsd";
+        public const string AmsMr = "AMS";
+        public const string Dacs = "DACs";
+        public const string Rx = "Range Extender";
+        public const string Igsd = "IGSD";
     }
 }

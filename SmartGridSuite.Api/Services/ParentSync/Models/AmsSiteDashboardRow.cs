@@ -30,6 +30,9 @@
         public string? TopName { get; init; }
         public string? TopDescription { get; init; }
         public string? TopSector { get; init; }
+        public string? TopVip { get; init; }
+        public string? TopIpA { get; init; }
+        public string? TopIpB { get; init; }
 
         public string? StreetNo { get; init; }
         public string? StreetName { get; init; }

@@ -14,11 +14,7 @@ namespace SmartGridSuite.Client.Services
 
         public TicketsApi(ApiClient api) => _api = api;
 
-        public async Task<List<TicketListItemDto>> GetTicketsAsync(
-            string? status = null,
-            string? tech = null,
-            DateTime? from = null,
-            DateTime? to = null,
+        public async Task<List<TicketListItemDto>> GetTicketsAsync(string? status = null, string? tech = null, DateTime? from = null, DateTime? to = null,
             CancellationToken ct = default)
         {
             var qs = new List<string>();
@@ -39,6 +35,19 @@ namespace SmartGridSuite.Client.Services
             return await _api.GetAsync<List<TicketListItemDto>>(path, ct) ?? new();
         }
 
+        public async Task<List<TicketListItemDto>> GetTicketsBySiteAsync(string siteId, CancellationToken ct = default)
+        {
+            siteId = (siteId ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(siteId))
+                return new();
+
+            return await _api.GetAsync<List<TicketListItemDto>>(
+                       $"api/tickets/by-site/{Uri.EscapeDataString(siteId)}",
+                       ct)
+                   ?? new();
+        }
+
         public async Task<long> CreateTicketAsync(CreateTicketRequest req, CancellationToken ct = default)
         {
             var res = await _api.PostAsync<CreateTicketRequest, CreateTicketResponse>("api/tickets", req, ct);
@@ -55,26 +64,32 @@ namespace SmartGridSuite.Client.Services
             return res?.Id ?? 0;
         }
 
-        public async Task<List<SapQueueImportPreviewResultRow>> PreviewSapQueueImportAsync(
-        SapQueueImportPreviewRequest req, CancellationToken ct = default)
+        public async Task<List<SapQueueImportPreviewResultRow>> PreviewSapQueueImportAsync(SapQueueImportPreviewRequest req, CancellationToken ct = default)
         {
             return await _api.PostAsync<SapQueueImportPreviewRequest, List<SapQueueImportPreviewResultRow>>(
                        "api/tickets/sap-import/preview", req, ct)
                    ?? new();
         }
 
-        public async Task<SapQueueImportCommitResponse> CommitSapQueueImportAsync(
-            SapQueueImportCommitRequest req, CancellationToken ct = default)
+        public async Task<SapQueueImportCommitResponse> CommitSapQueueImportAsync(SapQueueImportCommitRequest req, CancellationToken ct = default)
         {
             return await _api.PostAsync<SapQueueImportCommitRequest, SapQueueImportCommitResponse>(
                        "api/tickets/sap-import/commit", req, ct)
                    ?? new SapQueueImportCommitResponse(0, 0, 0, new());
         }
 
-        public async Task<List<DispatchTaskListItemDto>> GetDispatchTasksAsync(
-    CancellationToken ct = default)
+        public async Task<List<DispatchTaskListItemDto>> GetDispatchTasksAsync(CancellationToken ct = default)
         {
             return await _api.GetAsync<List<DispatchTaskListItemDto>>("api/tickets/dispatch-tasks", ct) ?? new();
+        }
+
+        //Request Capital
+        public async Task RequestCapitalAsync(long id, CancellationToken ct = default)
+        {
+            await _api.PostAsync<object, UpdateTicketResponse>(
+                $"api/tickets/{id}/request-capital",
+                new { },
+                ct);
         }
     }
 }

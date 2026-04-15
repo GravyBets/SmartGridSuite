@@ -19,6 +19,10 @@ namespace SmartGridSuite.Api.Data
         public virtual DbSet<TruckRosterEntity> TruckRosters { get; set; }        
         public virtual DbSet<TruckStyleEntity> TruckStyles { get; set; }
 
+        public virtual DbSet<SnmpProfileEntity> SnmpProfiles { get; set; } = null!;
+        public virtual DbSet<SnmpOidEntity> SnmpOids { get; set; } = null!;
+        public virtual DbSet<SnmpOidDecodeValueEntity> SnmpOidDecodeValues { get; set; } = null!;
+
         public DbSet<TicketStatusEntity> TicketStatuses { get; set; }
 
         public DbSet<TicketTaskCategoryEntity> TicketTaskCategories { get; set; }
@@ -244,6 +248,85 @@ namespace SmartGridSuite.Api.Data
                  .WithMany(t => t.WorkdayOverrides)
                  .HasForeignKey(x => x.TechnicianId)
                  .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<SnmpProfileEntity>(e =>
+            {
+                e.ToTable("snmp_profiles");
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.Id).HasColumnName("id");
+                e.Property(x => x.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
+                e.Property(x => x.DeviceFamily).HasColumnName("device_family").HasMaxLength(50).IsRequired();
+
+                e.Property(x => x.IsActive).HasColumnName("is_active");
+                e.Property(x => x.IsDefaultForFamily).HasColumnName("is_default_for_family");
+
+                e.Property(x => x.ReadCommunity).HasColumnName("read_community").HasMaxLength(255);
+                e.Property(x => x.WriteCommunity).HasColumnName("write_community").HasMaxLength(255);
+                e.Property(x => x.ContextName).HasColumnName("context_name").HasMaxLength(255);
+
+                e.Property(x => x.UsmUser).HasColumnName("usm_user").HasMaxLength(255);
+                e.Property(x => x.AuthProtocol).HasColumnName("auth_protocol").HasMaxLength(20);
+                e.Property(x => x.AuthKey).HasColumnName("auth_key").HasMaxLength(255);
+                e.Property(x => x.PrivacyProtocol).HasColumnName("privacy_protocol").HasMaxLength(20);
+                e.Property(x => x.PrivacyKey).HasColumnName("privacy_key").HasMaxLength(255);
+
+                e.Property(x => x.TimeoutMs).HasColumnName("timeout_ms");
+                e.Property(x => x.Retries).HasColumnName("retries");
+
+                e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+                e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+                e.HasMany(x => x.Oids)
+                    .WithOne(x => x.SnmpProfile)
+                    .HasForeignKey(x => x.SnmpProfileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<SnmpOidEntity>(e =>
+            {
+                e.ToTable("snmp_oids");
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.Id).HasColumnName("id");
+                e.Property(x => x.SnmpProfileId).HasColumnName("snmp_profile_id");
+
+                e.Property(x => x.Category).HasColumnName("category").HasMaxLength(50).IsRequired();
+                e.Property(x => x.Label).HasColumnName("label").HasMaxLength(100).IsRequired();
+                e.Property(x => x.Oid).HasColumnName("oid").HasMaxLength(255).IsRequired();
+                e.Property(x => x.ValueType).HasColumnName("value_type").HasMaxLength(30).IsRequired();
+
+                e.Property(x => x.IsWritable).HasColumnName("is_writable");
+                e.Property(x => x.ShowInWorkspace).HasColumnName("show_in_workspace");
+                e.Property(x => x.SortOrder).HasColumnName("sort_order");
+
+                e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+                e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+                e.Property(x => x.DecodeMode).HasColumnName("decode_mode").HasMaxLength(30).IsRequired();
+                e.Property(x => x.ShowRawValueAlongsideDecoded).HasColumnName("show_raw_value_alongside_decoded");
+
+                e.HasMany(x => x.DecodeValues)
+                    .WithOne(x => x.SnmpOid)
+                    .HasForeignKey(x => x.SnmpOidId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<SnmpOidDecodeValueEntity>(e =>
+            {
+                e.ToTable("snmp_oid_decode_values");
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.Id).HasColumnName("id");
+                e.Property(x => x.SnmpOidId).HasColumnName("snmp_oid_id");
+
+                e.Property(x => x.RawValue).HasColumnName("raw_value").HasMaxLength(100).IsRequired();
+                e.Property(x => x.DisplayText).HasColumnName("display_text").HasMaxLength(255).IsRequired();
+                e.Property(x => x.SortOrder).HasColumnName("sort_order");
+
+                e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+                e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             });
         }
     }
