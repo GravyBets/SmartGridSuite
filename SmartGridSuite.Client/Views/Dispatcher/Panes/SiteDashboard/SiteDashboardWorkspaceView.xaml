@@ -1,6 +1,7 @@
 ﻿<UserControl x:Class="SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard.SiteDashboardWorkspaceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
 
     <UserControl.Resources>
         <Style x:Key="WorkspaceTabControlStyle" TargetType="TabControl">
@@ -108,8 +109,8 @@
         </Style>
 
         <Style x:Key="TopAccessOpenButtonStyle"
-       TargetType="Button"
-       BasedOn="{StaticResource SecondaryButtonStyle}">
+               TargetType="Button"
+               BasedOn="{StaticResource SecondaryButtonStyle}">
             <Setter Property="Width" Value="40"/>
             <Setter Property="Height" Value="30"/>
             <Setter Property="Padding" Value="10,0"/>
@@ -117,20 +118,34 @@
         </Style>
 
         <Style x:Key="TopAccessTestButtonStyle"
-       TargetType="Button"
-       BasedOn="{StaticResource PrimaryButtonStyle}">
+               TargetType="Button"
+               BasedOn="{StaticResource PrimaryButtonStyle}">
             <Setter Property="MinWidth" Value="126"/>
             <Setter Property="Height" Value="30"/>
             <Setter Property="Padding" Value="12,0"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
+
+        <Style x:Key="SnmpResultBoxStyle"
+               TargetType="TextBox"
+               BasedOn="{StaticResource ModernTextBox}">
+            <Setter Property="Background" Value="{DynamicResource TabBgHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="IsReadOnlyCaretVisible" Value="True" />
+            <Setter Property="Focusable" Value="True" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="AcceptsReturn" Value="True" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+        </Style>
     </UserControl.Resources>
 
-    <Border Padding="12"
-            CornerRadius="12"
-            Background="{DynamicResource SurfaceBg}"
-            BorderBrush="{DynamicResource SurfaceBorder}"
-            BorderThickness="1">
+    
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -139,7 +154,7 @@
 
             <TabControl x:Name="WorkspaceTabControl"
                         Grid.Row="0"
-                        Margin="10,0,0,0"
+                        Margin="16,0,0,0"
                         Style="{StaticResource WorkspaceTabControlStyle}"
                         SelectionChanged="WorkspaceTabControl_SelectionChanged">
                 <TabControl.ItemContainerStyle>
@@ -147,21 +162,23 @@
                 </TabControl.ItemContainerStyle>
 
                 <TabItem Header="Main" Tag="TopWriteUp" Margin="0,0,0,0"/>
+                <TabItem x:Name="RxOverviewTabItem" Header="Range Extender" Tag="RxOverview" Visibility="Collapsed"/>
+                <TabItem x:Name="PortalTabItem" Header="PingScreen" Tag="Portal" Visibility="Collapsed"/>
                 <TabItem Header="Site History" Tag="SiteHistory"/>
                 <TabItem Header="Equipment" Tag="Equipment"/>
-                <TabItem Header="SNMP Tool" Tag="SNMPTool"/>
+                <TabItem x:Name="SnmpTabItem" Header="SNMP Tool" Tag="SNMPTool" Height="33" Margin="-4,0,0,0" VerticalAlignment="Top"/>
             </TabControl>
 
             <Border Grid.Row="1"
-                    Margin="0,-1,0,0"
-                    CornerRadius="0,12,12,12"
-                    Background="{DynamicResource SurfaceBg}"
+                    Margin="0,-2,0,0"
+                    CornerRadius="16,16,16,16"
+                    Background="{DynamicResource CardBackground}"
                     BorderBrush="{DynamicResource SurfaceBorder}"
                     BorderThickness="1">
                 <Grid x:Name="WorkspaceContentRoot">
 
                     <!-- TOP / Write Up -->
-                    <Grid x:Name="TopWriteUpPanel" Margin="10">
+                    <Grid x:Name="TopWriteUpPanel" Margin="0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="8"/>
@@ -170,13 +187,13 @@
 
                         <Grid Grid.Row="0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="320"/>
+                                <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
                             <!-- LEFT: TOP card -->
-                            <Border Grid.Column="0" Style="{StaticResource WorkspaceCardStyle}">
+                            <Border Grid.Column="0" Style="{StaticResource Card}">
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
@@ -184,7 +201,11 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="6"/>
                                         <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
+                                        <RowDefinition Height="6"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="6"/>
+                                        <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
 
                                     <TextBox x:Name="TopInfoTextBox"
                                              Visibility="Collapsed" />
@@ -192,18 +213,21 @@
                                     <!-- Header row -->
                                     <Grid Grid.Row="0">
                                         <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="146"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="88"/>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
+                                    </Grid.ColumnDefinitions>
 
                                         <TextBlock x:Name="TopAccessTitleTextBlock"
                                                    Grid.Column="0"
                                                    Text="TOP Access"
                                                    Style="{StaticResource WorkspaceSectionHeaderStyle}"
+                                                   TextTrimming="CharacterEllipsis"
                                                    VerticalAlignment="Center" />
 
                                         <Button x:Name="TestTopPairButton"
-                                                Grid.Column="1"
+                                                Grid.Column="2"
                                                 Style="{StaticResource PrimaryButtonStyle}"
                                                 Content="Active Test"
                                                 Height="28"
@@ -215,13 +239,14 @@
                                     <!-- IP A -->
                                     <Grid Grid.Row="2">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="28"/>
+                                            <ColumnDefinition Width="36"/>
                                             <ColumnDefinition Width="8"/>
                                             <ColumnDefinition Width="118"/>
                                             <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="96"/>
+                                            <ColumnDefinition Width="72"/>
                                             <ColumnDefinition Width="8"/>
                                             <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
                                         <TextBlock Grid.Column="0"
@@ -240,7 +265,7 @@
                                                 Grid.Column="4"
                                                 Style="{StaticResource SecondaryButtonStyle}"
                                                 Content="Open"
-                                                Width="56"
+                                                Width="72"
                                                 Height="28"
                                                 Padding="8,0"
                                                 Click="OpenTopIpAButton_Click" />
@@ -254,13 +279,14 @@
                                     <!-- IP B -->
                                     <Grid Grid.Row="4">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="28"/>
+                                            <ColumnDefinition Width="36"/>
                                             <ColumnDefinition Width="8"/>
                                             <ColumnDefinition Width="118"/>
                                             <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="96"/>
+                                            <ColumnDefinition Width="72"/>
                                             <ColumnDefinition Width="8"/>
                                             <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
                                         <TextBlock Grid.Column="0"
@@ -279,7 +305,7 @@
                                                 Grid.Column="4"
                                                 Style="{StaticResource SecondaryButtonStyle}"
                                                 Content="Open"
-                                                Width="56"
+                                                Width="72"
                                                 Height="28"
                                                 Padding="8,0"
                                                 Click="OpenTopIpBButton_Click" />
@@ -289,222 +315,307 @@
                                                    Style="{StaticResource WorkspaceMiniLabelStyle}"
                                                    VerticalAlignment="Center" />
                                     </Grid>
+
+                                    <Grid x:Name="TopTunnelRow"
+                                          Grid.Row="6"
+                                          Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="36"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="118"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="72"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0"
+                                                       Text="Tunnel"
+                                                       Style="{StaticResource WorkspaceMiniLabelStyle}" />
+
+                                        <TextBox x:Name="TopTunnelIpTextBox"
+                                                     Grid.Column="2"
+                                                     Style="{StaticResource WorkspaceEditorBoxStyle}"
+                                                     Height="28"
+                                                     Padding="10,0"
+                                                     VerticalContentAlignment="Center"
+                                                     IsReadOnly="True" />
+
+                                        <Button x:Name="OpenTopTunnelButton"
+                                                    Grid.Column="4"
+                                                    Style="{StaticResource SecondaryButtonStyle}"
+                                                    Content="Open"
+                                                    Width="72"
+                                                    Height="28"
+                                                    Padding="8,0"
+                                                    Click="OpenTopTunnelButton_Click" />                                       
+                                        
+                                        
+                                    </Grid>                                    
                                 </Grid>
                             </Border>
 
-                            <!-- RIGHT: Ticket card -->
-                            <Border Grid.Column="2"
-                                    Style="{StaticResource WorkspaceCardStyle}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="10"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="8"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="8"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="8"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="8"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="8"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
+                        <!-- RIGHT: Ticket card -->
+                        <Border Grid.Column="2"
+                                Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="8"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="10"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
 
-                                    <!-- Header -->
-                                    <Grid Grid.Row="0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
+                                <!-- Header -->
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                                        <TextBlock Text="Ticket Information"
-                                                   Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+                                    <TextBlock Text="Ticket Information"
+                                               Style="{StaticResource WorkspaceSectionHeaderStyle}" />
 
-                                        <Button x:Name="RefreshTicketButton"
-                                                Grid.Column="1"
-                                                Style="{StaticResource SecondaryButtonStyle}"
-                                                Content="Refresh Ticket"
-                                                Height="28"
-                                                Padding="12,0"
-                                                Click="RefreshTicketButton_Click" />
-                                    </Grid>
+                                    <Button x:Name="RefreshTicketButton"
+                                            Grid.Column="1"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Content="Refresh Ticket"
+                                            Height="28"
+                                            Padding="12,0"
+                                            Click="RefreshTicketButton_Click" />
+                                </Grid>
 
-                                    <!-- Notification Name -->
-                                    <Grid Grid.Row="2">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="118"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
+                                <!-- Notification Name -->
+                                <Grid Grid.Row="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="118"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0"
-                                                   Text="Notification Name"
-                                                   Style="{StaticResource WorkspaceMiniLabelStyle}" />
+                                    <TextBlock Grid.Column="0"
+                                               Text="Notification Name"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
 
-                                        <TextBlock x:Name="TicketNotificationNameTextBlock"
-                                                   Grid.Column="1"
+                                    <TextBlock x:Name="TicketNotificationNameTextBlock"
+                                               Grid.Column="1"
+                                               Foreground="{DynamicResource TextPrimary}"
+                                               TextWrapping="Wrap" />
+                                </Grid>
+
+                                <!-- Notification -->
+                                <Grid Grid.Row="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="118"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0"
+                                               Text="Notification"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
+
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <TextBlock x:Name="TicketNotificationNumberTextBlock"
                                                    Foreground="{DynamicResource TextPrimary}"
-                                                   TextWrapping="Wrap" />
-                                    </Grid>
+                                                   VerticalAlignment="Center" />
 
-                                    <!-- Notification -->
-                                    <Grid Grid.Row="4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="118"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="CopyTicketNotificationButton"
+                                                Style="{StaticResource MiniIconButton}"
+                                                Margin="6,0,0,0"
+                                                Width="22"
+                                                Height="22"
+                                                ToolTip="Copy notification"
+                                                Click="CopyTicketNotificationButton_Click">
+                                            <TextBlock Style="{StaticResource CopyGlyph}" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
 
-                                        <TextBlock Grid.Column="0"
-                                                   Text="Notification"
-                                                   Style="{StaticResource WorkspaceMiniLabelStyle}" />
+                                <!-- Problem / Issue -->
+                                <Grid Grid.Row="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="118"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                        <StackPanel Grid.Column="1"
-                                                    Orientation="Horizontal"
-                                                    VerticalAlignment="Center">
-                                            <TextBlock x:Name="TicketNotificationNumberTextBlock"
-                                                       Foreground="{DynamicResource TextPrimary}"
-                                                       VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="0"
+                                               Text="Problem / Issue"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
 
-                                            <Button x:Name="CopyTicketNotificationButton"
-                                                    Style="{StaticResource MiniIconButton}"
-                                                    Margin="6,0,0,0"
-                                                    Width="22"
-                                                    Height="22"
-                                                    ToolTip="Copy notification"
-                                                    Click="CopyTicketNotificationButton_Click">
-                                                <TextBlock Style="{StaticResource CopyGlyph}" />
-                                            </Button>
-                                        </StackPanel>
-                                    </Grid>
+                                    <TextBlock x:Name="TicketProblemIssueTextBlock"
+                                               Grid.Column="1"
+                                               Foreground="{DynamicResource TextPrimary}"
+                                               TextWrapping="Wrap" />
+                                </Grid>
 
-                                    <!-- Problem / Issue -->
-                                    <Grid Grid.Row="6">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="118"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
+                                <!-- Work Order -->
+                                <Grid Grid.Row="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="118"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0"
-                                                   Text="Problem / Issue"
-                                                   Style="{StaticResource WorkspaceMiniLabelStyle}" />
+                                    <TextBlock Grid.Column="0"
+                                               Text="Work Order"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
 
-                                        <TextBlock x:Name="TicketProblemIssueTextBlock"
-                                                   Grid.Column="1"
+                                    <StackPanel Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <TextBlock x:Name="TicketWorkOrderTextBlock"
                                                    Foreground="{DynamicResource TextPrimary}"
-                                                   TextWrapping="Wrap" />
-                                    </Grid>
+                                                   VerticalAlignment="Center" />
 
-                                    <!-- Work Order -->
-                                    <Grid Grid.Row="8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="118"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
+                                        <Button x:Name="CopyTicketWorkOrderButton"
+                                                Style="{StaticResource MiniIconButton}"
+                                                Margin="6,0,0,0"
+                                                Width="22"
+                                                Height="22"
+                                                ToolTip="Copy work order"
+                                                Click="CopyTicketWorkOrderButton_Click">
+                                            <TextBlock Style="{StaticResource CopyGlyph}" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
 
-                                        <TextBlock Grid.Column="0"
-                                                   Text="Work Order"
-                                                   Style="{StaticResource WorkspaceMiniLabelStyle}" />
+                                <!-- Work Order Type -->
+                                <Grid Grid.Row="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="118"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                        <StackPanel Grid.Column="1"
-                                                    Orientation="Horizontal"
-                                                    VerticalAlignment="Center">
-                                            <TextBlock x:Name="TicketWorkOrderTextBlock"
-                                                       Foreground="{DynamicResource TextPrimary}"
-                                                       VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="0"
+                                               Text="Work Order Type"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
 
-                                            <Button x:Name="CopyTicketWorkOrderButton"
-                                                    Style="{StaticResource MiniIconButton}"
-                                                    Margin="6,0,0,0"
-                                                    Width="22"
-                                                    Height="22"
-                                                    ToolTip="Copy work order"
-                                                    Click="CopyTicketWorkOrderButton_Click">
-                                                <TextBlock Style="{StaticResource CopyGlyph}" />
-                                            </Button>
-
-                                            <Border x:Name="TicketWorkOrderTypeBadge"
-                                                    Margin="8,0,0,0"
-                                                    Padding="8,2"
-                                                    CornerRadius="10"
-                                                    Background="{DynamicResource TabBgHover}"
-                                                    BorderBrush="{DynamicResource SurfaceBorder}"
-                                                    BorderThickness="1"
-                                                    VerticalAlignment="Center">
-                                                <TextBlock x:Name="TicketWorkOrderTypeTextBlock"
-                                                           FontSize="11"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource TextPrimary}" />
-                                            </Border>
-
-                                            <Button x:Name="RequestCapitalButton"
-                                                    Margin="10,0,0,0"
-                                                    Style="{StaticResource SecondaryButtonStyle}"
-                                                    Content="Request Capital"
-                                                    Padding="12,0"
-                                                    Height="28"
-                                                    Visibility="Collapsed"
-                                                    Click="RequestCapitalButton_Click" />
-                                        </StackPanel>
-                                    </Grid>
-
-                                    <!-- Assigned To -->
-                                    <Grid Grid.Row="10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="118"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <TextBlock Grid.Column="0"
-                                                   Text="Assigned To"
-                                                   Style="{StaticResource WorkspaceMiniLabelStyle}" />
-
-                                        <TextBlock x:Name="TicketAssignedToTextBlock"
-                                                   Grid.Column="1"
+                                    <!-- Keep this Border name for compile safety, but remove the bubble styling. -->
+                                    <Border x:Name="TicketWorkOrderTypeBadge"
+                                            Grid.Column="1"
+                                            Padding="0"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            HorizontalAlignment="Left">
+                                        <TextBlock x:Name="TicketWorkOrderTypeTextBlock"
                                                    Foreground="{DynamicResource TextPrimary}" />
-                                    </Grid>
+                                    </Border>
+                                </Grid>
 
-                                    <!-- Date Created + Current Status -->
-                                    <Grid Grid.Row="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="118"/>
-                                            <ColumnDefinition Width="150"/>
-                                            <ColumnDefinition Width="20"/>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
+                                <!-- Assigned To -->
+                                <Grid Grid.Row="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="118"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="20"/>
+                                        <ColumnDefinition Width="80"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0"
-                                                   Text="Date Created"
-                                                   Style="{StaticResource WorkspaceMiniLabelStyle}" />
+                                    <TextBlock Grid.Column="0"
+                                               Text="Assigned To"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
 
-                                        <TextBlock x:Name="TicketDateCreatedTextBlock"
-                                                   Grid.Column="1"
+                                    <TextBlock x:Name="TicketAssignedToTextBlock"
+                                               Grid.Column="1"
+                                               Foreground="{DynamicResource TextPrimary}" />
+
+                                    <TextBlock Grid.Column="3"
+                                               Text="Status"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
+
+                                    <Border x:Name="TicketStatusBadge"
+                                            Grid.Column="4"
+                                            Padding="0"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            HorizontalAlignment="Left">
+                                        <TextBlock x:Name="TicketStatusTextBlock"
                                                    Foreground="{DynamicResource TextPrimary}" />
+                                    </Border>
+                                </Grid>
 
-                                        <TextBlock Grid.Column="3"
-                                                   Text="Status"
-                                                   Style="{StaticResource WorkspaceMiniLabelStyle}" />
+                                <!-- Date Created -->
+                                <Grid Grid.Row="14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="118"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
 
-                                        <Border x:Name="TicketStatusBadge"
-                                                Grid.Column="4"
-                                                Padding="8,2"
-                                                CornerRadius="10"
-                                                Background="{DynamicResource TabBgHover}"
-                                                BorderBrush="{DynamicResource SurfaceBorder}"
-                                                BorderThickness="1"
-                                                HorizontalAlignment="Left">
-                                            <TextBlock x:Name="TicketStatusTextBlock"
-                                                       FontSize="11"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{DynamicResource TextPrimary}" />
-                                        </Border>
+                                    <TextBlock Grid.Column="0"
+                                               Text="Date Created"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
+
+                                    <TextBlock x:Name="TicketDateCreatedTextBlock"
+                                               Grid.Column="1"
+                                               Foreground="{DynamicResource TextPrimary}" />
+                                </Grid>
+
+                                <!-- Actions -->
+                                <Grid Grid.Row="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock x:Name="TicketActionHintTextBlock"
+                                               Grid.Column="0"
+                                               Text="Ticket actions require a reason."
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               VerticalAlignment="Center" />
+
+                                    <Button x:Name="RequestTicketButton"
+                                            Grid.Column="2"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Content="Request Ticket"
+                                            Height="28"
+                                            Padding="12,0"
+                                            Visibility="Collapsed"
+                                            Click="RequestTicketButton_Click" />
+
+                                    <Button x:Name="RequestMaintenanceButton"
+                                            Grid.Column="4"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Content="Request Maint"
+                                            Height="28"
+                                            Padding="12,0"
+                                            Visibility="Collapsed"
+                                            Click="RequestMaintenanceButton_Click" />
+
+                                    <Button x:Name="RequestCapitalButton"
+                                            Grid.Column="6"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Content="Request Cap"
+                                            Height="28"
+                                            Padding="12,0"
+                                            Visibility="Collapsed"
+                                            Click="RequestCapitalButton_Click" />                                    
                                     </Grid>
                                 </Grid>
                             </Border>
                         </Grid>
-
-                        <Border Grid.Row="2" Style="{StaticResource WorkspaceCardStyle}">
+                    
+                        <!-- Write-Up -->
+                        <Border Grid.Row="2" Style="{StaticResource Card}">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -512,20 +623,426 @@
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
 
-                                <TextBlock Text="Write Up"
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Text="Write Up"
+                                               Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+                                
+                                </Grid>
+
+                                <Grid Grid.Row="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="220"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBox x:Name="WriteUpTextBox"
+                                             Grid.Column="0"
+                                             MinHeight="260"
+                                             Height="Auto"
+                                             Padding="6,6,0,0"
+                                             AcceptsReturn="True"
+                                             TextWrapping="Wrap"
+                                             VerticalContentAlignment="Top"
+                                             VerticalScrollBarVisibility="Auto"
+                                             TextChanged="WriteUpTextBox_TextChanged" />
+
+                                    <Border Grid.Column="2"
+                                            Padding="12"
+                                            CornerRadius="10"
+                                            BorderBrush="{DynamicResource SurfaceBorder}"
+                                            BorderThickness="1"
+                                            Background="{DynamicResource SurfaceBg}">
+                                        <StackPanel>
+                                            <TextBlock Text="Include With Submit"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextPrimary}" />
+
+                                            <TextBlock Text="Equipment replacements are included automatically when replacement entries exist."
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,8,0,0"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondary}" />
+
+                                            <CheckBox x:Name="IncludePingStatsCheckBox"
+                                                      Content="Ping stats"
+                                                      IsChecked="True"
+                                                      Margin="0,12,0,0"
+                                                      Foreground="{DynamicResource TextPrimary}" />
+
+                                            <CheckBox x:Name="IncludeSnmpStatsCheckBox"
+                                                      Content="SNMP stats"
+                                                      IsChecked="False"
+                                                      Margin="0,8,0,0"
+                                                      Foreground="{DynamicResource TextPrimary}"
+                                                      Checked="IncludeSnmpStatsCheckBox_CheckedChanged"
+                                                      Unchecked="IncludeSnmpStatsCheckBox_CheckedChanged" />
+
+                                            <StackPanel x:Name="SnmpCategoryOptionsPanel"
+                                                        Visibility="Collapsed"
+                                                        Margin="18,6,0,0">
+                                                <CheckBox x:Name="IncludeSnmpAdminCheckBox"
+                                                          Content="Admin"
+                                                          IsChecked="True"
+                                                          Margin="0,0,0,4"
+                                                          Foreground="{DynamicResource TextPrimary}" />
+
+                                                <CheckBox x:Name="IncludeSnmpConfigCheckBox"
+                                                          Content="Config"
+                                                          IsChecked="True"
+                                                          Margin="0,0,0,4"
+                                                          Foreground="{DynamicResource TextPrimary}" />
+
+                                                <CheckBox x:Name="IncludeSnmpStatsCategoryCheckBox"
+                                                          Content="Stats"
+                                                          IsChecked="True"
+                                                          Foreground="{DynamicResource TextPrimary}" />
+                                            </StackPanel>
+
+                                            <Button x:Name="SubmitWriteUpButton"
+                                                    Style="{StaticResource PrimaryButtonStyle}"
+                                                    Content="Submit"
+                                                    Height="32"
+                                                    Margin="0,16,0,0"
+                                                    Padding="14,0"
+                                                    HorizontalAlignment="Stretch"
+                                                    Click="SubmitWriteUpButton_Click" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Range Extender -->
+                    <Grid x:Name="RxOverviewPanel"
+                          Margin="0"
+                          Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0"
+                                Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Range Extender"
                                            Style="{StaticResource WorkspaceSectionHeaderStyle}" />
 
-                                <TextBox x:Name="WriteUpTextBox"
-                                         Grid.Row="2"
-                                         MinHeight="260"
-                                         Height="Auto"
-                                         Padding="6,6,0,0"
-                                         AcceptsReturn="True"
-                                         TextWrapping="Wrap"
-                                         VerticalContentAlignment="Top"
-                                         VerticalScrollBarVisibility="Auto"
-                                         TextChanged="WriteUpTextBox_TextChanged" />
-                            </Grid>
+                                <TextBlock Text="RX lookup tools and related site research."
+                                           Margin="0,4,0,0"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="320"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- RX Links / Reference -->
+                        <Border Grid.Column="0"
+                                    Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="RX Tools"
+                                               Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+
+                                <Button x:Name="OpenRangeExtenderLinkButton"
+                                            Style="{StaticResource PrimaryButtonStyle}"
+                                            Content="Open Range Extender Link"
+                                            Height="32"
+                                            Margin="0,12,0,0"
+                                            Padding="12,0"
+                                            HorizontalAlignment="Stretch"
+                                            Click="OpenRangeExtenderLinkButton_Click" />
+
+                                <Border Height="1"
+                                        Margin="0,14,0,12"
+                                        Background="{DynamicResource SurfaceBorder}" />
+
+                                <TextBlock Text="Reference"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}" />
+
+                                <!-- Range Extender SN -->
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="4"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0"
+                                               Text="Range Extender SN"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
+
+                                    <Grid Grid.Row="2">
+                                        <TextBox x:Name="RxRangeExtenderSnTextBox"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 Height="30"
+                                                 Padding="10,0,34,0"
+                                                 VerticalContentAlignment="Center"
+                                                 IsReadOnly="True"
+                                                 IsReadOnlyCaretVisible="True" />
+
+                                        <Button Style="{StaticResource MiniIconButton}"
+                                                Width="22"
+                                                Height="22"
+                                                Margin="0,0,5,0"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                ToolTip="Copy Range Extender SN"
+                                                Tag="{Binding ElementName=RxRangeExtenderSnTextBox, Path=Text}"
+                                                Click="CopyRxReferenceButton_Click">
+                                            <TextBlock Style="{StaticResource CopyGlyph}" />
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+
+                                <!-- MAC Address -->
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="4"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0"
+                                               Text="MAC Address"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
+
+                                    <Grid Grid.Row="2">
+                                        <TextBox x:Name="RxMacAddressTextBox"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 Height="30"
+                                                 Padding="10,0,34,0"
+                                                 VerticalContentAlignment="Center"
+                                                 IsReadOnly="True"
+                                                 IsReadOnlyCaretVisible="True" />
+
+                                        <Button Style="{StaticResource MiniIconButton}"
+                                                Width="22"
+                                                Height="22"
+                                                Margin="0,0,5,0"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                ToolTip="Copy MAC Address"
+                                                Tag="{Binding ElementName=RxMacAddressTextBox, Path=Text}"
+                                                Click="CopyRxReferenceButton_Click">
+                                            <TextBlock Style="{StaticResource CopyGlyph}" />
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+
+                                <!-- Pole Point -->
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="4"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0"
+                                               Text="Pole Point"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
+
+                                    <Grid Grid.Row="2">
+                                        <TextBox x:Name="RxPolePointTextBox"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 Height="30"
+                                                 Padding="10,0,34,0"
+                                                 VerticalContentAlignment="Center"
+                                                 IsReadOnly="True"
+                                                 IsReadOnlyCaretVisible="True" />
+
+                                        <Button Style="{StaticResource MiniIconButton}"
+                                                Width="22"
+                                                Height="22"
+                                                Margin="0,0,5,0"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                ToolTip="Copy Pole Point"
+                                                Tag="{Binding ElementName=RxPolePointTextBox, Path=Text}"
+                                                Click="CopyRxReferenceButton_Click">
+                                            <TextBlock Style="{StaticResource CopyGlyph}" />
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+
+                                <!-- Transformer GLN -->
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="4"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0"
+                                               Text="Transformer GLN"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
+
+                                    <Grid Grid.Row="2">
+                                        <TextBox x:Name="RxTransformerGlnTextBox"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 Height="30"
+                                                 Padding="10,0,34,0"
+                                                 VerticalContentAlignment="Center"
+                                                 IsReadOnly="True"
+                                                 IsReadOnlyCaretVisible="True" />
+
+                                        <Button Style="{StaticResource MiniIconButton}"
+                                                Width="22"
+                                                Height="22"
+                                                Margin="0,0,5,0"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                ToolTip="Copy Transformer GLN"
+                                                Tag="{Binding ElementName=RxTransformerGlnTextBox, Path=Text}"
+                                                Click="CopyRxReferenceButton_Click">
+                                            <TextBlock Style="{StaticResource CopyGlyph}" />
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Associated Site Lookup -->
+                            <Border Grid.Column="2"
+                                    Style="{StaticResource Card}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="10"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="12"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0"
+                                               Text="Find Associated Site by IP"
+                                               Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+
+                                    <Grid Grid.Row="2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBox x:Name="RxIpLookupTextBox"
+                                                 Grid.Column="0"
+                                                 Style="{StaticResource WorkspaceEditorBoxStyle}"
+                                                 Height="32"
+                                                 Padding="10,0"
+                                                 VerticalContentAlignment="Center"
+                                                 Tag="Enter IP address" />
+
+                                        <Button Grid.Column="2"
+                                                Style="{StaticResource PrimaryButtonStyle}"
+                                                Content="Search"
+                                                Height="32"
+                                                MinWidth="90"
+                                                Padding="14,0"
+                                                Click="SearchRxIpButton_Click" />
+                                    </Grid>
+
+                                    <Border Grid.Row="4"
+                                            Padding="12"
+                                            CornerRadius="10"
+                                            BorderBrush="{DynamicResource SurfaceBorder}"
+                                            BorderThickness="1"
+                                            Background="{DynamicResource SurfaceBg}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock x:Name="RxIpLookupStatusTextBlock"
+                                                           Text="Enter an IP address to look up the associated site."
+                                                           Foreground="{DynamicResource TextSecondary}"
+                                                           TextWrapping="Wrap" />
+
+                                                <TextBlock x:Name="RxAssociatedSiteTextBlock"
+                                                           Margin="0,6,0,0"
+                                                           FontSize="18"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextPrimary}"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+
+                                            <Button x:Name="OpenAssociatedSiteButton"
+                                                    Grid.Column="2"
+                                                    Style="{StaticResource SecondaryButtonStyle}"
+                                                    Content="Open Site"
+                                                    Height="32"
+                                                    MinWidth="96"
+                                                    Padding="14,0"
+                                                    IsEnabled="False"
+                                                    Click="OpenAssociatedSiteButton_Click" />
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
+
+                    <!--Portal Tab-->
+                    <Grid x:Name="PortalPanel" Visibility="Collapsed">
+                        <Grid.RowDefinitions>                        
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="PingScreen"
+                                       Margin="10,4,0,0"
+                                       Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+
+                            <Button Grid.Column="2"
+                                    x:Name="ReloadPortalButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Reload"
+                                    Height="28"
+                                    Padding="12,0"
+                                    Click="ReloadPortalButton_Click" />
+
+                            <Button Grid.Column="4"
+                                    x:Name="OpenPortalInBrowserButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Open in Browser"
+                                    Height="28"
+                                    Padding="12,0"
+                                    Click="OpenPortalInBrowserButton_Click" />
+                        </Grid>
+
+                        <Border Grid.Row="2"
+                                CornerRadius="10"
+                                BorderBrush="{DynamicResource SurfaceBorder}"
+                                BorderThickness="1"
+                                Background="{DynamicResource SurfaceBg}">
+                            <wv2:WebView2 x:Name="PortalWebView" />
                         </Border>
                     </Grid>
 
@@ -561,7 +1078,7 @@
                                     <Setter Property="Background" Value="{DynamicResource SurfaceBg}" />
                                     <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
                                     <Setter Property="FontWeight" Value="SemiBold" />
-                                    <Setter Property="FontSize" Value="12" />
+                                    <Setter Property="FontSize" Value="14" />
                                     <Setter Property="Padding" Value="10,8" />
                                     <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}" />
                                     <Setter Property="BorderThickness" Value="0,0,0,1" />
@@ -572,7 +1089,8 @@
                                     <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
                                     <Setter Property="BorderThickness" Value="0" />
                                     <Setter Property="SnapsToDevicePixels" Value="True" />
-                                    <Style.Triggers>
+                                    <Setter Property="FontSize" Value="14" />
+                                <Style.Triggers>
                                         <Trigger Property="IsSelected" Value="True">
                                             <Setter Property="Background" Value="{DynamicResource TabBgHover}" />
                                             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
@@ -624,198 +1142,133 @@
                                     <TextBlock x:Name="NarrativeTextBlock"
                                                Padding="12"
                                                TextWrapping="Wrap"
-                                               Foreground="{DynamicResource TextPrimary}" />
+                                               Foreground="{DynamicResource TextPrimary}"
+                                               FontSize="14"/>
                                 </ScrollViewer>
                             </Border>
                         </Grid>
                     </Grid>
 
                     <!-- Equipment -->
-                    <Grid x:Name="EquipmentPanel" Margin="10" Visibility="Collapsed">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="8"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
+                    <Grid x:Name="EquipmentPanel"
+                          Visibility="Collapsed"
+                          Margin="0">
 
-                        <Grid Grid.Row="0">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="10"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="10"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="300"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                            <Border Grid.Row="0"
-                                    Grid.Column="0"
-                                    Style="{StaticResource WorkspaceCardStyle}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="6"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
+                        <!-- LEFT SIDE -->
+                        <StackPanel Grid.Column="0"
+                                    VerticalAlignment="Top">
 
-                                    <TextBlock Text="Enclosure"
-                                               Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+                            <!-- Serialized Devices -->
+                            <Border Style="{StaticResource Card}"
+                                    Padding="16"
+                                    Margin="0,0,0,8">
+                                <StackPanel>
+                                    <TextBlock Text="Serialized Devices"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}"/>
 
-                                    <TextBox x:Name="EnclosureCardTextBox"
-                                             Grid.Row="2"
-                                             Style="{StaticResource WorkspaceReadOnlyBoxStyle}" />
-                                </Grid>
+                                    <StackPanel x:Name="SerializedDevicesPanel"
+                                                Margin="0,10,0,0"/>
+                                </StackPanel>
                             </Border>
 
-                            <Border Grid.Row="0"
-                                    Grid.Column="2"
-                                    Style="{StaticResource WorkspaceCardStyle}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="6"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
+                            <!-- Access & Security -->
+                            <Border x:Name="AccessSecurityCard"
+                                    Style="{StaticResource Card}"
+                                    Padding="16">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
 
-                                    <TextBlock Text="Primary Communications"
-                                                Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+                                        <TextBlock Text="Access &amp; Security"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimary}"
+                                                   VerticalAlignment="Center"/>
 
-                                    <TextBox x:Name="PrimaryCardTextBox"
-                                             Grid.Row="2"
-                                             Style="{StaticResource WorkspaceReadOnlyBoxStyle}" />
-                                </Grid>
+                                        <Button x:Name="ToggleSensitiveEquipmentButton"
+                                                Grid.Column="1"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Content="View"
+                                                Height="28"
+                                                MinWidth="78"
+                                                Padding="12,0"
+                                                Click="ToggleSensitiveEquipmentButton_Click"/>
+                                    </Grid>
+
+                                    <StackPanel x:Name="AccessSecuritySectionPanel"/>
+                                </StackPanel>
                             </Border>
 
-                            <Border Grid.Row="2"
-                                    Grid.Column="0"
-                                    Style="{StaticResource WorkspaceCardStyle}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="6"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
+                        </StackPanel>
 
-                                    <TextBlock Text="Secondary Communications"
-                                               Style="{StaticResource WorkspaceSectionHeaderStyle}" />
-
-                                    <TextBox x:Name="SecondaryCardTextBox"
-                                             Grid.Row="2"
-                                             Style="{StaticResource WorkspaceReadOnlyBoxStyle}" />
-                                </Grid>
-                            </Border>
-
-                            <Border Grid.Row="2"
-                                    Grid.Column="2"
-                                    Style="{StaticResource WorkspaceCardStyle}">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="6"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-
-                                    <TextBlock Text="Antenna"
-                                               Style="{StaticResource WorkspaceSectionHeaderStyle}" />
-
-                                    <TextBox x:Name="AntennaCardTextBox"
-                                             Grid.Row="2"
-                                             Style="{StaticResource WorkspaceReadOnlyBoxStyle}" />
-                                </Grid>
-                            </Border>
-
-                            <!-- hidden raw text source used for parsing/lookups -->
-                            <TextBox x:Name="EquipmentTextBox"
-                                     Visibility="Collapsed" />
-                        </Grid>
-
-                        <Border Grid.Row="2" Style="{StaticResource WorkspaceCardStyle}">
+                        <!-- RIGHT SIDE -->
+                        <Border Grid.Column="2"
+                                Style="{StaticResource Card}"
+                                Padding="16">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="10"/>
+                                    <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
 
-                                <TextBlock Text="Replacement Entry"
-                                           Style="{StaticResource WorkspaceSectionHeaderStyle}" />
-
-                                <Grid Grid.Row="2">
+                                <!-- Header -->
+                                <Grid Grid.Row="0">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="10"/>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <TextBlock Grid.Column="0"
-                                               Text="Serialized Item"
-                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
+                                    <TextBlock Text="Replacement Entries"
+                                               FontSize="16"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}"
+                                               VerticalAlignment="Center"/>
 
-                                    <ComboBox x:Name="ReplacementItemComboBox"
-                                              Grid.Column="1"
-                                              SelectionChanged="ReplacementItemComboBox_SelectionChanged">
-                                        <ComboBoxItem Content="Enclosure SN"/>
-                                        <ComboBoxItem Content="Primary SN"/>
-                                        <ComboBoxItem Content="Secondary SN"/>
-                                        <ComboBoxItem Content="Antenna SN"/>
-                                    </ComboBox>
-
-                                    <TextBlock Grid.Column="3"
-                                               Text="Old Serial"
-                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
-
-                                    <TextBox x:Name="OldSerialTextBox"
-                                             Grid.Column="4"
-                                             Style="{StaticResource WorkspaceEditorBoxStyle}"
-                                             IsReadOnly="True" />
-                                </Grid>
-
-                                <Grid Grid.Row="4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="10"/>
-                                        <ColumnDefinition Width="120"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <TextBlock Grid.Column="0"
-                                               Text="New Serial"
-                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
-
-                                    <TextBox x:Name="NewSerialTextBox"
-                                             Grid.Column="1"
-                                             Style="{StaticResource WorkspaceEditorBoxStyle}" />
-
-                                    <Button x:Name="AddReplacementToWriteUpButton"
-                                            Grid.Column="3"
+                                    <Button Grid.Column="1"
+                                            Content="+ Add"
                                             Style="{StaticResource PrimaryButtonStyle}"
-                                            Content="Add to Write Up"
-                                            Click="AddReplacementToWriteUpButton_Click" />
+                                            Height="28"
+                                            MinWidth="78"
+                                            Padding="12,0"
+                                            Click="AddReplacementEntryButton_Click"/>
                                 </Grid>
+
+                                <!-- Replacement Entries Scroll Area -->
+                                <ScrollViewer Grid.Row="2"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel x:Name="ReplacementEntriesPanel"/>
+                                </ScrollViewer>
                             </Grid>
                         </Border>
                     </Grid>
 
-                    
                     <!-- SNMP -->
-                    <Grid x:Name="SnmpPanel" Margin="10" Visibility="Collapsed">
+                    <Grid x:Name="SnmpPanel" Margin="0" Visibility="Collapsed">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="10"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="10"/>
-                            <RowDefinition Height="190"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <!-- Summary / target -->
+                        <!-- Header -->
                         <Border Grid.Row="0"
-                                Style="{StaticResource WorkspaceCardStyle}">
+                                Style="{StaticResource Card}"
+                                Margin="0,0,0,0">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -825,209 +1278,304 @@
 
                                 <Grid Grid.Row="0">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                
+                                    <TextBlock Grid.Column="0"
+                                               Text="SNMP Tool"
+                                               Style="{StaticResource WorkspaceSectionHeaderStyle}"
+                                               VerticalAlignment="Center" />
+
+                                    <TextBlock x:Name="SnmpSupportInlineTextBlock"
+                                               Grid.Column="2"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Text="No site loaded." />
+                                </Grid>
+                                <Grid Grid.Row="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <TextBlock Text="SNMP Tool"
-                                               Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+                                    <TextBlock Grid.Column="0"
+                                               Text="Profile"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}"
+                                               VerticalAlignment="Center" />
 
-                                    <Button x:Name="RunSelectedSnmpButton"
-                                            Grid.Column="1"
-                                            Style="{StaticResource PrimaryButtonStyle}"
-                                            Content="Run Selected"
-                                            Height="28"
-                                            Padding="12,0"
-                                            Click="RunSelectedSnmpButton_Click" />
-
+                                    <ComboBox x:Name="SnmpProfileComboBox"
+                                              Grid.Column="2"
+                                              Height="28"
+                                              MinWidth="220"
+                                              IsEditable="False"
+                                              DisplayMemberPath="DisplayLabel"
+                                              SelectedValuePath="Id"
+                                              TextSearch.TextPath="DisplayLabel"
+                                              SelectionChanged="SnmpProfileComboBox_SelectionChanged" />
+                                
                                     <Button x:Name="RefreshSnmpButton"
-                                            Grid.Column="3"
+                                            Grid.Column="4"
                                             Style="{StaticResource SecondaryButtonStyle}"
-                                            Content="Refresh Config"
+                                            Content="Refresh SNMP Config"
                                             Height="28"
                                             Padding="12,0"
                                             Click="RefreshSnmpButton_Click" />
-                                </Grid>
-
-                                <Grid Grid.Row="2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="110"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="16"/>
-                                        <ColumnDefinition Width="90"/>
-                                        <ColumnDefinition Width="140"/>
-                                        <ColumnDefinition Width="16"/>
-                                        <ColumnDefinition Width="70"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <TextBlock Grid.Column="0"
-                                               Text="Support"
-                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
-                                    <TextBlock x:Name="SnmpSupportTextBlock"
-                                               Grid.Column="1"
-                                               Foreground="{DynamicResource TextPrimary}"
-                                               TextWrapping="Wrap" />
-
-                                    <TextBlock Grid.Column="3"
-                                               Text="Profile"
-                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
-                                    <TextBlock x:Name="SnmpProfileTextBlock"
-                                               Grid.Column="4"
-                                               Foreground="{DynamicResource TextPrimary}" />
 
                                     <TextBlock Grid.Column="6"
-                                               Text="Family"
-                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
-                                    <TextBlock x:Name="SnmpFamilyTextBlock"
-                                               Grid.Column="7"
-                                               Foreground="{DynamicResource TextPrimary}" />
-                                </Grid>
-                            </Grid>
-                        </Border>
-
-                        <!-- OID list -->
-                        <Border Grid.Row="2"
-                                Style="{StaticResource WorkspaceCardStyle}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <TextBlock Text="Configured OIDs"
-                                           Style="{StaticResource WorkspaceSectionHeaderStyle}" />
-
-                                <!-- Target -->
-                                <Grid Grid.Row="2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="70"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <TextBlock Grid.Column="0"
                                                Text="Target"
-                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}"
+                                               VerticalAlignment="Center" />
+
+                                    <ComboBox x:Name="SnmpTargetComboBox"
+                                              Grid.Column="8"
+                                              Height="28"
+                                              SelectionChanged="SnmpTargetComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="Primary IP"/>
+                                        <ComboBoxItem Content="LAN IP"/>
+                                        <ComboBoxItem Content="Secondary IP"/>
+                                    </ComboBox>
 
                                     <TextBox x:Name="SnmpTargetTextBox"
-                                             Grid.Column="1"
+                                             Grid.Column="10"
                                              Style="{StaticResource WorkspaceEditorBoxStyle}"
                                              Height="28"
-                                             Padding="10,0"
+                                             MinWidth="104"
+                                             Padding="10,0,14,0"
                                              VerticalContentAlignment="Center"
                                              LostFocus="SnmpTargetTextBox_LostFocus" />
-                                </Grid>
 
-                                <!-- Set value -->
+                                    <Button x:Name="PollAllSnmpButton"
+                                            Grid.Column="12"
+                                            Style="{StaticResource PrimaryButtonStyle}"
+                                            Content="Poll All"
+                                            Height="28"
+                                            Width="66"
+                                            Padding="12,0"
+                                            Click="PollAllSnmpButton_Click" />
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <!-- Category cards -->
+                        <Grid Grid.Row="2">
+                            <ItemsControl x:Name="SnmpCategoryItemsControl"
+                                          Margin="0,0,-8,0">                                      
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="3"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+
+                                <ItemsControl.ItemContainerStyle>
+                                    <Style TargetType="ContentPresenter">
+                                        <Setter Property="Margin" Value="0,0,8,0"/>
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
+
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource Card}"
+                                                Padding="12,10"
+                                                MinHeight="0">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="8"/>
+                                                    <RowDefinition Height="*"/>
+                                                </Grid.RowDefinitions>
+
+                                                <!-- Category header -->
+                                                <Grid Grid.Row="0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Text="{Binding Category}"
+                                                               Style="{StaticResource WorkspaceSectionHeaderStyle}"
+                                                               VerticalAlignment="Center" />                                                
+                                                </Grid>
+
+                                                <!-- Category contents -->
+                                                <Grid Grid.Row="2" MinHeight="0">
+                                                    <TextBlock Text="{Binding EmptyMessage}"
+                                                               Visibility="{Binding EmptyMessageVisibility}"
+                                                               Foreground="{DynamicResource TextSecondary}" />
+
+                                                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                                  HorizontalScrollBarVisibility="Disabled"
+                                                                  CanContentScroll="True">
+                                                        <ItemsControl ItemsSource="{Binding Rows}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border Margin="0,0,0,6"
+                                                                            Padding="0,0,0,6"
+                                                                            BorderBrush="{DynamicResource SurfaceBorder}"
+                                                                            BorderThickness="0,0,0,1">
+                                                                        <Grid>
+                                                                            <Grid.RowDefinitions>
+                                                                                <RowDefinition Height="Auto"/>
+                                                                                <RowDefinition Height="4"/>
+                                                                                <RowDefinition Height="Auto"/>
+                                                                            </Grid.RowDefinitions>
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="*"/>
+                                                                                <ColumnDefinition Width="Auto"/>
+                                                                            </Grid.ColumnDefinitions>
+
+                                                                            <TextBlock Grid.Row="0"
+                                                                                       Grid.Column="0"
+                                                                                       Text="{Binding Label}"
+                                                                                       TextWrapping="Wrap"
+                                                                                       Margin="0,1,8,0"
+                                                                                       Foreground="{DynamicResource TextPrimary}"
+                                                                                       FontWeight="SemiBold"
+                                                                                       VerticalAlignment="Center" />
+
+                                                                            <Button Grid.Row="0"
+                                                                                    Grid.Column="1"
+                                                                                    Style="{StaticResource SecondaryButtonStyle}"
+                                                                                    FontFamily="Segoe MDL2 Assets"
+                                                                                    Content="&#xE72C;"
+                                                                                    Height="24"
+                                                                                    MinWidth="28"
+                                                                                    Padding="0,0"
+                                                                                    Tag="{Binding}"
+                                                                                    Click="RunSnmpOidButton_Click" />
+
+                                                                            <TextBox Grid.Row="2"
+                                                                                     Grid.Column="0"
+                                                                                     Grid.ColumnSpan="2"
+                                                                                     VerticalScrollBarVisibility="Disabled"
+                                                                                     Text="{Binding ResultText}"
+                                                                                     Style="{StaticResource SnmpResultBoxStyle}"
+                                                                                     MinHeight="32" />
+                                                                        </Grid>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </ScrollViewer>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+
+                        <!-- SNMP Set Tool -->
+                        <Border Grid.Row="4"
+                                Style="{StaticResource Card}"
+                                Margin="0">
+                            <Grid MinHeight="100">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="8"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="8"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="8"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Text="SNMP Set Tool"
+                                           Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+
+
+                                <!-- Row 2: OID + Value + Set -->
                                 <Grid Grid.Row="4">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="70"/>
-                                        <ColumnDefinition Width="220"/>
-                                        <ColumnDefinition Width="10"/>
-                                        <ColumnDefinition Width="110"/>
-                                        <ColumnDefinition Width="10"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
                                     <TextBlock Grid.Column="0"
-                       Text="Set Value"
-                       Style="{StaticResource WorkspaceMiniLabelStyle}" />
+                                               Text="Choose OID"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
 
-                                    <TextBox x:Name="SnmpSetValueTextBox"
-                     Grid.Column="1"
-                     Style="{StaticResource WorkspaceEditorBoxStyle}"
-                     Height="28"
-                     Padding="10,0"
-                     VerticalContentAlignment="Center"
-                     IsEnabled="False" />
+                                    <ComboBox x:Name="SnmpWritableOidComboBox"
+                                              Grid.Column="2"
+                                              Height="28"
+                                              MinWidth="260"
+                                              HorizontalAlignment="Stretch"
+                                              IsEditable="False"
+                                              DisplayMemberPath="DisplayLabel"
+                                              TextSearch.TextPath="DisplayLabel"
+                                              SelectionChanged="SnmpWritableOidComboBox_SelectionChanged" />
+
+                                    <TextBlock Grid.Column="4"
+                                               Text="Set Value"
+                                               Style="{StaticResource WorkspaceMiniLabelStyle}" />
+
+                                    <Grid Grid.Column="6">
+                                        <TextBox x:Name="SnmpSetValueTextBox"
+                                                 Style="{StaticResource WorkspaceEditorBoxStyle}"
+                                                 Height="28"
+                                                 MinWidth="220"
+                                                 Padding="10,0"
+                                                 VerticalContentAlignment="Center"
+                                                 HorizontalAlignment="Stretch"
+                                                 IsEnabled="False" />
+
+                                        <ComboBox x:Name="SnmpSetValueComboBox"
+                                                  Height="28"
+                                                  MinWidth="220"
+                                                  HorizontalAlignment="Stretch"
+                                                  IsEditable="False"
+                                                  DisplayMemberPath="DisplayLabel"
+                                                  SelectedValuePath="RawValue"
+                                                  TextSearch.TextPath="DisplayLabel"
+                                                  Visibility="Collapsed"
+                                                  IsEnabled="False" />
+                                    </Grid>
 
                                     <Button x:Name="SetSelectedSnmpButton"
-                    Grid.Column="3"
-                    Style="{StaticResource PrimaryButtonStyle}"
-                    Content="Set Selected"
-                    Height="28"
-                    Padding="12,0"
-                    IsEnabled="False"
-                    Click="SetSelectedSnmpButton_Click" />
-
-                                    <TextBlock x:Name="SnmpSetHintTextBlock"
-                       Grid.Column="5"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource TextSecondary}"
-                       Text="Select a writable OID to enable setting a value." />
+                                            Grid.Column="8"
+                                            Style="{StaticResource PrimaryButtonStyle}"
+                                            Content="Set Selected"
+                                            Height="28"
+                                            MinWidth="108"
+                                            Padding="12,0"
+                                            IsEnabled="False"
+                                            Click="SetSelectedSnmpButton_Click" />
                                 </Grid>
 
-                                <DataGrid x:Name="SnmpOidDataGrid"
-                  Grid.Row="6"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  CanUserDeleteRows="False"
-                  CanUserReorderColumns="False"
-                  CanUserResizeRows="False"
-                  IsReadOnly="True"
-                  SelectionMode="Single"
-                  SelectionUnit="FullRow"
-                  RowHeaderWidth="0"
-                  BorderThickness="0"
-                  Background="Transparent"
-                  GridLinesVisibility="Horizontal"
-                  HeadersVisibility="Column"
-                  SelectionChanged="SnmpOidDataGrid_SelectionChanged">
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Category"
-                                    Width="120"
-                                    Binding="{Binding Category}" />
-                                        <DataGridTextColumn Header="Label"
-                                    Width="180"
-                                    Binding="{Binding Label}" />
-                                        <DataGridTextColumn Header="OID"
-                                    Width="*"
-                                    Binding="{Binding Oid}" />
-                                        <DataGridTextColumn Header="Type"
-                                    Width="90"
-                                    Binding="{Binding ValueType}" />
-                                        <DataGridTextColumn Header="Decode"
-                                    Width="90"
-                                    Binding="{Binding DecodeMode}" />
-                                        <DataGridCheckBoxColumn Header="Writable"
-                                        Width="80"
-                                        Binding="{Binding IsWritable}" />
-                                    </DataGrid.Columns>
-                                </DataGrid>
-                            </Grid>
-                        </Border>
-
-                        <!-- Preview -->
-                        <Border Grid.Row="4"
-                                Style="{StaticResource WorkspaceCardStyle}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <TextBlock Text="SNMP Preview"
-                                           Style="{StaticResource WorkspaceSectionHeaderStyle}" />
-
-                                <TextBox x:Name="SnmpPreviewTextBox"
-                                         Grid.Row="2"
+                                <!-- Decoder / help area -->
+                                <TextBox x:Name="SnmpDecoderValuesTextBox"
+                                         Grid.Row="6"
                                          Style="{StaticResource WorkspaceReadOnlyBoxStyle}"
                                          AcceptsReturn="True"
                                          TextWrapping="Wrap"
-                                         VerticalScrollBarVisibility="Auto" />
+                                         VerticalScrollBarVisibility="Auto"
+                                         IsReadOnly="True"
+                                         MinHeight="56" />
                             </Grid>
                         </Border>
                     </Grid>
                 </Grid>
             </Border>
         </Grid>
-    </Border>
+    
 </UserControl>

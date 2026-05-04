@@ -23,6 +23,11 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
         private string? _loadedAuthKey;
         private string? _loadedPrivacyKey;
 
+        private bool _isDirty;
+        private bool _suppressDirtyTracking;
+        private bool _suppressProfileSelection;
+        private ulong _loadedProfileId;
+
         
         public SnmpAdminView()
             : this(new ApiClient("https://localhost:7140"))
@@ -34,9 +39,19 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             InitializeComponent();
             _api = api;
 
-            HookEvents();
-            SetDefaults();
+            _suppressDirtyTracking = true;
+            try
+            {
+                HookEvents();
+                SetDefaults();
+                UpdateSnmpVersionUi();
+            }
+            finally
+            {
+                _suppressDirtyTracking = false;
+            }
 
+            ClearDirty();
             Loaded += SnmpAdminView_Loaded;
         }
 
@@ -56,47 +71,92 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             ProfilesDataGrid.SelectionChanged += ProfilesDataGrid_SelectionChanged;
             
             ProfileSearchTextBox.TextChanged += ProfileSearchTextBox_TextChanged;
+
+            ProfileNameTextBox.TextChanged += EditorChanged;
+            DeviceFamilyComboBox.SelectionChanged += EditorChanged;
+            ProfileIsActiveCheckBox.Checked += EditorChanged;
+            ProfileIsActiveCheckBox.Unchecked += EditorChanged;
+            ProfileIsDefaultCheckBox.Checked += EditorChanged;
+            ProfileIsDefaultCheckBox.Unchecked += EditorChanged;
+
+            TimeoutMsTextBox.TextChanged += EditorChanged;
+            RetriesTextBox.TextChanged += EditorChanged;
+
+            SnmpVersionComboBox.SelectionChanged += SnmpVersionComboBox_SelectionChanged;
+
+            ReadCommunityTextBox.TextChanged += EditorChanged;
+            WriteCommunityTextBox.TextChanged += EditorChanged;
+            ContextNameTextBox.TextChanged += EditorChanged;
+
+            UsmUserTextBox.TextChanged += EditorChanged;
+            AuthProtocolComboBox.SelectionChanged += EditorChanged;
+            PrivacyProtocolComboBox.SelectionChanged += EditorChanged;
+            AuthKeyPasswordBox.PasswordChanged += EditorChanged;
+            PrivacyKeyPasswordBox.PasswordChanged += EditorChanged;
         }
 
         private void SetDefaults()
         {
-            ProfileIdTextBlock.Text = "(new)";
-            SnmpStatusTextBlock.Text = "Ready.";
+            _suppressDirtyTracking = true;
 
-            if (DeviceFamilyComboBox.SelectedIndex < 0)
-                DeviceFamilyComboBox.SelectedIndex = 0;
+            try
+            {
+                ProfileIdTextBlock.Text = "(new)";
+                SnmpStatusTextBlock.Text = "Ready.";
 
-            if (AuthProtocolComboBox.SelectedIndex < 0)
-                AuthProtocolComboBox.SelectedIndex = 0;
+                if (DeviceFamilyComboBox.SelectedIndex < 0)
+                    DeviceFamilyComboBox.SelectedIndex = 0;
 
-            if (PrivacyProtocolComboBox.SelectedIndex < 0)
-                PrivacyProtocolComboBox.SelectedIndex = 0;            
+                if (AuthProtocolComboBox.SelectedIndex < 0)
+                    AuthProtocolComboBox.SelectedIndex = 0;
 
-            TimeoutMsTextBox.Text = "1500";
-            RetriesTextBox.Text = "1";
+                if (PrivacyProtocolComboBox.SelectedIndex < 0)
+                    PrivacyProtocolComboBox.SelectedIndex = 0;
 
-            RefreshOidGrid();
+                TimeoutMsTextBox.Text = "1500";
+                RetriesTextBox.Text = "1";
+
+                RefreshOidGrid();
+            }
+            finally
+            {
+                _suppressDirtyTracking = false;
+            }
+
+            ClearDirty();
         }
 
         private async void SnmpAdminView_Loaded(object sender, RoutedEventArgs e)
         {
             Loaded -= SnmpAdminView_Loaded;
             await LoadProfilesAsync();
+            ClearDirty();
         }
 
         private async void RefreshProfilesButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!await ConfirmPendingChangesAsync())
+                return;
+
             await LoadProfilesAsync();
         }
 
-        private void NewProfileButton_Click(object sender, RoutedEventArgs e)
+        private async void NewProfileButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!await ConfirmPendingChangesAsync())
+                return;
+
             ProfilesDataGrid.SelectedItem = null;
             ClearEditorForNewProfile();
             SnmpStatusTextBlock.Text = "New SNMP profile.";
         }
 
         private async void SaveProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            await SaveCurrentProfileAsync();
+        }
+
+        private async Task<bool> SaveCurrentProfileAsync()
         {
             try
             {
@@ -110,18 +170,23 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                 if (saved is null)
                 {
                     SnmpStatusTextBlock.Text = "Save failed.";
-                    return;
+                    return false;
                 }
 
                 _currentProfileId = saved.Id;
-                LoadProfileIntoEditor(saved);
+                _loadedProfileId = saved.Id;
 
+                LoadProfileIntoEditor(saved);
                 await LoadProfilesAsync(selectProfileId: saved.Id);
+
+                ClearDirty();
                 SnmpStatusTextBlock.Text = $"Saved profile {saved.Name}.";
+                return true;
             }
             catch (Exception ex)
             {
                 SnmpStatusTextBlock.Text = $"Save failed: {ex.Message}";
+                return false;
             }
             finally
             {
@@ -131,6 +196,9 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
         private async void DeactivateProfileButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!await ConfirmPendingChangesAsync())
+                return;
+
             if (_currentProfileId == 0)
             {
                 MessageBox.Show(
@@ -161,6 +229,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                 await LoadProfilesAsync();
                 ClearEditorForNewProfile();
 
+                ClearDirty();
                 SnmpStatusTextBlock.Text = "Profile deactivated.";
             }
             catch (Exception ex)
@@ -175,12 +244,16 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
         private void AddOidButton_Click(object sender, RoutedEventArgs e)
         {
+            var nextSort = _currentOids.Count == 0
+                ? 10
+                : ((_currentOids.Max(x => x.SortOrder) / 10) + 1) * 10;
+
             var window = new SnmpOidEditorWindow
             {
                 Owner = Window.GetWindow(this)
             };
 
-            window.LoadOid(null);
+            window.LoadOid(null, nextSort);
 
             if (window.ShowDialog() != true || window.Result is null)
                 return;
@@ -189,6 +262,8 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             RefreshOidGrid();
 
             SnmpStatusTextBlock.Text = "OID added to profile editor.";
+
+            MarkDirty();
         }
 
         private void EditOidButton_Click(object sender, RoutedEventArgs e)
@@ -258,6 +333,8 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             RefreshOidGrid();
 
             SnmpStatusTextBlock.Text = "OID updated in profile editor.";
+
+            MarkDirty();
         }        
 
         private void RemoveOidButton_Click(object sender, RoutedEventArgs e)
@@ -276,15 +353,26 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             RefreshOidGrid();
 
             SnmpStatusTextBlock.Text = "OID removed from profile editor.";
+
+            MarkDirty();
         }
 
         private async void ProfilesDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isLoadingProfile)
+            if (_isLoadingProfile || _suppressProfileSelection)
                 return;
 
             if (ProfilesDataGrid.SelectedItem is not SnmpProfileListItemDto selected)
                 return;
+
+            if (selected.Id == _loadedProfileId)
+                return;
+
+            if (!await ConfirmPendingChangesAsync())
+            {
+                RestoreProfileSelection();
+                return;
+            }
 
             try
             {
@@ -297,6 +385,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                 if (detail is null)
                 {
                     SnmpStatusTextBlock.Text = "Profile load failed.";
+                    RestoreProfileSelection();
                     return;
                 }
 
@@ -306,13 +395,36 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             catch (Exception ex)
             {
                 SnmpStatusTextBlock.Text = $"Profile load failed: {ex.Message}";
+                RestoreProfileSelection();
             }
             finally
             {
                 _isLoadingProfile = false;
                 ClearBusy();
             }
-        }        
+        }
+
+        private void RestoreProfileSelection()
+        {
+            _suppressProfileSelection = true;
+
+            try
+            {
+                var items = ProfilesDataGrid.ItemsSource as IEnumerable<SnmpProfileListItemDto>;
+                if (items is null)
+                {
+                    ProfilesDataGrid.SelectedItem = null;
+                    return;
+                }
+
+                var match = items.FirstOrDefault(x => x.Id == _loadedProfileId);
+                ProfilesDataGrid.SelectedItem = match;
+            }
+            finally
+            {
+                _suppressProfileSelection = false;
+            }
+        }
 
         private void ProfileSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -372,67 +484,97 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
         private void LoadProfileIntoEditor(SnmpProfileDetailDto detail)
         {
-            _currentProfileId = detail.Id;
-            ProfileIdTextBlock.Text = detail.Id.ToString();
+            _suppressDirtyTracking = true;
 
-            ProfileNameTextBox.Text = detail.Name;
-            SetComboText(DeviceFamilyComboBox, detail.DeviceFamily);
+            try
+            {
+                _currentProfileId = detail.Id;
+                _loadedProfileId = detail.Id;
+                ProfileIdTextBlock.Text = detail.Id.ToString();
 
-            ProfileIsActiveCheckBox.IsChecked = detail.IsActive;
-            ProfileIsDefaultCheckBox.IsChecked = detail.IsDefaultForFamily;
+                ProfileNameTextBox.Text = detail.Name;
+                SetComboText(DeviceFamilyComboBox, detail.DeviceFamily);
 
-            TimeoutMsTextBox.Text = detail.TimeoutMs.ToString();
-            RetriesTextBox.Text = detail.Retries.ToString();
+                ProfileIsActiveCheckBox.IsChecked = detail.IsActive;
+                ProfileIsDefaultCheckBox.IsChecked = detail.IsDefaultForFamily;
 
-            ReadCommunityTextBox.Text = detail.ReadCommunity ?? string.Empty;
-            WriteCommunityTextBox.Text = detail.WriteCommunity ?? string.Empty;
-            ContextNameTextBox.Text = detail.ContextName ?? string.Empty;
+                TimeoutMsTextBox.Text = detail.TimeoutMs.ToString();
+                RetriesTextBox.Text = detail.Retries.ToString();
 
-            UsmUserTextBox.Text = detail.UsmUser ?? string.Empty;
-            SetComboText(AuthProtocolComboBox, detail.AuthProtocol ?? "MD5");
-            SetComboText(PrivacyProtocolComboBox, detail.PrivacyProtocol ?? "DES");
+                ReadCommunityTextBox.Text = detail.ReadCommunity ?? string.Empty;
+                WriteCommunityTextBox.Text = detail.WriteCommunity ?? string.Empty;
+                ContextNameTextBox.Text = detail.ContextName ?? string.Empty;
 
-            _loadedAuthKey = detail.AuthKey;
-            _loadedPrivacyKey = detail.PrivacyKey;
-            AuthKeyPasswordBox.Password = string.Empty;
-            PrivacyKeyPasswordBox.Password = string.Empty;
+                SetComboText(SnmpVersionComboBox, detail.SnmpVersion ?? "v3");
+                UpdateSnmpVersionUi();
 
-            _currentOids.Clear();
-            _currentOids.AddRange(detail.Oids.OrderBy(x => x.SortOrder).ThenBy(x => x.Label));
+                UsmUserTextBox.Text = detail.UsmUser ?? string.Empty;
+                SetComboText(AuthProtocolComboBox, detail.AuthProtocol ?? "MD5");
+                SetComboText(PrivacyProtocolComboBox, detail.PrivacyProtocol ?? "DES");
 
-            RefreshOidGrid();            
+                _loadedAuthKey = detail.AuthKey;
+                _loadedPrivacyKey = detail.PrivacyKey;
+                AuthKeyPasswordBox.Password = string.Empty;
+                PrivacyKeyPasswordBox.Password = string.Empty;
+
+                _currentOids.Clear();
+                _currentOids.AddRange(detail.Oids.OrderBy(x => x.SortOrder).ThenBy(x => x.Label));
+
+                RefreshOidGrid();
+            }
+            finally
+            {
+                _suppressDirtyTracking = false;
+            }
+
+            ClearDirty();
         }
 
         private void ClearEditorForNewProfile()
         {
-            _currentProfileId = 0;
-            ProfileIdTextBlock.Text = "(new)";
+            _suppressDirtyTracking = true;
 
-            ProfileNameTextBox.Text = string.Empty;
-            SetComboText(DeviceFamilyComboBox, "RF700");
+            try
+            {
+                _currentProfileId = 0;
+                _loadedProfileId = 0;
+                ProfileIdTextBlock.Text = "(new)";
 
-            ProfileIsActiveCheckBox.IsChecked = true;
-            ProfileIsDefaultCheckBox.IsChecked = false;
+                ProfileNameTextBox.Text = string.Empty;
+                SetComboText(DeviceFamilyComboBox, "RF700");
 
-            TimeoutMsTextBox.Text = "1500";
-            RetriesTextBox.Text = "1";
+                ProfileIsActiveCheckBox.IsChecked = true;
+                ProfileIsDefaultCheckBox.IsChecked = false;
 
-            ReadCommunityTextBox.Text = string.Empty;
-            WriteCommunityTextBox.Text = string.Empty;
-            ContextNameTextBox.Text = string.Empty;
+                TimeoutMsTextBox.Text = "1500";
+                RetriesTextBox.Text = "1";
 
-            UsmUserTextBox.Text = string.Empty;
-            SetComboText(AuthProtocolComboBox, "MD5");
-            SetComboText(PrivacyProtocolComboBox, "DES");
+                ReadCommunityTextBox.Text = string.Empty;
+                WriteCommunityTextBox.Text = string.Empty;
+                ContextNameTextBox.Text = string.Empty;
 
-            _loadedAuthKey = null;
-            _loadedPrivacyKey = null;
-            AuthKeyPasswordBox.Password = string.Empty;
-            PrivacyKeyPasswordBox.Password = string.Empty;
+                SetComboText(SnmpVersionComboBox, "v3");
+                UpdateSnmpVersionUi();
 
-            _currentOids.Clear();
-            RefreshOidGrid();           
-        }        
+                UsmUserTextBox.Text = string.Empty;
+                SetComboText(AuthProtocolComboBox, "MD5");
+                SetComboText(PrivacyProtocolComboBox, "DES");
+
+                _loadedAuthKey = null;
+                _loadedPrivacyKey = null;
+                AuthKeyPasswordBox.Password = string.Empty;
+                PrivacyKeyPasswordBox.Password = string.Empty;
+
+                _currentOids.Clear();
+                RefreshOidGrid();
+            }
+            finally
+            {
+                _suppressDirtyTracking = false;
+            }
+
+            ClearDirty();
+        }
 
         private void RefreshOidGrid()
         {
@@ -458,6 +600,8 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                 DeviceFamily = GetComboText(DeviceFamilyComboBox, "RF700"),
                 IsActive = ProfileIsActiveCheckBox.IsChecked == true,
                 IsDefaultForFamily = ProfileIsDefaultCheckBox.IsChecked == true,
+
+                SnmpVersion = GetComboText(SnmpVersionComboBox, "v3"),
 
                 ReadCommunity = CleanNullable(ReadCommunityTextBox.Text),
                 WriteCommunity = CleanNullable(WriteCommunityTextBox.Text),
@@ -527,11 +671,6 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
 
-        private static string CleanOrDefault(string? value, string fallback)
-        {
-            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
-        }
-
         private static string GetComboText(ComboBox comboBox, string fallback)
         {
             if (comboBox.SelectedItem is ComboBoxItem item && item.Content is string itemText)
@@ -562,6 +701,94 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             comboBox.Text = value;
         }
 
-        
+        public async Task<bool> ConfirmPendingChangesAsync()
+        {
+            if (!_isDirty)
+                return true;
+
+            var result = MessageBox.Show(
+                "You have unsaved SNMP profile changes. Save before continuing?",
+                "Unsaved SNMP Changes",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Warning);
+
+            if (result == MessageBoxResult.Cancel)
+                return false;
+
+            if (result == MessageBoxResult.No)
+            {
+                ClearDirty();
+                return true;
+            }
+
+            return await SaveCurrentProfileAsync();
+        }
+
+        private void SnmpVersionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateSnmpVersionUi();
+            EditorChanged(sender, e);
+        }
+
+        private void UpdateSnmpVersionUi()
+        {
+            if (ReadCommunityTextBox is null ||
+                WriteCommunityTextBox is null ||
+                ContextNameTextBox is null ||
+                UsmUserTextBox is null ||
+                AuthProtocolComboBox is null ||
+                AuthKeyPasswordBox is null ||
+                PrivacyProtocolComboBox is null ||
+                PrivacyKeyPasswordBox is null)
+            {
+                return;
+            }
+
+            var version = GetComboText(SnmpVersionComboBox, "v3");
+
+            var isV2c = string.Equals(version, "v2c", StringComparison.OrdinalIgnoreCase);
+            var isV3 = string.Equals(version, "v3", StringComparison.OrdinalIgnoreCase);
+
+            ReadCommunityTextBox.IsEnabled = isV2c;
+            WriteCommunityTextBox.IsEnabled = isV2c;
+
+            ContextNameTextBox.IsEnabled = isV3;
+            UsmUserTextBox.IsEnabled = isV3;
+            AuthProtocolComboBox.IsEnabled = isV3;
+            AuthKeyPasswordBox.IsEnabled = isV3;
+            PrivacyProtocolComboBox.IsEnabled = isV3;
+            PrivacyKeyPasswordBox.IsEnabled = isV3;
+        }
+
+        //If Dirty Handlers
+        private void EditorChanged(object? sender, EventArgs e)
+        {
+            if (_suppressDirtyTracking)
+                return;
+
+            MarkDirty();
+        }
+
+        private void MarkDirty()
+        {
+            _isDirty = true;
+            UpdateDirtyStatus();
+        }
+
+        private void ClearDirty()
+        {
+            _isDirty = false;
+            UpdateDirtyStatus();
+        }
+
+        private void UpdateDirtyStatus()
+        {
+            if (_isDirty)
+                SnmpStatusTextBlock.Text = "Unsaved changes.";
+            else if (string.IsNullOrWhiteSpace(SnmpStatusTextBlock.Text) || SnmpStatusTextBlock.Text == "Unsaved changes.")
+                SnmpStatusTextBlock.Text = "Ready.";
+        }
+
+
     }
 }

@@ -83,12 +83,89 @@ namespace SmartGridSuite.Client.Services
             return await _api.GetAsync<List<DispatchTaskListItemDto>>("api/tickets/dispatch-tasks", ct) ?? new();
         }
 
-        //Request Capital
-        public async Task RequestCapitalAsync(long id, CancellationToken ct = default)
+        // Request Capital
+        public async Task RequestCapitalAsync(long id, string reason, string requestedBy = "Unknown", CancellationToken ct = default)
         {
-            await _api.PostAsync<object, UpdateTicketResponse>(
+            await _api.PostAsync<TicketActionReasonRequest, UpdateTicketResponse>(
                 $"api/tickets/{id}/request-capital",
-                new { },
+                new TicketActionReasonRequest
+                {
+                    Reason = reason ?? string.Empty,
+                    RequestedBy = requestedBy ?? "Unknown"
+                },
+                ct);
+        }
+
+        // Request Maintenance
+        public async Task RequestMaintenanceAsync(long id, string reason, string requestedBy = "Unknown", CancellationToken ct = default)
+        {
+            await _api.PostAsync<TicketActionReasonRequest, UpdateTicketResponse>(
+                $"api/tickets/{id}/request-maintenance",
+                new TicketActionReasonRequest
+                {
+                    Reason = reason ?? string.Empty,
+                    RequestedBy = requestedBy ?? "Unknown"
+                },
+                ct);
+        }
+
+        // Request Ticket
+        public async Task<long> RequestTicketAsync(string site, string reason, string requestedBy = "Unknown", CancellationToken ct = default)
+        {
+            var cleanSite = (site ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(cleanSite))
+                return 0;
+
+            var existingTickets = await GetTicketsBySiteAsync(cleanSite, ct);
+
+            var existingRequest = existingTickets
+                .Where(x =>
+                    string.Equals(x.NotificationName, "Ticket requested from Site Dashboard", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(x.Status, "Closed", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(x.Status, "Completed", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(x.Status, "Cancelled", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(x.Status, "Canceled", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(x => x.LastActivityAt)
+                .FirstOrDefault();
+
+            if (existingRequest is not null)
+                return existingRequest.Id;
+
+            var cleanReason = string.IsNullOrWhiteSpace(reason)
+                ? "Ticket requested from Site Dashboard."
+                : reason.Trim();
+
+            var request = new CreateTicketRequest(
+                Site: cleanSite,
+                NotificationName: "Ticket requested from Site Dashboard",
+                Notification: string.Empty,
+                WorkOrder: null,
+                WorkOrderClass: string.Empty,
+                GroupCode: string.Empty,
+                PriorityDays: 0,
+                Problem: cleanReason,
+                TaskCategoryId: null,
+                ActionRequiredOverride: "Review ticket request from Site Dashboard",
+                AssignedTech: "(Unassigned)",
+                Status: "Needs Review",
+                Notes: $"Ticket requested from Site Dashboard.{Environment.NewLine}Reason: {cleanReason}",
+                CreatedBy: requestedBy ?? "Unknown"
+            );
+
+            return await CreateTicketAsync(request, ct);
+        }
+
+        //Add Write-Up to Ticket
+        public async Task SubmitWriteUpAsync(long ticketId, string finalWriteUpText, string submittedBy = "Unknown", CancellationToken ct = default)
+        {
+            await _api.PostAsync<SubmitTicketWriteUpRequest, UpdateTicketResponse>(
+                $"api/tickets/{ticketId}/submit-writeup",
+                new SubmitTicketWriteUpRequest
+                {
+                    FinalWriteUpText = finalWriteUpText ?? string.Empty,
+                    SubmittedBy = submittedBy ?? "Unknown"
+                },
                 ct);
         }
     }

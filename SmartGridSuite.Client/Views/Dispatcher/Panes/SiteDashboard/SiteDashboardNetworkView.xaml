@@ -65,268 +65,391 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Padding="10"
-            CornerRadius="12"
-            Background="{DynamicResource SurfaceBg}"
-            BorderBrush="{DynamicResource SurfaceBorder}"
-            BorderThickness="1">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="8"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="8"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="8"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
 
-            <!-- Header / action card -->
-            <Border Grid.Row="0"
-                    Style="{StaticResource NetworkSectionBorderStyle}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
 
-                    <!-- Title row -->
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+            <RowDefinition x:Name="PrimarySectionRow" Height="*"/>
+            <RowDefinition Height="8"/>
 
-                        <TextBlock x:Name="NetworkHeaderTextBlock"
-                                   Grid.Column="0"
-                                   Text="Site"
-                                   Style="{StaticResource NetworkHeaderTitleStyle}" />
+            <RowDefinition x:Name="MiddleSectionRow" Height="*"/>
+            <RowDefinition Height="8"/>
 
-                        <Button x:Name="TestAllButton"
-                                Grid.Column="1"
-                                Style="{StaticResource NetworkPrimaryMiniButtonStyle}"
-                                Content="Test"
-                                Click="TestAllButton_Click" />
-                    </Grid>
+            <RowDefinition x:Name="SecondarySectionRow" Height="*"/>
+            <RowDefinition Height="8"/>
 
-                    <!-- Action row -->
-                    <Grid Grid.Row="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                        </Grid.ColumnDefinitions>
+            <RowDefinition x:Name="BottomReferenceRow" Height="0"/>
+        </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Column="0"
-                                   Text="Ping Count"
-                                   Style="{StaticResource NetworkHeaderLabelStyle}" />
+        <!-- Header / action card -->
+        <Border Grid.Row="0"
+            Style="{StaticResource Card}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                        <TextBox x:Name="PingCountTextBox"
-                                 Grid.Column="2"
-                                 Style="{StaticResource ModernWatermarkTextBox}"
-                                 Height="30"
-                                 Padding="8,0"
-                                 VerticalContentAlignment="Center"
-                                 HorizontalContentAlignment="Center"
-                                 ToolTip="Blank = continuous" 
-                                 PreviewTextInput="PingCountTextBox_PreviewTextInput"/>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                        <Button x:Name="PingAllButton"
-                                Grid.Column="4"
-                                Style="{StaticResource NetworkPrimaryMiniButtonStyle}"
-                                Content="Ping All"
-                                Click="PingAllButton_Click" />
-
-                        <Button x:Name="StopAllButton"
-                                Grid.Column="6"
-                                Style="{StaticResource NetworkMiniButtonStyle}"
-                                Content="Stop"
-                                Click="StopAllButton_Click" />
-
-                        <Button x:Name="ClearAllButton"
-                                Grid.Column="8"
-                                Style="{StaticResource NetworkMiniButtonStyle}"
-                                Content="Clear"
-                                Click="ClearAllButton_Click" />
-                    </Grid>
+                    <TextBlock x:Name="NetworkHeaderTextBlock"
+                           Grid.Column="0"
+                           Text="Site"
+                           Style="{StaticResource NetworkHeaderTitleStyle}" />
+                    
                 </Grid>
-            </Border>
 
-            <!-- Primary -->
-            <Border Grid.Row="2"
-                    Style="{StaticResource NetworkSectionBorderStyle}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="72"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="70"/>
-                        </Grid.ColumnDefinitions>
+                    <TextBox x:Name="PingCountTextBox"
+                         Grid.Column="0"
+                         Style="{StaticResource ModernWatermarkTextBox}"
+                         Height="30"
+                         Padding="8,0"
+                         VerticalContentAlignment="Center"
+                         HorizontalContentAlignment="Left"
+                         ToolTip="Blank = continuous"
+                         Tag="Ping Count"                         
+                         PreviewTextInput="PingCountTextBox_PreviewTextInput"/>
 
-                        <TextBlock Grid.Column="0"
-                                   Text="Primary"
-                                   Style="{StaticResource NetworkHeaderLabelStyle}" />
-
-                        <TextBox x:Name="PrimaryIpTextBox"
-                                 Grid.Column="1"
-                                 Style="{StaticResource ModernWatermarkTextBox}"
-                                 Height="30"
-                                 Padding="10,0"
-                                 VerticalContentAlignment="Center"
-                                 FontSize="13"
-                                 FontWeight="SemiBold"
-                                 Text="" />
-
-                        <Button Grid.Column="3"
-                                Style="{StaticResource NetworkMiniButtonStyle}"
-                                Content="Ping"
-                                Click="PingPrimaryButton_Click" />
-                    </Grid>
-
-                    <Border Grid.Row="2"
-                            CornerRadius="8"
-                            BorderBrush="{DynamicResource SurfaceBorder}"
-                            BorderThickness="1"
-                            Background="{DynamicResource SurfaceBg}">
-                        <TextBox x:Name="PrimaryResultsTextBox"
-                                 Style="{StaticResource NetworkOutputTextBoxStyle}" />
-                    </Border>
-
-                    <TextBlock x:Name="PrimarySummaryTextBlock"
-                               Grid.Row="4"
-                               Text="Ready."
-                               Style="{StaticResource NetworkSummaryTextStyle}" />
+                    <Button x:Name="PingAllButton"
+                        Grid.Column="2"
+                        Style="{StaticResource NetworkPrimaryMiniButtonStyle}"
+                        Content="Ping All"
+                        Click="PingAllButton_Click" />
                 </Grid>
-            </Border>
 
-            <!-- LAN -->
-            <Border Grid.Row="4"
-                    Style="{StaticResource NetworkSectionBorderStyle}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+                <Grid Grid.Row="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="72"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="70"/>
-                        </Grid.ColumnDefinitions>
+                    <Button x:Name="StopAllButton"
+                            Grid.Column="1"
+                            Style="{StaticResource NetworkMiniButtonStyle}"
+                            Content="Stop"
+                            Click="StopAllButton_Click" />
 
-                        <TextBlock Grid.Column="0"
-                                   Text="LAN"
-                                   Style="{StaticResource NetworkHeaderLabelStyle}" />
+                    <Button x:Name="ClearAllButton"
+                            Grid.Column="3"
+                            Style="{StaticResource NetworkMiniButtonStyle}"
+                            Content="Clear"
+                            Click="ClearAllButton_Click" />
 
-                        <TextBox x:Name="LanIpTextBox"
-                                 Grid.Column="1"
-                                 Style="{StaticResource ModernWatermarkTextBox}"
-                                 Height="30"
-                                 Padding="10,0"
-                                 VerticalContentAlignment="Center"
-                                 FontSize="13"
-                                 FontWeight="SemiBold"
-                                 Text="" />
-
-                        <Button Grid.Column="3"
-                                Style="{StaticResource NetworkMiniButtonStyle}"
-                                Content="Ping"
-                                Click="PingLanButton_Click" />
-                    </Grid>
-
-                    <Border Grid.Row="2"
-                            CornerRadius="8"
-                            BorderBrush="{DynamicResource SurfaceBorder}"
-                            BorderThickness="1"
-                            Background="{DynamicResource SurfaceBg}">
-                        <TextBox x:Name="LanResultsTextBox"
-                                 Style="{StaticResource NetworkOutputTextBoxStyle}" />
-                    </Border>
-
-                    <TextBlock x:Name="LanSummaryTextBlock"
-                               Grid.Row="4"
-                               Text="Ready."
-                               Style="{StaticResource NetworkSummaryTextStyle}" />
+                    <Button x:Name="TestAllButton"
+                            Grid.Column="5"
+                            Style="{StaticResource NetworkPrimaryMiniButtonStyle}"
+                            Content="Test"
+                            Click="TestAllButton_Click" />
                 </Grid>
-            </Border>
+            </Grid>
+        </Border>
 
-            <!-- Secondary -->
-            <Border Grid.Row="6"
-                    Style="{StaticResource NetworkSectionBorderStyle}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+        <!-- Primary Ping Card -->
+        <Border Grid.Row="2"
+                Style="{StaticResource Card}"
+                Padding="10,10,10,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="72"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="70"/>
-                        </Grid.ColumnDefinitions>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="72"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="70"/>
+                    </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="0"
-                                   Text="Secondary"
-                                   Style="{StaticResource NetworkHeaderLabelStyle}" />
+                    <TextBlock x:Name="PrimaryPingLabelTextBlock"
+                               Grid.Column="0"
+                               Text="Primary"
+                               Style="{StaticResource NetworkHeaderLabelStyle}" />
 
-                        <TextBox x:Name="SecondaryIpTextBox"
-                                 Grid.Column="1"
-                                 Style="{StaticResource ModernWatermarkTextBox}"
-                                 Height="30"
-                                 Padding="10,0"
-                                 VerticalContentAlignment="Center"
-                                 FontSize="13"
-                                 FontWeight="SemiBold"
-                                 Text="" />
+                    <TextBox x:Name="PrimaryIpTextBox"
+                         Grid.Column="1"
+                         Style="{StaticResource ModernWatermarkTextBox}"
+                         Height="30"
+                         Padding="10,0"
+                         VerticalContentAlignment="Center"
+                         FontSize="13"
+                         FontWeight="SemiBold" />
 
-                        <Button Grid.Column="3"
-                                Style="{StaticResource NetworkMiniButtonStyle}"
-                                Content="Ping"
-                                Click="PingSecondaryButton_Click" />
-                    </Grid>
-
-                    <Border Grid.Row="2"
-                            CornerRadius="8"
-                            BorderBrush="{DynamicResource SurfaceBorder}"
-                            BorderThickness="1"
-                            Background="{DynamicResource SurfaceBg}">
-                        <TextBox x:Name="SecondaryResultsTextBox"
-                                 Style="{StaticResource NetworkOutputTextBoxStyle}" />
-                    </Border>
-
-                    <TextBlock x:Name="SecondarySummaryTextBlock"
-                               Grid.Row="4"
-                               Text="Ready."
-                               Style="{StaticResource NetworkSummaryTextStyle}" />
+                    <Button Grid.Column="3"
+                        Style="{StaticResource NetworkMiniButtonStyle}"
+                        Content="Ping"
+                        Click="PingPrimaryButton_Click" />
                 </Grid>
-            </Border>
-        </Grid>
-    </Border>
+
+                <Border Grid.Row="2"
+                    CornerRadius="8"
+                    BorderBrush="{DynamicResource SurfaceBorder}"
+                    BorderThickness="1"
+                    Background="{DynamicResource SurfaceBg}">
+                    <TextBox x:Name="PrimaryResultsTextBox"
+                         Style="{StaticResource NetworkOutputTextBoxStyle}" />
+                </Border>
+
+                <TextBlock x:Name="PrimarySummaryTextBlock"
+                       Grid.Row="4"
+                       Text="Ready."
+                       Style="{StaticResource NetworkSummaryTextStyle}" />
+            </Grid>
+        </Border>
+
+        <!-- Normal LAN Ping Card (non-IGSD only) -->
+        <Border x:Name="LanSectionBorder"
+            Grid.Row="4"
+            Style="{StaticResource Card}"
+            Padding="10,10,10,10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="72"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="70"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="LanPingLabelTextBlock"
+                               Grid.Column="0"
+                               Text="LAN"
+                               Style="{StaticResource NetworkHeaderLabelStyle}" />
+
+                    <TextBox x:Name="LanIpTextBox"
+                         Grid.Column="1"
+                         Style="{StaticResource ModernWatermarkTextBox}"
+                         Height="30"
+                         Padding="10,0"
+                         VerticalContentAlignment="Center"
+                         FontSize="13"
+                         FontWeight="SemiBold" />
+
+                    <Button Grid.Column="3"
+                        Style="{StaticResource NetworkMiniButtonStyle}"
+                        Content="Ping"
+                        Click="PingLanButton_Click" />
+                </Grid>
+
+                <Border Grid.Row="2"
+                    CornerRadius="8"
+                    BorderBrush="{DynamicResource SurfaceBorder}"
+                    BorderThickness="1"
+                    Background="{DynamicResource SurfaceBg}">
+                    <TextBox x:Name="LanResultsTextBox"
+                         Style="{StaticResource NetworkOutputTextBoxStyle}" />
+                </Border>
+
+                <TextBlock x:Name="LanSummaryTextBlock"
+                       Grid.Row="4"
+                       Text="Ready."
+                       Style="{StaticResource NetworkSummaryTextStyle}" />
+            </Grid>
+        </Border>
+
+        <!-- IGSD Primary RTU reference card -->
+        <Border x:Name="PrimaryRtuReferenceSectionBorder"
+                Grid.Row="4"
+                Style="{StaticResource Card}"
+                Padding="10,10,10,10"
+                Visibility="Collapsed">
+            <StackPanel>
+                <Grid x:Name="PrimaryCommsEthRow"
+                      Margin="0,0,0,8"
+                      Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="Primary Comms Eth IP"
+                               Style="{StaticResource NetworkHeaderLabelStyle}" />
+
+                    <TextBox x:Name="IgsdPrimaryCommsEthernetIpTextBox"
+                             Grid.Column="2"
+                             Style="{StaticResource ModernWatermarkTextBox}"
+                             Height="30"
+                             Padding="10,0"
+                             VerticalContentAlignment="Center"
+                             FontSize="13"
+                             FontWeight="SemiBold"
+                             IsReadOnly="False" />
+                </Grid>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="Primary RTU IP"
+                               Style="{StaticResource NetworkHeaderLabelStyle}" />
+
+                    <TextBox x:Name="IgsdPrimaryRtuIpTextBox"
+                             Grid.Column="2"
+                             Style="{StaticResource ModernWatermarkTextBox}"
+                             Height="30"
+                             Padding="10,0"
+                             VerticalContentAlignment="Center"
+                             FontSize="13"
+                             FontWeight="SemiBold"
+                             IsReadOnly="False" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Secondary Ping Card -->
+        <Border Grid.Row="6"
+                Style="{StaticResource Card}"
+                Padding="10,10,10,10"
+                Margin="0,0,0,-8">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="72"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="70"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="SecondaryPingLabelTextBlock"
+                               Grid.Column="0"
+                               Text="Secondary"
+                               Style="{StaticResource NetworkHeaderLabelStyle}" />
+
+                    <TextBox x:Name="SecondaryIpTextBox"
+                         Grid.Column="1"
+                         Style="{StaticResource ModernWatermarkTextBox}"
+                         Height="30"
+                         Padding="10,0"
+                         VerticalContentAlignment="Center"
+                         FontSize="13"
+                         FontWeight="SemiBold" />
+
+                    <Button Grid.Column="3"
+                        Style="{StaticResource NetworkMiniButtonStyle}"
+                        Content="Ping"
+                        Click="PingSecondaryButton_Click" />
+                </Grid>
+
+                <Border Grid.Row="2"
+                    CornerRadius="8"
+                    BorderBrush="{DynamicResource SurfaceBorder}"
+                    BorderThickness="1"
+                    Background="{DynamicResource SurfaceBg}">
+                    <TextBox x:Name="SecondaryResultsTextBox"
+                         Style="{StaticResource NetworkOutputTextBoxStyle}" />
+                </Border>
+
+                <TextBlock x:Name="SecondarySummaryTextBlock"
+                       Grid.Row="4"
+                       Text="Ready."
+                       Style="{StaticResource NetworkSummaryTextStyle}" />
+            </Grid>
+        </Border>
+
+        <!-- IGSD Secondary reference card -->
+        <Border x:Name="SecondaryReferenceSectionBorder"
+                Grid.Row="8"
+                Style="{StaticResource Card}"
+                Padding="10,10,10,60"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                           Text="Secondary Comms Eth IP"
+                           Style="{StaticResource NetworkHeaderLabelStyle}" />
+
+                    <TextBox x:Name="IgsdSecondaryCommsEthernetIpTextBox"
+                         Grid.Column="2"
+                         Style="{StaticResource ModernWatermarkTextBox}"
+                         Height="30"
+                         Padding="10,0"
+                         VerticalContentAlignment="Center"
+                         FontSize="13"
+                         FontWeight="SemiBold"
+                         IsReadOnly="False" />
+                </Grid>
+
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                           Text="Secondary RTU IP"
+                           Style="{StaticResource NetworkHeaderLabelStyle}" />
+
+                    <TextBox x:Name="IgsdSecondaryRtuIpTextBox"
+                         Grid.Column="2"
+                         Style="{StaticResource ModernWatermarkTextBox}"
+                         Height="30"
+                         Padding="10,0"
+                         VerticalContentAlignment="Center"
+                         FontSize="13"
+                         FontWeight="SemiBold"
+                         IsReadOnly="False" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+
 </UserControl>

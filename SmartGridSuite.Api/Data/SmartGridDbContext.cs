@@ -24,8 +24,11 @@ namespace SmartGridSuite.Api.Data
         public virtual DbSet<SnmpOidDecodeValueEntity> SnmpOidDecodeValues { get; set; } = null!;
 
         public DbSet<TicketStatusEntity> TicketStatuses { get; set; }
-
         public DbSet<TicketTaskCategoryEntity> TicketTaskCategories { get; set; }
+
+        public DbSet<AppSettingEntity> AppSettings => Set<AppSettingEntity>();
+
+        public virtual DbSet<CommunicationDeviceTypeEntity> CommunicationDeviceTypes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -278,6 +281,8 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
                 e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
+                e.Property(x => x.SnmpVersion).HasColumnName("snmp_version").HasMaxLength(10).IsRequired();
+
                 e.HasMany(x => x.Oids)
                     .WithOne(x => x.SnmpProfile)
                     .HasForeignKey(x => x.SnmpProfileId)
@@ -327,6 +332,56 @@ namespace SmartGridSuite.Api.Data
 
                 e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
                 e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            });
+
+            modelBuilder.Entity<AppSettingEntity>(e =>
+            {
+                e.ToTable("app_settings");
+                e.HasKey(x => x.SettingKey);
+
+                e.Property(x => x.SettingKey)
+                    .HasColumnName("setting_key")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SettingValue)
+                    .HasColumnName("setting_value");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+            });
+
+            modelBuilder.Entity<CommunicationDeviceTypeEntity>(entity =>
+            {
+                entity.ToTable("communication_device_types");
+
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("id");
+
+                entity.Property(e => e.DisplayName)
+                    .HasColumnName("display_name")
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(e => e.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("tinyint(1)")
+                    .HasDefaultValue(true);
+
+                entity.Property(e => e.SortOrder)
+                    .HasColumnName("sort_order")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                entity.HasIndex(e => e.DisplayName)
+                    .IsUnique()
+                    .HasDatabaseName("ux_communication_device_types_display_name");
             });
         }
     }

@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Smart Grid Suite"
-        Height="560"
+        Height="610"
         Width="920"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
@@ -170,17 +170,79 @@
             </Grid>
         </Border>
 
-        <!-- Footer buttons -->
-        <StackPanel Grid.Row="2"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Center">
-            <Button Style="{StaticResource FooterButton}"
-                    Content="About App"
-                    Click="About_Click"
-                    Margin="0,0,18,0"/>
-            <Button Style="{StaticResource FooterButton}"
-                    Content="Bug / Feature Request"
-                    Click="BugFeature_Click"/>
-        </StackPanel>
+        <!-- Footer: Display scale + buttons -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="18"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- SmartGridSuite UI Scale -->
+            <Border Grid.Column="0"
+            Style="{StaticResource Card}"
+            Padding="12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0"
+                        VerticalAlignment="Center">
+                        <TextBlock Text="Display Scale"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}"/>
+
+                        <TextBlock Text="Recommendations: Laptop = 80%; Desk = 100%"
+                           FontSize="11"
+                           Margin="0,2,0,0"
+                           Foreground="{DynamicResource TextSecondary}"/>
+                    </StackPanel>
+
+                    <Slider x:Name="UiScaleSlider"
+                    Grid.Column="2"
+                    Minimum="80"
+                    Maximum="100"
+                    TickFrequency="5"
+                    IsSnapToTickEnabled="True"
+                    VerticalAlignment="Center"/>
+
+                    <TextBlock x:Name="UiScaleValueTextBlock"
+                       Grid.Column="4"
+                       Width="48"
+                       TextAlignment="Right"
+                       VerticalAlignment="Center"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"/>
+
+                    <Button Grid.Column="6"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    Content="Reset"
+                    Height="30"
+                    Padding="12,0"
+                    Click="ResetUiScaleButton_Click"/>
+                </Grid>
+            </Border>
+
+            <!-- Footer buttons -->
+            <StackPanel Grid.Column="2"
+                Orientation="Horizontal"
+                VerticalAlignment="Center">
+                <Button Style="{StaticResource FooterButton}"
+                Content="About App"
+                Click="About_Click"
+                Margin="0,0,18,0"/>
+
+                <Button Style="{StaticResource FooterButton}"
+                Content="Bug / Feature Request"
+                Click="BugFeature_Click"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

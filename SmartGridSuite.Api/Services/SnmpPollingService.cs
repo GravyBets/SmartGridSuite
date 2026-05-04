@@ -52,20 +52,42 @@ namespace SmartGridSuite.Api.Services
             {
                 var endpoint = new IPEndPoint(ip, 161);
                 var variables = new List<Variable>
-                {
-                    new(new ObjectIdentifier(oid.Oid))
-                };
+        {
+            new(new ObjectIdentifier(oid.Oid))
+        };
 
                 string rawValue;
 
-                if (!string.IsNullOrWhiteSpace(profile.UsmUser) &&
-                    !string.IsNullOrWhiteSpace(profile.AuthKey) &&
-                    !string.IsNullOrWhiteSpace(profile.PrivacyKey))
+                if (IsV3(profile))
                 {
+                    if (string.IsNullOrWhiteSpace(profile.UsmUser) ||
+                        string.IsNullOrWhiteSpace(profile.AuthKey) ||
+                        string.IsNullOrWhiteSpace(profile.PrivacyKey))
+                    {
+                        return Fail(
+                            "Profile is set to SNMPv3 but is missing one or more required v3 credentials.",
+                            req,
+                            profile.Name,
+                            oid.Label,
+                            oid.Oid,
+                            oid.DecodeMode);
+                    }
+
                     rawValue = PollV3(profile, oid, endpoint, variables);
                 }
-                else if (!string.IsNullOrWhiteSpace(profile.ReadCommunity))
+                else
                 {
+                    if (string.IsNullOrWhiteSpace(profile.ReadCommunity))
+                    {
+                        return Fail(
+                            "Profile is set to SNMPv2c but Read Community is missing.",
+                            req,
+                            profile.Name,
+                            oid.Label,
+                            oid.Oid,
+                            oid.DecodeMode);
+                    }
+
                     var result = Messenger.Get(
                         VersionCode.V2,
                         endpoint,
@@ -74,16 +96,6 @@ namespace SmartGridSuite.Api.Services
                         profile.TimeoutMs);
 
                     rawValue = result.First().Data.ToString();
-                }
-                else
-                {
-                    return Fail(
-                        "Profile does not have usable SNMP credentials. Configure either Read Community for v2c or USM/Auth/Privacy for v3.",
-                        req,
-                        profile.Name,
-                        oid.Label,
-                        oid.Oid,
-                        oid.DecodeMode);
                 }
 
                 var displayValue = DecodeValue(oid, rawValue);
@@ -114,18 +126,8 @@ namespace SmartGridSuite.Api.Services
 
         private static string PollV3(Data.Entities.SnmpProfileEntity profile, Data.Entities.SnmpOidEntity oid, IPEndPoint endpoint, IList<Variable> variables)
         {
-            //Disable the "Old Crypto" Error *smdh*
-#pragma warning disable CS0618
-            IAuthenticationProvider auth =
-                string.Equals(profile.AuthProtocol, "SHA", StringComparison.OrdinalIgnoreCase)
-                    ? new SHA1AuthenticationProvider(new OctetString(profile.AuthKey!))
-                    : new MD5AuthenticationProvider(new OctetString(profile.AuthKey!));
-
-            IPrivacyProvider privacy =
-                new DESPrivacyProvider(new OctetString(profile.PrivacyKey!), auth);
-#pragma warning restore CS0618
-            //Re-Enable those Errors.
-
+            var auth = CreateAuthenticationProvider(profile);
+            var privacy = CreatePrivacyProvider(profile, auth);
 
             var discovery = Messenger.GetNextDiscovery(SnmpType.GetRequestPdu);
             var report = discovery.GetResponse(profile.TimeoutMs, endpoint);
@@ -217,14 +219,36 @@ namespace SmartGridSuite.Api.Services
 
                 string rawValue;
 
-                if (!string.IsNullOrWhiteSpace(profile.UsmUser) &&
-                    !string.IsNullOrWhiteSpace(profile.AuthKey) &&
-                    !string.IsNullOrWhiteSpace(profile.PrivacyKey))
+                if (IsV3(profile))
                 {
+                    if (string.IsNullOrWhiteSpace(profile.UsmUser) ||
+                        string.IsNullOrWhiteSpace(profile.AuthKey) ||
+                        string.IsNullOrWhiteSpace(profile.PrivacyKey))
+                    {
+                        return FailSet(
+                            "Profile is set to SNMPv3 but is missing one or more required v3 credentials.",
+                            req,
+                            profile.Name,
+                            oid.Label,
+                            oid.Oid,
+                            oid.DecodeMode);
+                    }
+
                     rawValue = SetV3(profile, endpoint, variables);
                 }
-                else if (!string.IsNullOrWhiteSpace(profile.WriteCommunity))
+                else
                 {
+                    if (string.IsNullOrWhiteSpace(profile.WriteCommunity))
+                    {
+                        return FailSet(
+                            "Profile is set to SNMPv2c but Write Community is missing.",
+                            req,
+                            profile.Name,
+                            oid.Label,
+                            oid.Oid,
+                            oid.DecodeMode);
+                    }
+
                     var result = Messenger.Set(
                         VersionCode.V2,
                         endpoint,
@@ -233,16 +257,6 @@ namespace SmartGridSuite.Api.Services
                         profile.TimeoutMs);
 
                     rawValue = result.First().Data.ToString();
-                }
-                else
-                {
-                    return FailSet(
-                        "Profile does not have usable SNMP write credentials.",
-                        req,
-                        profile.Name,
-                        oid.Label,
-                        oid.Oid,
-                        oid.DecodeMode);
                 }
 
                 var displayValue = DecodeValue(oid, rawValue);
@@ -331,15 +345,8 @@ namespace SmartGridSuite.Api.Services
 
         private static string SetV3(Data.Entities.SnmpProfileEntity profile, IPEndPoint endpoint, IList<Variable> variables)
         {
-#pragma warning disable CS0618
-            IAuthenticationProvider auth =
-                string.Equals(profile.AuthProtocol, "SHA", StringComparison.OrdinalIgnoreCase)
-                    ? new SHA1AuthenticationProvider(new OctetString(profile.AuthKey!))
-                    : new MD5AuthenticationProvider(new OctetString(profile.AuthKey!));
-
-            IPrivacyProvider privacy =
-                new DESPrivacyProvider(new OctetString(profile.PrivacyKey!), auth);
-#pragma warning restore CS0618
+            var auth = CreateAuthenticationProvider(profile);
+            var privacy = CreatePrivacyProvider(profile, auth);
 
             var discovery = Messenger.GetNextDiscovery(SnmpType.GetRequestPdu);
             var report = discovery.GetResponse(profile.TimeoutMs, endpoint);
@@ -402,6 +409,82 @@ namespace SmartGridSuite.Api.Services
                 DisplayValue = string.Empty,
                 ErrorMessage = error
             };
+        }
+
+        private static string NormalizeVersion(string? version)
+        {
+            return string.IsNullOrWhiteSpace(version) ? "v3" : version.Trim().ToLowerInvariant();
+        }
+
+        private static string NormalizeAuthProtocol(string? protocol)
+        {
+            return string.IsNullOrWhiteSpace(protocol) ? "MD5" : protocol.Trim();
+        }
+
+        private static string NormalizePrivacyProtocol(string? protocol)
+        {
+            return string.IsNullOrWhiteSpace(protocol) ? "DES" : protocol.Trim();
+        }
+
+        private static bool IsV3(Data.Entities.SnmpProfileEntity profile)
+        {
+            return string.Equals(NormalizeVersion(profile.SnmpVersion), "v3", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static IAuthenticationProvider CreateAuthenticationProvider(Data.Entities.SnmpProfileEntity profile)
+        {
+            var authProtocol = NormalizeAuthProtocol(profile.AuthProtocol);
+
+#pragma warning disable CS0618
+            if (string.Equals(authProtocol, "SHA-512", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(authProtocol, "SHA512", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SHA512AuthenticationProvider(new OctetString(profile.AuthKey!));
+            }
+
+            if (string.Equals(authProtocol, "SHA-384", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(authProtocol, "SHA384", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SHA384AuthenticationProvider(new OctetString(profile.AuthKey!));
+            }
+
+            if (string.Equals(authProtocol, "SHA-256", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(authProtocol, "SHA256", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SHA256AuthenticationProvider(new OctetString(profile.AuthKey!));
+            }
+
+            if (string.Equals(authProtocol, "SHA-1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(authProtocol, "SHA", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(authProtocol, "SHA1", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SHA1AuthenticationProvider(new OctetString(profile.AuthKey!));
+            }
+
+            return new MD5AuthenticationProvider(new OctetString(profile.AuthKey!));
+#pragma warning restore CS0618
+        }
+
+        private static IPrivacyProvider CreatePrivacyProvider(Data.Entities.SnmpProfileEntity profile, IAuthenticationProvider auth)
+        {
+            var privacyProtocol = NormalizePrivacyProtocol(profile.PrivacyProtocol);
+
+#pragma warning disable CS0618
+            if (string.Equals(privacyProtocol, "AES-256", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(privacyProtocol, "AES256", StringComparison.OrdinalIgnoreCase))
+            {
+                return new AES256PrivacyProvider(new OctetString(profile.PrivacyKey!), auth);
+            }
+
+            if (string.Equals(privacyProtocol, "AES-128", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(privacyProtocol, "AES128", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(privacyProtocol, "AES", StringComparison.OrdinalIgnoreCase))
+            {
+                return new AESPrivacyProvider(new OctetString(profile.PrivacyKey!), auth);
+            }
+
+            return new DESPrivacyProvider(new OctetString(profile.PrivacyKey!), auth);
+#pragma warning restore CS0618
         }
     }
 }

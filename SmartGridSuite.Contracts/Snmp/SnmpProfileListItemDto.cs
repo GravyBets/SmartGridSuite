@@ -8,5 +8,7 @@
         public bool IsActive { get; set; }
         public bool IsDefaultForFamily { get; set; }
         public int OidCount { get; set; }
+
+        public string SnmpVersion { get; set; } = "v3";
     }
 }

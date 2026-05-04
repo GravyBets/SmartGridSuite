@@ -223,7 +223,7 @@
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
@@ -238,7 +238,7 @@
 
                         <Button x:Name="CopyAddressButton"
                                 Grid.Column="2"
-                                Style="{StaticResource TopBarMiniIconButton}"                                
+                                Style="{StaticResource TopBarMiniIconButton}"
                                 ToolTip="Copy address"
                                 Click="CopyAddressButton_Click">
                             <TextBlock Style="{StaticResource CopyGlyph}"/>

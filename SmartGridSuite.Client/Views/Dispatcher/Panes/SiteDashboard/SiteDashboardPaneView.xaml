@@ -3,16 +3,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sd="clr-namespace:SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard">
 
-    <Grid Margin="12">
+    <Grid Margin="0,0,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="12"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="440"/>
-            <ColumnDefinition Width="12"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition x:Name="NetworkColumn" Width="340"/>
+            <ColumnDefinition x:Name="NetworkGapColumn" Width="8"/>
+            <ColumnDefinition x:Name="WorkspaceColumn" Width="*"/>
         </Grid.ColumnDefinitions>
 
         <sd:SiteDashboardTopBarView x:Name="TopBarView"

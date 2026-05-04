@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Input;
+using System.Linq;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 {
@@ -16,11 +17,40 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private CancellationTokenSource? _lanPingCts;
         private CancellationTokenSource? _secondaryPingCts;
 
+        public bool IsIgsdMode { get; set; }
+
         public SiteDashboardNetworkView()
         {
             InitializeComponent();
             DataObject.AddPastingHandler(PingCountTextBox, PingCountTextBox_Pasting);
             Reset();
+        }
+
+        //Layout Helper
+        public void ApplyLayoutMode()
+        {
+            if (IsIgsdMode)
+            {
+                LanSectionBorder.Visibility = Visibility.Collapsed;
+                PrimaryRtuReferenceSectionBorder.Visibility = Visibility.Visible;
+                SecondaryReferenceSectionBorder.Visibility = Visibility.Visible;
+
+                PrimarySectionRow.Height = new GridLength(1, GridUnitType.Star);
+                MiddleSectionRow.Height = GridLength.Auto;
+                SecondarySectionRow.Height = new GridLength(1, GridUnitType.Star);
+                BottomReferenceRow.Height = GridLength.Auto;
+            }
+            else
+            {
+                LanSectionBorder.Visibility = Visibility.Visible;
+                PrimaryRtuReferenceSectionBorder.Visibility = Visibility.Collapsed;
+                SecondaryReferenceSectionBorder.Visibility = Visibility.Collapsed;
+
+                PrimarySectionRow.Height = new GridLength(1, GridUnitType.Star);
+                MiddleSectionRow.Height = new GridLength(1, GridUnitType.Star);
+                SecondarySectionRow.Height = new GridLength(1, GridUnitType.Star);
+                BottomReferenceRow.Height = new GridLength(0);
+            }
         }
 
         public string SiteHeader
@@ -50,13 +80,49 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             set => SecondaryIpTextBox.Text = NormalizeDisplay(value);
         }
 
+        public string PrimaryPingLabel
+        {
+            get => PrimaryPingLabelTextBlock.Text;
+            set => PrimaryPingLabelTextBlock.Text = CleanNetworkLabel(value, "Primary");
+        }
+
+        public string LanPingLabel
+        {
+            get => LanPingLabelTextBlock.Text;
+            set => LanPingLabelTextBlock.Text = CleanNetworkLabel(value, "LAN");
+        }
+
+        public string SecondaryPingLabel
+        {
+            get => SecondaryPingLabelTextBlock.Text;
+            set => SecondaryPingLabelTextBlock.Text = CleanNetworkLabel(value, "Secondary");
+        }
+
+        private static string CleanNetworkLabel(string? value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? fallback
+                : value.Trim();
+        }
+
         public void Reset()
         {
             StopAllPings();
 
+            IsIgsdMode = false;
+            PrimaryPingLabel = "Primary";
+            LanPingLabel = "LAN";
+            SecondaryPingLabel = "Secondary";
+
+
             PrimaryIp = string.Empty;
             LanIp = string.Empty;
             SecondaryIp = string.Empty;
+
+            IgsdPrimaryRtuIp = string.Empty;
+            IgsdPrimaryCommsEthernetIp = string.Empty;
+            IgsdSecondaryCommsEthernetIp = string.Empty;
+            IgsdSecondaryRtuIp = string.Empty;
 
             PingCountTextBox.Text = string.Empty;
 
@@ -72,6 +138,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             ClearIpTestState(PrimaryIpTextBox);
             ClearIpTestState(LanIpTextBox);
             ClearIpTestState(SecondaryIpTextBox);
+
+            ApplyLayoutMode();
         }
 
         private async void PingPrimaryButton_Click(object sender, RoutedEventArgs e)
@@ -115,28 +183,35 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             StopAllPings();
 
             _primaryPingCts = new CancellationTokenSource();
-            _lanPingCts = new CancellationTokenSource();
             _secondaryPingCts = new CancellationTokenSource();
 
-            var primaryTask = PingTargetAsync(
-                PrimaryIp,
-                PrimarySummaryTextBlock,
-                PrimaryResultsTextBox,
-                _primaryPingCts.Token);
+            var tasks = new List<Task>
+            {
+                PingTargetAsync(
+                    PrimaryIp,
+                    PrimarySummaryTextBlock,
+                    PrimaryResultsTextBox,
+                    _primaryPingCts.Token),
 
-            var lanTask = PingTargetAsync(
-                LanIp,
-                LanSummaryTextBlock,
-                LanResultsTextBox,
-                _lanPingCts.Token);
+                PingTargetAsync(
+                    SecondaryIp,
+                    SecondarySummaryTextBlock,
+                    SecondaryResultsTextBox,
+                    _secondaryPingCts.Token)
+            };
 
-            var secondaryTask = PingTargetAsync(
-                SecondaryIp,
-                SecondarySummaryTextBlock,
-                SecondaryResultsTextBox,
-                _secondaryPingCts.Token);
+            if (!IsIgsdMode)
+            {
+                _lanPingCts = new CancellationTokenSource();
 
-            await Task.WhenAll(primaryTask, lanTask, secondaryTask);
+                tasks.Insert(1, PingTargetAsync(
+                    LanIp,
+                    LanSummaryTextBlock,
+                    LanResultsTextBox,
+                    _lanPingCts.Token));
+            }
+
+            await Task.WhenAll(tasks);
         }
 
         private void StopAllButton_Click(object sender, RoutedEventArgs e)
@@ -231,6 +306,40 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
         }
 
+        //IGSD View Mode
+        public string IgsdPrimaryRtuIp
+        {
+            get => IgsdPrimaryRtuIpTextBox.Text;
+            set => IgsdPrimaryRtuIpTextBox.Text = NormalizeDisplay(value);
+        }
+
+        public string IgsdPrimaryCommsEthernetIp
+        {
+            get => IgsdPrimaryCommsEthernetIpTextBox.Text;
+            set
+            {
+                var normalized = NormalizeDisplay(value);
+                var hasValue = !string.IsNullOrWhiteSpace(normalized) && normalized != "—";
+
+                IgsdPrimaryCommsEthernetIpTextBox.Text = hasValue ? normalized : string.Empty;
+                PrimaryCommsEthRow.Visibility = hasValue
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+        }
+
+        public string IgsdSecondaryCommsEthernetIp
+        {
+            get => IgsdSecondaryCommsEthernetIpTextBox.Text;
+            set => IgsdSecondaryCommsEthernetIpTextBox.Text = NormalizeDisplay(value);
+        }
+
+        public string IgsdSecondaryRtuIp
+        {
+            get => IgsdSecondaryRtuIpTextBox.Text;
+            set => IgsdSecondaryRtuIpTextBox.Text = NormalizeDisplay(value);
+        }
+
         private int? ParsePingCount()
         {
             var raw = PingCountTextBox.Text?.Trim();
@@ -301,8 +410,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             CancelAndDispose(ref _lanPingCts);
             CancelAndDispose(ref _secondaryPingCts);
         }
-
-
 
         private static void CancelAndDispose(ref CancellationTokenSource? cts)
         {
@@ -413,11 +520,110 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             ipTextBox.BorderBrush = new SolidColorBrush(border);
         }
 
+        public string GetPingStatsForWriteUp()
+        {
+            var lines = new List<string>
+            {
+                "Ping Stats:"
+            };
 
+            var hasAnyPingStats = false;
 
+            if (TryAddPingWriteUpBlock(
+                    lines,
+                    PrimaryPingLabel,
+                    PrimaryIpTextBox.Text,
+                    PrimarySummaryTextBlock.Text))
+            {
+                hasAnyPingStats = true;
+
+                AddReferenceIpLine(lines, "Primary Comms Eth IP", IgsdPrimaryCommsEthernetIpTextBox.Text);
+                AddReferenceIpLine(lines, "Primary RTU IP", IgsdPrimaryRtuIpTextBox.Text);
+            }
+
+            if (!IsIgsdMode)
+            {
+                if (TryAddPingWriteUpBlock(
+                        lines,
+                        LanPingLabel,
+                        LanIpTextBox.Text,
+                        LanSummaryTextBlock.Text))
+                {
+                    hasAnyPingStats = true;
+                }
+            }
+
+            if (TryAddPingWriteUpBlock(
+                    lines,
+                    SecondaryPingLabel,
+                    SecondaryIpTextBox.Text,
+                    SecondarySummaryTextBlock.Text))
+            {
+                hasAnyPingStats = true;
+
+                AddReferenceIpLine(lines, "Secondary Comms Eth IP", IgsdSecondaryCommsEthernetIpTextBox.Text);
+                AddReferenceIpLine(lines, "Secondary RTU IP", IgsdSecondaryRtuIpTextBox.Text);
+            }
+
+            return hasAnyPingStats
+                ? string.Join(Environment.NewLine, lines)
+                : string.Empty;
+        }
+
+        private static bool TryAddPingWriteUpBlock(List<string> lines, string label, string? ip, string? summary)
+        {
+            var cleanIp = (ip ?? string.Empty).Trim();
+            var cleanSummary = CleanPingSummaryForWriteUp(summary);
+
+            if (string.IsNullOrWhiteSpace(cleanIp) ||
+                cleanIp == "—" ||
+                string.IsNullOrWhiteSpace(cleanSummary))
+            {
+                return false;
+            }
+
+            if (lines.Count > 1)
+                lines.Add(string.Empty);
+
+            lines.Add($"{label} ({cleanIp}) - {cleanSummary}");
+            return true;
+        }
+
+        private static string CleanPingSummaryForWriteUp(string? summary)
+        {
+            var value = (summary ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(value) ||
+                value.Equals("Ready.", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Ready", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Testing...", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("No IP available.", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            return value.TrimEnd('.');
+        }
+
+        private static void AddReferenceIpLine(List<string> lines, string label, string? ip)
+        {
+            var cleanIp = (ip ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(cleanIp) || cleanIp == "—")
+                return;
+
+            lines.Add($"{label} ({cleanIp})");
+        }
 
         public Task RunQuickReachabilityTestForAllAsync()
         {
+            if (IsIgsdMode)
+            {
+                return Task.WhenAll(
+                    RunQuickReachabilityTestAsync(PrimaryIpTextBox, PrimarySummaryTextBlock),
+                    RunQuickReachabilityTestAsync(SecondaryIpTextBox, SecondarySummaryTextBlock));
+            }
+
             return Task.WhenAll(
                 RunQuickReachabilityTestAsync(PrimaryIpTextBox, PrimarySummaryTextBlock),
                 RunQuickReachabilityTestAsync(LanIpTextBox, LanSummaryTextBlock),

@@ -69,6 +69,7 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(result);
         }
 
+
         [HttpGet("dispatch-tasks")]
         public async Task<ActionResult<List<DispatchTaskListItemDto>>> GetDispatchTasks(CancellationToken ct)
         {
@@ -108,6 +109,7 @@ namespace SmartGridSuite.Api.Controllers
 
             return Ok(items);
         }
+
 
         [HttpGet("by-site/{siteId}")]
         public async Task<ActionResult<List<TicketListItemDto>>> GetBySite(string siteId, CancellationToken ct)
@@ -157,12 +159,18 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(result);
         }
 
+
         [HttpPost("{id:long}/request-capital")]
-        public async Task<ActionResult<UpdateTicketResponse>> RequestCapital(long id, CancellationToken ct)
+        public async Task<ActionResult<UpdateTicketResponse>> RequestCapital(long id, [FromBody] TicketActionReasonRequest req, CancellationToken ct)
         {
             var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
             if (entity == null)
                 return NotFound();
+
+            var reason = (req.Reason ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(reason))
+                return BadRequest("Reason is required.");
 
             var awaitingCapitalStatus = await _db.TicketStatuses
                 .AsNoTracking()
@@ -174,6 +182,13 @@ namespace SmartGridSuite.Api.Controllers
                 return BadRequest("Status 'Awaiting Capital' is missing or inactive.");
 
             entity.Status = awaitingCapitalStatus.Name;
+            entity.ActionRequiredOverride = "Review Capital request";
+            entity.Notes = AppendTicketNote(
+                entity.Notes,
+                "Capital requested",
+                reason,
+                req.RequestedBy);
+
             entity.LastActivityAt = DateTime.Now;
 
             await _db.SaveChangesAsync(ct);
@@ -181,8 +196,45 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(new UpdateTicketResponse(entity.Id));
         }
 
-        private static DispatchTaskListItemDto MapToDispatchTask(
-                        TicketEntity t, string fallbackCategoryName, string fallbackActionRequired)
+
+        [HttpPost("{id:long}/request-maintenance")]
+        public async Task<ActionResult<UpdateTicketResponse>> RequestMaintenance(long id, [FromBody] TicketActionReasonRequest req, CancellationToken ct)
+        {
+            var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+            if (entity == null)
+                return NotFound();
+
+            var reason = (req.Reason ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(reason))
+                return BadRequest("Reason is required.");
+
+            var needsReviewStatus = await _db.TicketStatuses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.IsActive && x.Name.ToLower() == "needs review",
+                    ct);
+
+            if (needsReviewStatus == null)
+                return BadRequest("Status 'Needs Review' is missing or inactive.");
+
+            entity.Status = needsReviewStatus.Name;
+            entity.ActionRequiredOverride = "Review Maintenance request";
+            entity.Notes = AppendTicketNote(
+                entity.Notes,
+                "Maintenance requested",
+                reason,
+                req.RequestedBy);
+
+            entity.LastActivityAt = DateTime.Now;
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(new UpdateTicketResponse(entity.Id));
+        }
+
+
+        private static DispatchTaskListItemDto MapToDispatchTask(TicketEntity t, string fallbackCategoryName, string fallbackActionRequired)
         {
             var hasActiveAssignedCategory =
                 t.TaskCategory != null &&
@@ -230,14 +282,57 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             return "";
-        }        
-        
+        }
+
+        private static string AppendTicketNote(string? existingNotes, string action, string reason, string? requestedBy)
+        {
+            var cleanExisting = (existingNotes ?? string.Empty).Trim();
+            var cleanAction = string.IsNullOrWhiteSpace(action) ? "Ticket action" : action.Trim();
+            var cleanReason = (reason ?? string.Empty).Trim();
+            var cleanRequestedBy = string.IsNullOrWhiteSpace(requestedBy)
+                ? "Unknown"
+                : requestedBy.Trim();
+
+            var entry =
+                $"[{DateTime.Now:MM-dd-yyyy HH:mm}] {cleanAction} by {cleanRequestedBy}{Environment.NewLine}" +
+                $"Reason: {cleanReason}";
+
+            if (string.IsNullOrWhiteSpace(cleanExisting))
+                return entry;
+
+            return cleanExisting + Environment.NewLine + Environment.NewLine + entry;
+        }
+
 
         [HttpPost]
         public async Task<ActionResult<CreateTicketResponse>> Create([FromBody] CreateTicketRequest req)
         {
             if (string.IsNullOrWhiteSpace(req.Site)) return BadRequest("Site required");
             if (string.IsNullOrWhiteSpace(req.Problem)) return BadRequest("Problem required");
+
+            var incomingNotificationName = (req.NotificationName ?? string.Empty).Trim();
+
+            if (incomingNotificationName.Equals(
+                    "Ticket requested from Site Dashboard",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                var site = req.Site.Trim();
+
+                var existingDashboardRequest = await _db.Tickets
+                    .AsNoTracking()
+                    .Where(t =>
+                        t.Site == site &&
+                        t.NotificationName == "Ticket requested from Site Dashboard" &&
+                        t.Status != "Closed" &&
+                        t.Status != "Completed" &&
+                        t.Status != "Cancelled" &&
+                        t.Status != "Canceled")
+                    .OrderByDescending(t => t.LastActivityAt)
+                    .FirstOrDefaultAsync();
+
+                if (existingDashboardRequest is not null)
+                    return Ok(new CreateTicketResponse(existingDashboardRequest.Id));
+            }
 
             string? notif = string.IsNullOrWhiteSpace(req.Notification) ? null : req.Notification.Trim();
 
@@ -790,6 +885,42 @@ namespace SmartGridSuite.Api.Controllers
                         candidates.Add(value.ToUpperInvariant());
                 }
             }
+        }
+
+        [HttpPost("{id:long}/submit-writeup")]
+        public async Task<ActionResult<UpdateTicketResponse>> SubmitWriteUp(long id, [FromBody] SubmitTicketWriteUpRequest req, CancellationToken ct)
+        {
+            var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+
+            if (entity == null)
+                return NotFound();
+
+            var finalWriteUp = (req.FinalWriteUpText ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(finalWriteUp))
+                return BadRequest("Write-up text is required.");
+
+            entity.Notes = AppendTicketNote(
+                entity.Notes,
+                "Write-up submitted",
+                finalWriteUp,
+                req.SubmittedBy);
+
+            entity.ActionRequiredOverride = "Review submitted site write-up";
+            entity.LastActivityAt = DateTime.Now;
+
+            var needsReviewStatus = await _db.TicketStatuses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.IsActive && x.Name.ToLower() == "needs review",
+                    ct);
+
+            if (needsReviewStatus != null)
+                entity.Status = needsReviewStatus.Name;
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(new UpdateTicketResponse(entity.Id));
         }
 
     }

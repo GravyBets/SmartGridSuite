@@ -72,6 +72,13 @@
                                    FontSize="18"
                                    FontWeight="SemiBold"/>
                     </ListBoxItem>
+
+                    <ListBoxItem Tag="GeneralSettings">
+                        <TextBlock Text="General Settings"
+                                   Padding="8,0,0,2"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"/>
+                    </ListBoxItem>
                 </ListBox>
 
                 <!-- Home button -->

@@ -23,7 +23,7 @@
                                FontSize="16"
                                FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimary}"/>
-                    <TextBlock Text="Add / edit technicians and manage title, schedule, roles, and home truck"
+                    <TextBlock Text="Add / edit technicians and manage title, schedule, roles, and home truck."
                                Margin="0,2,0,0"
                                Foreground="{DynamicResource TextSecondary}"/>
                 </StackPanel>

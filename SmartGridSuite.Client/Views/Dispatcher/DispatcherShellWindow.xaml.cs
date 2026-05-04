@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using SmartGridSuite.Client.Views.Dispatcher.Panes;
 using System.Text.Json;
 using SmartGridSuite.Client.Services;
+using System.Windows.Media;
 
 namespace SmartGridSuite.Client.Views
 {
@@ -17,11 +18,14 @@ namespace SmartGridSuite.Client.Views
         {
             InitializeComponent();
 
+            UiScaleService.ApplyToWindow(this);
+
             // Default selection = Dashboard
             SelectNavIndex(0);
 
         }
 
+        
         private void SelectNavIndex(int index)
         {
             _syncingNav = true;
@@ -72,10 +76,6 @@ namespace SmartGridSuite.Client.Views
         {
             switch (GetNavKey(item))
             {
-                case "Dashboard":
-                    MainPaneHost.Content = new DashboardPaneView();
-                    break;
-
                 case "Tasks":
                     MainPaneHost.Content = new TaskPaneView();
                     break;

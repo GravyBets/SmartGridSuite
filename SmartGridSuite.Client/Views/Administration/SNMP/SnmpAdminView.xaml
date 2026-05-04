@@ -255,11 +255,33 @@
                             <RowDefinition Height="10"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
+                        
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>                            
+                        </Grid.ColumnDefinitions>
 
-                        <TextBlock Text="Connection Settings"
+                        <TextBlock Grid.Column="0"
+                                   Text="Connection Settings"
                                    FontSize="18"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextPrimary}"/>
+
+                        <TextBlock Grid.Column="2"
+                                   Text="Version"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+
+                        <ComboBox x:Name="SnmpVersionComboBox"
+                                  Grid.Column="4"
+                                  Height="34"
+                                  SelectedIndex="1">
+                            <ComboBoxItem Content="v2c"/>
+                            <ComboBoxItem Content="v3"/>
+                        </ComboBox>
 
                         <!-- Communities / context -->
                         <Grid Grid.Row="2">
@@ -312,13 +334,14 @@
                         <Grid Grid.Row="4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="260"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="10"/>
                                 <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Column="0"
@@ -341,7 +364,10 @@
                                       Height="34"
                                       SelectedIndex="0">
                                 <ComboBoxItem Content="MD5"/>
-                                <ComboBoxItem Content="SHA"/>
+                                <ComboBoxItem Content="SHA-1"/>
+                                <ComboBoxItem Content="SHA-256"/>
+                                <ComboBoxItem Content="SHA-384"/>
+                                <ComboBoxItem Content="SHA-512"/>
                             </ComboBox>
 
                             <TextBlock Grid.Column="6"
@@ -354,6 +380,8 @@
                                       SelectedIndex="0">
                                 <ComboBoxItem Content="DES"/>
                                 <ComboBoxItem Content="AES"/>
+                                <ComboBoxItem Content="AES-128"/>
+                                <ComboBoxItem Content="AES-256"/>
                             </ComboBox>
                         </Grid>
 
@@ -374,7 +402,7 @@
                             <PasswordBox x:Name="AuthKeyPasswordBox"
                                          Grid.Column="1"
                                          Height="34"
-                                         Padding="10,0"/>
+                                         Padding="10,7,0,0"/>
 
                             <TextBlock Grid.Column="3"
                                        Text="Privacy Key"
@@ -383,7 +411,7 @@
                             <PasswordBox x:Name="PrivacyKeyPasswordBox"
                                          Grid.Column="4"
                                          Height="34"
-                                         Padding="10,0"/>
+                                         Padding="10,7,0,0"/>
                         </Grid>
                     </Grid>
                 </Border>

@@ -22,20 +22,34 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             SetDefaults();
         }
 
-        public void LoadOid(SnmpOidConfigDto? oid)
+        public void LoadOid(SnmpOidConfigDto? oid, int suggestedSortOrder = 10)
         {
             if (oid is null)
             {
                 WindowTitleTextBlock.Text = "New SNMP OID";
                 Result = null;
+
+                SetComboText(CategoryComboBox, "Config");
+                LabelTextBox.Text = string.Empty;
+                OidTextBox.Text = string.Empty;
+                SetComboText(ValueTypeComboBox, "String");
+                SortOrderTextBox.Text = suggestedSortOrder.ToString();
+                WritableCheckBox.IsChecked = false;
+                ShowInWorkspaceCheckBox.IsChecked = true;
+
+                SetComboText(DecodeModeComboBox, "Raw");
+                ShowRawAlongsideDecodedCheckBox.IsChecked = false;
+
                 _decodeValues.Clear();
                 RefreshDecodeGrid();
+                ClearDecodeEditor();
+                SetDecodeUiEnabled(false);
                 return;
             }
 
             WindowTitleTextBlock.Text = "Edit SNMP OID";
 
-            CategoryTextBox.Text = oid.Category;
+            SetComboText(CategoryComboBox, string.IsNullOrWhiteSpace(oid.Category) ? "Config" : oid.Category);
             LabelTextBox.Text = oid.Label;
             OidTextBox.Text = oid.Oid;
             SetComboText(ValueTypeComboBox, oid.ValueType);
@@ -60,6 +74,8 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                     }));
 
             RefreshDecodeGrid();
+            ClearDecodeEditor();
+            SetDecodeUiEnabled(string.Equals(GetComboText(DecodeModeComboBox, "Raw"), "ValueMap", StringComparison.OrdinalIgnoreCase));
         }
 
         private void HookEvents()
@@ -68,6 +84,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             RemoveDecodeRowButton.Click += RemoveDecodeRowButton_Click;
             ApplyDecodeRowButton.Click += ApplyDecodeRowButton_Click;
             DecodeValuesDataGrid.SelectionChanged += DecodeValuesDataGrid_SelectionChanged;
+            DecodeModeComboBox.SelectionChanged += DecodeModeComboBox_SelectionChanged;
 
             SaveButtonEx.Click += SaveButtonEx_Click;
             CancelButtonEx.Click += CancelButtonEx_Click;
@@ -75,11 +92,14 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
         private void SetDefaults()
         {
+            SetComboText(CategoryComboBox, "Config");
             SetComboText(ValueTypeComboBox, "String");
             SetComboText(DecodeModeComboBox, "Raw");
-            SortOrderTextBox.Text = "0";
+            SortOrderTextBox.Text = "10";
             ShowInWorkspaceCheckBox.IsChecked = true;
             DecodeSortOrderTextBox.Text = "0";
+
+            SetDecodeUiEnabled(false);
             RefreshDecodeGrid();
         }
 
@@ -203,7 +223,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
             Result = new SnmpOidConfigDto
             {
-                Category = string.IsNullOrWhiteSpace(CategoryTextBox.Text) ? "General" : CategoryTextBox.Text.Trim(),
+                Category = GetComboText(CategoryComboBox, "Config"),
                 Label = label,
                 Oid = oid,
                 ValueType = GetComboText(ValueTypeComboBox, "String"),
@@ -277,6 +297,21 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             }
 
             comboBox.Text = value;
+        }
+
+        private void SetDecodeUiEnabled(bool enabled)
+        {
+            if (DecodeValuesBorder is null)
+                return;
+
+            DecodeValuesBorder.IsEnabled = enabled;
+            DecodeValuesBorder.Opacity = enabled ? 1.0 : 0.55;
+        }
+
+        private void DecodeModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var mode = GetComboText(DecodeModeComboBox, "Raw");
+            SetDecodeUiEnabled(string.Equals(mode, "ValueMap", StringComparison.OrdinalIgnoreCase));
         }
     }
 }

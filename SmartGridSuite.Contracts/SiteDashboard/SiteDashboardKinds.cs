@@ -6,5 +6,6 @@
         public const string Dacs = "DACs";
         public const string Rx = "Range Extender";
         public const string Igsd = "IGSD";
+        public const string Tower = "Tower";
     }
 }

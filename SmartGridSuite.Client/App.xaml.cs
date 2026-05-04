@@ -1,14 +1,15 @@
-﻿using System.Configuration;
-using System.Data;
+﻿using SmartGridSuite.Client.Services;
 using System.Windows;
 
 namespace SmartGridSuite.Client
 {
-    /// <summary>
-    /// Interaction logic for App.xaml
-    /// </summary>
     public partial class App : Application
     {
-    }
+        protected override void OnStartup(StartupEventArgs e)
+        {
+            UiScaleService.Load();
 
+            base.OnStartup(e);
+        }
+    }
 }

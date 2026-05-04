@@ -36,7 +36,8 @@ namespace SmartGridSuite.Api.Controllers
                     DeviceFamily = x.DeviceFamily,
                     IsActive = x.IsActive,
                     IsDefaultForFamily = x.IsDefaultForFamily,
-                    OidCount = x.Oids.Count(o => !o.IsDeleted)
+                    OidCount = x.Oids.Count(o => !o.IsDeleted),
+                    SnmpVersion = x.SnmpVersion
                 })
                 .ToListAsync(ct);
 
@@ -188,6 +189,9 @@ namespace SmartGridSuite.Api.Controllers
             entity.TimeoutMs = req.TimeoutMs;
             entity.Retries = req.Retries;
             entity.UpdatedAt = DateTime.Now;
+
+            entity.SnmpVersion = string.IsNullOrWhiteSpace(req.SnmpVersion)
+                ? "v3" : req.SnmpVersion.Trim().ToLowerInvariant();
 
             if (entity.IsDefaultForFamily)
             {
@@ -377,6 +381,7 @@ namespace SmartGridSuite.Api.Controllers
 
                 TimeoutMs = entity.TimeoutMs,
                 Retries = entity.Retries,
+                SnmpVersion = entity.SnmpVersion,
 
                 Oids = entity.Oids
                     .Where(x => !x.IsDeleted)

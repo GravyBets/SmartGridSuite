@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using SmartGridSuite.Api.Mappings;
 using SmartGridSuite.Api.Services.ParentSync;
 using SmartGridSuite.Api.Services.ParentSync.Models;
-using SmartGridSuite.Api.Mappings;
 using SmartGridSuite.Contracts.SiteDashboard;
+using System.Net;
+using System.Net.Sockets;
 
 namespace SmartGridSuite.Api.Controllers
 {
@@ -67,8 +69,32 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(dashboard.ToDto());
         }
 
+        //IP Look Up
+        [HttpGet("associated-site-by-ip")]
+        public async Task<ActionResult<AssociatedSiteByIpLookupDto>> GetAssociatedSiteByIp(
+            [FromQuery] string ip,
+            CancellationToken cancellationToken = default)
+        {
+            var normalizedIp = NormalizeRequiredText(ip);
+
+            if (normalizedIp is null)
+                return BadRequest("IP address is required.");
+
+            if (!IPAddress.TryParse(normalizedIp, out var parsedIp) ||
+                parsedIp.AddressFamily != AddressFamily.InterNetwork)
+            {
+                return BadRequest("Enter a valid IPv4 address.");
+            }
+
+            var result = await _parentSyncService.FindAssociatedSiteByIpAsync(
+                normalizedIp,
+                cancellationToken);
+
+            return Ok(result);
+        }
+
         //AMS
-        
+
         [HttpGet("ams-mr-site/{siteId}")]
         public async Task<ActionResult<AmsSiteDashboardDto>> GetAmsMrSite(
             string siteId, CancellationToken cancellationToken = default)
@@ -193,11 +219,31 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(rows);
         }
 
+        [HttpGet("tower-dashboard/{topNameId:int}")]
+        public async Task<ActionResult<SiteDashboardResponseDto>> GetTowerDashboard(int topNameId, CancellationToken cancellationToken = default)
+        {
+            if (topNameId <= 0)
+            {
+                return BadRequest("TopNameId must be greater than zero.");
+            }
+
+            var dashboard = await _parentSyncService.GetTowerDashboardAsync(topNameId, cancellationToken);
+
+            if (dashboard is null)
+            {
+                return NotFound(new { message = $"Tower '{topNameId}' was not found." });
+            }
+
+            return Ok(dashboard.ToDto());
+        }
+
         private static string? NormalizeRequiredText(string? value)
         {
             var normalized = (value ?? "").Trim();
             return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
         }
+
+        
 
     }
 }

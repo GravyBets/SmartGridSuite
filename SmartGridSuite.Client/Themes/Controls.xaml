@@ -141,7 +141,7 @@
     <!-- Secondary button -->
     <Style x:Key="SecondaryButtonStyle" TargetType="Button">
         <Setter Property="Height" Value="34"/>
-        <Setter Property="MinWidth" Value="96"/>
+        <Setter Property="MinWidth" Value="40"/>
         <Setter Property="Padding" Value="16,0"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="FontWeight" Value="SemiBold"/>

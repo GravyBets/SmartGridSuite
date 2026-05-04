@@ -27,6 +27,8 @@ namespace SmartGridSuite.Api.Data.Entities
         public bool IsDeleted { get; set; }
         public DateTime UpdatedAt { get; set; }
 
+        public string SnmpVersion { get; set; } = "v3";
+
         public virtual ICollection<SnmpOidEntity> Oids { get; set; } = new List<SnmpOidEntity>();
     }
 }

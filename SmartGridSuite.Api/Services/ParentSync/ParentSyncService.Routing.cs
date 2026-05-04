@@ -162,5 +162,32 @@ namespace SmartGridSuite.Api.Services.ParentSync
             }
         }
 
+        public async Task<SiteDashboardResponse?> GetTowerDashboardAsync(int topNameId, CancellationToken cancellationToken = default)
+        {
+            if (topNameId <= 0)
+                return null;
+
+            var row = await GetTowerAsync(topNameId, cancellationToken);
+            if (row is null)
+                return null;
+
+            var syntheticSiteId = $"TOWER:{topNameId}";
+
+            return new SiteDashboardResponse
+            {
+                SiteId = syntheticSiteId,
+                DashboardKind = SiteDashboardKinds.Tower,
+                Route = new SiteDashboardRouteInfo
+                {
+                    SiteId = syntheticSiteId,
+                    SiteType = "Tower",
+                    SiteConfigName = "Tower",
+                    PrimaryCommType = null,
+                    SecondaryCommType = null,
+                    SiteConfigDescription = "Tower dashboard"
+                },
+                Data = row
+            };
+        }
     }
 }

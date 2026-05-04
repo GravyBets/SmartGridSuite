@@ -10,8 +10,12 @@ namespace SmartGridSuite.Client.Views
         public ModuleLauncherWindow()
         {
             InitializeComponent();
+            LoadUiScaleControl();
+            UiScaleSlider.ValueChanged += UiScaleSlider_ValueChanged;
             ThemeToggle.IsChecked = ThemeService.Current == AppTheme.Dark;
         }
+
+        private bool _loadingUiScale;
 
         private void ThemeToggle_Checked(object sender, RoutedEventArgs e)
             => ThemeService.Apply(AppTheme.Dark);
@@ -48,5 +52,35 @@ namespace SmartGridSuite.Client.Views
 
         private void BugFeature_Click(object sender, RoutedEventArgs e)
             => MessageBox.Show("Bug/Feature link (later).");
+
+        private void LoadUiScaleControl()
+        {
+            _loadingUiScale = true;
+
+            var percent = Math.Round(UiScaleService.CurrentScale * 100);
+
+            UiScaleSlider.Value = percent;
+            UiScaleValueTextBlock.Text = $"{percent:0}%";
+
+            _loadingUiScale = false;
+        }
+
+        private void UiScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_loadingUiScale)
+                return;
+
+            var percent = Math.Round(e.NewValue);
+            var scale = percent / 100.0;
+
+            UiScaleValueTextBlock.Text = $"{percent:0}%";
+            UiScaleService.SaveScale(scale);
+        }
+
+        private void ResetUiScaleButton_Click(object sender, RoutedEventArgs e)
+        {
+            UiScaleService.SaveScale(0.80);
+            LoadUiScaleControl();
+        }
     }
 }

@@ -1,8 +1,10 @@
-﻿using System.Windows;
-using System.Windows.Controls;
-using SmartGridSuite.Client.Services;
-using SmartGridSuite.Client.Views.Administration.Tickets;
+﻿using SmartGridSuite.Client.Services;
+using SmartGridSuite.Client.Views.Administration.GeneralSettings;
 using SmartGridSuite.Client.Views.Administration.SNMP;
+using SmartGridSuite.Client.Views.Administration.Tickets;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
 
 namespace SmartGridSuite.Client.Views.Administration
 {
@@ -13,7 +15,11 @@ namespace SmartGridSuite.Client.Views.Administration
         private readonly TechniciansAdminView _techniciansView;
         private readonly TrucksAdminView _trucksView;
         private readonly TicketsAdminView _ticketsView;
+        private readonly GeneralSettingsAdminView _generalSettingsView;
         private readonly SnmpAdminView _snmpView;
+
+        private bool _suppressNavSelectionChanged;
+        private string? _currentNavTag;
 
         public AdministrationShellWindow()
         {
@@ -21,20 +27,39 @@ namespace SmartGridSuite.Client.Views.Administration
 
             _api = new ApiClient("https://localhost:7140");
 
+            UiScaleService.ApplyToWindow(this);
+
             _techniciansView = new TechniciansAdminView(_api);
             _trucksView = new TrucksAdminView(_api);
             _ticketsView = new TicketsAdminView(_api);
+            _generalSettingsView = new GeneralSettingsAdminView(_api);
             _snmpView = new SnmpAdminView(_api);
 
             NavigationListBox.SelectedIndex = 0;
         }
 
-        private void NavigationListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void NavigationListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_suppressNavSelectionChanged)
+                return;
+
             if (NavigationListBox.SelectedItem is not ListBoxItem item)
                 return;
 
-            switch (item.Tag as string)
+            var requestedTag = item.Tag as string;
+            if (string.IsNullOrWhiteSpace(requestedTag))
+                return;
+
+            if (requestedTag == _currentNavTag)
+                return;
+
+            if (!await CanLeaveCurrentViewAsync())
+            {
+                RestoreCurrentSelection();
+                return;
+            }
+
+            switch (requestedTag)
             {
                 case "Technicians":
                     ShowTechnicians();
@@ -48,9 +73,49 @@ namespace SmartGridSuite.Client.Views.Administration
                     ShowTickets();
                     break;
 
+                case "GeneralSettings":
+                    ShowGeneralSettings();
+                    break;
+
                 case "SNMP":
                     ShowSNMP();
                     break;
+
+                default:
+                    RestoreCurrentSelection();
+                    return;
+            }
+
+            _currentNavTag = requestedTag;
+        }
+
+        private async Task<bool> CanLeaveCurrentViewAsync()
+        {
+            if (_currentNavTag == "SNMP")
+                return await _snmpView.ConfirmPendingChangesAsync();
+
+            return true;
+        }
+
+        private void RestoreCurrentSelection()
+        {
+            _suppressNavSelectionChanged = true;
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(_currentNavTag))
+                    return;
+
+                var match = NavigationListBox.Items
+                    .OfType<ListBoxItem>()
+                    .FirstOrDefault(x => string.Equals(x.Tag as string, _currentNavTag, StringComparison.Ordinal));
+
+                if (match is not null)
+                    NavigationListBox.SelectedItem = match;
+            }
+            finally
+            {
+                _suppressNavSelectionChanged = false;
             }
         }
 
@@ -63,10 +128,15 @@ namespace SmartGridSuite.Client.Views.Administration
         {
             ShowView(_trucksView);
         }
-        
+
         private void ShowTickets()
         {
             ShowView(_ticketsView);
+        }
+
+        private void ShowGeneralSettings()
+        {
+            ShowView(_generalSettingsView);
         }
 
         private void ShowSNMP()
@@ -79,8 +149,11 @@ namespace SmartGridSuite.Client.Views.Administration
             AdminContentHost.Content = view;
         }
 
-        private void HomeButton_Click(object sender, RoutedEventArgs e)
+        private async void HomeButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!await CanLeaveCurrentViewAsync())
+                return;
+
             var home = new ModuleLauncherWindow();
             home.Show();
             Close();

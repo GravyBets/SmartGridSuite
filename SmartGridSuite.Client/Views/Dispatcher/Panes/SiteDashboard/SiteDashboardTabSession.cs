@@ -5,12 +5,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 {
     public sealed class SiteDashboardTabSession
     {
+        public string DashboardKind { get; set; } = string.Empty;
         public string SessionKey { get; init; } = string.Empty;
         public string HeaderText { get; set; } = "Blank";
         public string SearchText { get; set; } = string.Empty;
 
         public string AddressText { get; set; } = "—";
         public string CoordinatesText { get; set; } = "—";
+
+        public string TopTunnelIp { get; set; } = "—";
 
         public string PrimaryIp { get; set; } = "—";
         public string LanIp { get; set; } = "—";
@@ -23,6 +26,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         public string SiteStatusText { get; set; } = string.Empty;
         public string TopAccessTitleText { get; set; } = "TOP Access";
+
+        // Range Extender
+        public string RangeExtenderLinkUrl { get; set; } = "";
+
+        //IGSD   
+        public string IgsdPrimaryRtuIp { get; set; } = "—";
+
+        //For Dual Cell Sites
+        public string IgsdPrimaryCommsEthernetIp { get; set; } = "—";
+
+        public string IgsdSecondaryCommsEthernetIp { get; set; } = "—";
+        public string IgsdSecondaryRtuIp { get; set; } = "—";
+        public string IgsdPrimaryTunnelIp { get; set; } = "—";
+
+        public bool ShowIgsdPortalTab { get; set; }
+        public string IgsdPortalUrl { get; set; } = "";
 
         //Tickets
         public string TicketInfoText { get; set; } = string.Empty;
@@ -40,6 +59,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public string SnmpTargetIp { get; set; } = string.Empty;
         public List<SnmpOidConfigDto> SnmpOids { get; set; } = new();
 
+        public List<SnmpProfileListItemDto> SnmpProfiles { get; set; } = new();
+
         public ulong? SnmpProfileId { get; set; }
+
+        public Dictionary<ulong, string> SnmpOidResults { get; set; } = new();
     }
 }

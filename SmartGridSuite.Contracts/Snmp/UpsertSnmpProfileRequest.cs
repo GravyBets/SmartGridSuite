@@ -23,6 +23,8 @@ namespace SmartGridSuite.Contracts.Snmp
         public int TimeoutMs { get; set; } = 1500;
         public int Retries { get; set; } = 1;
 
+        public string SnmpVersion { get; set; } = "v3";
+
         public List<UpsertSnmpOidRequest> Oids { get; set; } = new();
     }
 }

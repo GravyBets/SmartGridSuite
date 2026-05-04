@@ -235,6 +235,7 @@ namespace SmartGridSuite.Api.Mappings
                 SiteDashboardKinds.Dacs when data is DacsSiteDashboardRow row => row.ToDto(),
                 SiteDashboardKinds.Rx when data is RxSiteDashboardRow row => row.ToDto(),
                 SiteDashboardKinds.Igsd when data is IgsdSiteDashboardRow row => row.ToDto(),
+                SiteDashboardKinds.Tower => data,
                 _ => null
             };
         }
