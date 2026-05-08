@@ -5,12 +5,13 @@
         public int TopSiteId { get; init; }
         public string? Sector { get; init; }
 
-        public decimal? TxWatts { get; init; }
         public decimal? TxDbm { get; init; }
-        public decimal? ErpWatts { get; init; }
         public decimal? Downtilt { get; init; }
 
         public int? Channel { get; init; }
+        public decimal? ChannelTxFrequency { get; init; }
+        public decimal? ChannelRxFrequency { get; init; }
+
         public string? Network { get; init; }
 
         public string? Vip { get; init; }
@@ -19,8 +20,6 @@
         public string? Vlan { get; init; }
 
         public string? Bsid { get; init; }
-        public string? ApModel { get; init; }
-        public string? ApFrequency { get; init; }
 
         public string? AntennaSerialA { get; init; }
         public string? AntennaSerialB { get; init; }

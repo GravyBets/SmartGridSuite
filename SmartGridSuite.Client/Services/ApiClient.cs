@@ -1,11 +1,7 @@
 ﻿using SmartGridSuite.Contracts.Settings;
 using SmartGridSuite.Contracts.SiteDashboard;
-using System;
-using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Json;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace SmartGridSuite.Client.Services
 {
@@ -195,6 +191,28 @@ namespace SmartGridSuite.Client.Services
                 {
                     Url = url ?? string.Empty
                 },
+                ct);
+        }
+
+        //Tower Stuff
+        public async Task<List<TowerSearchResultDto>> SearchTowersAsync(
+            string term, int take = 25, CancellationToken ct = default)
+        {
+            term = (term ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(term))
+                return new List<TowerSearchResultDto>();
+
+            return await GetAsync<List<TowerSearchResultDto>>(
+                $"api/site-dashboard/tower-search?term={Uri.EscapeDataString(term)}&take={take}",
+                ct) ?? new List<TowerSearchResultDto>();
+        }
+
+        public async Task<SiteDashboardResponseDto?> GetTowerDashboardAsync(
+            int topNameId, CancellationToken ct = default)
+        {
+            return await GetAsync<SiteDashboardResponseDto>(
+                $"api/site-dashboard/tower-dashboard/{topNameId}",
                 ct);
         }
     }

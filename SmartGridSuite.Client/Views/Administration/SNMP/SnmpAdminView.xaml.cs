@@ -73,11 +73,8 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             ProfileSearchTextBox.TextChanged += ProfileSearchTextBox_TextChanged;
 
             ProfileNameTextBox.TextChanged += EditorChanged;
-            DeviceFamilyComboBox.SelectionChanged += EditorChanged;
             ProfileIsActiveCheckBox.Checked += EditorChanged;
             ProfileIsActiveCheckBox.Unchecked += EditorChanged;
-            ProfileIsDefaultCheckBox.Checked += EditorChanged;
-            ProfileIsDefaultCheckBox.Unchecked += EditorChanged;
 
             TimeoutMsTextBox.TextChanged += EditorChanged;
             RetriesTextBox.TextChanged += EditorChanged;
@@ -93,6 +90,8 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             PrivacyProtocolComboBox.SelectionChanged += EditorChanged;
             AuthKeyPasswordBox.PasswordChanged += EditorChanged;
             PrivacyKeyPasswordBox.PasswordChanged += EditorChanged;
+
+            DeleteProfileButton.Click += DeleteProfileButton_Click;
         }
 
         private void SetDefaults()
@@ -103,9 +102,6 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             {
                 ProfileIdTextBlock.Text = "(new)";
                 SnmpStatusTextBlock.Text = "Ready.";
-
-                if (DeviceFamilyComboBox.SelectedIndex < 0)
-                    DeviceFamilyComboBox.SelectedIndex = 0;
 
                 if (AuthProtocolComboBox.SelectedIndex < 0)
                     AuthProtocolComboBox.SelectedIndex = 0;
@@ -476,7 +472,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             {
                 filtered = filtered.Where(x =>
                     x.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    x.DeviceFamily.Contains(search, StringComparison.OrdinalIgnoreCase));
+                    (x.SnmpVersion ?? string.Empty).Contains(search, StringComparison.OrdinalIgnoreCase));
             }
 
             ProfilesDataGrid.ItemsSource = filtered.ToList();
@@ -493,10 +489,8 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                 ProfileIdTextBlock.Text = detail.Id.ToString();
 
                 ProfileNameTextBox.Text = detail.Name;
-                SetComboText(DeviceFamilyComboBox, detail.DeviceFamily);
 
                 ProfileIsActiveCheckBox.IsChecked = detail.IsActive;
-                ProfileIsDefaultCheckBox.IsChecked = detail.IsDefaultForFamily;
 
                 TimeoutMsTextBox.Text = detail.TimeoutMs.ToString();
                 RetriesTextBox.Text = detail.Retries.ToString();
@@ -541,10 +535,8 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                 ProfileIdTextBlock.Text = "(new)";
 
                 ProfileNameTextBox.Text = string.Empty;
-                SetComboText(DeviceFamilyComboBox, "RF700");
 
                 ProfileIsActiveCheckBox.IsChecked = true;
-                ProfileIsDefaultCheckBox.IsChecked = false;
 
                 TimeoutMsTextBox.Text = "1500";
                 RetriesTextBox.Text = "1";
@@ -597,9 +589,8 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             {
                 Id = _currentProfileId > 0 ? _currentProfileId : null,
                 Name = (ProfileNameTextBox.Text ?? string.Empty).Trim(),
-                DeviceFamily = GetComboText(DeviceFamilyComboBox, "RF700"),
+                DeviceFamily = "GENERAL",
                 IsActive = ProfileIsActiveCheckBox.IsChecked == true,
-                IsDefaultForFamily = ProfileIsDefaultCheckBox.IsChecked == true,
 
                 SnmpVersion = GetComboText(SnmpVersionComboBox, "v3"),
 
@@ -654,6 +645,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             DeactivateProfileButton.IsEnabled = false;
             AddOidButton.IsEnabled = false;            
             RemoveOidButton.IsEnabled = false;
+            DeleteProfileButton.IsEnabled = false;
         }
 
         private void ClearBusy()
@@ -664,6 +656,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             DeactivateProfileButton.IsEnabled = true;
             AddOidButton.IsEnabled = true;            
             RemoveOidButton.IsEnabled = true;
+            DeleteProfileButton.IsEnabled = true;
         }
 
         private static string? CleanNullable(string? value)
@@ -758,6 +751,56 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             AuthKeyPasswordBox.IsEnabled = isV3;
             PrivacyProtocolComboBox.IsEnabled = isV3;
             PrivacyKeyPasswordBox.IsEnabled = isV3;
+        }
+
+        private async void DeleteProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!await ConfirmPendingChangesAsync())
+                return;
+
+            if (_currentProfileId == 0)
+            {
+                MessageBox.Show(
+                    "Select a profile first.",
+                    "Delete SNMP Profile",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var profileName = (ProfileNameTextBox.Text ?? string.Empty).Trim();
+
+            var confirm = MessageBox.Show(
+                $"Delete SNMP profile{(string.IsNullOrWhiteSpace(profileName) ? "" : $" \"{profileName}\"")}?\n\nThis will also remove its OIDs from the admin list.",
+                "Delete SNMP Profile",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                SetBusy("Deleting SNMP profile...");
+
+                await _api.PostAsync<object, object>(
+                    $"api/snmp-profiles/{_currentProfileId}/delete",
+                    new { });
+
+                await LoadProfilesAsync();
+                ClearEditorForNewProfile();
+
+                ClearDirty();
+                SnmpStatusTextBlock.Text = "Profile deleted.";
+            }
+            catch (Exception ex)
+            {
+                SnmpStatusTextBlock.Text = $"Delete failed: {ex.Message}";
+            }
+            finally
+            {
+                ClearBusy();
+            }
         }
 
         //If Dirty Handlers

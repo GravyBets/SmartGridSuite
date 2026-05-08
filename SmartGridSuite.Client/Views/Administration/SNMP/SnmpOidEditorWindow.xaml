@@ -8,12 +8,12 @@
         ResizeMode="CanResize"
         Background="{DynamicResource AppBackground}">
 
-    <Grid Margin="14">
+    <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="8"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="8"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -38,9 +38,9 @@
         <Grid Grid.Row="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="12"/>
+                <RowDefinition Height="10"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="12"/>
+                <RowDefinition Height="8"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -53,7 +53,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="10"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="8"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
@@ -64,13 +64,16 @@
 
                     <Grid Grid.Row="2">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="56"/>
-                            <ColumnDefinition Width="120"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="36"/>
-                            <ColumnDefinition Width="180"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="36"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
@@ -79,7 +82,7 @@
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondary}"/>
                         <ComboBox x:Name="CategoryComboBox"
-                                  Grid.Column="1"
+                                  Grid.Column="2"
                                   Height="34"
                                   SelectedIndex="1">
                             <ComboBoxItem Content="Admin"/>
@@ -87,23 +90,23 @@
                             <ComboBoxItem Content="Stats"/>
                         </ComboBox>
 
-                        <TextBlock Grid.Column="3"
+                        <TextBlock Grid.Column="4"
                                    Text="Label"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondary}"/>
                         <TextBox x:Name="LabelTextBox"
-                                 Grid.Column="4"
+                                 Grid.Column="6"
                                  Style="{StaticResource ModernWatermarkTextBox}"
                                  Height="34"
                                  Padding="10,0"
                                  VerticalContentAlignment="Center"/>
 
-                        <TextBlock Grid.Column="6"
+                        <TextBlock Grid.Column="8"
                                    Text="OID"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondary}"/>
                         <TextBox x:Name="OidTextBox"
-                                 Grid.Column="7"
+                                 Grid.Column="10"
                                  Style="{StaticResource ModernWatermarkTextBox}"
                                  Height="34"
                                  Padding="10,0"
@@ -112,15 +115,18 @@
 
                     <Grid Grid.Row="4">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="36"/>
-                            <ColumnDefinition Width="160"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="28"/>
-                            <ColumnDefinition Width="34"/>
-                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="48"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0"
@@ -128,7 +134,7 @@
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondary}"/>
                         <ComboBox x:Name="ValueTypeComboBox"
-                                  Grid.Column="1"
+                                  Grid.Column="2"
                                   Height="34"
                                   SelectedIndex="0">
                             <ComboBoxItem Content="String"/>
@@ -138,24 +144,24 @@
                             <ComboBoxItem Content="IpAddress"/>
                         </ComboBox>
 
-                        <TextBlock Grid.Column="3"
+                        <TextBlock Grid.Column="4"
                                    Text="Sort"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondary}"/>
                         <TextBox x:Name="SortOrderTextBox"
-                                 Grid.Column="4"
+                                 Grid.Column="6"
                                  Style="{StaticResource ModernWatermarkTextBox}"
                                  Height="34"
                                  Padding="10,0"
                                  VerticalContentAlignment="Center"/>
 
                         <CheckBox x:Name="WritableCheckBox"
-                                  Grid.Column="6"
+                                  Grid.Column="8"
                                   Content="Writable"
                                   VerticalAlignment="Center"/>
 
                         <CheckBox x:Name="ShowInWorkspaceCheckBox"
-                                  Grid.Column="8"
+                                  Grid.Column="10"
                                   Content="Show in Workspace"
                                   VerticalAlignment="Center"/>
                     </Grid>
@@ -181,9 +187,11 @@
                     <Grid Grid.Row="2">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="80"/>
-                            <ColumnDefinition Width="160"/>
-                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0"
@@ -191,7 +199,7 @@
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondary}"/>
                         <ComboBox x:Name="DecodeModeComboBox"
-                                  Grid.Column="1"
+                                  Grid.Column="2"
                                   Height="34"
                                   SelectedIndex="0">
                             <ComboBoxItem Content="Raw"/>
@@ -199,7 +207,7 @@
                         </ComboBox>
 
                         <CheckBox x:Name="ShowRawAlongsideDecodedCheckBox"
-                                  Grid.Column="3"
+                                  Grid.Column="4"
                                   Content="Show raw value alongside decoded"
                                   VerticalAlignment="Center"/>
                     </Grid>
@@ -236,27 +244,30 @@
                             <Button x:Name="AddDecodeRowButton"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Content="Add Decode Row"
-                                    Padding="14,8"
+                                    Padding="14,0"
                                     Margin="0,0,8,0"/>
 
                             <Button x:Name="RemoveDecodeRowButton"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Content="Remove Selected"
-                                    Padding="14,8"/>
+                                    Padding="14,0"/>
                         </StackPanel>
                     </Grid>
 
                     <Grid Grid.Row="2">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="80"/>
-                            <ColumnDefinition Width="150"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="90"/>
+                            <ColumnDefinition Width="24"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="56"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="12"/>
-                            <ColumnDefinition Width="50"/>
-                            <ColumnDefinition Width="80"/>
-                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="56"/>
+                            <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
@@ -265,37 +276,40 @@
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondary}"/>
                         <TextBox x:Name="DecodeRawValueTextBox"
-                                 Grid.Column="1"
+                                 Grid.Column="2"
                                  Style="{StaticResource ModernWatermarkTextBox}"
                                  Height="34"
+                                 TextAlignment="Center"
                                  Padding="10,0"
                                  VerticalContentAlignment="Center"/>
 
-                        <TextBlock Grid.Column="3"
+                        <TextBlock Grid.Column="4"
                                    Text="Display"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondary}"/>
                         <TextBox x:Name="DecodeDisplayTextBox"
-                                 Grid.Column="4"
+                                 Grid.Column="6"
                                  Style="{StaticResource ModernWatermarkTextBox}"
                                  Height="34"
                                  Padding="10,0"
                                  VerticalContentAlignment="Center"/>
 
-                        <TextBlock Grid.Column="6"
+                        <TextBlock Grid.Column="8"
                                    Text="Sort"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondary}"/>
                         <TextBox x:Name="DecodeSortOrderTextBox"
-                                 Grid.Column="7"
+                                 Grid.Column="10"
                                  Style="{StaticResource ModernWatermarkTextBox}"
                                  Height="34"
+                                 TextAlignment="Center"
                                  Padding="10,0"
                                  VerticalContentAlignment="Center"/>
 
                         <Button x:Name="ApplyDecodeRowButton"
-                                Grid.Column="9"
+                                Grid.Column="12"
                                 Style="{StaticResource PrimaryButtonStyle}"
+                                Width="80"
                                 Content="Apply"
                                 Padding="14,8"/>
                     </Grid>
@@ -350,13 +364,15 @@
                     <Button x:Name="CancelButtonEx"
                             Style="{StaticResource SecondaryButtonStyle}"
                             Content="Cancel"
-                            Padding="16,8"
-                            Margin="0,0,8,0"/>
+                            Padding="16,0"
+                            Margin="0,0,8,0"
+                            Width="96"/>
 
                     <Button x:Name="SaveButtonEx"
                             Style="{StaticResource PrimaryButtonStyle}"
                             Content="Save OID"
-                            Padding="16,8"/>
+                            Padding="16,0"
+                            Width="96"/>
                 </StackPanel>
             </Grid>
         </Border>

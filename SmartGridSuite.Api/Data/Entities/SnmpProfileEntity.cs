@@ -9,7 +9,6 @@ namespace SmartGridSuite.Api.Data.Entities
         public string Name { get; set; } = "";
         public string DeviceFamily { get; set; } = "";
         public bool IsActive { get; set; }
-        public bool IsDefaultForFamily { get; set; }
 
         public string? ReadCommunity { get; set; }
         public string? WriteCommunity { get; set; }

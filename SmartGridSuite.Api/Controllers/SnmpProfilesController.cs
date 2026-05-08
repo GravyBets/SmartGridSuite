@@ -27,7 +27,6 @@ namespace SmartGridSuite.Api.Controllers
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted)
                 .OrderBy(x => x.DeviceFamily)
-                .ThenByDescending(x => x.IsDefaultForFamily)
                 .ThenBy(x => x.Name)
                 .Select(x => new SnmpProfileListItemDto
                 {
@@ -35,7 +34,6 @@ namespace SmartGridSuite.Api.Controllers
                     Name = x.Name,
                     DeviceFamily = x.DeviceFamily,
                     IsActive = x.IsActive,
-                    IsDefaultForFamily = x.IsDefaultForFamily,
                     OidCount = x.Oids.Count(o => !o.IsDeleted),
                     SnmpVersion = x.SnmpVersion
                 })
@@ -57,80 +55,6 @@ namespace SmartGridSuite.Api.Controllers
                 return NotFound();
 
             return Ok(MapDetail(entity));
-        }
-
-        [HttpGet("active-by-family/{deviceFamily}")]
-        public async Task<ActionResult<SnmpProfileDetailDto>> GetActiveByFamily(string deviceFamily, CancellationToken ct)
-        {
-            deviceFamily = (deviceFamily ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(deviceFamily))
-                return BadRequest("Device family is required.");
-
-            var normalized = deviceFamily.ToUpperInvariant();
-
-            var entity = await _db.SnmpProfiles
-                .AsNoTracking()
-                .Include(x => x.Oids)
-                    .ThenInclude(x => x.DecodeValues)
-                .Where(x =>
-                    !x.IsDeleted &&
-                    x.IsActive &&
-                    x.DeviceFamily.ToUpper() == normalized)
-                .OrderByDescending(x => x.IsDefaultForFamily)
-                .ThenBy(x => x.Name)
-                .FirstOrDefaultAsync(ct);
-
-            if (entity is null)
-                return NotFound();
-
-            return Ok(MapDetail(entity));
-        }
-
-        [HttpGet("supports-site")]
-        public async Task<ActionResult<SnmpProfileSupportsSiteDto>> SupportsSite([FromQuery] string primaryCommType, CancellationToken ct)
-        {
-            var normalizedPrimary = (primaryCommType ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(normalizedPrimary))
-            {
-                return Ok(new SnmpProfileSupportsSiteDto
-                {
-                    SnmpSupported = false,
-                    DeviceFamily = ""
-                });
-            }
-
-            var isRf700 = normalizedPrimary.Contains("RF700", StringComparison.OrdinalIgnoreCase);
-
-            if (!isRf700)
-            {
-                return Ok(new SnmpProfileSupportsSiteDto
-                {
-                    SnmpSupported = false,
-                    DeviceFamily = normalizedPrimary
-                });
-            }
-
-            const string deviceFamily = "RF700";
-
-            var profile = await _db.SnmpProfiles
-                .AsNoTracking()
-                .Where(x =>
-                    !x.IsDeleted &&
-                    x.IsActive &&
-                    x.DeviceFamily == deviceFamily)
-                .OrderByDescending(x => x.IsDefaultForFamily)
-                .ThenBy(x => x.Name)
-                .FirstOrDefaultAsync(ct);
-
-            return Ok(new SnmpProfileSupportsSiteDto
-            {
-                SnmpSupported = profile is not null,
-                DeviceFamily = deviceFamily,
-                ProfileId = profile?.Id,
-                ProfileName = profile?.Name
-            });
         }
 
         [HttpPost("save")]
@@ -174,7 +98,6 @@ namespace SmartGridSuite.Api.Controllers
             entity.Name = req.Name.Trim();
             entity.DeviceFamily = normalizedFamily;
             entity.IsActive = req.IsActive;
-            entity.IsDefaultForFamily = req.IsDefaultForFamily;
 
             entity.ReadCommunity = Clean(req.ReadCommunity);
             entity.WriteCommunity = Clean(req.WriteCommunity);
@@ -192,19 +115,7 @@ namespace SmartGridSuite.Api.Controllers
 
             entity.SnmpVersion = string.IsNullOrWhiteSpace(req.SnmpVersion)
                 ? "v3" : req.SnmpVersion.Trim().ToLowerInvariant();
-
-            if (entity.IsDefaultForFamily)
-            {
-                var otherDefaults = await _db.SnmpProfiles
-                    .Where(x =>
-                        !x.IsDeleted &&
-                        x.Id != entity.Id &&
-                        x.DeviceFamily == normalizedFamily)
-                    .ToListAsync(ct);
-
-                foreach (var other in otherDefaults)
-                    other.IsDefaultForFamily = false;
-            }
+                        
 
             var incomingOidIds = req.Oids
                 .Where(x => x.Id.HasValue && x.Id.Value > 0)
@@ -336,11 +247,14 @@ namespace SmartGridSuite.Api.Controllers
                 return NotFound();
 
             entity.IsActive = false;
-            entity.IsDefaultForFamily = false;
             entity.UpdatedAt = DateTime.Now;
 
             await _db.SaveChangesAsync(ct);
-            return Ok();
+
+            return Ok(new
+            {
+                Success = true
+            });
         }
 
         [HttpPost("run-selected")]
@@ -357,6 +271,41 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(result);
         }
 
+        [HttpPost("{id}/delete")]
+        public async Task<ActionResult> DeleteProfile(ulong id, CancellationToken ct)
+        {
+            var entity = await _db.SnmpProfiles
+                .Include(x => x.Oids)
+                    .ThenInclude(x => x.DecodeValues)
+                .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+
+            if (entity is null)
+                return NotFound();
+
+            entity.IsDeleted = true;
+            entity.IsActive = false;
+            entity.UpdatedAt = DateTime.Now;
+
+            foreach (var oid in entity.Oids)
+            {
+                oid.IsDeleted = true;
+                oid.UpdatedAt = DateTime.Now;
+
+                foreach (var decode in oid.DecodeValues)
+                {
+                    decode.IsDeleted = true;
+                    decode.UpdatedAt = DateTime.Now;
+                }
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(new
+            {
+                Success = true
+            });
+        }
+
 
         //Helpers
         private static SnmpProfileDetailDto MapDetail(SnmpProfileEntity entity)
@@ -367,7 +316,6 @@ namespace SmartGridSuite.Api.Controllers
                 Name = entity.Name,
                 DeviceFamily = entity.DeviceFamily,
                 IsActive = entity.IsActive,
-                IsDefaultForFamily = entity.IsDefaultForFamily,
 
                 ReadCommunity = entity.ReadCommunity,
                 WriteCommunity = entity.WriteCommunity,

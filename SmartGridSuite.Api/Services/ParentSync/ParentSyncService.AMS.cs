@@ -55,6 +55,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
                 gps.Latitude,
                 gps.Longitude
+
             FROM [sgc_comm].[AMS] a
             LEFT JOIN [sgc_equip].[PMR] p
                 ON a.iTron_CR_Num = p.SN

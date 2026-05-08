@@ -900,11 +900,7 @@ namespace SmartGridSuite.Api.Controllers
             if (string.IsNullOrWhiteSpace(finalWriteUp))
                 return BadRequest("Write-up text is required.");
 
-            entity.Notes = AppendTicketNote(
-                entity.Notes,
-                "Write-up submitted",
-                finalWriteUp,
-                req.SubmittedBy);
+            entity.Notes = AppendRawTicketNote(entity.Notes, finalWriteUp);
 
             entity.ActionRequiredOverride = "Review submitted site write-up";
             entity.LastActivityAt = DateTime.Now;
@@ -921,6 +917,23 @@ namespace SmartGridSuite.Api.Controllers
             await _db.SaveChangesAsync(ct);
 
             return Ok(new UpdateTicketResponse(entity.Id));
+        }
+
+        private static string AppendRawTicketNote(string? existingNotes, string noteToAppend)
+        {
+            var existing = (existingNotes ?? string.Empty).TrimEnd();
+            var next = (noteToAppend ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(existing))
+                return next;
+
+            if (string.IsNullOrWhiteSpace(next))
+                return existing;
+
+            return existing +
+                   Environment.NewLine +
+                   Environment.NewLine +
+                   next;
         }
 
     }

@@ -263,7 +263,6 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.DeviceFamily).HasColumnName("device_family").HasMaxLength(50).IsRequired();
 
                 e.Property(x => x.IsActive).HasColumnName("is_active");
-                e.Property(x => x.IsDefaultForFamily).HasColumnName("is_default_for_family");
 
                 e.Property(x => x.ReadCommunity).HasColumnName("read_community").HasMaxLength(255);
                 e.Property(x => x.WriteCommunity).HasColumnName("write_community").HasMaxLength(255);

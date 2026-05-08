@@ -162,6 +162,7 @@
                 </TabControl.ItemContainerStyle>
 
                 <TabItem Header="Main" Tag="TopWriteUp" Margin="0,0,0,0"/>
+                <TabItem x:Name="TowerOverviewTabItem" Header="Tower" Tag="TowerOverview" Visibility="Collapsed"/>
                 <TabItem x:Name="RxOverviewTabItem" Header="Range Extender" Tag="RxOverview" Visibility="Collapsed"/>
                 <TabItem x:Name="PortalTabItem" Header="PingScreen" Tag="Portal" Visibility="Collapsed"/>
                 <TabItem Header="Site History" Tag="SiteHistory"/>
@@ -716,6 +717,53 @@
                                     </Border>
                                 </Grid>
                             </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Tower Overview -->
+                    <Grid x:Name="TowerOverviewPanel"
+                          Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header -->
+                        <Border Grid.Row="0"
+                                Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock x:Name="TowerHeaderTextBlock"
+                                           Text="Tower"
+                                           Style="{StaticResource WorkspaceSectionHeaderStyle}"
+                                           VerticalAlignment="Center"/>
+
+                                <Button Grid.Column="1"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Content="Test All"
+                                        Height="28"
+                                        MinWidth="88"
+                                        Padding="12,0"
+                                        Click="TestAllTowerSectorsButton_Click"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Sector cards -->
+                        <Border Grid.Row="2"
+                                Style="{StaticResource Card}">
+                            <ScrollViewer x:Name="TowerSectorCardsScrollViewer"
+                                          VerticalScrollBarVisibility="Disabled"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          SizeChanged="TowerSectorCardsScrollViewer_SizeChanged">
+                                <StackPanel x:Name="TowerSectorCardsPanel"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Stretch" />
+                            </ScrollViewer>
                         </Border>
                     </Grid>
 
@@ -1301,7 +1349,7 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="8"/>
                                         <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="8"/>
                                         <ColumnDefinition Width="Auto"/>
@@ -1341,14 +1389,11 @@
 
                                     <ComboBox x:Name="SnmpTargetComboBox"
                                               Grid.Column="8"
-                                              Height="28"
-                                              SelectionChanged="SnmpTargetComboBox_SelectionChanged">
-                                        <ComboBoxItem Content="Primary IP"/>
-                                        <ComboBoxItem Content="LAN IP"/>
-                                        <ComboBoxItem Content="Secondary IP"/>
-                                    </ComboBox>
+                                              Height="30"
+                                              VerticalContentAlignment="Center"
+                                              SelectionChanged="SnmpTargetComboBox_SelectionChanged"/>
 
-                                    <TextBox x:Name="SnmpTargetTextBox"
+                                <TextBox x:Name="SnmpTargetTextBox"
                                              Grid.Column="10"
                                              Style="{StaticResource WorkspaceEditorBoxStyle}"
                                              Height="28"

@@ -1,6 +1,8 @@
 ﻿using Microsoft.Data.SqlClient;
 using SmartGridSuite.Api.Services.ParentSync.Models;
+using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 
 namespace SmartGridSuite.Api.Services.ParentSync
 {
@@ -22,8 +24,23 @@ namespace SmartGridSuite.Api.Services.ParentSync
                     tn.GPS_id        AS GpsId,
                     tn.CNP_Area_id   AS CnpAreaId,
                     tn.CustomerOwned AS CustomerOwnedValue,
-                    tn.Note          AS Note
+                    tn.Note          AS Note,
+
+                    gps.SiteId       AS HistorySiteId,
+                    CAST(gps.Latitude AS decimal(18, 8))  AS Latitude,
+                    CAST(gps.Longitude AS decimal(18, 8)) AS Longitude,
+
+                    addr.StreetNo    AS StreetNo,
+                    addr.StreetName  AS StreetName,
+                    addr.City        AS City,
+                    addr.County      AS County,
+                    addr.StateCode   AS StateCode,
+                    addr.ZipCode     AS ZipCode
                 FROM [sgc_tnp].[TopName] tn
+                LEFT JOIN [sgc_main].[GPS] gps
+                    ON tn.GPS_id = gps.id
+                LEFT JOIN [sgc_main].[Address] addr
+                    ON gps.SiteId = addr.SiteId
                 WHERE tn.id = @TopNameId;
                 """;
 
@@ -39,6 +56,13 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
             var customerOwnedValue = GetNullableInt32(headerReader, "CustomerOwnedValue");
 
+            var streetNo = GetString(headerReader, "StreetNo");
+            var streetName = GetString(headerReader, "StreetName");
+            var city = GetString(headerReader, "City");
+            var stateCode = GetString(headerReader, "StateCode");
+            var zipCode = GetString(headerReader, "ZipCode");
+            var historySiteId = GetString(headerReader, "HistorySiteId");
+
             var row = new TowerDashboardRow
             {
                 TopNameId = GetNullableInt32(headerReader, "TopNameId") ?? 0,
@@ -49,31 +73,71 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 GpsId = GetNullableInt32(headerReader, "GpsId"),
                 CnpAreaId = GetNullableInt32(headerReader, "CnpAreaId"),
                 CustomerOwned = customerOwnedValue.HasValue ? customerOwnedValue.Value != 0 : null,
-                Note = GetString(headerReader, "Note")
+                Note = GetString(headerReader, "Note"),
+
+                HistorySiteId = historySiteId,
+
+                Latitude = GetDecimal(headerReader, "Latitude"),
+                Longitude = GetDecimal(headerReader, "Longitude"),
+
+                StreetNo = streetNo,
+                StreetName = streetName,
+                City = city,
+                County = GetString(headerReader, "County"),
+                StateCode = stateCode,
+                ZipCode = zipCode,
+                FullAddress = BuildTowerFullAddress(streetNo, streetName, city, stateCode, zipCode)
             };
 
             await headerReader.CloseAsync();
 
+            var historyCandidates = new[]
+            {
+                row.HistorySiteId,
+                row.TopName,
+                row.TopName?.Replace("_", "-")
+            }
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+            if (historyCandidates.Length > 0)
+            {
+                var historyLookup = await GetRecentSiteHistoryLookupAsync(
+                    historyCandidates,
+                    cancellationToken);
+
+                foreach (var candidate in historyCandidates)
+                {
+                    if (historyLookup.TryGetValue(candidate, out var history))
+                    {
+                        row.History.AddRange(history);
+                        break;
+                    }
+                }
+            }
+
             var sectorSql = """
                 SELECT
-                    ts.id                         AS TopSiteId,
-                    ts.Sector                     AS Sector,
-                    ts.Tx_W                       AS TxWatts,
-                    ts.TX_dbm                     AS TxDbm,
-                    ts.ERP_W                      AS ErpWatts,
-                    ts.Downtilt                   AS Downtilt,
-                    ts.Channel                    AS Channel,
-                    ts.Network                    AS Network,
-                    ts.VIP                        AS Vip,
-                    ts.IPa                        AS IPa,
-                    ts.IPb                        AS IPb,
-                    ts.VLAN                       AS Vlan,
-                    CAST(ts.BSID AS varchar(50))  AS Bsid,
-                    ts.AP_Model                   AS ApModel,
-                    CAST(ts.AP_Freq AS varchar(50)) AS ApFrequency,
-                    ts.AP_SNa                     AS AntennaSerialA,
-                    ts.AP_SNb                     AS AntennaSerialB
+                    ts.id                           AS TopSiteId,
+                    ts.Sector                       AS Sector,
+                    ts.TX_dbm                       AS TxDbm,
+                    ts.Downtilt                     AS Downtilt,
+                    ts.Channel                      AS Channel,
+                    ch.TX_Freq                      AS ChannelTxFrequency,
+                    ch.RX_Freq                      AS ChannelRxFrequency,
+                    ts.Network                      AS Network,
+                    ts.VIP                          AS Vip,
+                    ts.IPa                          AS IPa,
+                    ts.IPb                          AS IPb,
+                    ts.VLAN                         AS Vlan,
+                    CAST(ts.BSID AS varchar(50))    AS Bsid,
+                    ts.AP_SNa                       AS AntennaSerialA,
+                    ts.AP_SNb                       AS AntennaSerialB
                 FROM [sgc_tnp].[TopSite] ts
+                LEFT JOIN [cnpamscr].[700Channel_T] ch
+                    ON ts.Channel = ch.Channel
                 WHERE ts.TopName_id = @TopNameId
                 ORDER BY ts.Sector, ts.id;
                 """;
@@ -90,12 +154,13 @@ namespace SmartGridSuite.Api.Services.ParentSync
                     TopSiteId = GetNullableInt32(sectorReader, "TopSiteId") ?? 0,
                     Sector = GetString(sectorReader, "Sector"),
 
-                    TxWatts = GetDecimal(sectorReader, "TxWatts"),
                     TxDbm = GetDecimal(sectorReader, "TxDbm"),
-                    ErpWatts = GetDecimal(sectorReader, "ErpWatts"),
                     Downtilt = GetDecimal(sectorReader, "Downtilt"),
 
                     Channel = GetNullableInt32(sectorReader, "Channel"),
+                    ChannelTxFrequency = GetDecimal(sectorReader, "ChannelTxFrequency"),
+                    ChannelRxFrequency = GetDecimal(sectorReader, "ChannelRxFrequency"),
+
                     Network = GetString(sectorReader, "Network"),
 
                     Vip = GetString(sectorReader, "Vip"),
@@ -104,8 +169,6 @@ namespace SmartGridSuite.Api.Services.ParentSync
                     Vlan = GetString(sectorReader, "Vlan"),
 
                     Bsid = GetString(sectorReader, "Bsid"),
-                    ApModel = GetString(sectorReader, "ApModel"),
-                    ApFrequency = GetString(sectorReader, "ApFrequency"),
 
                     AntennaSerialA = GetString(sectorReader, "AntennaSerialA"),
                     AntennaSerialB = GetString(sectorReader, "AntennaSerialB")
@@ -180,6 +243,30 @@ namespace SmartGridSuite.Api.Services.ParentSync
             }
 
             return results;
+        }
+
+        private static string? BuildTowerFullAddress(
+            string? streetNo,
+            string? streetName,
+            string? city,
+            string? stateCode,
+            string? zipCode)
+        {
+            var line1 = string.Join(" ", new[] { streetNo, streetName }
+                .Where(x => !string.IsNullOrWhiteSpace(x)));
+
+            var cityState = string.Join(", ", new[] { city, stateCode }
+                .Where(x => !string.IsNullOrWhiteSpace(x)));
+
+            var line2 = string.Join(" ", new[] { cityState, zipCode }
+                .Where(x => !string.IsNullOrWhiteSpace(x)));
+
+            var combined = string.Join("  ", new[] { line1, line2 }
+                .Where(x => !string.IsNullOrWhiteSpace(x)));
+
+            return string.IsNullOrWhiteSpace(combined)
+                ? null
+                : combined;
         }
     }
 }

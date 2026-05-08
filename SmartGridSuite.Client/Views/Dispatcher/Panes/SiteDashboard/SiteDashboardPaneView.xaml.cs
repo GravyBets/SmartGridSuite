@@ -1,21 +1,21 @@
 ﻿using SmartGridSuite.Client.Services;
 using SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard;
+using SmartGridSuite.Contracts.Administration.Technicians;
+using SmartGridSuite.Contracts.Settings;
 using SmartGridSuite.Contracts.SiteDashboard;
 using SmartGridSuite.Contracts.Snmp;
 using SmartGridSuite.Contracts.Tickets;
-using SmartGridSuite.Contracts.Settings;
-using System;
-using System.Windows;
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 using static SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard.SiteDashboardWorkspaceView;
+using SmartGridSuite.Contracts.Crews;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
@@ -24,6 +24,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private readonly ApiClient _api;
         private readonly TicketsApi _ticketsApi;
         private CancellationTokenSource? _loadCts;
+
+        private string _currentCnpTechName = string.Empty;
 
         private readonly List<SiteDashboardTabSession> _sessions = new();
         private string? _selectedSessionKey;
@@ -104,6 +106,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     ApplyRxDashboard(session, dashboard, requestedSiteId);
                     break;
 
+                case SiteDashboardKinds.Tower:
+                    ApplyTowerDashboard(session, dashboard, requestedSiteId);
+                    break;
+
                 default:
                     ApplyFallbackDashboard(session, dashboard, requestedSiteId);
                     break;
@@ -148,7 +154,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.HistoryRows = BuildHistoryRows(dashboard);
         }
 
-        //IGSD Adapter
+        //------//
+        //-IGSD-//
+        //------//
+
+        //Adapter
         private void ApplyIgsdDashboard(SiteDashboardTabSession session, SiteDashboardResponseDto? dashboard, string requestedSiteId)
         {
             var dto = DeserializeDashboardData<IgsdSiteDashboardDto>(dashboard);
@@ -217,8 +227,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.ShowIgsdPortalTab = false;
             session.IgsdPortalUrl = string.Empty;
         }
+        //Portal Helper
+        private async Task ApplyPingScreenPortalUrlAsync(SiteDashboardTabSession session, SiteDashboardResponseDto? dashboard, CancellationToken ct)
+        {
+            var dashboardKind = dashboard?.DashboardKind ?? string.Empty;
 
-        //DACs Adapter
+            var showPingScreen =
+                string.Equals(dashboardKind, SiteDashboardKinds.Igsd, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(dashboardKind, SiteDashboardKinds.Dacs, StringComparison.OrdinalIgnoreCase);
+
+            if (!showPingScreen)
+            {
+                session.ShowIgsdPortalTab = false;
+                session.IgsdPortalUrl = string.Empty;
+                return;
+            }
+
+            var dto = await _api.GetIgsdPortalUrlAsync(ct);
+            var url = (dto?.Url ?? string.Empty).Trim();
+
+            session.ShowIgsdPortalTab = !string.IsNullOrWhiteSpace(url);
+            session.IgsdPortalUrl = url;
+        }
+
+        //------//
+        //-DACs-//
+        //------//
         private void ApplyDacsDashboard(SiteDashboardTabSession session, SiteDashboardResponseDto? dashboard, string requestedSiteId)
         {
             var dto = DeserializeDashboardData<DacsSiteDashboardDto>(dashboard);
@@ -254,7 +288,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.HistoryRows = BuildHistoryRows(dashboard);
         }
 
-        //RX Adapter
+        //------//
+        //--RX--//
+        //------//
         private void ApplyRxDashboard(SiteDashboardTabSession session, SiteDashboardResponseDto? dashboard, string requestedSiteId)
         {
             var dto = DeserializeDashboardData<RxSiteDashboardDto>(dashboard);
@@ -311,6 +347,97 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
+        //RX Portal Helper
+        private async Task LoadRangeExtenderLinkUrlForWorkspaceAsync()
+        {
+            try
+            {
+                var dto = await _api.GetRangeExtenderLinkUrlAsync();
+                _rangeExtenderLinkUrl = dto?.Url?.Trim() ?? string.Empty;
+
+                foreach (var session in _sessions.Where(x =>
+                             string.Equals(x.DashboardKind, SiteDashboardKinds.Rx, StringComparison.OrdinalIgnoreCase)))
+                {
+                    session.RangeExtenderLinkUrl = _rangeExtenderLinkUrl;
+                }
+
+                var selected = GetSelectedSession();
+
+                if (selected is not null &&
+                    string.Equals(selected.DashboardKind, SiteDashboardKinds.Rx, StringComparison.OrdinalIgnoreCase))
+                {
+                    RenderSelectedSession();
+                }
+            }
+            catch
+            {
+                _rangeExtenderLinkUrl = string.Empty;
+            }
+        }
+
+        //-------//
+        //-Tower-//
+        //-------//
+        private void ApplyTowerDashboard(SiteDashboardTabSession session, SiteDashboardResponseDto? dashboard, string requestedSiteId)
+        {
+            var dto = DeserializeDashboardData<TowerDashboardDto>(dashboard);
+
+            session.DashboardKind = SiteDashboardKinds.Tower;
+
+            session.TowerTopNameId = dto?.TopNameId;
+            session.HeaderText = dto?.TopName?.Replace("_", "-") ?? requestedSiteId;
+            session.SearchText = session.HeaderText;
+
+            session.AddressText = DashIfEmpty(dto?.FullAddress);
+            session.CoordinatesText = BuildCoordinates(dto?.Latitude, dto?.Longitude);
+
+            session.PrimaryIp = "—";
+            session.LanIp = "—";
+            session.SecondaryIp = "—";
+            session.TopTunnelIp = "—";
+
+            session.ShowIgsdPortalTab = false;
+            session.IgsdPortalUrl = string.Empty;
+            session.RangeExtenderLinkUrl = string.Empty;
+
+            session.SiteStatusText = "Tower";
+            session.TopAccessTitleText = dto?.TopName?.Replace("_", "-") ?? "Tower";
+            session.TopInfoText = string.Empty;
+            session.EquipmentText = string.Empty;
+
+            session.TowerSummaryText = BuildTowerSummary(dto);
+            session.TowerSectors = dto?.Sectors ?? new List<TowerSectorDto>();
+
+            session.HistoryRows = BuildHistoryRows(dashboard);
+
+            session.SelectedWorkspaceTabKey = "TowerOverview";
+        }
+        private static string BuildTowerSummary(TowerDashboardDto? dto)
+        {
+            if (dto is null)
+                return string.Empty;
+
+            var lines = new List<string>();
+
+            AddLine(lines, "Top Name", dto.TopName?.Replace("_", "-"));
+            AddLine(lines, "Description", dto.TopDescription);
+            AddLine(lines, "Top Type", dto.TopType);
+            AddLine(lines, "IP Assignment", dto.IpAssignment);
+            AddLine(lines, "GPS ID", dto.GpsId?.ToString());
+            AddLine(lines, "Address", dto.FullAddress);
+
+            if (dto.Latitude.HasValue || dto.Longitude.HasValue)
+                AddLine(lines, "Coordinates", $"{dto.Latitude}, {dto.Longitude}");
+
+            AddLine(lines, "Customer Owned", dto.CustomerOwned.HasValue
+                ? dto.CustomerOwned.Value ? "Yes" : "No"
+                : null);
+
+            AddLine(lines, "Note", dto.Note);
+
+            return string.Join(Environment.NewLine, lines);
+        }
+
         //Fallback Adapter
         private void ApplyFallbackDashboard(SiteDashboardTabSession session, SiteDashboardResponseDto? dashboard, string requestedSiteId)
         {
@@ -359,60 +486,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.EquipmentText = BuildEquipmentSummary(dashboard);
             session.HistoryRows = BuildHistoryRows(dashboard);
         }
-
-        //IGSD Portal Helper
-        private async Task ApplyPingScreenPortalUrlAsync(
-            SiteDashboardTabSession session,
-            SiteDashboardResponseDto? dashboard,
-            CancellationToken ct)
-        {
-            var dashboardKind = dashboard?.DashboardKind ?? string.Empty;
-
-            var showPingScreen =
-                string.Equals(dashboardKind, SiteDashboardKinds.Igsd, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(dashboardKind, SiteDashboardKinds.Dacs, StringComparison.OrdinalIgnoreCase);
-
-            if (!showPingScreen)
-            {
-                session.ShowIgsdPortalTab = false;
-                session.IgsdPortalUrl = string.Empty;
-                return;
-            }
-
-            var dto = await _api.GetIgsdPortalUrlAsync(ct);
-            var url = (dto?.Url ?? string.Empty).Trim();
-
-            session.ShowIgsdPortalTab = !string.IsNullOrWhiteSpace(url);
-            session.IgsdPortalUrl = url;
-        }
-
-        //RX Portal Helper
-        private async Task LoadRangeExtenderLinkUrlForWorkspaceAsync()
-        {
-            try
-            {
-                var dto = await _api.GetRangeExtenderLinkUrlAsync();
-                _rangeExtenderLinkUrl = dto?.Url?.Trim() ?? string.Empty;
-
-                foreach (var session in _sessions.Where(x =>
-                             string.Equals(x.DashboardKind, SiteDashboardKinds.Rx, StringComparison.OrdinalIgnoreCase)))
-                {
-                    session.RangeExtenderLinkUrl = _rangeExtenderLinkUrl;
-                }
-
-                var selected = GetSelectedSession();
-
-                if (selected is not null &&
-                    string.Equals(selected.DashboardKind, SiteDashboardKinds.Rx, StringComparison.OrdinalIgnoreCase))
-                {
-                    RenderSelectedSession();
-                }
-            }
-            catch
-            {
-                _rangeExtenderLinkUrl = string.Empty;
-            }
-        }
+        
 
         private async void WorkspaceView_RefreshSnmpRequested(object? sender, EventArgs e)
         {
@@ -523,8 +597,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async Task RefreshSnmpConfigAsync(SiteDashboardTabSession session, CancellationToken ct)
         {
-            if (string.IsNullOrWhiteSpace(session.SnmpTargetIp))
-                session.SnmpTargetIp = session.PrimaryIp;
+            if (string.IsNullOrWhiteSpace(session.SnmpTargetIp) || session.SnmpTargetIp == "—")
+                session.SnmpTargetIp = GetDefaultSnmpTargetIp(session);
 
             session.SnmpSupported = false;
             session.SnmpDeviceFamily = string.Empty;
@@ -533,49 +607,115 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.SnmpSupportMessage = string.Empty;
             session.SnmpProfiles = new List<SnmpProfileListItemDto>();
             session.SnmpOids = new List<SnmpOidConfigDto>();
-            session.SnmpOidResults = new Dictionary<ulong, string>();            
+            session.SnmpOidResults = new Dictionary<ulong, string>();
 
-            if (string.IsNullOrWhiteSpace(session.SnmpPrimaryCommType))
-            {
-                session.SnmpSupportMessage = "Primary device type is unavailable.";
-                return;
-            }
-
-            var supports = await _api.GetAsync<SnmpProfileSupportsSiteDto>(
-                $"api/snmp-profiles/supports-site?primaryCommType={Uri.EscapeDataString(session.SnmpPrimaryCommType)}",
-                ct);
-
-            if (supports is null || !supports.SnmpSupported || string.IsNullOrWhiteSpace(supports.DeviceFamily))
-            {
-                session.SnmpSupportMessage = $"SNMP not supported for primary device: {session.SnmpPrimaryCommType}.";
-                return;
-            }
-
-            var allProfiles = await _api.GetAsync<List<SnmpProfileListItemDto>>("api/snmp-profiles", ct)
-                             ?? new List<SnmpProfileListItemDto>();
+            var allProfiles = await _api.GetAsync<List<SnmpProfileListItemDto>>(
+                "api/snmp-profiles",
+                ct) ?? new List<SnmpProfileListItemDto>();
 
             session.SnmpProfiles = allProfiles
-                .Where(x => x.IsActive &&
-                            string.Equals(x.DeviceFamily, supports.DeviceFamily, StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(x => x.IsDefaultForFamily)
-                .ThenBy(x => x.Name)
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.Name)
                 .ToList();
 
             if (session.SnmpProfiles.Count == 0)
             {
-                session.SnmpSupportMessage = $"No active SNMP profiles configured for {supports.DeviceFamily}.";
+                session.SnmpSupportMessage = "No active SNMP profiles are configured.";
                 return;
             }
 
             session.SnmpSupported = true;
-            session.SnmpDeviceFamily = supports.DeviceFamily;
 
-            var selectedProfileId = session.SnmpProfileId.HasValue &&
-                                    session.SnmpProfiles.Any(x => x.Id == session.SnmpProfileId.Value)
-                ? session.SnmpProfileId.Value
-                : session.SnmpProfiles.First().Id;
+            ulong selectedProfileId;
+
+            if (session.SnmpProfileId.HasValue &&
+                session.SnmpProfiles.Any(x => x.Id == session.SnmpProfileId.Value))
+            {
+                selectedProfileId = session.SnmpProfileId.Value;
+            }
+            else if (string.Equals(session.DashboardKind, SiteDashboardKinds.Tower, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedProfileId =
+                    session.SnmpProfiles.FirstOrDefault(x =>
+                        x.Name.Contains("Tower", StringComparison.OrdinalIgnoreCase))?.Id
+                    ?? session.SnmpProfiles.First().Id;
+            }
+            else
+            {
+                selectedProfileId = session.SnmpProfiles.First().Id;
+            }
 
             await LoadSnmpProfileIntoSessionAsync(session, selectedProfileId, ct);
+        }
+
+        private static string GetDefaultSnmpTargetIp(SiteDashboardTabSession session)
+        {
+            if (string.Equals(session.DashboardKind, SiteDashboardKinds.Tower, StringComparison.OrdinalIgnoreCase))
+            {
+                var towerTarget = session.TowerSectors
+                    .SelectMany(x => new[] { x.IPa, x.IPb })
+                    .Select(x => (x ?? string.Empty).Trim())
+                    .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x) && x != "—");
+
+                return towerTarget ?? string.Empty;
+            }
+
+            return new[]
+                {
+            session.PrimaryIp,
+            session.LanIp,
+            session.SecondaryIp
+        }
+                .Select(x => (x ?? string.Empty).Trim())
+                .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x) && x != "—")
+                ?? string.Empty;
+        }
+
+        private static IEnumerable<(string Key, string Label, string IpAddress)> BuildTowerSnmpTargets(SiteDashboardTabSession session)
+        {
+            var sectors = session.TowerSectors
+                .OrderBy(x => GetTowerSectorSortRankForSnmp(x.Sector))
+                .ThenBy(x => x.Sector)
+                .ThenBy(x => x.TopSiteId)
+                .ToList();
+
+            foreach (var sector in sectors)
+            {
+                var sectorName = string.IsNullOrWhiteSpace(sector.Sector)
+                    ? $"Sector {sector.TopSiteId}"
+                    : sector.Sector.Trim();
+
+                var ipA = (sector.IPa ?? string.Empty).Trim();
+                var ipB = (sector.IPb ?? string.Empty).Trim();
+
+                if (!string.IsNullOrWhiteSpace(ipA) && ipA != "—")
+                    yield return ($"{sectorName}-IPA", $"Sector {sectorName} IP A", ipA);
+
+                if (!string.IsNullOrWhiteSpace(ipB) && ipB != "—")
+                    yield return ($"{sectorName}-IPB", $"Sector {sectorName} IP B", ipB);
+            }
+        }
+
+        private static int GetTowerSectorSortRankForSnmp(string? sector)
+        {
+            var value = (sector ?? string.Empty).Trim().ToUpperInvariant();
+
+            if (value == "AP1")
+                return 1;
+
+            if (value == "AP2")
+                return 2;
+
+            if (value == "AP3")
+                return 3;
+
+            if (value.StartsWith("AP") &&
+                int.TryParse(value[2..], out var apNumber))
+            {
+                return 100 + apNumber;
+            }
+
+            return 1000;
         }
 
         private async Task LoadSnmpProfileIntoSessionAsync(SiteDashboardTabSession session, ulong profileId, CancellationToken ct)
@@ -603,7 +743,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 .ThenBy(x => x.Label)
                 .ToList();
 
-            session.SnmpSupportMessage = $"SNMP ready for {session.HeaderText}.";
+            session.SnmpSupportMessage = string.IsNullOrWhiteSpace(session.SnmpProfileName)
+                ? $"SNMP ready for {session.HeaderText}."
+                : $"SNMP ready for {session.HeaderText}. Profile: {session.SnmpProfileName}.";
+
             session.SnmpOidResults = new Dictionary<ulong, string>();
         }        
 
@@ -822,6 +965,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         //Load Async
         private async Task LoadAsync(string rawSiteId)
         {
+            WorkspaceView.StopTowerPings();
             var siteId = (rawSiteId ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(siteId))
@@ -874,7 +1018,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 TopBarView.SetLoading(true);
                 TopBarView.StatusText = $"Loading {siteId}...";
 
-                var dashboard = await _api.GetSiteDashboardAsync(siteId, _loadCts.Token);
+                var dashboard = await GetSiteOrTowerDashboardAsync(siteId, _loadCts.Token);
                 var loadedSiteId = GetObjectPropertyText(dashboard, "SiteId") ?? siteId;
 
                 selectedSession.TicketInfoText = "Loading ticket data...";
@@ -924,6 +1068,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         //RENDER METHOD
         private void RenderSelectedSession()
         {
+            WorkspaceView.StopTowerPings();
             EnsureInitialBlankTab();
 
             TopBarView.SetTabs(_sessions, _selectedSessionKey);
@@ -945,6 +1090,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 return;
             }
+
+            WorkspaceView.CurrentCnpTechName = _currentCnpTechName;
 
             ApplyShellLayoutMode(session);
             _renderingSession = true;
@@ -1001,6 +1148,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 WorkspaceView.EquipmentDashboardKind = session.DashboardKind;
                 WorkspaceView.EquipmentText = session.EquipmentText;
                 WorkspaceView.SetHistoryRows(session.HistoryRows);
+                WorkspaceView.TowerSummaryText = session.TowerSummaryText;
+                WorkspaceView.SetTowerSectors(session.TowerSectors);
                 WorkspaceView.SetSelectedWorkspaceTab(session.SelectedWorkspaceTabKey);
 
                                
@@ -1022,6 +1171,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     session.SecondaryIp,
                     session.SnmpTargetIp);
 
+                if (string.Equals(session.DashboardKind, SiteDashboardKinds.Tower, StringComparison.OrdinalIgnoreCase))
+                {
+                    WorkspaceView.SetSnmpTargetOptions(
+                        BuildTowerSnmpTargets(session),
+                        session.SnmpTargetIp);
+                }
+
                 WorkspaceView.SetSnmpProfiles(session.SnmpProfiles, session.SnmpProfileId);
 
                 WorkspaceView.SetSnmpOids(session.SnmpOids, session.SnmpOidResults);
@@ -1035,20 +1191,76 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void ApplyShellLayoutMode(SiteDashboardTabSession session)
         {
-            var isRx = string.Equals(
-                session.DashboardKind,
-                SiteDashboardKinds.Rx,
-                StringComparison.OrdinalIgnoreCase);
+            var hideNetwork =
+                string.Equals(session.DashboardKind, SiteDashboardKinds.Rx, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(session.DashboardKind, SiteDashboardKinds.Tower, StringComparison.OrdinalIgnoreCase);
 
-            NetworkView.Visibility = isRx ? Visibility.Collapsed : Visibility.Visible;
+            NetworkView.Visibility = hideNetwork ? Visibility.Collapsed : Visibility.Visible;
 
-            NetworkColumn.Width = isRx
+            NetworkColumn.Width = hideNetwork
                 ? new GridLength(0)
                 : new GridLength(340);
 
-            NetworkGapColumn.Width = isRx
+            NetworkGapColumn.Width = hideNetwork
                 ? new GridLength(0)
                 : new GridLength(8);
+        }
+
+        private async Task<SiteDashboardResponseDto?> GetSiteOrTowerDashboardAsync(string searchText, CancellationToken ct)
+        {
+            try
+            {
+                return await _api.GetSiteDashboardAsync(searchText, ct);
+            }
+            catch (ApiClient.ApiException ex) when (ex.StatusCode == 404)
+            {
+                var tower = await TryFindTowerDashboardAsync(searchText, ct);
+
+                if (tower is not null)
+                    return tower;
+
+                throw;
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                var tower = await TryFindTowerDashboardAsync(searchText, ct);
+
+                if (tower is not null)
+                    return tower;
+
+                throw;
+            }
+        }
+
+        private async Task<SiteDashboardResponseDto?> TryFindTowerDashboardAsync(string searchText, CancellationToken ct)
+        {
+            var results = await _api.SearchTowersAsync(searchText, take: 10, ct);
+
+            if (results.Count == 0)
+                return null;
+
+            var normalizedSearch = NormalizeTowerSearchText(searchText);
+
+            var exact = results.FirstOrDefault(x =>
+                NormalizeTowerSearchText(x.TopName) == normalizedSearch ||
+                NormalizeTowerSearchText(x.TopDescription) == normalizedSearch);
+
+            var selected = exact ?? results.FirstOrDefault();
+
+            if (selected is null || selected.TopNameId <= 0)
+                return null;
+
+            return await _api.GetTowerDashboardAsync(selected.TopNameId, ct);
+        }
+
+        private static string NormalizeTowerSearchText(string? value)
+        {
+            return (value ?? string.Empty)
+                .Replace("_", "")
+                .Replace("-", "")
+                .Replace(" ", "")
+                .Trim()
+                .ToUpperInvariant();
         }
 
         private string BuildTicketInfoSummaryFromTickets(IEnumerable<TicketListItemDto>? tickets)
@@ -1984,6 +2196,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             await LoadCommunicationDeviceTypesForWorkspaceAsync();
             await LoadRangeExtenderLinkUrlForWorkspaceAsync();
+            await LoadCurrentCnpTechNameAsync();
         }
 
         private async Task LoadCommunicationDeviceTypesForWorkspaceAsync()
@@ -2224,6 +2437,48 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 NetworkView.PrimaryPingLabel = "Primary";
                 NetworkView.LanPingLabel = "LAN";
                 NetworkView.SecondaryPingLabel = "Secondary";
+            }
+        }
+
+        private static string GetWindowsEmployeeId()
+        {
+            var name = WindowsIdentity.GetCurrent()?.Name ?? string.Empty;
+
+            if (name.Contains('\\'))
+                name = name.Split('\\').Last();
+
+            if (name.Contains('@'))
+                name = name.Split('@').First();
+
+            return name.Trim();
+        }
+
+        private async Task LoadCurrentCnpTechNameAsync()
+        {
+            try
+            {
+                var employeeId = GetWindowsEmployeeId();
+
+                if (string.IsNullOrWhiteSpace(employeeId))
+                {
+                    _currentCnpTechName = string.Empty;
+                    WorkspaceView.CurrentCnpTechName = string.Empty;
+                    return;
+                }
+
+                var crew = await _api.GetAsync<CurrentCrewDto>(
+                    $"api/technicians/current-crew/{Uri.EscapeDataString(employeeId)}");
+
+                _currentCnpTechName = string.IsNullOrWhiteSpace(crew?.DisplayText)
+                    ? employeeId
+                    : crew.DisplayText.Trim();
+
+                WorkspaceView.CurrentCnpTechName = _currentCnpTechName;
+            }
+            catch
+            {
+                _currentCnpTechName = GetWindowsEmployeeId();
+                WorkspaceView.CurrentCnpTechName = _currentCnpTechName;
             }
         }
     }

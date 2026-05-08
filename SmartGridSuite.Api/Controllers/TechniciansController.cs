@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Contracts.Administration.Technicians;
+using SmartGridSuite.Contracts.Crews;
 
 namespace SmartGridSuite.Api.Controllers;
 
@@ -301,4 +302,149 @@ public sealed class TechniciansController : ControllerBase
             DayOfWeek.Sunday => t.WorksSunday,
             _ => false
         };
+
+    [HttpGet("by-employee-id/{employeeId}")]
+    public async Task<ActionResult<TechnicianDto>> GetByEmployeeId(string employeeId, CancellationToken ct)
+    {
+        employeeId = (employeeId ?? string.Empty).Trim();
+
+        if (string.IsNullOrWhiteSpace(employeeId))
+            return BadRequest("Employee ID is required.");
+
+        var tech = await _db.Technicians
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.EmployeeId == employeeId && x.IsActive, ct);
+
+        if (tech is null)
+            return NotFound();
+
+        return Ok(new TechnicianDto
+        {
+            Id = (int)tech.Id,
+            FirstName = tech.FirstName,
+            LastName = tech.LastName,
+            EmployeeId = tech.EmployeeId,
+            IsActive = tech.IsActive
+        });
+    }
+
+    [HttpGet("current-crew/{employeeId}")]
+    public async Task<ActionResult<CurrentCrewDto>> GetCurrentCrew(string employeeId, CancellationToken ct)
+    {
+        employeeId = (employeeId ?? string.Empty).Trim();
+
+        if (string.IsNullOrWhiteSpace(employeeId))
+        {
+            return Ok(new CurrentCrewDto
+            {
+                PrimaryTech = "Unknown",
+                DisplayText = "Unknown"
+            });
+        }
+
+        var workDate = DateTime.Today;
+
+        var submitter = await _db.Technicians
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.EmployeeId == employeeId && x.IsActive, ct);
+
+        if (submitter is null)
+        {
+            return Ok(new CurrentCrewDto
+            {
+                PrimaryTech = employeeId,
+                DisplayText = employeeId
+            });
+        }
+
+        var primaryName = FormatTechnicianName(
+            submitter.FirstName,
+            submitter.LastName,
+            submitter.EmployeeId);
+
+        var submitterRoster = await _db.TruckRosters
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.WorkDate == workDate &&
+                x.TechnicianId == submitter.Id,
+                ct);
+
+        if (submitterRoster is null)
+        {
+            return Ok(new CurrentCrewDto
+            {
+                PrimaryTech = primaryName,
+                DisplayText = primaryName
+            });
+        }
+
+        var crewTechs = await (
+            from roster in _db.TruckRosters.AsNoTracking()
+            join tech in _db.Technicians.AsNoTracking()
+                on roster.TechnicianId equals tech.Id
+            where roster.WorkDate == workDate
+                  && roster.TruckId == submitterRoster.TruckId
+                  && tech.IsActive
+            select new
+            {
+                tech.Id,
+                tech.EmployeeId,
+                tech.FirstName,
+                tech.LastName,
+            })
+            .ToListAsync(ct);
+
+        var secondaryTechs = crewTechs
+            .Where(x => x.Id != submitter.Id)
+            .Select(x => FormatTechnicianName(
+                x.FirstName,
+                x.LastName,
+                x.EmployeeId))
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToList();
+
+        var displayNames = new List<string> { primaryName };
+        displayNames.AddRange(secondaryTechs);
+
+        return Ok(new CurrentCrewDto
+        {
+            PrimaryTech = primaryName,
+            SecondaryTechs = secondaryTechs,
+            DisplayText = FormatCrewDisplayText(displayNames)
+        });
+    }
+
+    private static string FormatTechnicianName(string? firstName, string? lastName, string? fallbackEmployeeId)
+    {
+        var fullName = $"{firstName ?? string.Empty} {lastName ?? string.Empty}".Trim();
+
+        if (!string.IsNullOrWhiteSpace(fullName))
+            return fullName;
+
+        return (fallbackEmployeeId ?? "Unknown").Trim();
+    }
+
+    private static string FormatCrewDisplayText(IReadOnlyList<string> names)
+    {
+        var cleanNames = names
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (cleanNames.Count == 0)
+            return "Unknown";
+
+        if (cleanNames.Count == 1)
+            return cleanNames[0];
+
+        if (cleanNames.Count == 2)
+            return $"{cleanNames[0]} & {cleanNames[1]}";
+
+        return string.Join(", ", cleanNames.Take(cleanNames.Count - 1)) +
+               " & " +
+               cleanNames.Last();
+    }
 }

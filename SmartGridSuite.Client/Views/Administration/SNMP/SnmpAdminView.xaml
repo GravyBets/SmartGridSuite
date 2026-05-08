@@ -5,7 +5,7 @@
     <Grid Margin="0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="8"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -25,7 +25,7 @@
                                FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimary}"/>
 
-                    <TextBlock Text="Manage admin-configurable SNMP profiles and OIDs for supported radio families."
+                    <TextBlock Text="Manage admin-configurable SNMP profiles and OIDs."
                                Margin="0,4,0,0"
                                Foreground="{DynamicResource TextSecondary}"/>
                 </StackPanel>
@@ -35,12 +35,14 @@
                             VerticalAlignment="Center">
                     <Button x:Name="RefreshProfilesButton"
                             Style="{StaticResource SecondaryButtonStyle}"
+                            Width="82"
                             Content="Refresh"
                             Padding="16,8"
                             Margin="0,0,8,0"/>
 
                     <Button x:Name="NewProfileButton"
                             Style="{StaticResource PrimaryButtonStyle}"
+                            Width="96"
                             Content="New Profile"
                             Padding="16,8"/>
                 </StackPanel>
@@ -51,7 +53,7 @@
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="360"/>
-                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="8"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
@@ -101,9 +103,11 @@
                             <DataGridTextColumn Header="Name"
                                                 Width="*"
                                                 Binding="{Binding Name}" />
-                            <DataGridTextColumn Header="Family"
-                                                Width="110"
-                                                Binding="{Binding DeviceFamily}" />
+
+                            <DataGridTextColumn Header="OIDs"
+                                                Width="60"
+                                                Binding="{Binding OidCount}" />
+
                             <DataGridCheckBoxColumn Header="Active"
                                                     Width="70"
                                                     Binding="{Binding IsActive}" />
@@ -116,11 +120,11 @@
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="8"/>                    
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="8"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="8"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
@@ -131,9 +135,9 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="12"/>
+                            <RowDefinition Height="10"/>                            
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="10"/>
+                            <RowDefinition Height="8"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
@@ -144,15 +148,16 @@
 
                         <Grid Grid.Row="2">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="110"/>
-                                <ColumnDefinition Width="180"/>
-                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="12"/>
+                                <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="24"/>
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Column="0"
@@ -161,70 +166,16 @@
                                        Foreground="{DynamicResource TextSecondary}"/>
 
                             <TextBox x:Name="ProfileNameTextBox"
-                                     Grid.Column="1"
+                                     Grid.Column="2"
                                      Style="{StaticResource ModernWatermarkTextBox}"
                                      Height="34"
                                      Padding="10,0"
                                      VerticalContentAlignment="Center"/>
-
-                            <TextBlock Grid.Column="3"
-                                       Text="Device Family"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextSecondary}"/>
-
-                            <ComboBox x:Name="DeviceFamilyComboBox"
-                                      Grid.Column="4"
-                                      Height="34"
-                                      SelectedIndex="0">
-                                <ComboBoxItem Content="RF700"/>
-                            </ComboBox>
 
                             <CheckBox x:Name="ProfileIsActiveCheckBox"
-                                      Grid.Column="6"
+                                      Grid.Column="4"
                                       Content="Active"
                                       VerticalAlignment="Center"/>
-
-                            <CheckBox x:Name="ProfileIsDefaultCheckBox"
-                                      Grid.Column="8"
-                                      Content="Default for Family"
-                                      VerticalAlignment="Center"/>
-                        </Grid>
-
-                        <Grid Grid.Row="4">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="110"/>
-                                <ColumnDefinition Width="140"/>
-                                <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="60"/>
-                                <ColumnDefinition Width="80"/>
-                            </Grid.ColumnDefinitions>
-
-                            <TextBlock Grid.Column="0"
-                                       Text="Timeout (ms)"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextSecondary}"/>
-
-                            <TextBox x:Name="TimeoutMsTextBox"
-                                     Grid.Column="1"
-                                     Style="{StaticResource ModernWatermarkTextBox}"
-                                     Height="34"
-                                     Padding="10,0"
-                                     VerticalContentAlignment="Center"/>
-
-                            <TextBlock Grid.Column="3"
-                                       Text="Retries"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextSecondary}"/>
-
-                            <TextBox x:Name="RetriesTextBox"
-                                     Grid.Column="4"
-                                     Style="{StaticResource ModernWatermarkTextBox}"
-                                     Height="34"
-                                     Padding="10,0"
-                                     VerticalContentAlignment="Center"/>
 
                             <TextBlock Grid.Column="6"
                                        Text="Profile ID"
@@ -232,11 +183,49 @@
                                        Foreground="{DynamicResource TextSecondary}"/>
 
                             <TextBlock x:Name="ProfileIdTextBlock"
-                                       Grid.Column="7"
+                                       Grid.Column="8"
                                        VerticalAlignment="Center"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimary}"
                                        Text="(new)"/>
+                        </Grid>
+
+                        <Grid Grid.Row="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="38"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                        Text="Timeout (ms)"
+                                        VerticalAlignment="Center"
+                                        Foreground="{DynamicResource TextSecondary}"/>
+
+                            <TextBox x:Name="TimeoutMsTextBox"
+                                        Grid.Column="2"
+                                        Style="{StaticResource ModernWatermarkTextBox}"
+                                        Height="34"
+                                        Padding="10,0"
+                                        VerticalContentAlignment="Center"/>
+
+                            <TextBlock Grid.Column="4"
+                                        Text="Retries"
+                                        VerticalAlignment="Center"
+                                        Foreground="{DynamicResource TextSecondary}"/>
+
+                            <TextBox x:Name="RetriesTextBox"
+                                        Grid.Column="6"
+                                        Style="{StaticResource ModernWatermarkTextBox}"
+                                        Height="34"
+                                        Padding="2,0"
+                                        TextAlignment="Center"
+                                        VerticalContentAlignment="Center"/>
                         </Grid>
                     </Grid>
                 </Border>
@@ -250,49 +239,62 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="10"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="10"/>
+                            <RowDefinition Height="8"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="10"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>                            
-                        </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="0"
-                                   Text="Connection Settings"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextPrimary}"/>
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>                                
+                            </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="2"
-                                   Text="Version"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Grid.Column="0"
+                                       Text="Connection Settings"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </Grid>
 
-                        <ComboBox x:Name="SnmpVersionComboBox"
-                                  Grid.Column="4"
-                                  Height="34"
-                                  SelectedIndex="1">
-                            <ComboBoxItem Content="v2c"/>
-                            <ComboBoxItem Content="v3"/>
-                        </ComboBox>
-
-                        <!-- Communities / context -->
+                        <!--Version-->
                         <Grid Grid.Row="2">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120"/>
+                                <ColumnDefinition Width="96"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="120"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Version"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+
+                            <ComboBox x:Name="SnmpVersionComboBox"
+                                      Grid.Column="2"
+                                      Height="34"
+                                      SelectedIndex="1">
+                                <ComboBoxItem Content="v2c"/>
+                                <ComboBoxItem Content="v3"/>
+                            </ComboBox>
+                        </Grid>
+
+                        <!-- Communities / context -->
+                        <Grid Grid.Row="4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="96"/>
+                                <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="96"/>
+                                <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
@@ -301,29 +303,51 @@
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource TextSecondary}"/>
                             <TextBox x:Name="ReadCommunityTextBox"
-                                     Grid.Column="1"
+                                     Grid.Column="2"
                                      Style="{StaticResource ModernWatermarkTextBox}"
                                      Height="34"
                                      Padding="10,0"
                                      VerticalContentAlignment="Center"/>
 
-                            <TextBlock Grid.Column="3"
+                            <TextBlock Grid.Column="4"
                                        Text="Write Community"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource TextSecondary}"/>
                             <TextBox x:Name="WriteCommunityTextBox"
-                                     Grid.Column="4"
+                                     Grid.Column="6"
                                      Style="{StaticResource ModernWatermarkTextBox}"
                                      Height="34"
                                      Padding="10,0"
-                                     VerticalContentAlignment="Center"/>
+                                     VerticalContentAlignment="Center"/>                            
+                        </Grid>
 
-                            <TextBlock Grid.Column="6"
+                        <Grid Grid.Row="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="96"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="96"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
                                        Text="Context Name"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource TextSecondary}"/>
                             <TextBox x:Name="ContextNameTextBox"
-                                     Grid.Column="7"
+                                         Grid.Column="2"
+                                         Style="{StaticResource ModernWatermarkTextBox}"
+                                         Height="34"
+                                         Padding="10,0"
+                                         VerticalContentAlignment="Center"/>
+                            <TextBlock Grid.Column="4"
+                                       Text="USM User"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBox x:Name="UsmUserTextBox"
+                                     Grid.Column="6"
                                      Style="{StaticResource ModernWatermarkTextBox}"
                                      Height="34"
                                      Padding="10,0"
@@ -331,68 +355,15 @@
                         </Grid>
 
                         <!-- v3 identity -->
-                        <Grid Grid.Row="4">
+                        <Grid Grid.Row="8">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="260"/>
-                                <ColumnDefinition Width="10"/>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="10"/>
-                                <ColumnDefinition Width="100"/>
-                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="96"/>
+                                <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-
-                            <TextBlock Grid.Column="0"
-                                       Text="USM User"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextSecondary}"/>
-                            <TextBox x:Name="UsmUserTextBox"
-                                     Grid.Column="1"
-                                     Style="{StaticResource ModernWatermarkTextBox}"
-                                     Height="34"
-                                     Padding="10,0"
-                                     VerticalContentAlignment="Center"/>
-
-                            <TextBlock Grid.Column="3"
-                                       Text="Auth Protocol"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextSecondary}"/>
-                            <ComboBox x:Name="AuthProtocolComboBox"
-                                      Grid.Column="4"
-                                      Height="34"
-                                      SelectedIndex="0">
-                                <ComboBoxItem Content="MD5"/>
-                                <ComboBoxItem Content="SHA-1"/>
-                                <ComboBoxItem Content="SHA-256"/>
-                                <ComboBoxItem Content="SHA-384"/>
-                                <ComboBoxItem Content="SHA-512"/>
-                            </ComboBox>
-
-                            <TextBlock Grid.Column="6"
-                                       Text="Privacy Protocol"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextSecondary}"/>
-                            <ComboBox x:Name="PrivacyProtocolComboBox"
-                                      Grid.Column="7"
-                                      Height="34"
-                                      SelectedIndex="0">
-                                <ComboBoxItem Content="DES"/>
-                                <ComboBoxItem Content="AES"/>
-                                <ComboBoxItem Content="AES-128"/>
-                                <ComboBoxItem Content="AES-256"/>
-                            </ComboBox>
-                        </Grid>
-
-                        <!-- keys -->
-                        <Grid Grid.Row="6">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="16"/>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="96"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>                                
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Column="0"
@@ -400,30 +371,73 @@
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource TextSecondary}"/>
                             <PasswordBox x:Name="AuthKeyPasswordBox"
-                                         Grid.Column="1"
+                                         Style="{StaticResource ModernPasswordBoxStyle}"
+                                         Grid.Column="2"
                                          Height="34"
-                                         Padding="10,7,0,0"/>
+                                         Padding="4,0,0,0"/>
 
-                            <TextBlock Grid.Column="3"
+                            <TextBlock Grid.Column="4"
+                                        Text="Auth Protocol"
+                                        VerticalAlignment="Center"
+                                        Foreground="{DynamicResource TextSecondary}"/>
+                            <ComboBox x:Name="AuthProtocolComboBox"
+                                        Grid.Column="6"                                        
+                                        Height="34"
+                                        SelectedIndex="0">
+                                <ComboBoxItem Content="MD5"/>
+                                <ComboBoxItem Content="SHA-1"/>
+                                <ComboBoxItem Content="SHA-256"/>
+                                <ComboBoxItem Content="SHA-384"/>
+                                <ComboBoxItem Content="SHA-512"/>
+                            </ComboBox>                                                        
+                        </Grid>
+                        
+                        <Grid Grid.Row="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="96"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="96"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>                                
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
                                        Text="Privacy Key"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource TextSecondary}"/>
                             <PasswordBox x:Name="PrivacyKeyPasswordBox"
-                                         Grid.Column="4"
+                                         Style="{StaticResource ModernPasswordBoxStyle}"
+                                         Grid.Column="2"
                                          Height="34"
-                                         Padding="10,7,0,0"/>
+                                         Padding="4,0,0,0"/>
+
+                            <TextBlock Grid.Column="4"
+                                       Text="Privacy Protocol"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <ComboBox x:Name="PrivacyProtocolComboBox"
+                                      Grid.Column="6"
+                                      Height="34"
+                                      SelectedIndex="6">
+                                <ComboBoxItem Content="DES"/>
+                                <ComboBoxItem Content="AES"/>
+                                <ComboBoxItem Content="AES-128"/>
+                                <ComboBoxItem Content="AES-256"/>
+                            </ComboBox>
                         </Grid>
                     </Grid>
                 </Border>
 
                 <!-- OIDs -->
                 <Border Grid.Row="4"
-        Style="{StaticResource Card}"
-        Padding="16">
+                        Style="{StaticResource Card}"
+                        Padding="16">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="10"/>
+                            <RowDefinition Height="8"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
@@ -434,28 +448,28 @@
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Text="OID Configuration"
-                       FontSize="18"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextPrimary}"/>
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
 
                             <StackPanel Grid.Column="1"
-                        Orientation="Horizontal">
+                                        Orientation="Horizontal">
                                 <Button x:Name="AddOidButton"
-                        Style="{StaticResource SecondaryButtonStyle}"
-                        Content="Add OID"
-                        Padding="14,8"
-                        Margin="0,0,8,0"/>
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Add OID"
+                                        Padding="14,8"
+                                        Margin="0,0,8,0"/>
 
                                 <Button x:Name="EditOidButton"
-                        Style="{StaticResource SecondaryButtonStyle}"
-                        Content="Edit Selected"
-                        Padding="14,8"
-                        Margin="0,0,8,0"/>
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Edit Selected"
+                                        Padding="14,8"
+                                        Margin="0,0,8,0"/>
 
                                 <Button x:Name="RemoveOidButton"
-                        Style="{StaticResource SecondaryButtonStyle}"
-                        Content="Remove Selected"
-                        Padding="14,8"/>
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Remove Selected"
+                                        Padding="14,8"/>
                             </StackPanel>
                         </Grid>
 
@@ -475,29 +489,29 @@
                                   HeadersVisibility="Column">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Category"
-                                    Width="110"
-                                    Binding="{Binding Category}" />
+                                                    Width="88"
+                                                    Binding="{Binding Category}" />
                                 <DataGridTextColumn Header="Label"
-                                    Width="160"
-                                    Binding="{Binding Label}" />
+                                                    Width="*"
+                                                    Binding="{Binding Label}" />
                                 <DataGridTextColumn Header="OID"
-                                    Width="*"
-                                    Binding="{Binding Oid}" />
+                                                    Width="188"
+                                                    Binding="{Binding Oid}" />
                                 <DataGridTextColumn Header="Type"
-                                    Width="85"
-                                    Binding="{Binding ValueType}" />
+                                                    Width="68"
+                                                    Binding="{Binding ValueType}" />
                                 <DataGridTextColumn Header="Decode"
-                                    Width="90"
-                                    Binding="{Binding DecodeMode}" />
+                                                    Width="68"
+                                                    Binding="{Binding DecodeMode}" />
                                 <DataGridCheckBoxColumn Header="Writable"
-                                        Width="80"
-                                        Binding="{Binding IsWritable}" />
+                                                        Width="80"
+                                                        Binding="{Binding IsWritable}" />
                                 <DataGridCheckBoxColumn Header="Workspace"
-                                        Width="90"
-                                        Binding="{Binding ShowInWorkspace}" />
+                                                        Width="90"
+                                                        Binding="{Binding ShowInWorkspace}" />
                                 <DataGridTextColumn Header="Sort"
-                                    Width="70"
-                                    Binding="{Binding SortOrder}" />
+                                                    Width="70"
+                                                    Binding="{Binding SortOrder}" />
                             </DataGrid.Columns>
                         </DataGrid>
                     </Grid>
@@ -520,14 +534,24 @@
 
                         <StackPanel Grid.Column="1"
                                     Orientation="Horizontal">
+                            <Button x:Name="DeleteProfileButton"
+                                    Content="Delete Profile"
+                                    Padding="16,0"
+                                    Margin="0,0,8,0"
+                                    Foreground="White"
+                                    Background="#DC2626"
+                                    BorderBrush="#B91C1C"/>
+
                             <Button x:Name="DeactivateProfileButton"
                                     Style="{StaticResource SecondaryButtonStyle}"
+                                    Width="104"
                                     Content="Deactivate"
-                                    Padding="16,8"
+                                    Padding="16,0"
                                     Margin="0,0,8,0"/>
 
                             <Button x:Name="SaveProfileButton"
                                     Style="{StaticResource PrimaryButtonStyle}"
+                                    Width="104"
                                     Content="Save Profile"
                                     Padding="16,8"/>
                         </StackPanel>
