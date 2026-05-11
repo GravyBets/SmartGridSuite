@@ -7,6 +7,7 @@
         public DateTime? VisitDate { get; init; }
         public string? PrimaryTech { get; init; }
         public string? SecondaryTech { get; init; }
+        public string? IssueText { get; set; }
         public string? Narrative { get; init; }
     }
 }

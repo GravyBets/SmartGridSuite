@@ -43,6 +43,7 @@ namespace SmartGridSuite.Api.Mappings
                 VisitDate = source.VisitDate,
                 PrimaryTech = source.PrimaryTech,
                 SecondaryTech = source.SecondaryTech,
+                IssueText = source.IssueText,
                 Narrative = source.Narrative
             };
         }

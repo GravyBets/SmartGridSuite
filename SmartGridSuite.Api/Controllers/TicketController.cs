@@ -902,6 +902,8 @@ namespace SmartGridSuite.Api.Controllers
 
             entity.Notes = AppendRawTicketNote(entity.Notes, finalWriteUp);
 
+            await InsertSubmittedWriteUpIntoSiteHistoryAsync(entity, finalWriteUp, req.SubmittedBy, ct);
+
             entity.ActionRequiredOverride = "Review submitted site write-up";
             entity.LastActivityAt = DateTime.Now;
 
@@ -934,6 +936,185 @@ namespace SmartGridSuite.Api.Controllers
                    Environment.NewLine +
                    Environment.NewLine +
                    next;
+        }
+
+        private async Task InsertSubmittedWriteUpIntoSiteHistoryAsync(TicketEntity ticket, string finalWriteUp, string? submittedByEmployeeId, CancellationToken ct)
+        {
+            var siteId = (ticket.Site ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(siteId))
+                return;
+
+            var crew = await ResolveSubmittedCrewAsync(submittedByEmployeeId, ct);
+
+            var sourceType = "SmartGridSuite";
+            var sourceFile = $"Ticket {ticket.Id}";
+            var visitDate = DateTime.Today;
+
+            var primaryTech = TrimForColumn(crew.PrimaryTech, 100);
+            var secondaryTech = TrimForColumn(crew.SecondaryTech, 100);
+            var issueText = ticket.Problem ?? string.Empty;
+
+            await _db.Database.ExecuteSqlInterpolatedAsync($@"
+            INSERT INTO site_history
+            (
+                legacy_source_id,
+                source_type,
+                source_file,
+                site_id,
+                visit_date,
+                primary_tech,
+                secondary_tech,
+                narrative,
+                issue_text
+            )
+            VALUES
+            (
+                NULL,
+                {sourceType},
+                {sourceFile},
+                {siteId},
+                {visitDate},
+                {primaryTech},
+                {secondaryTech},
+                {finalWriteUp},
+                {issueText}
+            );", ct);
+        }
+
+        private async Task<SubmittedCrewInfo> ResolveSubmittedCrewAsync( string? submittedByEmployeeId, CancellationToken ct)
+        {
+            var employeeId = (submittedByEmployeeId ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(employeeId))
+            {
+                return new SubmittedCrewInfo
+                {
+                    PrimaryTech = "Unknown",
+                    SecondaryTech = null
+                };
+            }
+
+            var workDate = DateTime.Today;
+
+            var submitter = await _db.Technicians
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.EmployeeId == employeeId && x.IsActive, ct);
+
+            if (submitter is null)
+            {
+                return new SubmittedCrewInfo
+                {
+                    PrimaryTech = employeeId,
+                    SecondaryTech = null
+                };
+            }
+
+            var primaryName = FormatTechnicianName(
+                submitter.FirstName,
+                submitter.LastName,
+                submitter.EmployeeId);
+
+            var submitterRoster = await _db.TruckRosters
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.WorkDate == workDate &&
+                    x.TechnicianId == submitter.Id,
+                    ct);
+
+            if (submitterRoster is null)
+            {
+                return new SubmittedCrewInfo
+                {
+                    PrimaryTech = primaryName,
+                    SecondaryTech = null
+                };
+            }
+
+            var crewTechs = await (
+                from roster in _db.TruckRosters.AsNoTracking()
+                join tech in _db.Technicians.AsNoTracking()
+                    on roster.TechnicianId equals tech.Id
+                where roster.WorkDate == workDate
+                      && roster.TruckId == submitterRoster.TruckId
+                      && tech.IsActive
+                select new
+                {
+                    tech.Id,
+                    tech.EmployeeId,
+                    tech.FirstName,
+                    tech.LastName
+                })
+                .ToListAsync(ct);
+
+            var secondaryNames = crewTechs
+                .Where(x => x.Id != submitter.Id)
+                .Select(x => FormatTechnicianName(
+                    x.FirstName,
+                    x.LastName,
+                    x.EmployeeId))
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x)
+                .ToList();
+
+            return new SubmittedCrewInfo
+            {
+                PrimaryTech = primaryName,
+                SecondaryTech = secondaryNames.Count == 0
+                    ? null
+                    : FormatCrewDisplayText(secondaryNames)
+            };
+        }
+
+        private sealed class SubmittedCrewInfo
+        {
+            public string PrimaryTech { get; set; } = "";
+            public string? SecondaryTech { get; set; }
+        }
+
+        private static string FormatTechnicianName(string? firstName, string? lastName, string? fallbackEmployeeId)
+        {
+            var fullName = $"{firstName ?? string.Empty} {lastName ?? string.Empty}".Trim();
+
+            if (!string.IsNullOrWhiteSpace(fullName))
+                return fullName;
+
+            return (fallbackEmployeeId ?? "Unknown").Trim();
+        }
+
+        private static string FormatCrewDisplayText(IReadOnlyList<string> names)
+        {
+            var cleanNames = names
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (cleanNames.Count == 0)
+                return string.Empty;
+
+            if (cleanNames.Count == 1)
+                return cleanNames[0];
+
+            if (cleanNames.Count == 2)
+                return $"{cleanNames[0]} & {cleanNames[1]}";
+
+            return string.Join(", ", cleanNames.Take(cleanNames.Count - 1)) +
+                   " & " +
+                   cleanNames.Last();
+        }
+
+        private static string? TrimForColumn(string? value, int maxLength)
+        {
+            var text = (value ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            return text.Length <= maxLength
+                ? text
+                : text[..maxLength];
         }
 
     }

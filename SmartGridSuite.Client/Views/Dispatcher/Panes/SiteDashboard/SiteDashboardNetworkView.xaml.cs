@@ -17,6 +17,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private CancellationTokenSource? _lanPingCts;
         private CancellationTokenSource? _secondaryPingCts;
 
+        private bool? _primaryTestSuccessful;
+        private bool? _lanTestSuccessful;
+        private bool? _secondaryTestSuccessful;
+
         public bool IsIgsdMode { get; set; }
 
         public SiteDashboardNetworkView()
@@ -139,7 +143,124 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             ClearIpTestState(LanIpTextBox);
             ClearIpTestState(SecondaryIpTextBox);
 
+            _primaryTestSuccessful = null;
+            _lanTestSuccessful = null;
+            _secondaryTestSuccessful = null;
+
             ApplyLayoutMode();
+        }
+
+        public NetworkPingSessionState GetPingSessionState()
+        {
+            return new NetworkPingSessionState
+            {
+                PingCount = PingCountTextBox.Text ?? string.Empty,
+
+                Primary = new NetworkPingTargetState
+                {
+                    Ip = SnapshotIp(PrimaryIpTextBox.Text),
+                    Results = PrimaryResultsTextBox.Text ?? string.Empty,
+                    Summary = PrimarySummaryTextBlock.Text ?? "Ready.",
+                    TestSuccessful = _primaryTestSuccessful
+                },
+
+                Lan = new NetworkPingTargetState
+                {
+                    Ip = SnapshotIp(LanIpTextBox.Text),
+                    Results = LanResultsTextBox.Text ?? string.Empty,
+                    Summary = LanSummaryTextBlock.Text ?? "Ready.",
+                    TestSuccessful = _lanTestSuccessful
+                },
+
+                Secondary = new NetworkPingTargetState
+                {
+                    Ip = SnapshotIp(SecondaryIpTextBox.Text),
+                    Results = SecondaryResultsTextBox.Text ?? string.Empty,
+                    Summary = SecondarySummaryTextBlock.Text ?? "Ready.",
+                    TestSuccessful = _secondaryTestSuccessful
+                },
+
+                IgsdPrimaryRtuIp = IgsdPrimaryRtuIpTextBox.Text ?? string.Empty,
+                IgsdPrimaryCommsEthernetIp = IgsdPrimaryCommsEthernetIpTextBox.Text ?? string.Empty,
+                IgsdSecondaryCommsEthernetIp = IgsdSecondaryCommsEthernetIpTextBox.Text ?? string.Empty,
+                IgsdSecondaryRtuIp = IgsdSecondaryRtuIpTextBox.Text ?? string.Empty
+            };
+        }
+
+        public void RestorePingSessionState(NetworkPingSessionState? state)
+        {
+            if (state is null)
+                return;
+
+            PingCountTextBox.Text = state.PingCount ?? string.Empty;
+
+            RestorePingTargetState(
+                state.Primary,
+                PrimaryIpTextBox,
+                PrimaryResultsTextBox,
+                PrimarySummaryTextBlock,
+                ref _primaryTestSuccessful);
+
+            RestorePingTargetState(
+                state.Lan,
+                LanIpTextBox,
+                LanResultsTextBox,
+                LanSummaryTextBlock,
+                ref _lanTestSuccessful);
+
+            RestorePingTargetState(
+                state.Secondary,
+                SecondaryIpTextBox,
+                SecondaryResultsTextBox,
+                SecondarySummaryTextBlock,
+                ref _secondaryTestSuccessful);
+
+            if (!string.IsNullOrWhiteSpace(state.IgsdPrimaryRtuIp))
+                IgsdPrimaryRtuIpTextBox.Text = state.IgsdPrimaryRtuIp;
+
+            if (!string.IsNullOrWhiteSpace(state.IgsdPrimaryCommsEthernetIp))
+                IgsdPrimaryCommsEthernetIpTextBox.Text = state.IgsdPrimaryCommsEthernetIp;
+
+            if (!string.IsNullOrWhiteSpace(state.IgsdSecondaryCommsEthernetIp))
+                IgsdSecondaryCommsEthernetIpTextBox.Text = state.IgsdSecondaryCommsEthernetIp;
+
+            if (!string.IsNullOrWhiteSpace(state.IgsdSecondaryRtuIp))
+                IgsdSecondaryRtuIpTextBox.Text = state.IgsdSecondaryRtuIp;
+        }
+
+        private static void RestorePingTargetState(NetworkPingTargetState? state, TextBox ipTextBox, TextBox resultsTextBox,
+            TextBlock summaryTextBlock, ref bool? testStateField)
+        {
+            if (state is null)
+                return;
+
+            if (IsUsableSnapshotIp(state.Ip))
+                ipTextBox.Text = state.Ip.Trim();
+
+            resultsTextBox.Text = state.Results ?? string.Empty;
+            summaryTextBlock.Text = string.IsNullOrWhiteSpace(state.Summary)
+                ? "Ready."
+                : state.Summary;
+
+            testStateField = state.TestSuccessful;
+            SetIpTestState(ipTextBox, state.TestSuccessful);
+        }
+
+        private static bool IsUsableSnapshotIp(string? value)
+        {
+            var text = (value ?? string.Empty).Trim();
+
+            return !string.IsNullOrWhiteSpace(text) &&
+                   text != "—";
+        }
+
+        private static string SnapshotIp(string? value)
+        {
+            var text = (value ?? string.Empty).Trim();
+
+            return string.IsNullOrWhiteSpace(text) || text == "—"
+                ? string.Empty
+                : text;
         }
 
         private async void PingPrimaryButton_Click(object sender, RoutedEventArgs e)
@@ -232,6 +353,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             ClearIpTestState(PrimaryIpTextBox);
             ClearIpTestState(LanIpTextBox);
             ClearIpTestState(SecondaryIpTextBox);
+
+            _primaryTestSuccessful = null;
+            _lanTestSuccessful = null;
+            _secondaryTestSuccessful = null;
         }
 
         private static void ClearIpTestState(TextBox ipTextBox)
@@ -454,6 +579,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             var ip = ipTextBox.Text?.Trim();
 
             ClearIpTestState(ipTextBox);
+            RememberIpTestState(ipTextBox, null);
             summaryTextBlock.Text = "Testing...";
 
             if (string.IsNullOrWhiteSpace(ip))
@@ -491,6 +617,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             var isSuccessful = successCount > 0;
 
             SetIpTestState(ipTextBox, isSuccessful);
+            RememberIpTestState(ipTextBox, isSuccessful);
             summaryTextBlock.Text = isSuccessful ? "Test Successful" : "Test Failed";
         }
 
@@ -518,6 +645,26 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             ipTextBox.Background = new SolidColorBrush(background);
             ipTextBox.BorderBrush = new SolidColorBrush(border);
+        }
+
+        private void RememberIpTestState(TextBox ipTextBox, bool? isSuccessful)
+        {
+            if (ReferenceEquals(ipTextBox, PrimaryIpTextBox))
+            {
+                _primaryTestSuccessful = isSuccessful;
+                return;
+            }
+
+            if (ReferenceEquals(ipTextBox, LanIpTextBox))
+            {
+                _lanTestSuccessful = isSuccessful;
+                return;
+            }
+
+            if (ReferenceEquals(ipTextBox, SecondaryIpTextBox))
+            {
+                _secondaryTestSuccessful = isSuccessful;
+            }
         }
 
         public string GetPingStatsForWriteUp()

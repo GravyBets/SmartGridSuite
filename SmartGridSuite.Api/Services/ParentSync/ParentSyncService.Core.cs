@@ -84,6 +84,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
                         visit_date,
                         primary_tech,
                         secondary_tech,
+                        issue_text AS IssueText,
                         narrative
                     FROM site_history
                     WHERE site_id IN ({string.Join(", ", parameterNames)})
@@ -103,6 +104,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
                         VisitDate = GetNullableDateTime(reader, "visit_date"),
                         PrimaryTech = GetDbString(reader, "primary_tech"),
                         SecondaryTech = GetDbString(reader, "secondary_tech"),
+                        IssueText = GetDbString(reader, "IssueText"),
                         Narrative = GetDbString(reader, "narrative")
                     });
                 }

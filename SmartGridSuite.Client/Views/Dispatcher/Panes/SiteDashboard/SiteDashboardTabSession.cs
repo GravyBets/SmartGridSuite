@@ -6,6 +6,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 {
     public sealed class SiteDashboardTabSession
     {
+        public List<EquipmentReplacementSessionEntry> EquipmentReplacementEntries { get; set; } = new();
+        public NetworkPingSessionState? NetworkPingState { get; set; }
         public string DashboardKind { get; set; } = string.Empty;
         public string SessionKey { get; init; } = string.Empty;
         public string HeaderText { get; set; } = "Blank";
@@ -58,5 +60,38 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public int? TowerTopNameId { get; set; }
         public string TowerSummaryText { get; set; } = string.Empty;
         public List<TowerSectorDto> TowerSectors { get; set; } = new();
+    }
+
+    public sealed class EquipmentReplacementSessionEntry
+    {
+        public string SlotLabel { get; set; } = "";
+        public bool UsesCommunicationDeviceTypePicker { get; set; }
+        public string Item { get; set; } = "";
+        public string OldSerial { get; set; } = "";
+        public string NewSerial { get; set; } = "";
+        public string ReplacementKey { get; set; } = "";
+    }
+
+    public sealed class NetworkPingSessionState
+    {
+        public string PingCount { get; set; } = "";
+
+        public NetworkPingTargetState Primary { get; set; } = new();
+        public NetworkPingTargetState Lan { get; set; } = new();
+        public NetworkPingTargetState Secondary { get; set; } = new();
+
+        public string IgsdPrimaryRtuIp { get; set; } = "";
+        public string IgsdPrimaryCommsEthernetIp { get; set; } = "";
+        public string IgsdSecondaryCommsEthernetIp { get; set; } = "";
+        public string IgsdSecondaryRtuIp { get; set; } = "";
+    }
+
+    public sealed class NetworkPingTargetState
+    {
+        public string Ip { get; set; } = "";
+        public string Results { get; set; } = "";
+        public string Summary { get; set; } = "Ready.";
+
+        public bool? TestSuccessful { get; set; }
     }
 }

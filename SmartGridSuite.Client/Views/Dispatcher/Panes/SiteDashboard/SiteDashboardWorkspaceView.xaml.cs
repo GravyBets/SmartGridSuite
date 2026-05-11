@@ -50,8 +50,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public IReadOnlyList<SnmpOidConfigDto> Oids { get; }
     }
 
-      
-
 
     public partial class SiteDashboardWorkspaceView : UserControl
     {
@@ -856,7 +854,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             return true;
         }
-
 
         private void ResetTowerIpStatus(TowerPingEndpoint endpoint)
         {
@@ -2040,6 +2037,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             TopTunnelIp = "—";
             CurrentTicketId = 0;
 
+            _snmpCategoryOptionsInitialized = false;
+
+            IncludeSnmpStatsCheckBox.IsChecked = false;
+            IncludeSnmpAdminCheckBox.IsChecked = true;
+            IncludeSnmpConfigCheckBox.IsChecked = true;
+            IncludeSnmpStatsCategoryCheckBox.IsChecked = true;
+            SnmpCategoryOptionsPanel.Visibility = Visibility.Collapsed;
+
             //Tower
             TowerSummaryText = string.Empty;
             SetTowerSectors(Array.Empty<TowerSectorDto>());
@@ -2062,6 +2067,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             SerializedDevicesPanel.Children.Clear();
             AccessSecuritySectionPanel.Children.Clear();
             ReplacementEntriesPanel.Children.Clear();
+            _activeReplacementEntryKeys.Clear();
 
             _equipmentText = string.Empty;
             RefreshEquipmentCards();
@@ -2082,7 +2088,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 return;
 
             ApplyWorkspaceTabVisualState(tab.Tag as string, raiseChangedEvent: true);
-        }
+        }        
 
         private void WriteUpTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -4183,6 +4189,150 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             dialog.Content = root;
 
             return dialog.ShowDialog() == true;
+        }
+
+
+        //Trying to persist all data in a tab
+        public List<EquipmentReplacementSessionEntry> GetEquipmentReplacementSessionEntries()
+        {
+            var entries = new List<EquipmentReplacementSessionEntry>();
+
+            if (ReplacementEntriesPanel is null)
+                return entries;
+
+            foreach (var child in ReplacementEntriesPanel.Children)
+            {
+                if (child is not Border rowBorder)
+                    continue;
+
+                if (rowBorder.Tag is not ReplacementEntryRowTag rowTag)
+                    continue;
+
+                var entry = GetEquipmentReplacementEntry(rowBorder, rowTag);
+
+                var isBlank =
+                    string.IsNullOrWhiteSpace(entry.Item) &&
+                    string.IsNullOrWhiteSpace(entry.OldSerial) &&
+                    string.IsNullOrWhiteSpace(entry.NewSerial);
+
+                if (isBlank)
+                    continue;
+
+                entries.Add(new EquipmentReplacementSessionEntry
+                {
+                    SlotLabel = rowTag.Label,
+                    UsesCommunicationDeviceTypePicker = rowTag.UsesCommunicationDeviceTypePicker,
+                    ReplacementKey = rowTag.ReplacementKey ?? string.Empty,
+                    Item = entry.Item,
+                    OldSerial = entry.OldSerial,
+                    NewSerial = entry.NewSerial
+                });
+            }
+
+            return entries;
+        }
+
+        public void RestoreEquipmentReplacementSessionEntries(IEnumerable<EquipmentReplacementSessionEntry>? entries)
+        {
+            if (entries is null || ReplacementEntriesPanel is null)
+                return;
+
+            var restoredAnySwapKey = false;
+
+            foreach (var entry in entries)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Item) &&
+                    string.IsNullOrWhiteSpace(entry.OldSerial) &&
+                    string.IsNullOrWhiteSpace(entry.NewSerial))
+                {
+                    continue;
+                }
+
+                var replacementKey = entry.ReplacementKey;
+
+                // Fallback for entries saved before ReplacementKey existed.
+                if (string.IsNullOrWhiteSpace(replacementKey) &&
+                    !string.IsNullOrWhiteSpace(entry.SlotLabel))
+                {
+                    replacementKey = BuildReplacementEntryKey(entry.SlotLabel, entry.OldSerial);
+                }
+
+                if (!string.IsNullOrWhiteSpace(replacementKey))
+                {
+                    _activeReplacementEntryKeys.Add(replacementKey);
+                    restoredAnySwapKey = true;
+                }
+
+                AddReplacementEntryRow(
+                    label: entry.SlotLabel,
+                    oldSerial: entry.OldSerial,
+                    allowCustomLabel: true,
+                    usesCommunicationDeviceTypePicker: entry.UsesCommunicationDeviceTypePicker,
+                    replacementKey: string.IsNullOrWhiteSpace(replacementKey) ? null : replacementKey);
+
+                if (ReplacementEntriesPanel.Children.Count == 0)
+                    continue;
+
+                if (ReplacementEntriesPanel.Children[^1] is not Border rowBorder)
+                    continue;
+
+                SetTaggedTextBoxValue(rowBorder, "ReplacementItem", entry.Item);
+                SetTaggedTextBoxValue(rowBorder, "ReplacementOldSerial", entry.OldSerial);
+                SetTaggedTextBoxValue(rowBorder, "ReplacementNewSerial", entry.NewSerial);
+                SetTaggedComboBoxValue(rowBorder, "ReplacementDeviceType", entry.Item);
+            }
+
+            // Important: rebuild serialized equipment cards AFTER restoring keys,
+            // so Swap buttons visually disable/gray out correctly.
+            if (restoredAnySwapKey)
+                RefreshEquipmentCards();
+        }
+
+        private static void SetTaggedTextBoxValue(DependencyObject root, string tag, string? value)
+        {
+            var textBox = FindVisualChildren<TextBox>(root)
+                .FirstOrDefault(x => string.Equals(x.Tag?.ToString(), tag, StringComparison.OrdinalIgnoreCase));
+
+            if (textBox is not null)
+                textBox.Text = value ?? string.Empty;
+        }
+
+        private static void SetTaggedComboBoxValue(DependencyObject root, string tag, string? value)
+        {
+            var comboBox = FindVisualChildren<ComboBox>(root)
+                .FirstOrDefault(x => string.Equals(x.Tag?.ToString(), tag, StringComparison.OrdinalIgnoreCase));
+
+            if (comboBox is null)
+                return;
+
+            var cleanValue = (value ?? string.Empty).Trim();
+
+            foreach (var item in comboBox.Items)
+            {
+                var itemText = item switch
+                {
+                    ComboBoxItem comboBoxItem => comboBoxItem.Content?.ToString(),
+                    _ => item?.ToString()
+                };
+
+                if (string.Equals(itemText?.Trim(), cleanValue, StringComparison.OrdinalIgnoreCase))
+                {
+                    comboBox.SelectedItem = item;
+                    return;
+                }
+            }
+
+            comboBox.Text = cleanValue;
+        }
+
+        public Dictionary<ulong, string> GetSnmpOidResultSnapshot()
+        {
+            return _snmpCategoryGroups
+                .SelectMany(x => x.Rows)
+                .Where(x => x.Id > 0)
+                .ToDictionary(
+                    x => x.Id,
+                    x => x.ResultText ?? string.Empty);
         }
     }
 }

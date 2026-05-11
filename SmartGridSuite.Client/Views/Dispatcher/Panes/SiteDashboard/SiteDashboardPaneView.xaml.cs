@@ -486,7 +486,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.EquipmentText = BuildEquipmentSummary(dashboard);
             session.HistoryRows = BuildHistoryRows(dashboard);
         }
-        
 
         private async void WorkspaceView_RefreshSnmpRequested(object? sender, EventArgs e)
         {
@@ -783,12 +782,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void TopBarView_AddTabRequested(object? sender, EventArgs e)
         {
+            SaveCurrentTabUiState();
+
             CreateBlankTab(selectNewTab: true);
             RenderSelectedSession();
         }
 
         private void TopBarView_SelectedTabChanged(object? sender, string? sessionKey)
         {
+            if (string.Equals(_selectedSessionKey, sessionKey, StringComparison.Ordinal))
+                return;
+
+            SaveCurrentTabUiState();
+
             _selectedSessionKey = sessionKey;
             RenderSelectedSession();
         }
@@ -797,6 +803,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         {
             if (string.IsNullOrWhiteSpace(sessionKey))
                 return;
+
+            SaveCurrentTabUiState();
 
             var index = _sessions.FindIndex(x => x.SessionKey == sessionKey);
             if (index < 0)
@@ -874,12 +882,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     submittedBy: Environment.UserName,
                     CancellationToken.None);
 
-                await RefreshTicketInfoAsync(session, CancellationToken.None);
+                TopBarView.StatusText = "Refreshing site after write-up submit...";
 
-                if (session.SessionKey == _selectedSessionKey)
-                    RenderSelectedSession();
+                await RefreshDashboardAfterWriteUpSubmitAsync(session, CancellationToken.None);
 
-                TopBarView.StatusText = "Write-up submitted to ticket.";
+                TopBarView.StatusText = "Write-up submitted. Site history refreshed.";
             }
             catch (Exception ex)
             {
@@ -917,7 +924,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 await RefreshTicketInfoAsync(session, CancellationToken.None);
 
                 if (session.SessionKey == _selectedSessionKey)
+                {
+                    SaveCurrentTabUiState();
                     RenderSelectedSession();
+                }
 
                 TopBarView.StatusText = "Ticket refreshed.";
             }
@@ -961,7 +971,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return _sessions.FirstOrDefault(x => x.SessionKey == _selectedSessionKey);
         }
 
-
         //Load Async
         private async Task LoadAsync(string rawSiteId)
         {
@@ -981,6 +990,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             if (existingSession is not null)
             {
+                SaveCurrentTabUiState();
+
                 _selectedSessionKey = existingSession.SessionKey;
                 RenderSelectedSession();
                 TopBarView.StatusText = $"Switched to {existingSession.HeaderText}.";
@@ -999,12 +1010,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             var previousLoadedSite = (selectedSession.SearchText ?? string.Empty).Trim();
 
+            var isBlankSessionLoad =
+                string.IsNullOrWhiteSpace(previousLoadedSite) ||
+                previousLoadedSite.StartsWith("Blank", StringComparison.OrdinalIgnoreCase);
+
             var isDifferentSiteLoad =
-                !string.IsNullOrWhiteSpace(previousLoadedSite) &&
-                !previousLoadedSite.StartsWith("Blank", StringComparison.OrdinalIgnoreCase) &&
+                !isBlankSessionLoad &&
                 !string.Equals(previousLoadedSite, siteId, StringComparison.OrdinalIgnoreCase);
 
-            if (isDifferentSiteLoad)
+            var shouldClearForSiteLoad = isBlankSessionLoad || isDifferentSiteLoad;
+
+            if (shouldClearForSiteLoad)
             {
                 ResetSessionForNewSiteLoad(selectedSession);
             }
@@ -1026,13 +1042,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 ApplyDashboardToSession(selectedSession, dashboard, loadedSiteId);
                 await ApplyPingScreenPortalUrlAsync(selectedSession, dashboard, _loadCts.Token);
 
-                if (isDifferentSiteLoad)
+                if (shouldClearForSiteLoad)
                 {
                     selectedSession.SelectedWorkspaceTabKey = "TopWriteUp";
                 }
 
                 selectedSession.SnmpTargetIp =
-                    isDifferentSiteLoad || string.IsNullOrWhiteSpace(selectedSession.SnmpTargetIp)
+                    shouldClearForSiteLoad || string.IsNullOrWhiteSpace(selectedSession.SnmpTargetIp)
                         ? selectedSession.PrimaryIp
                         : selectedSession.SnmpTargetIp;
 
@@ -1047,8 +1063,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 if (selectedSession.SessionKey == _selectedSessionKey)
                     RenderSelectedSession();
 
-                if (!string.Equals(selectedSession.DashboardKind, SiteDashboardKinds.Rx, StringComparison.OrdinalIgnoreCase))
-                    _ = NetworkView.RunQuickReachabilityTestForAllAsync();
+                if (shouldClearForSiteLoad &&
+                    !string.Equals(selectedSession.DashboardKind, SiteDashboardKinds.Rx, StringComparison.OrdinalIgnoreCase))
+                {
+                    await Dispatcher.InvokeAsync(
+                        () => { },
+                        System.Windows.Threading.DispatcherPriority.Loaded);
+
+                    await NetworkView.RunQuickReachabilityTestForAllAsync();
+
+                    selectedSession.NetworkPingState = NetworkView.GetPingSessionState();
+                }
+
                 TopBarView.StatusText = $"Loaded {loadedSiteId}.";
             }
             catch (OperationCanceledException)
@@ -1129,6 +1155,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 NetworkView.IgsdSecondaryRtuIp = session.IgsdSecondaryRtuIp;
 
                 NetworkView.ApplyLayoutMode();
+                NetworkView.RestorePingSessionState(session.NetworkPingState);
 
                 //Main Workspace
                 WorkspaceView.Reset();
@@ -1182,6 +1209,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 WorkspaceView.SetSnmpOids(session.SnmpOids, session.SnmpOidResults);
                 WorkspaceView.RefreshEquipmentDisplay();
+
+                WorkspaceView.RestoreEquipmentReplacementSessionEntries(session.EquipmentReplacementEntries);
             }
             finally
             {
@@ -1399,6 +1428,69 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 bestTicket is null ? Array.Empty<TicketListItemDto>() : new[] { bestTicket });
         }
 
+        private async Task RefreshDashboardAfterWriteUpSubmitAsync(SiteDashboardTabSession session, CancellationToken ct)
+        {
+            var reloadId = (session.SearchText ?? session.HeaderText ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(reloadId) ||
+                reloadId.StartsWith("Blank", StringComparison.OrdinalIgnoreCase))
+            {
+                await RefreshTicketInfoAsync(session, ct);
+
+                if (session.SessionKey == _selectedSessionKey)
+                    RenderSelectedSession();
+
+                return;
+            }
+
+            // Stop anything that might still be running.
+            WorkspaceView.StopTowerPings();
+
+            // Clear session-only/temporary state before reload.
+            ClearSessionTemporaryDashboardState(session);
+
+            var dashboard = await _api.GetSiteDashboardAsync(reloadId, ct);
+            var loadedSiteId = GetObjectPropertyText(dashboard, "SiteId") ?? reloadId;
+
+            ApplyDashboardToSession(session, dashboard, loadedSiteId);
+
+            // Reload SNMP config fresh, but no poll results.
+            await RefreshSnmpConfigAsync(session, ct);
+
+            // Reload ticket info fresh.
+            await RefreshTicketInfoAsync(session, ct);
+
+            // After submit, show the newly-added history row.
+            session.SelectedWorkspaceTabKey = "SiteHistory";
+
+            if (session.SessionKey == _selectedSessionKey)
+                RenderSelectedSession();
+        }
+
+        private static void ClearSessionTemporaryDashboardState(SiteDashboardTabSession session)
+        {
+            // Main write-up area
+            session.WriteUpText = string.Empty;
+
+            session.EquipmentReplacementEntries = new List<EquipmentReplacementSessionEntry>();
+
+            session.NetworkPingState = null;
+
+            // SNMP temporary state/results
+            session.SnmpTargetIp = string.Empty;
+            session.SnmpProfileId = null;
+            session.SnmpProfileName = string.Empty;
+            session.SnmpDeviceFamily = string.Empty;
+            session.SnmpSupportMessage = string.Empty;
+            session.SnmpSupported = false;
+            session.SnmpProfiles = new();
+            session.SnmpOids = new();
+            session.SnmpOidResults = new();
+
+            // Workspace selection gets set after reload.
+            session.SelectedWorkspaceTabKey = "SiteHistory";
+        }
+
         private List<SiteDashboardHistoryRowViewModel> BuildHistoryRows(object? dashboard)
         {
             var result = new List<SiteDashboardHistoryRowViewModel>();
@@ -1423,9 +1515,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     ?? string.Empty;
 
                 var issue =
-                    GetFirstNonEmptyText(item, "Issue", "SiteIssue", "Problem")
-                    ?? ExtractIssueFromNarrative(narrative)
-                    ?? "—";
+                    GetFirstNonEmptyText(item, "IssueText", "issueText", "issue_text", "Issue", "SiteIssue", "Site Issue", "Problem")
+                    ?? "Other";
 
                 var tech1 =
                     GetFirstNonEmptyText(item, "PrimaryTech", "Tech1", "Technician1")
@@ -1910,26 +2001,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return $"{latitude}, {longitude}";
         }
 
-        private static string? ExtractIssueFromNarrative(string? narrative)
-        {
-            if (string.IsNullOrWhiteSpace(narrative))
-                return null;
-
-            var lines = narrative
-                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
-                .Select(x => x.Trim())
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToList();
-
-            foreach (var line in lines)
-            {
-                if (line.StartsWith("Site Issue:", StringComparison.OrdinalIgnoreCase))
-                    return line["Site Issue:".Length..].Trim();
-            }
-
-            return lines.FirstOrDefault();
-        }
-
         private static string FormatHistoryDate(string? rawDateText)
         {
             if (string.IsNullOrWhiteSpace(rawDateText))
@@ -2100,10 +2171,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.PrimaryIp = "—";
             session.LanIp = "—";
             session.SecondaryIp = "—";
+            session.NetworkPingState = null;
 
             session.TopInfoText = string.Empty;
             session.WriteUpText = string.Empty;
             session.EquipmentText = string.Empty;
+            session.EquipmentReplacementEntries = new List<EquipmentReplacementSessionEntry>();
             session.SelectedWorkspaceTabKey = "TopWriteUp";
 
             session.SiteStatusText = string.Empty;
@@ -2284,7 +2357,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 await RefreshTicketInfoAsync(session, CancellationToken.None);
 
                 if (session.SessionKey == _selectedSessionKey)
+                {
+                    SaveCurrentTabUiState();
                     RenderSelectedSession();
+                }
 
                 TopBarView.StatusText = "Capital request saved.";
             }
@@ -2315,7 +2391,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 await RefreshTicketInfoAsync(session, CancellationToken.None);
 
                 if (session.SessionKey == _selectedSessionKey)
+                {
+                    SaveCurrentTabUiState();
                     RenderSelectedSession();
+                }
 
                 TopBarView.StatusText = "Maintenance request saved.";
             }
@@ -2342,7 +2421,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 await RefreshTicketInfoAsync(session, CancellationToken.None);
 
                 if (session.SessionKey == _selectedSessionKey)
+                {
+                    SaveCurrentTabUiState();
                     RenderSelectedSession();
+                }
 
                 TopBarView.StatusText = "Ticket request created.";
             }
@@ -2401,11 +2483,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             if (existingSession is not null)
             {
+                SaveCurrentTabUiState();
+
                 _selectedSessionKey = existingSession.SessionKey;
                 RenderSelectedSession();
                 TopBarView.StatusText = $"Switched to {siteId}.";
                 return;
             }
+
+            SaveCurrentTabUiState();
 
             CreateBlankTab(selectNewTab: true);
             RenderSelectedSession();
@@ -2480,6 +2566,29 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 _currentCnpTechName = GetWindowsEmployeeId();
                 WorkspaceView.CurrentCnpTechName = _currentCnpTechName;
             }
+        }
+
+        private void SaveCurrentTabUiState()
+        {
+            if (_renderingSession)
+                return;
+
+            var session = GetSelectedSession();
+
+            if (session is null)
+                return;
+
+            session.WriteUpText = WorkspaceView.WriteUpText;
+            session.SelectedWorkspaceTabKey = WorkspaceView.SelectedWorkspaceTabKey;
+
+            session.EquipmentReplacementEntries =
+                WorkspaceView.GetEquipmentReplacementSessionEntries();
+
+            session.SnmpTargetIp = WorkspaceView.GetSnmpTargetIp();
+            session.SnmpProfileId = WorkspaceView.GetSelectedSnmpProfileId();
+            session.SnmpOidResults = WorkspaceView.GetSnmpOidResultSnapshot();
+
+            session.NetworkPingState = NetworkView.GetPingSessionState();
         }
     }
 }
