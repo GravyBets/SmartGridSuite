@@ -11,6 +11,7 @@ namespace SmartGridSuite.Client.Views
     {
         private bool _navCollapsed;
         private bool _syncingNav;
+        private SiteDashboardPaneView? _siteDashboardPaneView;
 
         private readonly ApiClient _api = new("https://localhost:7140");
 
@@ -20,7 +21,7 @@ namespace SmartGridSuite.Client.Views
 
             UiScaleService.ApplyToWindow(this);
 
-            // Default selection = Dashboard
+            // Default selection =  Site Dashboard
             SelectNavIndex(0);
 
         }
@@ -89,7 +90,8 @@ namespace SmartGridSuite.Client.Views
                     break;
 
                 case "Site Dashboard":
-                    MainPaneHost.Content = new SiteDashboardPaneView();
+                    _siteDashboardPaneView ??= new SiteDashboardPaneView();
+                    MainPaneHost.Content = _siteDashboardPaneView;
                     break;
 
                 default:

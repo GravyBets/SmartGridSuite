@@ -60,6 +60,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public int? TowerTopNameId { get; set; }
         public string TowerSummaryText { get; set; } = string.Empty;
         public List<TowerSectorDto> TowerSectors { get; set; } = new();
+        public TowerPingSessionState? TowerPingState { get; set; }
+
+        //Popped Out
+        public bool IsPoppedOut { get; set; }
+
     }
 
     public sealed class EquipmentReplacementSessionEntry
@@ -94,4 +99,28 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         public bool? TestSuccessful { get; set; }
     }
+
+    public sealed class TowerPingSessionState
+    {
+        public List<TowerSectorPingSessionState> Sectors { get; set; } = new();
+    }
+
+    public sealed class TowerSectorPingSessionState
+    {
+        public string Sector { get; set; } = "";
+        public string PingCount { get; set; } = "";
+        public List<TowerEndpointPingSessionState> Endpoints { get; set; } = new();
+    }
+
+    public sealed class TowerEndpointPingSessionState
+    {
+        public string Label { get; set; } = "";
+        public string IpAddress { get; set; } = "";
+        public string Results { get; set; } = "";
+        public string Summary { get; set; } = "Ready.";
+        public bool? TestSuccessful { get; set; }
+    }
+
+
+
 }

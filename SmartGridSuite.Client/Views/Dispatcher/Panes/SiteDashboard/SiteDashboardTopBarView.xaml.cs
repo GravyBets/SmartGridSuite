@@ -13,6 +13,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public event EventHandler? AddTabRequested;
         public event EventHandler<string?>? SelectedTabChanged;
         public event EventHandler<string?>? CloseTabRequested;
+        public event EventHandler? PopOutRequested;
 
         private bool _syncingTabs;
 
@@ -212,8 +213,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         //Pop-Out Button
         private void PopOutButton_Click(object sender, RoutedEventArgs e)
         {
-            // Next micro-step:
-            // open the current dashboard session in a separate window
+            PopOutRequested?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void SetPopOutButtonVisible(bool isVisible)
+        {
+            if (PopOutButton is null)
+                return;
+
+            PopOutButton.Visibility = isVisible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         //Copy Buttons
