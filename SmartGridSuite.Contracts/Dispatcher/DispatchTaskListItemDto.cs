@@ -4,6 +4,8 @@ namespace SmartGridSuite.Contracts.Dispatcher
 {
     public class DispatchTaskListItemDto
     {
+        public long TicketId { get; set; }
+
         public DateTime OccurredAt { get; set; }
 
         public string Site { get; set; } = "";

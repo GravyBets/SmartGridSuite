@@ -57,6 +57,15 @@
                   x:Name="SendToDispatchTasksCheckBox"
                   Content="Send tickets in this status to Dispatch Tasks"
                   VerticalAlignment="Top"/>
+        
+        <TextBlock Grid.Row="13"
+                   x:Name="SystemRequiredTextBlock"
+                   Margin="0,28,0,0"
+                   Text="System-required status. Name, Active, and Closed behavior are protected because SmartGridSuite depends on them."
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource TextSecondary}"
+                   Visibility="Collapsed"
+                   VerticalAlignment="Top"/>
 
         <StackPanel Grid.Row="14"
                     Orientation="Horizontal"

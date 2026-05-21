@@ -76,7 +76,28 @@
             <Setter Property="VerticalContentAlignment" Value="Top"/>
         </Style>
 
-        
+        <Style x:Key="TicketDetailLabelText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="Margin" Value="0,0,0,3"/>
+        </Style>
+
+        <Style x:Key="TicketDetailValueText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+
+        <Style x:Key="TicketDetailSectionCard" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="12"/>
+        </Style>
+
+
 
     </UserControl.Resources>
 
@@ -295,11 +316,11 @@
 
         <!-- Summary panel -->
         <Border Grid.Row="4"
-        x:Name="SummaryPanel"
-        Style="{StaticResource Card}"
-        Padding="12"
-        Margin="0,0,0,12"
-        Visibility="Collapsed">
+                x:Name="SummaryPanel"
+                Style="{StaticResource Card}"
+                Padding="12"
+                Margin="0,0,0,12"
+                Visibility="Collapsed">
 
             <UniformGrid Rows="1"
                  Columns="8">
@@ -396,10 +417,113 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <DockPanel Grid.Row="0">
-                        <TextBlock Text="Ticket List"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextPrimary}"/>                        
+                    <DockPanel Grid.Row="0"
+                               LastChildFill="True">
+
+                        <!-- Actions -->
+                        <StackPanel DockPanel.Dock="Right"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+
+                            <Button x:Name="MissingProblemsButton"
+                                    Content="Missing Problems"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Margin="0,0,8,0"
+                                    Click="MissingProblems_Click"/>
+
+                            <Button x:Name="UnassignedTicketsButton"
+                                    Content="Unassigned"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Margin="0,0,8,0"
+                                    Click="UnassignedTickets_Click"/>
+
+                            <Button x:Name="ReadyToAssignButton"
+                                    Content="Ready to Assign"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Margin="0,0,8,0"
+                                    Click="ReadyToAssign_Click"/>
+
+                            <Button x:Name="AssignedTicketsButton"
+                                    Content="Assigned"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Margin="0,0,8,0"
+                                    Click="AssignedTickets_Click"/>
+
+                            <Button x:Name="ClearMissingProblemsButton"
+                                    Content="Clear Quick Filter"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Margin="0,0,8,0"
+                                    Visibility="Collapsed"
+                                    Click="ClearQuickFilter_Click"/>
+
+                            <Button x:Name="SelectVisibleTicketsButton"
+                                    Content="Select Showing"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Margin="0,0,8,0"
+                                    Click="SelectVisibleTickets_Click"/>
+
+                            <Button x:Name="ClearSelectionButton"
+                                    Content="Clear Selection"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Margin="0,0,8,0"
+                                    IsEnabled="False"
+                                    Click="ClearSelection_Click"/>
+
+                            <Button x:Name="AssignSelectedButton"
+                                    Content="Assign Selected"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Margin="0,0,8,0"
+                                    IsEnabled="False"
+                                    Click="AssignSelected_Click"/>
+
+                            <Button x:Name="BulkSetProblemButton"
+                                    Content="Set Problem"
+                                    Height="30"
+                                    Padding="12,0"
+                                    IsEnabled="False"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="BulkSetProblem_Click"/>
+                        </StackPanel>
+
+                        <!-- Title / status -->
+                        <StackPanel Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+
+                            <TextBlock Text="Ticket List"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       VerticalAlignment="Center"/>
+
+                            <Border x:Name="MissingProblemsBadge"
+                                    Margin="10,0,0,0"
+                                    Padding="8,3"
+                                    CornerRadius="10"
+                                    Background="{DynamicResource SurfaceBg}"
+                                    BorderBrush="{DynamicResource SurfaceBorder}"
+                                    BorderThickness="1"
+                                    Visibility="Collapsed"
+                                    VerticalAlignment="Center">
+                                <TextBlock x:Name="MissingProblemsBadgeText"
+                                           Text="Missing Problems"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+
+                            <TextBlock x:Name="SelectedCountTextBlock"
+                                       Margin="10,0,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
                     </DockPanel>
 
                     <DataGrid Grid.Row="2"
@@ -408,8 +532,10 @@
                               AutoGenerateColumns="False"
                               HeadersVisibility="Column"
                               IsReadOnly="True"
-                              SelectionMode="Single"
-                              SelectionChanged="TicketsGrid_SelectionChanged">
+                              SelectionMode="Extended"
+                              SelectionUnit="FullRow"
+                              SelectionChanged="TicketsGrid_SelectionChanged"
+                              MouseDoubleClick="TicketsGrid_MouseDoubleClick">
 
                         <DataGrid.Columns>
 
@@ -456,6 +582,12 @@
                                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding CurrentWorkOrder}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding WorkOrderClassLabel}" Value="">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding WorkOrderClassLabel}" Value="{x:Null}">
                                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
@@ -507,20 +639,23 @@
 
                 <!-- Details inspector -->
                 <Border Grid.Column="2"
-        x:Name="DetailsPanel"
-        Style="{StaticResource Card}"
-        Padding="14"
-        Visibility="Collapsed">
+                        x:Name="DetailsPanel"
+                        Style="{StaticResource Card}"
+                        Padding="14"
+                        Visibility="Collapsed">
 
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="12"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="10"/>
                             <RowDefinition Height="*"/>
+                            <RowDefinition Height="12"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <!-- Title row -->
+                        <!-- Header -->
                         <Grid Grid.Row="0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -529,219 +664,468 @@
 
                             <StackPanel>
                                 <TextBlock Text="{Binding SelectedTicket.Site, TargetNullValue=Ticket Details}"
-                           FontWeight="Bold"
-                           FontSize="16"
-                           Foreground="{DynamicResource TextPrimary}"/>
+                                           FontSize="20"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
 
-                                <TextBlock Margin="0,2,0,0"
-                           Foreground="{DynamicResource TextSecondary}">
-                    <Run Text="{Binding SelectedTicket.TaskCategoryName}"/>
-                    <Run Text=" • "/>
-                    <Run Text="{Binding SelectedTicket.Status}"/>
-                                </TextBlock>
+                                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                    <Border Padding="8,3"
+                                            CornerRadius="10"
+                                            Background="{DynamicResource SurfaceBg}"
+                                            BorderBrush="{DynamicResource SurfaceBorder}"
+                                            BorderThickness="1">
+                                        <TextBlock Text="{Binding SelectedTicket.Status}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextSecondary}"/>
+                                    </Border>
+
+                                    <Border Margin="8,0,0,0"
+                                            Padding="8,3"
+                                            CornerRadius="10"
+                                            Background="{DynamicResource SurfaceBg}"
+                                            BorderBrush="{DynamicResource SurfaceBorder}"
+                                            BorderThickness="1">
+                                        <TextBlock Text="{Binding SelectedTicket.AssignedTech}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextSecondary}"/>
+                                    </Border>
+                                </StackPanel>
                             </StackPanel>
 
                             <Button Grid.Column="1"
-                    Width="32"
-                    Height="32"
-                    Margin="10,0,0,0"
-                    ToolTip="Close details"
-                    Click="CloseDetails_Click"
-                    Background="Transparent"
-                    BorderThickness="0">
+                                    Width="32"
+                                    Height="32"
+                                    Margin="10,0,0,0"
+                                    ToolTip="Close details"
+                                    Click="CloseDetails_Click"
+                                    Background="Transparent"
+                                    BorderThickness="0">
                                 <TextBlock Text="✕"
-                           FontSize="14"
-                           Foreground="{DynamicResource TextSecondary}"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Center"/>
+                                           FontSize="14"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"/>
                             </Button>
                         </Grid>
 
-                        <!-- Key fields -->
-                        <Grid Grid.Row="1" Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <TextBlock Grid.Row="0" Grid.Column="0"
-                       Text="Date/Time"
-                       Foreground="{DynamicResource TextSecondary}"
-                       Margin="0,0,0,8"/>
-                            <TextBlock Grid.Row="0" Grid.Column="1"
-                       Text="{Binding SelectedTicket.LastActivityAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"
-                       Foreground="{DynamicResource TextPrimary}"
-                       Margin="0,0,0,8"/>
-
-                            <TextBlock Grid.Row="1" Grid.Column="0"
-                       Text="Tech"
-                       Foreground="{DynamicResource TextSecondary}"
-                       Margin="0,0,0,8"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1"
-                       Text="{Binding SelectedTicket.AssignedTech}"
-                       Foreground="{DynamicResource TextPrimary}"
-                       Margin="0,0,0,8"/>
-
-                            <TextBlock Grid.Row="2" Grid.Column="0"
-                       Text="Notification"
-                       Foreground="{DynamicResource TextSecondary}"
-                       Margin="0,0,0,8"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1"
-                       Text="{Binding SelectedTicket.Notification}"
-                       Foreground="{DynamicResource TextPrimary}"
-                       Margin="0,0,0,8"/>
-
-                            <TextBlock Grid.Row="3" Grid.Column="0"
-                       Text="Work Order"
-                       Foreground="{DynamicResource TextSecondary}"
-                       Margin="0,0,0,8"/>
-
-                            <StackPanel Grid.Row="3" Grid.Column="1"
-                        Orientation="Horizontal"
-                        Margin="0,0,0,8">
-                                <TextBlock Text="{Binding SelectedTicket.CurrentWorkOrder}"
-                           Foreground="{DynamicResource TextPrimary}"
-                           VerticalAlignment="Center"/>
-
-                                <Border Margin="8,0,0,0"
-                        Padding="8,3"
-                        CornerRadius="10"
-                        Background="{DynamicResource SurfaceBg}"
-                        BorderBrush="{DynamicResource SurfaceBorder}"
-                        BorderThickness="1">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding SelectedTicket.CurrentWorkOrder}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding SelectedTicket.CurrentWorkOrder}" Value="{x:Null}">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-
-                                    <TextBlock Text="{Binding SelectedTicket.WorkOrderClassLabel}"
-                                               Foreground="{DynamicResource TextSecondary}"
-                                               FontSize="12"
-                                               VerticalAlignment="Center"/>
-                                </Border>
-                            </StackPanel>
-
-                            <TextBlock Grid.Row="4" Grid.Column="0"
-                                       Text="Created By"
-                                       Foreground="{DynamicResource TextSecondary}"
-                                       Margin="0,0,0,8"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1"
-                                       Text="{Binding SelectedTicketCreatedByDisplay}"
-                                       Foreground="{DynamicResource TextPrimary}"
-                                       Margin="0,0,0,8"/>
-
-                            <TextBlock Grid.Row="5" Grid.Column="0"
-                                       Text="Problem"
-                                       Foreground="{DynamicResource TextSecondary}"
-                                       Margin="0,0,0,8"/>
-                            <TextBlock Grid.Row="5" Grid.Column="1"
-                                       Text="{Binding SelectedTicket.Problem}"
-                                       Foreground="{DynamicResource TextPrimary}"
-                                       TextWrapping="Wrap"
-                                       Margin="0,0,0,8"/>
-
-                            <TextBlock Grid.Row="6" Grid.Column="0"
-                                       Text="Notification Name"
-                                       Foreground="{DynamicResource TextSecondary}"
-                                       Margin="0,0,0,8"/>
-                            <TextBlock Grid.Row="6" Grid.Column="1"
-                                       Text="{Binding SelectedTicket.NotificationName}"
-                                       Foreground="{DynamicResource TextPrimary}"
-                                       TextWrapping="Wrap"
-                                       Margin="0,0,0,8"/>
-
-                            <TextBlock Grid.Row="7" Grid.Column="0"
-                                       Text="Action Required"
-                                       Foreground="{DynamicResource TextSecondary}"/>
-                            <TextBlock Grid.Row="7" Grid.Column="1"
-                                       Text="{Binding SelectedTicket.ActionRequiredOverride}"
-                                       Foreground="{DynamicResource TextPrimary}"
-                                       TextWrapping="Wrap"/>
-                        </Grid>
-
-                        <!-- Notes + actions -->
-                        <Border Grid.Row="3"
-                                Background="{DynamicResource SurfaceBg}"
-                                BorderBrush="{DynamicResource SurfaceBorder}"
-                                BorderThickness="1"
-                                CornerRadius="12"
-                                Padding="12">
-
+                        <!-- Main info card -->
+                        <Border Grid.Row="2"
+                                Style="{StaticResource TicketDetailSectionCard}">
                             <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="12"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="12"/>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="12"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
-                                <TextBlock Grid.Row="0"
-                                           Text="Notes"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <!-- LEFT 1: Notification Name -->
+                                <StackPanel Grid.Row="0" Grid.Column="0">
+                                    <TextBlock Text="Notification Name"
+                                               Style="{StaticResource TicketDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTicket.NotificationName}"
+                                               Style="{StaticResource TicketDetailValueText}"/>
+                                </StackPanel>
 
-                                <Border Grid.Row="2"
-                                        MinHeight="220"
-                                        CornerRadius="10"
-                                        BorderThickness="1"
-                                        BorderBrush="{DynamicResource SurfaceBorder}"
-                                        Background="{DynamicResource SurfaceBg}">
+                                <!-- RIGHT 1: Problem / Issue -->
+                                <StackPanel Grid.Row="0" Grid.Column="2">
+                                    <TextBlock Text="Problem / Issue"
+                                               Style="{StaticResource TicketDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTicket.Problem}"
+                                               Style="{StaticResource TicketDetailValueText}"/>
+                                </StackPanel>
 
-                                    <TextBox x:Name="DetailsNotesTextBox"
-                                             Style="{x:Null}"
-                                             Text="{Binding SelectedTicket.Notes, UpdateSourceTrigger=PropertyChanged}"
-                                             AcceptsReturn="True"
-                                             TextWrapping="Wrap"
-                                             VerticalContentAlignment="Top"
-                                             HorizontalContentAlignment="Left"
-                                             VerticalAlignment="Stretch"
-                                             HorizontalAlignment="Stretch"
-                                             Padding="10"
-                                             BorderThickness="0"
-                                             Background="Transparent"
-                                             Foreground="{DynamicResource TextPrimary}"
-                                             VerticalScrollBarVisibility="Auto"
-                                             HorizontalScrollBarVisibility="Disabled"
-                                             TextChanged="DetailsNotesTextBox_TextChanged"/>
-                                </Border>
+                                <!-- LEFT 2: Notification -->
+                                <StackPanel Grid.Row="2" Grid.Column="0">
+                                    <TextBlock Text="Notification"
+                                               Style="{StaticResource TicketDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTicket.Notification}"
+                                               Style="{StaticResource TicketDetailValueText}"/>
+                                </StackPanel>
 
-                                <StackPanel Grid.Row="4"
-                                            Orientation="Horizontal"
-                                            HorizontalAlignment="Right">
-                                    <Button x:Name="EditTicketButton"
-                                            Content="Edit Ticket"
-                                            MinWidth="120"
-                                            Margin="0,0,8,0"
-                                            Click="EditTicket_Click"/>
+                                <!-- RIGHT 2: Work Order -->
+                                <StackPanel Grid.Row="2" Grid.Column="2">
+                                    <TextBlock Text="Work Order"
+                                               Style="{StaticResource TicketDetailLabelText}"/>
 
-                                    <Button x:Name="SaveTicketButton"
-                                            Content="Save"
-                                            MinWidth="100"
-                                            IsEnabled="False"
-                                            Click="SaveDetails_Click"/>
+                                    <StackPanel Orientation="Horizontal"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding SelectedTicket.CurrentWorkOrder}"
+                                                   Style="{StaticResource TicketDetailValueText}"
+                                                   VerticalAlignment="Center"/>
+
+                                        <Border>
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Setter Property="Margin" Value="8,0,0,0"/>
+                                                    <Setter Property="Padding" Value="8,3"/>
+                                                    <Setter Property="CornerRadius" Value="10"/>
+                                                    <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+                                                    <Setter Property="BorderThickness" Value="1"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SelectedTicket.CurrentWorkOrder}" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SelectedTicket.CurrentWorkOrder}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SelectedTicket.WorkOrderClassLabel}" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding SelectedTicket.WorkOrderClassLabel}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+
+                                            <TextBlock Text="{Binding SelectedTicket.WorkOrderClassLabel}"
+                                                       Foreground="{DynamicResource TextSecondary}"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- LEFT 3: Task Category -->
+                                <StackPanel Grid.Row="4" Grid.Column="0">
+                                    <TextBlock Text="Task Category"
+                                               Style="{StaticResource TicketDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTicket.TaskCategoryName}"
+                                               Style="{StaticResource TicketDetailValueText}"/>
+                                </StackPanel>
+
+                                <!-- RIGHT 3: Action Required -->
+                                <StackPanel Grid.Row="4" Grid.Column="2">
+                                    <TextBlock Text="Action Required"
+                                               Style="{StaticResource TicketDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTicket.ActionRequiredOverride}"
+                                               Style="{StaticResource TicketDetailValueText}"/>
+                                </StackPanel>
+
+                                <!-- LEFT 4: Last Activity -->
+                                <StackPanel Grid.Row="6" Grid.Column="0">
+                                    <TextBlock Text="Last Activity"
+                                               Style="{StaticResource TicketDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTicket.LastActivityAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"
+                                               Style="{StaticResource TicketDetailValueText}"/>
+                                </StackPanel>
+
+                                <!-- RIGHT 4: Created By -->
+                                <StackPanel Grid.Row="6" Grid.Column="2">
+                                    <TextBlock Text="Created By"
+                                               Style="{StaticResource TicketDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTicketCreatedByDisplay}"
+                                               Style="{StaticResource TicketDetailValueText}"/>
                                 </StackPanel>
                             </Grid>
                         </Border>
+
+                        <!-- Collapsible note sections -->
+                        <ScrollViewer Grid.Row="4"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+
+                                <!-- Site Notes -->
+                                <Expander x:Name="SiteNotesExpander"
+                                          IsExpanded="False"
+                                          Expanded="TicketDetailExpander_ExpandedChanged"
+                                          Collapsed="TicketDetailExpander_ExpandedChanged">
+                                    <Expander.Header>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Site Notes"
+                                                       VerticalAlignment="Center"/>
+
+                                            <Border Margin="8,0,0,0"
+                                                    MinWidth="17"
+                                                    Height="17"
+                                                    Padding="4,0"
+                                                    CornerRadius="11"
+                                                    Background="#D92D20"
+                                                    VerticalAlignment="Center">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding SelectedTicketSiteNotesCount}" Value="0">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+
+                                                <TextBlock Text="{Binding SelectedTicketSiteNotesCount}"
+                                                           FontSize="11"
+                                                           FontWeight="Bold"
+                                                           Foreground="White"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Expander.Header>
+                                    
+                                    <Border Style="{StaticResource TicketDetailSectionCard}"
+                                            Margin="0,8,0,0">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="8"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <Grid Grid.Row="0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Text="Reusable notes tied to this site."
+                                                           FontSize="11"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="{DynamicResource TextSecondary}"
+                                                           VerticalAlignment="Center"/>
+
+                                                <Button Grid.Column="1"
+                                                        Content="+ Add"
+                                                        Height="28"
+                                                        Width="60"
+                                                        Padding="12,0"
+                                                        Click="AddSelectedTicketSiteNote_Click">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding CanEditSelectedTicket}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </Grid>
+
+                                            <ItemsControl Grid.Row="2"
+                                                          ItemsSource="{Binding SelectedTicketSiteNotes}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Margin="0,0,0,8"
+                                                                Padding="10"
+                                                                CornerRadius="10"
+                                                                BorderBrush="{DynamicResource SurfaceBorder}"
+                                                                BorderThickness="1"
+                                                                Background="{DynamicResource SurfaceBg}">
+                                                            <Grid>
+                                                                <Grid.RowDefinitions>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                    <RowDefinition Height="8"/>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                    <RowDefinition Height="8"/>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                </Grid.RowDefinitions>
+
+                                                                <TextBlock Grid.Row="0"
+                                                                           Text="{Binding NoteText}"
+                                                                           TextWrapping="Wrap"
+                                                                           Foreground="{DynamicResource TextPrimary}"/>
+
+                                                                <TextBlock Grid.Row="2"
+                                                                           FontSize="11"
+                                                                           Foreground="{DynamicResource TextSecondary}">
+                                                                    <Run Text="Created by "/>
+                                                                    <Run Text="{Binding CreatedBy}"/>
+                                                                    <Run Text=" on "/>
+                                                                    <Run Text="{Binding CreatedAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"/>
+                                                                </TextBlock>
+
+                                                                <StackPanel Grid.Row="4"
+                                                                            Orientation="Horizontal"
+                                                                            HorizontalAlignment="Right">
+                                                                    <StackPanel.Style>
+                                                                        <Style TargetType="StackPanel">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding DataContext.CanEditSelectedTicket, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </StackPanel.Style>
+
+                                                                    <Button Content="Edit"
+                                                                            Height="24"
+                                                                            Width="48"
+                                                                            Padding="8,0"
+                                                                            Margin="0,0,6,0"
+                                                                            Tag="{Binding}"
+                                                                            Style="{StaticResource SecondaryButtonStyle}"
+                                                                            Click="EditSelectedTicketSiteNote_Click"/>
+
+                                                                    <Button Content="Delete"
+                                                                            Height="24"
+                                                                            Padding="8,0"
+                                                                            Tag="{Binding}"
+                                                                            Style="{StaticResource SecondaryButtonStyle}"
+                                                                            Click="DeleteSelectedTicketSiteNote_Click"/>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Grid>
+                                    </Border>
+                                </Expander>
+
+                                <!-- Dispatch Notes -->
+                                <Expander x:Name="DispatchNotesExpander"
+                                          Header="Dispatch Notes"
+                                          IsExpanded="False"
+                                          Margin="0,10,0,0"
+                                          Expanded="TicketDetailExpander_ExpandedChanged"
+                                          Collapsed="TicketDetailExpander_ExpandedChanged">
+                                    <Border Style="{StaticResource TicketDetailSectionCard}"
+                                            Margin="0,8,0,0">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="8"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Grid.Row="0"
+                                                       Text="Notes for remote troubleshooting, follow-up instructions, or things dispatch wants checked."
+                                                       FontSize="11"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource TextSecondary}"/>
+
+                                            <Border Grid.Row="2"
+                                                    CornerRadius="10"
+                                                    BorderThickness="1"
+                                                    BorderBrush="{DynamicResource SurfaceBorder}"
+                                                    Background="{DynamicResource SurfaceBg}">
+
+                                                <TextBox x:Name="DetailsDispatchNotesTextBox"
+                                                         Style="{x:Null}"
+                                                         Text="{Binding SelectedTicket.DispatchNotes, UpdateSourceTrigger=PropertyChanged}"
+                                                         AcceptsReturn="True"
+                                                         TextWrapping="Wrap"
+                                                         IsReadOnly="{Binding IsSelectedTicketClosed}"
+                                                         VerticalContentAlignment="Top"
+                                                         HorizontalContentAlignment="Left"
+                                                         VerticalAlignment="Stretch"
+                                                         HorizontalAlignment="Stretch"
+                                                         MinHeight="160"
+                                                         MaxHeight="328"
+                                                         Padding="10"
+                                                         BorderThickness="0"
+                                                         Background="Transparent"
+                                                         Foreground="{DynamicResource TextPrimary}"
+                                                         VerticalScrollBarVisibility="Auto"
+                                                         HorizontalScrollBarVisibility="Disabled"
+                                                         TextChanged="DetailsDispatchNotesTextBox_TextChanged"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </Expander>
+
+                                <!-- Tech Write-Ups -->
+                                <Expander x:Name="TechWriteUpsExpander"
+                                          Header="Tech Write-Ups"
+                                          IsExpanded="False"
+                                          Margin="0,10,0,0"
+                                          Expanded="TicketDetailExpander_ExpandedChanged"
+                                          Collapsed="TicketDetailExpander_ExpandedChanged">
+                                    <Border Style="{StaticResource TicketDetailSectionCard}"
+                                            Margin="0,8,0,0">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="8"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Grid.Row="0"
+                                                       Text="Technician write-up and ticket notes."
+                                                       FontSize="11"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource TextSecondary}"/>
+
+                                            <Border Grid.Row="2"
+                                                    CornerRadius="10"
+                                                    BorderThickness="1"
+                                                    BorderBrush="{DynamicResource SurfaceBorder}"
+                                                    Background="{DynamicResource SurfaceBg}">
+
+                                                <TextBox x:Name="DetailsTechWriteUpsTextBox"
+                                                         Style="{x:Null}"
+                                                         Text="{Binding SelectedTicket.Notes, UpdateSourceTrigger=PropertyChanged}"
+                                                         AcceptsReturn="True"
+                                                         TextWrapping="Wrap"
+                                                         IsReadOnly="{Binding IsSelectedTicketClosed}"
+                                                         VerticalContentAlignment="Top"
+                                                         HorizontalContentAlignment="Left"
+                                                         VerticalAlignment="Stretch"
+                                                         HorizontalAlignment="Stretch"
+                                                         MinHeight="160"
+                                                         MaxHeight="342"
+                                                         Padding="10"
+                                                         BorderThickness="0"
+                                                         Background="Transparent"
+                                                         Foreground="{DynamicResource TextPrimary}"
+                                                         VerticalScrollBarVisibility="Auto"
+                                                         HorizontalScrollBarVisibility="Disabled"
+                                                         TextChanged="DetailsTechWriteUpsTextBox_TextChanged"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </Expander>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Actions -->
+                        <Grid Grid.Row="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding SelectedTicketClosedLockText}"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center"/>
+
+                            <StackPanel Grid.Column="1"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Right">
+                                <Button x:Name="EditTicketButton"
+                                        Content="Edit Ticket"
+                                        Height="32"
+                                        MinWidth="120"
+                                        Margin="0,0,8,0"
+                                        Click="EditTicket_Click"/>
+
+                                <Button x:Name="SaveTicketButton"
+                                        Content="Save Notes"
+                                        Height="32"
+                                        MinWidth="110"
+                                        IsEnabled="False"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Click="SaveDetails_Click"/>
+                            </StackPanel>
+                        </Grid>
                     </Grid>
                 </Border>
             </Grid>

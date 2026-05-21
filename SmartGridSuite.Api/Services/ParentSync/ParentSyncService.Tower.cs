@@ -8,8 +8,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
 {
     public sealed partial class ParentSyncService
     {
-        public async Task<TowerDashboardRow?> GetTowerAsync(
-            int topNameId, CancellationToken cancellationToken = default)
+        public async Task<TowerDashboardRow?> GetTowerAsync(int topNameId, CancellationToken cancellationToken = default)
         {
             await using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync(cancellationToken);
@@ -95,7 +94,10 @@ namespace SmartGridSuite.Api.Services.ParentSync
             {
                 row.HistorySiteId,
                 row.TopName,
-                row.TopName?.Replace("_", "-")
+                row.TopName?.Replace("_", "-"),
+                row.TopName?.Replace("-", "_"),
+                row.TopName?.Replace("_", ""),
+                row.TopName?.Replace("-", "")
             }
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x!.Trim())
@@ -180,8 +182,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
             return row;
         }
 
-        public async Task<List<TowerSearchRow>> SearchTowersAsync(
-            string term, int take = 25, CancellationToken cancellationToken = default)
+        public async Task<List<TowerSearchRow>> SearchTowersAsync(string term, int take = 25, CancellationToken cancellationToken = default)
         {
             term = (term ?? "").Trim();
 
@@ -245,12 +246,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
             return results;
         }
 
-        private static string? BuildTowerFullAddress(
-            string? streetNo,
-            string? streetName,
-            string? city,
-            string? stateCode,
-            string? zipCode)
+        private static string? BuildTowerFullAddress(string? streetNo, string? streetName, string? city, string? stateCode, string? zipCode)
         {
             var line1 = string.Join(" ", new[] { streetNo, streetName }
                 .Where(x => !string.IsNullOrWhiteSpace(x)));

@@ -1,5 +1,9 @@
 ﻿using SmartGridSuite.Contracts.SiteDashboard;
 using SmartGridSuite.Contracts.Snmp;
+using SmartGridSuite.Client.Services;
+using SmartGridSuite.Contracts.SiteNotes;
+using System.Collections.ObjectModel;
+using System.Security.Principal;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -34,6 +38,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             InitializeComponent();
             WriteUpTextBox.TextChanged += WriteUpTextBox_TextChanged;
 
+            SiteNotesItemsControl.ItemsSource = _siteNotes;
+
             Reset();
         }
 
@@ -51,6 +57,24 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public event EventHandler? OpenTopTunnelRequested;
 
         private readonly List<TowerSectorPingCard> _towerPingCards = new();
+
+        private readonly ObservableCollection<SiteNoteDto> _siteNotes = new();
+        private readonly SiteNotesApi _siteNotesApi = new(new ApiClient("https://localhost:7140/"));
+        private int _siteNotesLoadVersion;
+
+        public static readonly DependencyProperty CanManageSiteNotesProperty = DependencyProperty.Register(
+            nameof(CanManageSiteNotes),
+            typeof(bool),
+            typeof(SiteDashboardWorkspaceView),
+            new PropertyMetadata(true));
+
+        public bool CanManageSiteNotes
+        {
+            get => (bool)GetValue(CanManageSiteNotesProperty);
+            set => SetValue(CanManageSiteNotesProperty, value);
+        }
+
+        public string CurrentSiteId { get; private set; } = "";
 
         public string CurrentCnpTechName { get; set; } = string.Empty;
                 
@@ -185,6 +209,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             TopTunnelIp = "—";
             CurrentTicketId = 0;
 
+            CurrentSiteId = "";
+            _siteNotes.Clear();
+            RefreshSiteNotesEmptyState();
+
             _snmpCategoryOptionsInitialized = false;
 
             IncludeSnmpStatsCheckBox.IsChecked = false;
@@ -225,6 +253,234 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             // SNMP
             ResetSnmp();
+        }
+
+        public async Task LoadSiteNotesAsync(string siteId, CancellationToken ct = default)
+        {
+            var requestedSiteId = (siteId ?? string.Empty).Trim().ToUpperInvariant();
+
+            CurrentSiteId = requestedSiteId;
+
+            var loadVersion = ++_siteNotesLoadVersion;
+
+            _siteNotes.Clear();
+            RefreshSiteNotesEmptyState();
+
+            if (string.IsNullOrWhiteSpace(requestedSiteId))
+                return;
+
+            try
+            {
+                var notes = await _siteNotesApi.GetBySiteAsync(requestedSiteId, ct);
+
+                if (ct.IsCancellationRequested)
+                    return;
+
+                if (loadVersion != _siteNotesLoadVersion)
+                    return;
+
+                if (!string.Equals(CurrentSiteId, requestedSiteId, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                _siteNotes.Clear();
+
+                foreach (var note in notes
+                             .GroupBy(x => x.Id)
+                             .Select(g => g.First())
+                             .OrderBy(x => x.NoteType)
+                             .ThenByDescending(x => x.UpdatedAt ?? x.CreatedAt))
+                {
+                    _siteNotes.Add(note);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                if (loadVersion != _siteNotesLoadVersion)
+                    return;
+
+                MessageBox.Show(
+                    $"Failed to load site notes.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+
+            RefreshSiteNotesEmptyState();
+        }
+
+        private void RefreshSiteNotesEmptyState()
+        {
+            var count = _siteNotes.Count;
+
+            if (SiteNotesEmptyTextBlock != null)
+            {
+                SiteNotesEmptyTextBlock.Visibility = count == 0
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
+            if (SiteNotesCountBadge != null)
+            {
+                SiteNotesCountBadge.Visibility = count > 0
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
+            if (SiteNotesCountTextBlock != null)
+            {
+                SiteNotesCountTextBlock.Text = count.ToString();
+            }
+        }
+
+        private string GetCurrentUserDisplayName()
+        {
+            var currentName = (CurrentCnpTechName ?? string.Empty).Trim();
+
+            if (!IsGenericUserName(currentName))
+                return currentName;
+
+            var fullName = Environment.GetEnvironmentVariable("FULLNAME")?.Trim();
+
+            if (!IsGenericUserName(fullName))
+                return fullName!;
+
+            var windowsName = WindowsIdentity.GetCurrent()?.Name;
+
+            if (!string.IsNullOrWhiteSpace(windowsName))
+            {
+                var cleanWindowsName = windowsName.Trim();
+
+                var slashIndex = cleanWindowsName.LastIndexOf('\\');
+                if (slashIndex >= 0 && slashIndex < cleanWindowsName.Length - 1)
+                    cleanWindowsName = cleanWindowsName[(slashIndex + 1)..];
+
+                if (!IsGenericUserName(cleanWindowsName))
+                    return cleanWindowsName;
+            }
+
+            return string.IsNullOrWhiteSpace(Environment.UserName)
+                ? "Unknown"
+                : Environment.UserName;
+        }
+
+        private static bool IsGenericUserName(string? value)
+        {
+            var clean = (value ?? string.Empty).Trim();
+
+            return string.IsNullOrWhiteSpace(clean)
+                || clean.Equals("Dispatcher", StringComparison.OrdinalIgnoreCase)
+                || clean.Equals("Dispatch", StringComparison.OrdinalIgnoreCase)
+                || clean.Equals("Unknown", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async void AddSiteNoteButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(CurrentSiteId))
+            {
+                MessageBox.Show(
+                    "Load a site before adding a site note.",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var win = new SiteNoteEditorWindow(CurrentSiteId)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (win.ShowDialog() != true)
+                return;
+
+            try
+            {
+                await _siteNotesApi.CreateAsync(new CreateSiteNoteRequest
+                {
+                    SiteId = CurrentSiteId,
+                    NoteType = win.NoteType,
+                    NoteText = win.NoteText,
+                    CreatedBy = GetCurrentUserDisplayName()
+                });
+
+                await LoadSiteNotesAsync(CurrentSiteId);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to add site note.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private async void EditSiteNoteButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button || button.Tag is not SiteNoteDto note)
+                return;
+
+            var win = new SiteNoteEditorWindow(CurrentSiteId, note)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (win.ShowDialog() != true)
+                return;
+
+            try
+            {
+                await _siteNotesApi.UpdateAsync(new UpdateSiteNoteRequest
+                {
+                    Id = note.Id,
+                    NoteType = win.NoteType,
+                    NoteText = win.NoteText,
+                    UpdatedBy = GetCurrentUserDisplayName()
+                });
+
+                await LoadSiteNotesAsync(CurrentSiteId);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to update site note.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private async void DeleteSiteNoteButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button || button.Tag is not SiteNoteDto note)
+                return;
+
+            var confirm = MessageBox.Show(
+                "Delete this site note?",
+                "Delete Site Note",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                await _siteNotesApi.DeleteAsync(note.Id, GetCurrentUserDisplayName());
+
+                await LoadSiteNotesAsync(CurrentSiteId);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to delete site note.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
     }
 }

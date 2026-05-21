@@ -37,11 +37,10 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 : Convert.ToInt32(result);
         }
 
-        private async Task<Dictionary<string, List<SiteHistoryPreviewRow>>> GetRecentSiteHistoryLookupAsync(
-            IEnumerable<string> siteIds,
+        private async Task<Dictionary<string, List<SiteHistoryPreviewRow>>> GetRecentSiteHistoryLookupAsync(IEnumerable<string> siteIds,
             CancellationToken cancellationToken = default)
         {
-            var distinctSiteIds = siteIds
+            var requestedCandidates = siteIds
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -49,18 +48,19 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
             var lookup = new Dictionary<string, List<SiteHistoryPreviewRow>>(StringComparer.OrdinalIgnoreCase);
 
-            if (distinctSiteIds.Count == 0)
-            {
+            if (requestedCandidates.Count == 0)
                 return lookup;
-            }
+
+            var normalizedSearchKeys = BuildSiteHistoryMatchKeys(requestedCandidates.ToArray());
+
+            if (normalizedSearchKeys.Count == 0)
+                return lookup;
 
             var conn = _appDb.Database.GetDbConnection();
             var shouldClose = conn.State != ConnectionState.Open;
 
             if (shouldClose)
-            {
                 await conn.OpenAsync(cancellationToken);
-            }
 
             try
             {
@@ -68,11 +68,12 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
                 var parameterNames = new List<string>();
 
-                for (var i = 0; i < distinctSiteIds.Count; i++)
+                for (var i = 0; i < normalizedSearchKeys.Count; i++)
                 {
                     var parameter = cmd.CreateParameter();
                     parameter.ParameterName = $"@p{i}";
-                    parameter.Value = distinctSiteIds[i];
+                    parameter.Value = normalizedSearchKeys[i];
+
                     cmd.Parameters.Add(parameter);
                     parameterNames.Add(parameter.ParameterName);
                 }
@@ -87,8 +88,16 @@ namespace SmartGridSuite.Api.Services.ParentSync
                         issue_text AS IssueText,
                         narrative
                     FROM site_history
-                    WHERE site_id IN ({string.Join(", ", parameterNames)})
-                    ORDER BY site_id, visit_date DESC, history_id DESC;
+                    WHERE UPPER(
+                        REPLACE(
+                        REPLACE(
+                        REPLACE(
+                        REPLACE(TRIM(site_id), '_', ''),
+                                               '-', ''),
+                                               ' ', ''),
+                                               '.', '')
+                    ) IN ({string.Join(", ", parameterNames)})
+                    ORDER BY visit_date DESC, history_id DESC;
                     """;
 
                 var allRows = new List<SiteHistoryPreviewRow>();
@@ -109,9 +118,38 @@ namespace SmartGridSuite.Api.Services.ParentSync
                     });
                 }
 
-                foreach (var group in allRows.GroupBy(x => x.SiteId, StringComparer.OrdinalIgnoreCase))
+                var rowsByNormalizedSiteId = allRows
+                    .GroupBy(x => NormalizeSiteHistoryKey(x.SiteId), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x
+                            .OrderByDescending(r => r.VisitDate ?? DateTime.MinValue)
+                            .ThenByDescending(r => r.HistoryId)
+                            .ToList(),
+                        StringComparer.OrdinalIgnoreCase);
+
+                foreach (var candidate in requestedCandidates)
                 {
-                    lookup[group.Key] = group.ToList();
+                    var candidateKeys = BuildSiteHistoryMatchKeys(candidate);
+
+                    var candidateRows = candidateKeys
+                        .Where(rowsByNormalizedSiteId.ContainsKey)
+                        .SelectMany(key => rowsByNormalizedSiteId[key])
+                        .GroupBy(x => x.HistoryId)
+                        .Select(x => x.First())
+                        .OrderByDescending(x => x.VisitDate ?? DateTime.MinValue)
+                        .ThenByDescending(x => x.HistoryId)
+                        .ToList();
+
+                    if (candidateRows.Count == 0)
+                        continue;
+
+                    // Preserve old behavior: callers can still ask by the original candidate text.
+                    lookup[candidate] = candidateRows;
+
+                    // Also allow lookup by normalized form.
+                    foreach (var key in candidateKeys)
+                        lookup[key] = candidateRows;
                 }
 
                 return lookup;
@@ -119,10 +157,48 @@ namespace SmartGridSuite.Api.Services.ParentSync
             finally
             {
                 if (shouldClose)
-                {
                     await conn.CloseAsync();
+            }
+        }
+
+        private static List<string> BuildSiteHistoryMatchKeys(params string?[] values)
+        {
+            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var value in values)
+            {
+                var key = NormalizeSiteHistoryKey(value);
+
+                if (string.IsNullOrWhiteSpace(key))
+                    continue;
+
+                keys.Add(key);
+
+                // MR flexibility:
+                // 2837MR should also match older rows stored as 2837.
+                if (key.EndsWith("MR", StringComparison.OrdinalIgnoreCase) &&
+                    key.Length > 2)
+                {
+                    keys.Add(key[..^2]);
                 }
             }
+
+            return keys.ToList();
+        }
+
+        private static string NormalizeSiteHistoryKey(string? value)
+        {
+            var text = (value ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            return text
+                .Replace("_", "")
+                .Replace("-", "")
+                .Replace(" ", "")
+                .Replace(".", "")
+                .ToUpperInvariant();
         }
 
         private static string? GetString(SqlDataReader reader, string columnName)

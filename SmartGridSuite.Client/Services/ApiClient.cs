@@ -2,6 +2,8 @@
 using SmartGridSuite.Contracts.SiteDashboard;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Net;
+using System.Text.Json;
 
 namespace SmartGridSuite.Client.Services
 {
@@ -33,9 +35,7 @@ namespace SmartGridSuite.Client.Services
         public Task<T?> GetAsync<T>(string path, CancellationToken ct = default)
             => _http.GetFromJsonAsync<T>(path, ct);
 
-        public async Task<TResponse?> PostAsync<TRequest, TResponse>(
-            string path,
-            TRequest body,
+        public async Task<TResponse?> PostAsync<TRequest, TResponse>(string path, TRequest body,
             CancellationToken ct = default)
         {
             using var resp = await _http.PostAsJsonAsync(path, body, ct);
@@ -54,12 +54,10 @@ namespace SmartGridSuite.Client.Services
                 throw new ApiException((int)resp.StatusCode, text);
             }
 
-            return await resp.Content.ReadFromJsonAsync<TResponse>(cancellationToken: ct);
+            return await ReadJsonOrDefaultAsync<TResponse>(resp, ct); 
         }
 
-        public async Task PutAsync<TRequest>(
-            string path,
-            TRequest body,
+        public async Task PutAsync<TRequest>(string path, TRequest body,
             CancellationToken ct = default)
         {
             using var resp = await _http.PutAsJsonAsync(path, body, ct);
@@ -79,9 +77,7 @@ namespace SmartGridSuite.Client.Services
             }
         }
 
-        public async Task<TResponse?> PutAsync<TRequest, TResponse>(
-            string path,
-            TRequest body,
+        public async Task<TResponse?> PutAsync<TRequest, TResponse>(string path, TRequest body,
             CancellationToken ct = default)
         {
             using var resp = await _http.PutAsJsonAsync(path, body, ct);
@@ -100,11 +96,10 @@ namespace SmartGridSuite.Client.Services
                 throw new ApiException((int)resp.StatusCode, text);
             }
 
-            return await resp.Content.ReadFromJsonAsync<TResponse>(cancellationToken: ct);
+            return await ReadJsonOrDefaultAsync<TResponse>(resp, ct);
         }
 
-        public async Task<SiteDashboardResponseDto?> GetSiteDashboardAsync(
-            string siteId,
+        public async Task<SiteDashboardResponseDto?> GetSiteDashboardAsync(string siteId,
             CancellationToken cancellationToken = default)
         {
             siteId = (siteId ?? string.Empty).Trim();
@@ -214,6 +209,24 @@ namespace SmartGridSuite.Client.Services
             return await GetAsync<SiteDashboardResponseDto>(
                 $"api/site-dashboard/tower-dashboard/{topNameId}",
                 ct);
+        }
+
+        private static async Task<TResponse?> ReadJsonOrDefaultAsync<TResponse>(HttpResponseMessage resp, CancellationToken ct)
+        {
+            if (resp.StatusCode == HttpStatusCode.NoContent)
+                return default;
+
+            var text = await resp.Content.ReadAsStringAsync(ct);
+
+            if (string.IsNullOrWhiteSpace(text))
+                return default;
+
+            return JsonSerializer.Deserialize<TResponse>(
+                text,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
         }
     }
 }

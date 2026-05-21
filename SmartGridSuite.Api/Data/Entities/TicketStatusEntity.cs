@@ -23,6 +23,9 @@ namespace SmartGridSuite.Api.Data.Entities
         [Column("is_closed")]
         public bool IsClosed { get; set; }
 
+        [Column("is_field_complete")]
+        public bool IsFieldComplete { get; set; }
+
         [Column("show_in_filter")]
         public bool ShowInFilter { get; set; }
 

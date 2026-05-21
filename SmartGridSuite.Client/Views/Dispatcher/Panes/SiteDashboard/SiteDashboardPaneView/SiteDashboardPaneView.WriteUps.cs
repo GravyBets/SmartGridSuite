@@ -59,6 +59,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 await _ticketsApi.SubmitWriteUpAsync(
                     targetTicketId,
                     e.FinalWriteUpText,
+                    e.SiteHistoryWriteUpText,
                     submittedBy: Environment.UserName,
                     CancellationToken.None);
 
@@ -87,30 +88,46 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 await RefreshTicketInfoAsync(session, ct);
 
+                session.SelectedWorkspaceTabKey = "SiteHistory";
+
                 if (session.SessionKey == _selectedSessionKey)
                     RenderSelectedSession();
 
                 return;
             }
 
-            // Stop anything that might still be running.
             WorkspaceView.StopTowerPings();
 
-            // Clear session-only/temporary state before reload.
             ClearSessionTemporaryDashboardState(session);
 
-            var dashboard = await _api.GetSiteDashboardAsync(reloadId, ct);
-            var loadedSiteId = GetObjectPropertyText(dashboard, "SiteId") ?? reloadId;
+            try
+            {
+                var dashboard = await GetSiteOrTowerDashboardAsync(reloadId, ct);
+                var loadedSiteId = GetObjectPropertyText(dashboard, "SiteId") ?? reloadId;
 
-            ApplyDashboardToSession(session, dashboard, loadedSiteId);
+                ApplyDashboardToSession(session, dashboard, loadedSiteId);
 
-            // Reload SNMP config fresh, but no poll results.
-            await RefreshSnmpConfigAsync(session, ct);
+                if (ShouldLoadSnmpForDashboard(session))
+                {
+                    await RefreshSnmpConfigAsync(session, ct);
+                }
+                else
+                {
+                    ClearSnmpForUnsupportedDashboard(session);
+                }
+            }
+            catch (Exception ex) when (IsDashboardNotFoundException(ex))
+            {
+                // This handles brand-new/blank sites that do not exist in the parent DB yet.
+                var blankSiteId = ResolveBlankDashboardSiteId(reloadId);
 
-            // Reload ticket info fresh.
+                ApplyBlankDashboardToSession(session, blankSiteId);
+
+                session.SelectedWorkspaceTabKey = "SiteHistory";
+            }
+
             await RefreshTicketInfoAsync(session, ct);
 
-            // After submit, show the newly-added history row.
             session.SelectedWorkspaceTabKey = "SiteHistory";
 
             if (session.SessionKey == _selectedSessionKey)

@@ -15,11 +15,12 @@ namespace SmartGridSuite.Contracts.Tickets
         DateTime CreatedAt,
         DateTime LastActivityAt,
         string? CurrentWorkOrder,
-        string? WorkOrderClass, // "Maint" or "Cap"
-        string GroupCode,       // HRM2/HRC1/...
-        int PriorityDays,       // 1/3/5/15
+        string? WorkOrderClass,
+        string GroupCode,
+        int PriorityDays,
         string Problem,
         string Notes,
-        string CreatedBy
+        string CreatedBy,
+        string DispatchNotes = ""
     );
 }

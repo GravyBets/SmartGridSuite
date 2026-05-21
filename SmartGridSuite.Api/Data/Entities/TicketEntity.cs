@@ -17,6 +17,8 @@
         public int PriorityDays { get; set; }
         public string Problem { get; set; } = "";
         public string? Notes { get; set; }
+
+        public string? DispatchNotes { get; set; }
         public string CreatedBy { get; set; } = "";
         public uint? AssignedCrewId { get; set; }
 

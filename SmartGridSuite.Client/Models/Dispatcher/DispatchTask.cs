@@ -1,43 +1,90 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 
 namespace SmartGridSuite.Client.Models.Dispatcher
 {
     public class DispatchTask : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        private void OnPropertyChanged([CallerMemberName] string? name = null)
+        {
+            if (!string.IsNullOrWhiteSpace(name))
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+
+        private static string Clean(string? value)
+        {
+            return value?.Trim() ?? "";
+        }
+
+        private long _ticketId;
+        public long TicketId
+        {
+            get => _ticketId;
+            set
+            {
+                if (_ticketId == value) return;
+
+                _ticketId = value;
+                OnPropertyChanged();
+            }
+        }
 
         private DateTime _occurredAt = DateTime.Now;
         public DateTime OccurredAt
         {
             get => _occurredAt;
-            set { _occurredAt = value; OnPropertyChanged(nameof(OccurredAt)); }
+            set
+            {
+                if (_occurredAt == value) return;
+
+                _occurredAt = value;
+                OnPropertyChanged();
+            }
         }
 
         private string _site = "";
         public string Site
         {
             get => _site;
-            set { _site = value; OnPropertyChanged(nameof(Site)); }
+            set
+            {
+                var cleaned = Clean(value);
+                if (_site == cleaned) return;
+
+                _site = cleaned;
+                OnPropertyChanged();
+            }
         }
 
         private string _tech = "";
         public string Tech
         {
             get => _tech;
-            set { _tech = value; OnPropertyChanged(nameof(Tech)); }
+            set
+            {
+                var cleaned = Clean(value);
+                if (_tech == cleaned) return;
+
+                _tech = cleaned;
+                OnPropertyChanged();
+            }
         }
 
         private string _notification = "";
         public string Notification
         {
             get => _notification;
-            set { _notification = value; OnPropertyChanged(nameof(Notification)); }
+            set
+            {
+                var cleaned = Clean(value);
+                if (_notification == cleaned) return;
+
+                _notification = cleaned;
+                OnPropertyChanged();
+            }
         }
 
         private string _workOrder = "";
@@ -46,55 +93,100 @@ namespace SmartGridSuite.Client.Models.Dispatcher
             get => _workOrder;
             set
             {
-                _workOrder = value ?? "";
-                OnPropertyChanged(nameof(WorkOrder));
+                var cleaned = Clean(value);
+                if (_workOrder == cleaned) return;
+
+                _workOrder = cleaned;
+                OnPropertyChanged();
                 OnPropertyChanged(nameof(WorkOrderClassLabel));
             }
         }
 
-        private WorkOrderClass _workOrderClass = WorkOrderClass.Maintenance;
+        private WorkOrderClass _workOrderClass = WorkOrderClass.Unknown;
         public WorkOrderClass WorkOrderClass
         {
             get => _workOrderClass;
             set
             {
+                if (_workOrderClass == value) return;
+
                 _workOrderClass = value;
-                OnPropertyChanged(nameof(WorkOrderClass));
+                OnPropertyChanged();
                 OnPropertyChanged(nameof(WorkOrderClassLabel));
             }
         }
 
         public string WorkOrderClassLabel
-            => string.IsNullOrWhiteSpace(WorkOrder)
-                ? ""
-                : (WorkOrderClass == WorkOrderClass.Capital ? "Cap." : "Maint.");
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(WorkOrder))
+                    return "";
+
+                return WorkOrderClass switch
+                {
+                    WorkOrderClass.Capital => "Cap.",
+                    WorkOrderClass.Maintenance => "Maint.",
+                    WorkOrderClass.Distribution => "Dist.",
+                    _ => ""
+                };
+            }
+        }
 
         private string _actionRequired = "";
         public string ActionRequired
         {
             get => _actionRequired;
-            set { _actionRequired = value; OnPropertyChanged(nameof(ActionRequired)); }
+            set
+            {
+                var cleaned = Clean(value);
+                if (_actionRequired == cleaned) return;
+
+                _actionRequired = cleaned;
+                OnPropertyChanged();
+            }
         }
 
         private string _notes = "";
         public string Notes
         {
             get => _notes;
-            set { _notes = value; OnPropertyChanged(nameof(Notes)); }
+            set
+            {
+                var cleaned = value ?? "";
+                if (_notes == cleaned) return;
+
+                _notes = cleaned;
+                OnPropertyChanged();
+            }
         }
 
         private string _status = "Open";
         public string Status
         {
             get => _status;
-            set { _status = value; OnPropertyChanged(nameof(Status)); }
+            set
+            {
+                var cleaned = Clean(value);
+                if (_status == cleaned) return;
+
+                _status = cleaned;
+                OnPropertyChanged();
+            }
         }
 
-        private string _category = "All";
+        private string _category = "";
         public string Category
         {
             get => _category;
-            set { _category = value; OnPropertyChanged(nameof(Category)); }
+            set
+            {
+                var cleaned = Clean(value);
+                if (_category == cleaned) return;
+
+                _category = cleaned;
+                OnPropertyChanged();
+            }
         }
     }
 }

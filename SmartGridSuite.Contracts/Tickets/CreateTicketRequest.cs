@@ -5,15 +5,16 @@
         string NotificationName,
         string Notification,
         string? WorkOrder,
-        string WorkOrderClass,   // "Maint" or "Cap" (ignored if WorkOrder null/empty)
-        string GroupCode,        // HRM2/HRC1/...
-        int PriorityDays,        // 1/3/5/15
+        string WorkOrderClass,
+        string GroupCode,
+        int PriorityDays,
         string Status,
         ulong? TaskCategoryId,
         string? ActionRequiredOverride,
         string AssignedTech,
         string Problem,
         string Notes,
-        string CreatedBy
+        string CreatedBy,
+        string? DispatchNotes = null
     );
 }

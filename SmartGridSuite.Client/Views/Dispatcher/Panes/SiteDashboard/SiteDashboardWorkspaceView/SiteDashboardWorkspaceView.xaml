@@ -100,8 +100,8 @@
         </Style>
 
         <Style x:Key="TopAccessValueBoxStyle"
-       TargetType="TextBox"
-       BasedOn="{StaticResource WorkspaceEditorBoxStyle}">
+               TargetType="TextBox"
+               BasedOn="{StaticResource WorkspaceEditorBoxStyle}">
             <Setter Property="Width" Value="88"/>
             <Setter Property="Height" Value="30"/>
             <Setter Property="Padding" Value="10,0"/>
@@ -193,7 +193,9 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <!-- LEFT: TOP card -->
+                            <!-- LEFT: TOP + Site Notes -->
+                        <StackPanel Grid.Column="0"
+                                        VerticalAlignment="Top">
                             <Border Grid.Column="0" Style="{StaticResource Card}">
                                 <Grid>
                                     <Grid.RowDefinitions>
@@ -356,6 +358,154 @@
                                     </Grid>                                    
                                 </Grid>
                             </Border>
+                            
+                            <!-- Site Notes -->
+                            <Border x:Name="SiteNotesCard" Margin="0,8,0,0"
+                                    Style="{StaticResource Card}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="2"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="8"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="6"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Note count bubble -->
+                                        <Border x:Name="SiteNotesCountBadge"
+                                                Grid.Column="0"
+                                                MinWidth="22"
+                                                Height="22"
+                                                Padding="6,0"
+                                                CornerRadius="11"
+                                                Background="#D92D20"
+                                                Visibility="Collapsed"
+                                                VerticalAlignment="Center">
+                                            <TextBlock x:Name="SiteNotesCountTextBlock"
+                                                       Text="0"
+                                                       FontSize="12"
+                                                       FontWeight="Bold"
+                                                       Foreground="White"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <TextBlock Grid.Column="2"
+                                                   Text="Site Notes / Access Info"
+                                                   Style="{StaticResource WorkspaceSectionHeaderStyle}"
+                                                   VerticalAlignment="Center"/>
+
+                                        <Button Grid.Column="3"
+                                                Content="+ Add"
+                                                Height="28"
+                                                Width="60"
+                                                Padding="8,0,0,0"
+                                                Click="AddSiteNoteButton_Click">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding CanManageSiteNotes, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </Grid>
+
+                                    <TextBlock Grid.Row="2"
+                                               x:Name="SiteNotesEmptyTextBlock"
+                                               Text="No site notes for this site."
+                                               TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextSecondary}"/>
+
+                                    <ScrollViewer Grid.Row="4"
+                                                  MaxHeight="210"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsControl x:Name="SiteNotesItemsControl">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Margin="0,0,0,0"
+                                                            Padding="8"
+                                                            CornerRadius="8"
+                                                            BorderBrush="{DynamicResource SurfaceBorder}"
+                                                            BorderThickness="1"
+                                                            Background="{DynamicResource SurfaceBg}">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="8"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="8"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+
+                                                            <!-- Note text -->
+                                                            <TextBlock Grid.Row="0"
+                                                                       Text="{Binding NoteText}"
+                                                                       TextWrapping="Wrap"
+                                                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                                                            <!-- Created by status -->
+                                                            <TextBlock Grid.Row="2"
+                                                                       FontSize="11"
+                                                                       Foreground="{DynamicResource TextSecondary}">
+                                                                <Run Text="Created by "/>
+                                                                <Run Text="{Binding CreatedBy}"/>
+                                                                <Run Text=" on "/>
+                                                                <Run Text="{Binding CreatedAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"/>
+                                                            </TextBlock>
+
+                                                            <!-- Dispatcher-only actions -->
+                                                            <StackPanel Grid.Row="4"
+                                                                        Orientation="Horizontal"
+                                                                        HorizontalAlignment="Right">
+                                                                <StackPanel.Style>
+                                                                    <Style TargetType="StackPanel">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding CanManageSiteNotes, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </StackPanel.Style>
+
+                                                                <Button Content="Edit"
+                                                                        Height="24"
+                                                                        Width="48"
+                                                                        Padding="8,0"
+                                                                        Margin="0,0,6,0"
+                                                                        Tag="{Binding}"
+                                                                        Style="{StaticResource SecondaryButtonStyle}"
+                                                                        Click="EditSiteNoteButton_Click"/>
+
+                                                                <Button Content="Delete"
+                                                                        Height="24"
+                                                                        Padding="8,0"
+                                                                        Tag="{Binding}"
+                                                                        Style="{StaticResource SecondaryButtonStyle}"
+                                                                        Click="DeleteSiteNoteButton_Click"/>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
 
                         <!-- RIGHT: Ticket card -->
                         <Border Grid.Column="2"

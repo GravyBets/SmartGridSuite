@@ -18,6 +18,33 @@ namespace SmartGridSuite.Api.Controllers
             _db = db;
         }
 
+        private static readonly string[] RequiredTicketStatuses =
+        {
+            "Open",
+            "Assigned",
+            "In Progress",
+            "Waiting Dispatch",
+            "Needs Review",
+            "Closed"
+        };
+
+        private static bool IsRequiredTicketStatus(string? statusName)
+        {
+            var clean = (statusName ?? string.Empty).Trim();
+
+            return RequiredTicketStatuses.Contains(
+                clean,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static bool IsClosedRequiredStatus(string? statusName)
+        {
+            return string.Equals(
+                (statusName ?? string.Empty).Trim(),
+                "Closed",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
         [HttpGet("statuses")]
         public async Task<ActionResult<List<TicketStatusDto>>> GetStatuses(CancellationToken ct)
         {
@@ -61,8 +88,7 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPost("statuses")]
-        public async Task<ActionResult<TicketStatusDto>> CreateStatus(
-                [FromBody] CreateTicketStatusRequest request,
+        public async Task<ActionResult<TicketStatusDto>> CreateStatus([FromBody] CreateTicketStatusRequest request,
                 CancellationToken ct)
                     {
                         var name = (request.Name ?? "").Trim();
@@ -105,9 +131,7 @@ namespace SmartGridSuite.Api.Controllers
                     }
 
         [HttpPut("statuses/{id:long}")]
-        public async Task<ActionResult<TicketStatusDto>> UpdateStatus(
-            ulong id,
-            [FromBody] UpdateTicketStatusRequest request,
+        public async Task<ActionResult<TicketStatusDto>> UpdateStatus(ulong id, [FromBody] UpdateTicketStatusRequest request,
             CancellationToken ct)
         {
             if (id != request.Id)
@@ -123,6 +147,35 @@ namespace SmartGridSuite.Api.Controllers
 
             if (entity == null)
                 return NotFound();
+
+            var existingName = (entity.Name ?? string.Empty).Trim();
+
+            if (IsRequiredTicketStatus(existingName))
+            {
+                if (!string.Equals(existingName, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest(
+                        $"'{existingName}' is required by SmartGridSuite and cannot be renamed.");
+                }
+
+                if (!request.IsActive)
+                {
+                    return BadRequest(
+                        $"'{existingName}' is required by SmartGridSuite and cannot be deactivated.");
+                }
+
+                if (IsClosedRequiredStatus(existingName) && !request.IsClosed)
+                {
+                    return BadRequest(
+                        "'Closed' is required by SmartGridSuite and must remain marked as a closed status.");
+                }
+
+                if (!IsClosedRequiredStatus(existingName) && request.IsClosed)
+                {
+                    return BadRequest(
+                        $"'{existingName}' is required by SmartGridSuite and cannot be marked as a closed status.");
+                }
+            }
 
             var duplicateExists = await _db.TicketStatuses
                 .AsNoTracking()
@@ -163,6 +216,12 @@ namespace SmartGridSuite.Api.Controllers
             if (entity == null)
                 return NotFound();
 
+            if (IsRequiredTicketStatus(entity.Name))
+            {
+                return BadRequest(
+                    $"'{entity.Name}' is required by SmartGridSuite and cannot be deactivated.");
+            }
+
             entity.IsActive = false;
             entity.SendToDispatchTasks = false;
 
@@ -172,8 +231,7 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPost("task-categories")]
-        public async Task<ActionResult<TicketTaskCategoryDto>> CreateTaskCategory(
-                    [FromBody] CreateTicketTaskCategoryRequest request,
+        public async Task<ActionResult<TicketTaskCategoryDto>> CreateTaskCategory([FromBody] CreateTicketTaskCategoryRequest request,
                     CancellationToken ct)
         {
             var name = (request.Name ?? "").Trim();
@@ -216,9 +274,7 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPut("task-categories/{id:long}")]
-        public async Task<ActionResult<TicketTaskCategoryDto>> UpdateTaskCategory(
-            ulong id,
-            [FromBody] UpdateTicketTaskCategoryRequest request,
+        public async Task<ActionResult<TicketTaskCategoryDto>> UpdateTaskCategory(ulong id, [FromBody] UpdateTicketTaskCategoryRequest request,
             CancellationToken ct)
         {
             if (id != request.Id)

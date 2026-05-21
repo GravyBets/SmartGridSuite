@@ -7,7 +7,13 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Threading; 
+using System.Windows.Threading;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Runtime.CompilerServices;
+using SmartGridSuite.Contracts.SiteNotes;
+using SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard;
+using System.Security.Principal;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
@@ -15,7 +21,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
     {
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-        
 
         public sealed class StatusFilterOption : INotifyPropertyChanged
         {
@@ -47,9 +52,29 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private readonly TechniciansApi _techniciansApi;        
         private readonly HashSet<string> _knownTechs = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _createdByDisplayByUserId = new(StringComparer.OrdinalIgnoreCase);
-        private string _selectedTicketOriginalNotes = "";
+        private string _selectedTicketOriginalDispatchNotes = "";
         private bool _isSummaryExpanded;
         private bool _isSummaryLoading;
+
+        private readonly SiteNotesApi _siteNotesApi = new(new ApiClient("https://localhost:7140/"));
+
+        private readonly ObservableCollection<SiteNoteDto> _selectedTicketSiteNotes = new();
+        public int SelectedTicketSiteNotesCount => _selectedTicketSiteNotes.Count;
+
+        private string _selectedTicketOriginalTechNotes = "";
+
+        private enum TicketQuickFilter
+        {
+            None,
+            MissingProblems,
+            Unassigned,
+            ReadyToAssign,
+            Assigned
+        }
+
+        private TicketQuickFilter _activeQuickFilter = TicketQuickFilter.None;
+
+        private bool _detailsOpen;
 
         private readonly DispatcherTimer _searchDebounceTimer;
 
@@ -67,16 +92,48 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 if (ReferenceEquals(_selectedTicket, value)) return;
 
                 _selectedTicket = value;
-                _selectedTicketOriginalNotes = value?.Notes ?? "";
+
+                _selectedTicketOriginalTechNotes = value?.Notes ?? "";
+                _selectedTicketOriginalDispatchNotes = value?.DispatchNotes ?? "";
 
                 OnPropertyChanged(nameof(SelectedTicket));
                 OnPropertyChanged(nameof(SelectedTicketCreatedByDisplay));
+                OnPropertyChanged(nameof(IsSelectedTicketClosed));
+                OnPropertyChanged(nameof(CanEditSelectedTicket));
+                OnPropertyChanged(nameof(SelectedTicketClosedLockText));
+
+                _ = LoadSiteNotesForSelectedTicketAsync();
+
+                Dispatcher.BeginInvoke(new Action(CollapseTicketDetailExpanders),
+                    DispatcherPriority.Background);
 
                 UpdateSaveDetailsButtonState();
             }
         }
         public string SelectedTicketCreatedByDisplay
                     => ResolveCreatedByDisplay(SelectedTicket?.CreatedBy);
+
+        public ObservableCollection<SiteNoteDto> SelectedTicketSiteNotes => _selectedTicketSiteNotes;
+
+        public bool IsSelectedTicketClosed
+        {
+            get
+            {
+                var status = SelectedTicket?.Status ?? "";
+
+                return status.Equals("Closed", StringComparison.OrdinalIgnoreCase)
+                    || status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                    || status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
+                    || status.Equals("Canceled", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        public bool CanEditSelectedTicket => SelectedTicket != null && !IsSelectedTicketClosed;
+
+        public string SelectedTicketClosedLockText =>
+            IsSelectedTicketClosed
+                ? "This ticket is closed. Reopen it before editing notes."
+                : "";
 
         private bool _suppressFilterEvents;
         private bool _hasLoadedOnce;
@@ -245,6 +302,124 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             Loaded += TicketsPaneView_Loaded;
         }
 
+        private async void AddSelectedTicketSiteNote_Click(object sender, RoutedEventArgs e)
+        {
+            if (!CanEditSelectedTicket || SelectedTicket == null)
+                return;
+
+            var site = SelectedTicket.Site?.Trim();
+
+            if (string.IsNullOrWhiteSpace(site))
+                return;
+
+            await LoadKnownTechsFromApiAsync();
+
+            var win = new SiteNoteEditorWindow(site)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (win.ShowDialog() != true)
+                return;
+
+            try
+            {
+                await _siteNotesApi.CreateAsync(new CreateSiteNoteRequest
+                {
+                    SiteId = site,
+                    NoteType = "General",
+                    NoteText = win.NoteText,
+                    CreatedBy = GetCurrentUserDisplayName()
+                });
+
+                await LoadSiteNotesForSelectedTicketAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to add site note.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private async void EditSelectedTicketSiteNote_Click(object sender, RoutedEventArgs e)
+        {
+            if (!CanEditSelectedTicket)
+                return;
+
+            if (sender is not Button button || button.Tag is not SiteNoteDto note)
+                return;
+
+            await LoadKnownTechsFromApiAsync();
+
+            var site = SelectedTicket?.Site?.Trim() ?? "";
+
+            var win = new SiteNoteEditorWindow(site, note)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (win.ShowDialog() != true)
+                return;
+
+            try
+            {
+                await _siteNotesApi.UpdateAsync(new UpdateSiteNoteRequest
+                {
+                    Id = note.Id,
+                    NoteType = "General",
+                    NoteText = win.NoteText,
+                    UpdatedBy = GetCurrentUserDisplayName()
+                });
+
+                await LoadSiteNotesForSelectedTicketAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to update site note.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private async void DeleteSelectedTicketSiteNote_Click(object sender, RoutedEventArgs e)
+        {
+            if (!CanEditSelectedTicket)
+                return;
+
+            if (sender is not Button button || button.Tag is not SiteNoteDto note)
+                return;
+
+            await LoadKnownTechsFromApiAsync();
+
+            var confirm = MessageBox.Show(
+                "Delete this site note?",
+                "Delete Site Note",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                await _siteNotesApi.DeleteAsync(note.Id, GetCurrentUserDisplayName());
+                await LoadSiteNotesForSelectedTicketAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to delete site note.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
         private void SearchDebounceTimer_Tick(object? sender, EventArgs e)
         {
             _searchDebounceTimer.Stop();
@@ -285,7 +460,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 _isInitialLoadRunning = false;
             }
         }
-
         
         private void RebuildTechFilterFromKnownTechs()
         {
@@ -326,11 +500,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     var userId =
                         TryReadStringProperty(tech, "UserId", "UserName", "Username", "WindowsUserName", "NetworkUserId", "Login", "SamAccountName")?.Trim();
 
+                    var employeeId =
+                        TryReadStringProperty(tech, "EmployeeId", "EmployeeID", "EmpId", "BadgeNumber")?.Trim();
+
                     if (!string.IsNullOrWhiteSpace(displayName))
+                    {
                         _knownTechs.Add(displayName);
 
-                    if (!string.IsNullOrWhiteSpace(userId) && !string.IsNullOrWhiteSpace(displayName))
-                        _createdByDisplayByUserId[userId] = displayName;
+                        AddCreatedByDisplayAlias(displayName, displayName);
+                        AddCreatedByDisplayAlias(userId, displayName);
+                        AddCreatedByDisplayAlias(employeeId, displayName);
+                    }
                 }
 
                 RebuildTechFilterFromKnownTechs();
@@ -376,7 +556,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-
         private async Task LoadSummaryFromApiAsync(CancellationToken ct = default)
         {
             var dtos = await _ticketsApi.GetTicketsAsync(
@@ -400,12 +579,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private static DispatchTicket Map(TicketListItemDto dto)
         {
             var rawWorkOrderType = (dto.WorkOrderClass ?? "").Trim();
-
-            var woClass =
-                rawWorkOrderType.Equals("Cap", StringComparison.OrdinalIgnoreCase) ||
-                rawWorkOrderType.Equals("Capital", StringComparison.OrdinalIgnoreCase)
-                    ? WorkOrderClass.Capital
-                    : WorkOrderClass.Maintenance;
+            var woClass = ParseWorkOrderClass(rawWorkOrderType);
 
             return new DispatchTicket
             {
@@ -424,12 +598,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 PriorityDays = dto.PriorityDays,
                 Problem = dto.Problem ?? "",
                 Notes = dto.Notes ?? "",
+                DispatchNotes = dto.DispatchNotes ?? "",
                 CreatedBy = dto.CreatedBy ?? "",
                 Summary = dto.Problem ?? "",
                 TaskCategoryId = dto.TaskCategoryId,
                 TaskCategoryName = dto.TaskCategoryName ?? "",
                 ActionRequiredOverride = dto.ActionRequiredOverride ?? ""
             };
+        }
+
+        private static WorkOrderClass ParseWorkOrderClass(string? value)
+        {
+            var v = (value ?? "").Trim();
+
+            if (v.Equals("Cap", StringComparison.OrdinalIgnoreCase) ||
+                v.Equals("Capital", StringComparison.OrdinalIgnoreCase))
+                return WorkOrderClass.Capital;
+
+            if (v.Equals("Maint", StringComparison.OrdinalIgnoreCase) ||
+                v.Equals("Maintenance", StringComparison.OrdinalIgnoreCase))
+                return WorkOrderClass.Maintenance;
+
+            if (v.Equals("Dist", StringComparison.OrdinalIgnoreCase) ||
+                v.Equals("Distribution", StringComparison.OrdinalIgnoreCase))
+                return WorkOrderClass.Distribution;
+
+            return WorkOrderClass.Unknown;
         }
 
         private string ResolveCreatedByDisplay(string? createdBy)
@@ -445,7 +639,46 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return display;
             }
 
+            var normalizedKey = NormalizeUserLookupKey(key);
+
+            if (_createdByDisplayByUserId.TryGetValue(normalizedKey, out display) &&
+                !string.IsNullOrWhiteSpace(display))
+            {
+                return display;
+            }
+
             return key;
+        }
+
+        private static string NormalizeUserLookupKey(string? value)
+        {
+            var clean = (value ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(clean))
+                return "";
+
+            clean = clean.Replace("/", "\\");
+
+            var slashIndex = clean.LastIndexOf('\\');
+            if (slashIndex >= 0 && slashIndex < clean.Length - 1)
+                clean = clean[(slashIndex + 1)..];
+
+            return clean.Trim();
+        }
+
+        private void AddCreatedByDisplayAlias(string? key, string? displayName)
+        {
+            var cleanDisplay = (displayName ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(cleanDisplay))
+                return;
+
+            var cleanKey = (key ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(cleanKey))
+                _createdByDisplayByUserId[cleanKey] = cleanDisplay;
+
+            var normalizedKey = NormalizeUserLookupKey(key);
+            if (!string.IsNullOrWhiteSpace(normalizedKey))
+                _createdByDisplayByUserId[normalizedKey] = cleanDisplay;
         }
 
         private static string? TryReadStringProperty(object obj, params string[] propertyNames)
@@ -502,6 +735,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (!selectedStatuses.Contains(t.Status ?? ""))
                 return false;
 
+            if (!PassesQuickFilter(t))
+                return false;
+
             // Tech
             var tech = TechFilter?.SelectedItem as string ?? "All";
             if (tech == "(Unassigned)" && t.AssignedTech != "(Unassigned)")
@@ -550,7 +786,41 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                    Match(t.Problem) ||
                    Match(t.Summary) ||
                    Match(t.Notes) ||
+                   Match(t.DispatchNotes) ||
                    Match(t.CreatedBy);
+        }
+
+        private bool PassesQuickFilter(DispatchTicket ticket)
+        {
+            return _activeQuickFilter switch
+            {
+                TicketQuickFilter.MissingProblems =>
+                    string.IsNullOrWhiteSpace(ticket.Problem),
+
+                TicketQuickFilter.Unassigned =>
+                    IsUnassigned(ticket),
+
+                TicketQuickFilter.ReadyToAssign =>
+                    IsReadyToAssign(ticket),
+
+                TicketQuickFilter.Assigned =>
+                    string.Equals(ticket.Status, "Assigned", StringComparison.OrdinalIgnoreCase),
+
+                _ => true
+            };
+        }
+
+        private static bool IsUnassigned(DispatchTicket ticket)
+        {
+            return string.IsNullOrWhiteSpace(ticket.AssignedTech)
+                || string.Equals(ticket.AssignedTech, "(Unassigned)", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsReadyToAssign(DispatchTicket ticket)
+        {
+            return string.Equals(ticket.Status, "Open", StringComparison.OrdinalIgnoreCase)
+                && IsUnassigned(ticket)
+                && !string.IsNullOrWhiteSpace(ticket.Site);
         }
 
         private void RefreshView()
@@ -562,6 +832,102 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private void UpdateVisibleTicketCount()
         {
             VisibleTicketCount = TicketsView.Cast<DispatchTicket>().Count();
+            UpdateTicketListUiState();
+        }
+
+        private void UpdateTicketListUiState()
+        {
+            var selectedCount = TicketsGrid?.SelectedItems
+                .OfType<DispatchTicket>()
+                .Count() ?? 0;
+
+            if (BulkSetProblemButton != null)
+                BulkSetProblemButton.IsEnabled = selectedCount > 0;
+
+            if (AssignSelectedButton != null)
+                AssignSelectedButton.IsEnabled = selectedCount > 0;
+
+            if (ClearSelectionButton != null)
+                ClearSelectionButton.IsEnabled = selectedCount > 0;
+
+            if (SelectVisibleTicketsButton != null)
+                SelectVisibleTicketsButton.IsEnabled = VisibleTicketCount > 0;
+
+            if (SelectedCountTextBlock != null)
+            {
+                SelectedCountTextBlock.Text = selectedCount == 0
+                    ? ""
+                    : $"{selectedCount} selected";
+            }
+
+            if (MissingProblemsButton != null)
+            {
+                MissingProblemsButton.Content = IsQuickFilterActive(TicketQuickFilter.MissingProblems)
+                    ? "Showing Missing"
+                    : "Missing Problems";
+            }
+
+            if (UnassignedTicketsButton != null)
+            {
+                UnassignedTicketsButton.Content = IsQuickFilterActive(TicketQuickFilter.Unassigned)
+                    ? "Showing Unassigned"
+                    : "Unassigned";
+            }
+
+            if (ReadyToAssignButton != null)
+            {
+                ReadyToAssignButton.Content = IsQuickFilterActive(TicketQuickFilter.ReadyToAssign)
+                    ? "Showing Ready"
+                    : "Ready to Assign";
+            }
+
+            if (AssignedTicketsButton != null)
+            {
+                AssignedTicketsButton.Content = IsQuickFilterActive(TicketQuickFilter.Assigned)
+                    ? "Showing Assigned"
+                    : "Assigned";
+            }
+
+            var hasQuickFilter = _activeQuickFilter != TicketQuickFilter.None;
+            var quickFilterName = GetActiveQuickFilterDisplayName();
+
+            if (ClearMissingProblemsButton != null)
+            {
+                ClearMissingProblemsButton.Visibility = hasQuickFilter
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
+            if (MissingProblemsBadge != null)
+            {
+                MissingProblemsBadge.Visibility = hasQuickFilter
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
+            if (MissingProblemsBadgeText != null)
+            {
+                MissingProblemsBadgeText.Text = hasQuickFilter
+                    ? $"{VisibleTicketCount} {quickFilterName.ToLower()} ticket(s)"
+                    : "";
+            }
+        }
+
+        private string GetActiveQuickFilterDisplayName()
+        {
+            return _activeQuickFilter switch
+            {
+                TicketQuickFilter.MissingProblems => "Missing Problems",
+                TicketQuickFilter.Unassigned => "Unassigned",
+                TicketQuickFilter.ReadyToAssign => "Ready to Assign",
+                TicketQuickFilter.Assigned => "Assigned",
+                _ => ""
+            };
+        }
+
+        private bool IsQuickFilterActive(TicketQuickFilter filter)
+        {
+            return _activeQuickFilter == filter;
         }
 
         private void SetSelectedStatuses(params string[] statusNames)
@@ -600,20 +966,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void UpdateDetailsVisibility()
         {
-            if (SelectedTicket == null)
+            if (!_detailsOpen || SelectedTicket == null)
             {
                 DetailsPanel.Visibility = Visibility.Collapsed;
                 DetailsSplitter.Visibility = Visibility.Collapsed;
                 DetailsSplitterCol.Width = new GridLength(0);
                 DetailsCol.Width = new GridLength(0);
+                return;
             }
-            else
-            {
-                DetailsSplitterCol.Width = new GridLength(10);
-                DetailsCol.Width = new GridLength(440);
-                DetailsSplitter.Visibility = Visibility.Visible;
-                DetailsPanel.Visibility = Visibility.Visible;
-            }
+
+            DetailsSplitterCol.Width = new GridLength(10);
+            DetailsCol.Width = new GridLength(500);
+            DetailsSplitter.Visibility = Visibility.Visible;
+            DetailsPanel.Visibility = Visibility.Visible;
         }
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)
@@ -684,6 +1049,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _suppressFilterEvents = true;
             try
             {
+                _activeQuickFilter = TicketQuickFilter.None;
+
                 SearchBox.Text = string.Empty;
                 DateRangeFilter.SelectedIndex = 0;
                 TechFilter.SelectedItem = "All";
@@ -711,16 +1078,43 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private void TicketsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             SelectedTicket = TicketsGrid.SelectedItem as DispatchTicket;
+
+            // Single-click should only select/highlight.
+            // It should not open the details pane.
+            UpdateDetailsVisibility();
+            UpdateTicketListUiState();
+        }
+
+        private void TicketsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (IsInsideButton(e.OriginalSource as DependencyObject))
+                return;
+
+            var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+            if (row?.Item is not DispatchTicket ticket)
+                return;
+
+            TicketsGrid.SelectedItem = ticket;
+            SelectedTicket = ticket;
+
+            _detailsOpen = true;
             UpdateDetailsVisibility();
         }
 
         private async void CloseDetails_Click(object sender, RoutedEventArgs e)
         {
+            _detailsOpen = false;
+
             TicketsGrid.SelectedItem = null;
             SelectedTicket = null;
-            _selectedTicketOriginalNotes = "";
+            _selectedTicketOriginalTechNotes = "";
+            _selectedTicketOriginalDispatchNotes = "";
+            _selectedTicketSiteNotes.Clear();
+
             UpdateDetailsVisibility();
             UpdateSaveDetailsButtonState();
+            UpdateTicketListUiState();
+
             await LoadTicketsFromApiAsync();
         }
 
@@ -782,6 +1176,123 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 await LoadTicketsFromApiAsync();
         }
 
+        private void MissingProblems_Click(object sender, RoutedEventArgs e)
+        {
+            ApplyQuickFilter(
+                TicketQuickFilter.MissingProblems,
+                "Needs Review",
+                "Open",
+                "Assigned",
+                "In Progress",
+                "Waiting Dispatch");
+        }
+
+        private void UnassignedTickets_Click(object sender, RoutedEventArgs e)
+        {
+            ApplyQuickFilter(
+                TicketQuickFilter.Unassigned,
+                "Needs Review",
+                "Open",
+                "Assigned",
+                "In Progress",
+                "Waiting Dispatch");
+        }
+
+        private void ReadyToAssign_Click(object sender, RoutedEventArgs e)
+        {
+            ApplyQuickFilter(
+                TicketQuickFilter.ReadyToAssign,
+                "Open");
+        }
+
+        private void AssignedTickets_Click(object sender, RoutedEventArgs e)
+        {
+            ApplyQuickFilter(
+                TicketQuickFilter.Assigned,
+                "Assigned");
+        }
+
+        private void ClearQuickFilter_Click(object sender, RoutedEventArgs e)
+        {
+            _activeQuickFilter = TicketQuickFilter.None;
+
+            _suppressFilterEvents = true;
+            try
+            {
+                SearchBox.Text = string.Empty;
+                DateRangeFilter.SelectedIndex = 0;
+                TechFilter.SelectedItem = "All";
+
+                FromDatePicker.SelectedDate = null;
+                ToDatePicker.SelectedDate = null;
+
+                SetSelectedStatuses(
+                    "Needs Review",
+                    "Open",
+                    "Assigned",
+                    "In Progress",
+                    "Waiting Dispatch");
+            }
+            finally
+            {
+                _suppressFilterEvents = false;
+            }
+
+            UpdateCustomDateVisibility();
+            OnPropertyChanged(nameof(SelectedStatusesSummary));
+            RefreshView();
+        }
+
+        private void SelectVisibleTickets_Click(object sender, RoutedEventArgs e)
+        {
+            TicketsGrid.SelectedItems.Clear();
+
+            foreach (var ticket in TicketsView.Cast<DispatchTicket>())
+                TicketsGrid.SelectedItems.Add(ticket);
+
+            UpdateTicketListUiState();
+        }
+
+        private void ClearSelection_Click(object sender, RoutedEventArgs e)
+        {
+            TicketsGrid.SelectedItems.Clear();
+            SelectedTicket = null;
+            UpdateDetailsVisibility();
+            UpdateTicketListUiState();
+        }
+
+        private void ApplyQuickFilter(TicketQuickFilter quickFilter, params string[] statusesToShow)
+        {
+            _activeQuickFilter = quickFilter;
+
+            _suppressFilterEvents = true;
+            try
+            {
+                SearchBox.Text = string.Empty;
+                DateRangeFilter.SelectedIndex = 0;
+                TechFilter.SelectedItem = "All";
+
+                FromDatePicker.SelectedDate = null;
+                ToDatePicker.SelectedDate = null;
+
+                SetSelectedStatuses(statusesToShow);
+            }
+            finally
+            {
+                _suppressFilterEvents = false;
+            }
+
+            UpdateCustomDateVisibility();
+            RefreshView();
+        }
+
+        private List<DispatchTicket> GetSelectedTickets()
+        {
+            return TicketsGrid.SelectedItems
+                .OfType<DispatchTicket>()
+                .ToList();
+        }
+
         private async void SaveDetails_Click(object sender, RoutedEventArgs e)
         {
             if (SelectedTicket == null)
@@ -804,7 +1315,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     : SelectedTicket.ActionRequiredOverride,
                 AssignedTech: SelectedTicket.AssignedTech ?? "(Unassigned)",
                 Problem: SelectedTicket.Problem ?? "",
-                Notes: SelectedTicket.Notes ?? ""
+                Notes: SelectedTicket.Notes ?? "",
+                DispatchNotes: SelectedTicket.DispatchNotes ?? ""
             );
 
             SaveTicketButton.IsEnabled = false;
@@ -822,7 +1334,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     TicketsGrid.ScrollIntoView(found);
                 }
 
-                _selectedTicketOriginalNotes = found?.Notes ?? "";
+                _selectedTicketOriginalTechNotes = found?.Notes ?? "";
+                _selectedTicketOriginalDispatchNotes = found?.DispatchNotes ?? "";
                 UpdateSaveDetailsButtonState();
             }
             catch (ApiClient.ApiException ex) when (ex.StatusCode == 400)
@@ -891,14 +1404,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (SaveTicketButton == null)
                 return;
 
-            if (SelectedTicket == null)
+            if (SelectedTicket == null || IsSelectedTicketClosed)
             {
                 SaveTicketButton.IsEnabled = false;
                 return;
             }
 
-            var currentNotes = SelectedTicket.Notes ?? "";
-            SaveTicketButton.IsEnabled = !string.Equals(currentNotes, _selectedTicketOriginalNotes, StringComparison.Ordinal);
+            var currentTechNotes = SelectedTicket.Notes ?? "";
+            var currentDispatchNotes = SelectedTicket.DispatchNotes ?? "";
+
+            var techNotesChanged =
+                !string.Equals(currentTechNotes, _selectedTicketOriginalTechNotes, StringComparison.Ordinal);
+
+            var dispatchNotesChanged =
+                !string.Equals(currentDispatchNotes, _selectedTicketOriginalDispatchNotes, StringComparison.Ordinal);
+
+            SaveTicketButton.IsEnabled = techNotesChanged || dispatchNotesChanged;
+        }
+
+        private void DetailsDispatchNotesTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdateSaveDetailsButtonState();
+        }
+
+        private void DetailsTechWriteUpsTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdateSaveDetailsButtonState();
         }
 
         private void DetailsNotesTextChangedRefresh()
@@ -947,6 +1478,356 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 _isSummaryLoading = false;
                 SummaryToggleButton.IsEnabled = true;
             }
+        }
+
+        private async void BulkSetProblem_Click(object sender, RoutedEventArgs e)
+        {
+            var selected = GetSelectedTickets();
+
+            if (selected.Count == 0)
+            {
+                MessageBox.Show(
+                    "Select one or more tickets first.",
+                    "Set Problem",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var win = new BulkSetProblemWindow(selected.Count)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (win.ShowDialog() != true)
+                return;
+
+            var problem = win.Problem;
+            var updated = 0;
+            var failed = 0;
+            var selectedIds = selected.Select(t => t.Id).ToHashSet();
+
+            BulkSetProblemButton.IsEnabled = false;
+            AssignSelectedButton.IsEnabled = false;
+            SelectVisibleTicketsButton.IsEnabled = false;
+            ClearSelectionButton.IsEnabled = false;
+
+            try
+            {
+                foreach (var ticket in selected)
+                {
+                    try
+                    {
+                        var req = new UpdateTicketRequest(
+                            Site: ticket.Site ?? "",
+                            NotificationName: ticket.NotificationName ?? "",
+                            Notification: ticket.Notification ?? "",
+                            WorkOrder: string.IsNullOrWhiteSpace(ticket.CurrentWorkOrder) ? null : ticket.CurrentWorkOrder,
+                            WorkOrderClass: ticket.WorkOrderType ?? "",
+                            GroupCode: ticket.GroupCode ?? "",
+                            PriorityDays: ticket.PriorityDays,
+                            Status: ticket.Status ?? "",
+                            TaskCategoryId: ticket.TaskCategoryId,
+                            ActionRequiredOverride: string.IsNullOrWhiteSpace(ticket.ActionRequiredOverride)
+                                ? null
+                                : ticket.ActionRequiredOverride,
+                            AssignedTech: ticket.AssignedTech ?? "(Unassigned)",
+                            Problem: problem,
+                            Notes: ticket.Notes ?? "",
+                            DispatchNotes: ticket.DispatchNotes ?? ""
+                        );
+
+                        await _ticketsApi.UpdateTicketAsync(ticket.Id, req);
+                        updated++;
+                    }
+                    catch
+                    {
+                        failed++;
+                    }
+                }
+
+                await LoadTicketsFromApiAsync();
+
+                if (_activeQuickFilter != TicketQuickFilter.MissingProblems)
+                {
+                    foreach (var ticket in _tickets.Where(t => selectedIds.Contains(t.Id)))
+                        TicketsGrid.SelectedItems.Add(ticket);
+
+                    var first = _tickets.FirstOrDefault(t => selectedIds.Contains(t.Id));
+                    if (first != null)
+                    {
+                        TicketsGrid.SelectedItem = first;
+                        TicketsGrid.ScrollIntoView(first);
+                    }
+                }
+                else
+                {
+                    TicketsGrid.SelectedItems.Clear();
+                    SelectedTicket = null;
+                    UpdateDetailsVisibility();
+                }
+
+                var message = failed == 0
+                    ? _activeQuickFilter == TicketQuickFilter.MissingProblems
+                    ? $"Updated {updated} ticket(s). They were removed from the Missing Problems view."
+                        : $"Updated {updated} ticket(s)."
+                        : $"Updated {updated} ticket(s). Failed to update {failed}.";
+
+                MessageBox.Show(
+                    message,
+                    "Set Problem",
+                    MessageBoxButton.OK,
+                    failed == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            }
+            finally
+            {
+                UpdateTicketListUiState();
+            }
+        }
+
+        private async void AssignSelected_Click(object sender, RoutedEventArgs e)
+        {
+            var selected = GetSelectedTickets();
+
+            if (selected.Count == 0)
+            {
+                MessageBox.Show(
+                    "Select one or more tickets first.",
+                    "Assign Tickets",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            await LoadKnownTechsFromApiAsync();
+
+            var win = new AssignTicketsWindow(selected.Count, _knownTechs)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (win.ShowDialog() != true)
+                return;
+
+            var assignedTech = win.AssignedTech;
+            var updated = 0;
+            var failed = 0;
+            var selectedIds = selected.Select(t => t.Id).ToHashSet();
+
+            BulkSetProblemButton.IsEnabled = false;
+            AssignSelectedButton.IsEnabled = false;
+            SelectVisibleTicketsButton.IsEnabled = false;
+            ClearSelectionButton.IsEnabled = false;
+
+            try
+            {
+                foreach (var ticket in selected)
+                {
+                    try
+                    {
+                        var req = new UpdateTicketRequest(
+                            Site: ticket.Site ?? "",
+                            NotificationName: ticket.NotificationName ?? "",
+                            Notification: ticket.Notification ?? "",
+                            WorkOrder: string.IsNullOrWhiteSpace(ticket.CurrentWorkOrder) ? null : ticket.CurrentWorkOrder,
+                            WorkOrderClass: ticket.WorkOrderType ?? "",
+                            GroupCode: ticket.GroupCode ?? "",
+                            PriorityDays: ticket.PriorityDays,
+                            Status: "Assigned",
+                            TaskCategoryId: ticket.TaskCategoryId,
+                            ActionRequiredOverride: string.IsNullOrWhiteSpace(ticket.ActionRequiredOverride)
+                                ? null
+                                : ticket.ActionRequiredOverride,
+                            AssignedTech: assignedTech,
+                            Problem: ticket.Problem ?? "",
+                            Notes: ticket.Notes ?? ""
+                        );
+
+                        await _ticketsApi.UpdateTicketAsync(ticket.Id, req);
+                        updated++;
+                    }
+                    catch
+                    {
+                        failed++;
+                    }
+                }
+
+                await LoadTicketsFromApiAsync();
+
+                foreach (var ticket in _tickets.Where(t => selectedIds.Contains(t.Id)))
+                    TicketsGrid.SelectedItems.Add(ticket);
+
+                var first = _tickets.FirstOrDefault(t => selectedIds.Contains(t.Id));
+                if (first != null)
+                {
+                    TicketsGrid.SelectedItem = first;
+                    TicketsGrid.ScrollIntoView(first);
+                }
+
+                var message = failed == 0
+                    ? $"Assigned {updated} ticket(s) to {assignedTech}."
+                    : $"Assigned {updated} ticket(s) to {assignedTech}. Failed to update {failed}.";
+
+                MessageBox.Show(
+                    message,
+                    "Assign Tickets",
+                    MessageBoxButton.OK,
+                    failed == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            }
+            finally
+            {
+                UpdateTicketListUiState();
+            }
+        }
+
+        private static bool IsInsideButton(DependencyObject? source)
+        {
+            return FindVisualParent<Button>(source) != null;
+        }
+
+        private static T? FindVisualParent<T>(DependencyObject? source)
+            where T : DependencyObject
+        {
+            while (source != null)
+            {
+                if (source is T match)
+                    return match;
+
+                source = VisualTreeHelper.GetParent(source);
+            }
+
+            return null;
+        }
+
+        private async Task LoadSiteNotesForSelectedTicketAsync()
+        {
+            _selectedTicketSiteNotes.Clear();
+            OnPropertyChanged(nameof(SelectedTicketSiteNotesCount));
+
+            var site = SelectedTicket?.Site?.Trim();
+
+            if (string.IsNullOrWhiteSpace(site))
+                return;
+
+            try
+            {
+                var notes = await _siteNotesApi.GetBySiteAsync(site);
+
+                foreach (var note in notes)
+                    _selectedTicketSiteNotes.Add(note);
+
+                OnPropertyChanged(nameof(SelectedTicketSiteNotesCount));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to load site notes.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private string GetCurrentUserDisplayName()
+        {
+            var candidates = new[]
+            {
+                Environment.GetEnvironmentVariable("FULLNAME"),
+                WindowsIdentity.GetCurrent()?.Name,
+                Environment.UserName
+            };
+
+            foreach (var candidate in candidates)
+            {
+                var clean = (candidate ?? string.Empty).Trim();
+
+                if (string.IsNullOrWhiteSpace(clean))
+                    continue;
+
+                var resolved = ResolveCreatedByDisplay(clean);
+
+                if (!string.IsNullOrWhiteSpace(resolved) &&
+                    !string.Equals(resolved, clean, StringComparison.OrdinalIgnoreCase))
+                {
+                    return resolved;
+                }
+            }
+
+            var fullName = Environment.GetEnvironmentVariable("FULLNAME")?.Trim();
+            if (!string.IsNullOrWhiteSpace(fullName))
+                return fullName;
+
+            var windowsName = WindowsIdentity.GetCurrent()?.Name;
+            if (!string.IsNullOrWhiteSpace(windowsName))
+                return NormalizeUserLookupKey(windowsName);
+
+            return string.IsNullOrWhiteSpace(Environment.UserName)
+                ? "Unknown"
+                : Environment.UserName;
+        }
+
+        private void CollapseTicketDetailExpanders()
+        {
+            if (SiteNotesExpander != null)
+                SiteNotesExpander.IsExpanded = false;
+
+            if (DispatchNotesExpander != null)
+                DispatchNotesExpander.IsExpanded = false;
+
+            if (TechWriteUpsExpander != null)
+                TechWriteUpsExpander.IsExpanded = false;
+
+            UpdateTicketDetailTextBoxHeights();
+        }
+
+        private void TicketDetailExpander_ExpandedChanged(object sender, RoutedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(
+                new Action(UpdateTicketDetailTextBoxHeights),
+                DispatcherPriority.Background);
+        }
+
+        private void UpdateTicketDetailTextBoxHeights()
+        {
+            if (DetailsDispatchNotesTextBox == null || DetailsTechWriteUpsTextBox == null)
+                return;
+
+            var expandedCount = 0;
+
+            if (SiteNotesExpander?.IsExpanded == true)
+                expandedCount++;
+
+            if (DispatchNotesExpander?.IsExpanded == true)
+                expandedCount++;
+
+            if (TechWriteUpsExpander?.IsExpanded == true)
+                expandedCount++;
+
+            var dispatchHeight = expandedCount switch
+            {
+                0 => double.NaN,
+                1 => 360,
+                2 => 280,
+                _ => 210
+            };
+
+            var techHeight = expandedCount switch
+            {
+                0 => double.NaN,
+                1 => 430,
+                2 => 320,
+                _ => 240
+            };
+
+            DetailsDispatchNotesTextBox.Height =
+                DispatchNotesExpander?.IsExpanded == true
+                    ? dispatchHeight
+                    : double.NaN;
+
+            DetailsTechWriteUpsTextBox.Height =
+                TechWriteUpsExpander?.IsExpanded == true
+                    ? techHeight
+                    : double.NaN;
         }
     }
 }

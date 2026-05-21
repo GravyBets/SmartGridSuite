@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SmartGridSuite.Contracts.Tickets;
 using SmartGridSuite.Contracts.Dispatcher;
+using System.Security;
 
 
 namespace SmartGridSuite.Client.Services
@@ -83,6 +84,16 @@ namespace SmartGridSuite.Client.Services
             return await _api.GetAsync<List<DispatchTaskListItemDto>>("api/tickets/dispatch-tasks", ct) ?? new();
         }
 
+        public async Task<long> ResolveDispatchTaskAsync(long ticketId, CancellationToken ct = default)
+        {
+            var res = await _api.PostAsync<object, UpdateTicketResponse>(
+                $"api/tickets/{ticketId}/resolve-dispatch-task",
+                new { },
+                ct);
+
+            return res?.Id ?? 0;
+        }
+
         // Request Capital
         public async Task RequestCapitalAsync(long id, string reason, string requestedBy = "Unknown", CancellationToken ct = default)
         {
@@ -157,13 +168,15 @@ namespace SmartGridSuite.Client.Services
         }
 
         //Add Write-Up to Ticket
-        public async Task SubmitWriteUpAsync(long ticketId, string finalWriteUpText, string submittedBy = "Unknown", CancellationToken ct = default)
+        public async Task SubmitWriteUpAsync(long ticketId, string finalWriteUpText, string siteHistoryWriteUpText, string submittedBy = "Unknown",
+            CancellationToken ct = default)
         {
             await _api.PostAsync<SubmitTicketWriteUpRequest, UpdateTicketResponse>(
                 $"api/tickets/{ticketId}/submit-writeup",
                 new SubmitTicketWriteUpRequest
                 {
                     FinalWriteUpText = finalWriteUpText ?? string.Empty,
+                    SiteHistoryWriteUpText = siteHistoryWriteUpText ?? string.Empty,
                     SubmittedBy = submittedBy ?? "Unknown"
                 },
                 ct);

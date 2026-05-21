@@ -89,6 +89,13 @@ public sealed class NewTicketDraft : INotifyPropertyChanged
     private string _notes = "";
     public string Notes { get => _notes; set => SetField(ref _notes, value ?? ""); }
 
+    private string _dispatchNotes = "";
+    public string DispatchNotes
+    {
+        get => _dispatchNotes;
+        set => SetField(ref _dispatchNotes, value ?? "");
+    }
+
     private string _createdBy = "";
     public string CreatedBy { get => _createdBy; set => SetField(ref _createdBy, value ?? ""); }
 }

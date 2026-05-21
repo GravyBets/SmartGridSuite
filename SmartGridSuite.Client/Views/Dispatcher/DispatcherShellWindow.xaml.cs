@@ -12,6 +12,7 @@ namespace SmartGridSuite.Client.Views
         private bool _navCollapsed;
         private bool _syncingNav;
         private SiteDashboardPaneView? _siteDashboardPaneView;
+        private DailyAssignmentsPaneView? _dailyAssignmentsPaneView;
 
         private readonly ApiClient _api = new("https://localhost:7140");
 
@@ -77,6 +78,11 @@ namespace SmartGridSuite.Client.Views
         {
             switch (GetNavKey(item))
             {
+                case "Site Dashboard":
+                    _siteDashboardPaneView ??= new SiteDashboardPaneView();
+                    MainPaneHost.Content = _siteDashboardPaneView;
+                    break;
+
                 case "Tasks":
                     MainPaneHost.Content = new TaskPaneView();
                     break;
@@ -89,13 +95,14 @@ namespace SmartGridSuite.Client.Views
                     MainPaneHost.Content = new TechniciansPaneView();
                     break;
 
-                case "Site Dashboard":
-                    _siteDashboardPaneView ??= new SiteDashboardPaneView();
-                    MainPaneHost.Content = _siteDashboardPaneView;
+                case "Daily Assignments":
+                    _dailyAssignmentsPaneView ??= new DailyAssignmentsPaneView();
+                    MainPaneHost.Content = _dailyAssignmentsPaneView;
                     break;
 
                 default:
-                    MainPaneHost.Content = new DashboardPaneView();
+                    _siteDashboardPaneView ??= new SiteDashboardPaneView();
+                    MainPaneHost.Content = _siteDashboardPaneView;
                     break;
             }
         }
@@ -134,8 +141,6 @@ namespace SmartGridSuite.Client.Views
             var home = new ModuleLauncherWindow();
             home.Show();
             Close();
-        }
-
-       
+        }       
     }
 }

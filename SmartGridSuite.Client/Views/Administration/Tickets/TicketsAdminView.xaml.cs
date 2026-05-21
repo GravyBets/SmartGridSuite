@@ -87,9 +87,13 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
         private void UpdateStatusButtons()
         {
             var hasSelection = SelectedStatus != null;
+            var isSystemRequired = IsSystemRequiredStatus(SelectedStatus?.Name);
 
             EditStatusButton.IsEnabled = hasSelection;
-            DeactivateStatusButton.IsEnabled = hasSelection && SelectedStatus?.IsActive == true;
+            DeactivateStatusButton.IsEnabled =
+                hasSelection &&
+                SelectedStatus?.IsActive == true &&
+                !isSystemRequired;
         }
 
         private async void AddStatus_Click(object sender, RoutedEventArgs e)
@@ -170,6 +174,16 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
         {
             if (SelectedStatus == null)
                 return;
+
+            if (IsSystemRequiredStatus(SelectedStatus.Name))
+            {
+                MessageBox.Show(
+                    GetSystemRequiredStatusMessage(SelectedStatus.Name),
+                    "Protected Status",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
 
             var confirm = MessageBox.Show(
                 $"Deactivate '{SelectedStatus.Name}'?",
@@ -305,6 +319,23 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
+        }
+
+        private static bool IsSystemRequiredStatus(string? statusName)
+        {
+            var clean = (statusName ?? "").Trim();
+
+            return clean.Equals("Open", StringComparison.OrdinalIgnoreCase)
+                || clean.Equals("Assigned", StringComparison.OrdinalIgnoreCase)
+                || clean.Equals("In Progress", StringComparison.OrdinalIgnoreCase)
+                || clean.Equals("Waiting Dispatch", StringComparison.OrdinalIgnoreCase)
+                || clean.Equals("Needs Review", StringComparison.OrdinalIgnoreCase)
+                || clean.Equals("Closed", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetSystemRequiredStatusMessage(string statusName)
+        {
+            return $"'{statusName}' is required by SmartGridSuite and cannot be deactivated.";
         }
     }
 }

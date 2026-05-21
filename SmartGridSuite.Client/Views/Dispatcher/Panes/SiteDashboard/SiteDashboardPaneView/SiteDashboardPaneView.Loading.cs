@@ -253,6 +253,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 _selectedSessionKey = existingSession.SessionKey;
                 RenderSelectedSession();
+
+                await LoadSiteNotesForSessionAsync(existingSession, CancellationToken.None);
+
                 TopBarView.StatusText = $"Switched to {existingSession.HeaderText}.";
                 return;
             }
@@ -357,6 +360,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 _selectedSessionKey = selectedSession.SessionKey;
                 RenderSelectedSession();
 
+                await LoadSiteNotesForSessionAsync(
+                    selectedSession,
+                    _loadCts?.Token ?? CancellationToken.None);
+
+                // Optional but useful: still allow existing tickets/SNMP profiles to load
+
                 // Optional but useful: still allow existing tickets/SNMP profiles to load
                 // even though the site itself was not found.
                 try
@@ -425,6 +434,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.SnmpProfiles = new List<SnmpProfileListItemDto>();
             session.SnmpProfileId = null;
             session.SnmpOidResults = new Dictionary<ulong, string>();
+        }
+
+        private async Task LoadSiteNotesForSessionAsync(SiteDashboardTabSession? session, CancellationToken ct = default)
+        {
+            if (session == null)
+            {
+                await WorkspaceView.LoadSiteNotesAsync(string.Empty, ct);
+                return;
+            }
+
+            var siteId = ResolveSiteNotesSiteId(session);
+
+            await WorkspaceView.LoadSiteNotesAsync(siteId, ct);
+        }
+
+        private static string ResolveSiteNotesSiteId(SiteDashboardTabSession session)
+        {
+            var header = (session.HeaderText ?? string.Empty).Trim();
+            var search = (session.SearchText ?? string.Empty).Trim();
+
+            if (!string.IsNullOrWhiteSpace(header) &&
+                !header.StartsWith("Blank", StringComparison.OrdinalIgnoreCase))
+            {
+                return header;
+            }
+
+            return search;
         }
     }
 }

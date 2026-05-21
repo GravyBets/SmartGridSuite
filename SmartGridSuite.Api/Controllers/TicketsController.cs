@@ -5,6 +5,7 @@ using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Contracts.Tickets;
 using SmartGridSuite.Contracts.Dispatcher;
 using System.Text.RegularExpressions;
+using SmartGridSuite.Contracts.FieldTechnician;
 
 namespace SmartGridSuite.Api.Controllers
 {
@@ -15,12 +16,11 @@ namespace SmartGridSuite.Api.Controllers
         private readonly SmartGridDbContext _db;
         public TicketsController(SmartGridDbContext db) => _db = db;
 
+        private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
+
         [HttpGet]
-        public async Task<ActionResult<List<TicketListItemDto>>> Get(
-            [FromQuery] string? status = null,
-            [FromQuery] string? tech = null,
-            [FromQuery] DateTime? from = null,
-            [FromQuery] DateTime? to = null)
+        public async Task<ActionResult<List<TicketListItemDto>>> Get([FromQuery] string? status = null, [FromQuery] string? tech = null,
+            [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
         {
             var q = _db.Tickets
                 .Include(t => t.TaskCategory)
@@ -58,17 +58,17 @@ namespace SmartGridSuite.Api.Controllers
                 t.CreatedAt,
                 t.LastActivityAt,
                 t.CurrentWorkOrder ?? "",
-                string.IsNullOrWhiteSpace(t.WorkOrderClass) ? "Maint" : t.WorkOrderClass!,
+                NormalizeWorkOrderType(t.WorkOrderClass),
                 t.GroupCode,
                 t.PriorityDays,
                 t.Problem,
                 t.Notes ?? "",
-                t.CreatedBy
+                t.CreatedBy,
+                t.DispatchNotes ?? ""
             )).ToList();
 
             return Ok(result);
         }
-
 
         [HttpGet("dispatch-tasks")]
         public async Task<ActionResult<List<DispatchTaskListItemDto>>> GetDispatchTasks(CancellationToken ct)
@@ -110,7 +110,6 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(items);
         }
 
-
         [HttpGet("by-site/{siteId}")]
         public async Task<ActionResult<List<TicketListItemDto>>> GetBySite(string siteId, CancellationToken ct)
         {
@@ -148,17 +147,218 @@ namespace SmartGridSuite.Api.Controllers
                 t.CreatedAt,
                 t.LastActivityAt,
                 t.CurrentWorkOrder ?? "",
-                string.IsNullOrWhiteSpace(t.WorkOrderClass) ? "Maint" : t.WorkOrderClass!,
+                NormalizeWorkOrderType(t.WorkOrderClass),
                 t.GroupCode,
                 t.PriorityDays,
                 t.Problem,
                 t.Notes ?? "",
-                t.CreatedBy
+                t.CreatedBy,
+                t.DispatchNotes ?? ""
             )).ToList();
 
             return Ok(result);
         }
 
+        [HttpGet("field-tech/tasks/{employeeId}")]
+        public async Task<ActionResult<List<FieldTechTicketListItemDto>>> GetFieldTechTasks(string employeeId, CancellationToken ct)
+        {
+            var tech = await ResolveActiveTechnicianByEmployeeIdAsync(employeeId, ct);
+
+            if (tech == null)
+                return Ok(new List<FieldTechTicketListItemDto>());
+
+            var rosterDate = DateTime.Today.Date;
+            var assignmentDate = ActiveAssignmentDate;
+
+            var truckId = await _db.TruckRosters
+                .AsNoTracking()
+                .Where(x => x.WorkDate == rosterDate && x.TechnicianId == tech.Id)
+                .Select(x => (uint?)x.TruckId)
+                .FirstOrDefaultAsync(ct);
+
+            var publishedAssignments = new List<DailyTicketAssignmentPublishedEntity>();
+
+            if (truckId.HasValue)
+            {
+                var latestTruckVersion = await _db.DailyTicketAssignmentPublished
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.AssignmentDate == assignmentDate &&
+                        x.TargetType == "Truck" &&
+                        x.TruckId == truckId.Value)
+                    .Select(x => (int?)x.PublishedVersion)
+                    .MaxAsync(ct);
+
+                if (latestTruckVersion.HasValue)
+                {
+                    var truckRows = await _db.DailyTicketAssignmentPublished
+                        .AsNoTracking()
+                        .Include(x => x.Ticket)
+                            .ThenInclude(t => t!.TaskCategory)
+                        .Where(x =>
+                            x.AssignmentDate == assignmentDate &&
+                            x.TargetType == "Truck" &&
+                            x.TruckId == truckId.Value &&
+                            x.PublishedVersion == latestTruckVersion.Value)
+                        .OrderBy(x => x.SortOrder)
+                        .ThenBy(x => x.Id)
+                        .ToListAsync(ct);
+
+                    publishedAssignments.AddRange(truckRows);
+                }
+            }
+
+            var latestTechnicianVersion = await _db.DailyTicketAssignmentPublished
+                .AsNoTracking()
+                .Where(x =>
+                    x.AssignmentDate == assignmentDate &&
+                    x.TargetType == "Technician" &&
+                    x.TechnicianId == tech.Id)
+                .Select(x => (int?)x.PublishedVersion)
+                .MaxAsync(ct);
+
+            if (latestTechnicianVersion.HasValue)
+            {
+                var technicianRows = await _db.DailyTicketAssignmentPublished
+                    .AsNoTracking()
+                    .Include(x => x.Ticket)
+                        .ThenInclude(t => t!.TaskCategory)
+                    .Where(x =>
+                        x.AssignmentDate == assignmentDate &&
+                        x.TargetType == "Technician" &&
+                        x.TechnicianId == tech.Id &&
+                        x.PublishedVersion == latestTechnicianVersion.Value)
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.Id)
+                    .ToListAsync(ct);
+
+                publishedAssignments.AddRange(technicianRows);
+            }
+
+            var result = publishedAssignments
+                .Where(x => x.Ticket != null)
+                .OrderBy(x => x.TargetType == "Truck" ? 0 : 1)
+                .ThenBy(x => x.SortOrder)
+                .ThenBy(x => x.Id)
+                .Select(x => x.Ticket!)
+                .Where(t => !IsClosedTicketStatus(t.Status))
+                .Select(MapToFieldTechTicket)
+                .ToList();
+
+            return Ok(result);
+        }
+
+        [HttpGet("field-tech/history/{employeeId}")]
+        public async Task<ActionResult<List<FieldTechTicketListItemDto>>> GetFieldTechHistory(string employeeId, [FromQuery] int days = 30,
+            CancellationToken ct = default)
+        {
+            var tech = await ResolveActiveTechnicianByEmployeeIdAsync(employeeId, ct);
+
+            if (tech == null)
+                return Ok(new List<FieldTechTicketListItemDto>());
+
+            days = Math.Clamp(days, 1, 365);
+
+            var fromDate = DateTime.Today.AddDays(-days);
+            var assignedTechValues = BuildAssignedTechMatchValues(tech);
+
+            var rows = await _db.Tickets
+                .Include(t => t.TaskCategory)
+                .AsNoTracking()
+                .Where(t =>
+                    assignedTechValues.Contains(t.AssignedTech) &&
+                    t.LastActivityAt >= fromDate)
+                .OrderByDescending(t => t.LastActivityAt)
+                .ToListAsync(ct);
+
+            var result = rows
+                .Where(t => IsClosedTicketStatus(t.Status))
+                .Select(MapToFieldTechTicket)
+                .ToList();
+
+            return Ok(result);
+        }
+
+        private async Task<TechnicianEntity?> ResolveActiveTechnicianByEmployeeIdAsync(string employeeId, CancellationToken ct)
+        {
+            employeeId = (employeeId ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(employeeId))
+                return null;
+
+            return await _db.Technicians
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.EmployeeId == employeeId && t.IsActive, ct);
+        }
+
+        private static List<string> BuildAssignedTechMatchValues(TechnicianEntity tech)
+        {
+            var fullName = FormatTechnicianName(
+                tech.FirstName,
+                tech.LastName,
+                tech.EmployeeId);
+
+            return new[]
+                {
+            tech.EmployeeId,
+            fullName
+        }
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static bool IsClosedTicketStatus(string? status)
+        {
+            var cleanStatus = (status ?? string.Empty).Trim();
+
+            return cleanStatus.Equals("Closed", StringComparison.OrdinalIgnoreCase)
+                || cleanStatus.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                || cleanStatus.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
+                || cleanStatus.Equals("Canceled", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static FieldTechTicketListItemDto MapToFieldTechTicket(TicketEntity t)
+        {
+            var hasActiveAssignedCategory =
+                t.TaskCategory != null &&
+                t.TaskCategory.IsActive &&
+                !string.IsNullOrWhiteSpace(t.TaskCategory.Name);
+
+            var actionRequired = !string.IsNullOrWhiteSpace(t.ActionRequiredOverride)
+                ? t.ActionRequiredOverride.Trim()
+                : hasActiveAssignedCategory && !string.IsNullOrWhiteSpace(t.TaskCategory!.DefaultActionRequired)
+                    ? t.TaskCategory.DefaultActionRequired
+                    : "";
+
+            return new FieldTechTicketListItemDto
+            {
+                Id = t.Id,
+
+                Site = t.Site ?? "",
+                NotificationName = t.NotificationName ?? "",
+                Notification = t.Notification ?? "",
+
+                Status = string.IsNullOrWhiteSpace(t.Status) ? "Open" : t.Status,
+                AssignedTech = t.AssignedTech ?? "",
+
+                CreatedAt = t.CreatedAt,
+                LastActivityAt = t.LastActivityAt,
+
+                WorkOrder = t.CurrentWorkOrder ?? "",
+                WorkOrderClass = NormalizeWorkOrderType(t.WorkOrderClass),
+
+                GroupCode = t.GroupCode ?? "",
+                PriorityDays = t.PriorityDays,
+
+                Problem = t.Problem ?? "",
+                Notes = t.Notes ?? "",
+
+                Category = hasActiveAssignedCategory ? t.TaskCategory!.Name : "",
+                ActionRequired = actionRequired
+            };
+        }
 
         [HttpPost("{id:long}/request-capital")]
         public async Task<ActionResult<UpdateTicketResponse>> RequestCapital(long id, [FromBody] TicketActionReasonRequest req, CancellationToken ct)
@@ -196,7 +396,6 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(new UpdateTicketResponse(entity.Id));
         }
 
-
         [HttpPost("{id:long}/request-maintenance")]
         public async Task<ActionResult<UpdateTicketResponse>> RequestMaintenance(long id, [FromBody] TicketActionReasonRequest req, CancellationToken ct)
         {
@@ -233,6 +432,37 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(new UpdateTicketResponse(entity.Id));
         }
 
+        [HttpPost("{id:long}/resolve-dispatch-task")]
+        public async Task<ActionResult<UpdateTicketResponse>> ResolveDispatchTask(long id, CancellationToken ct)
+        {
+            var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+            if (entity == null)
+                return NotFound();
+
+            var openStatus = await _db.TicketStatuses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.IsActive && x.Name.ToLower() == "open",
+                    ct);
+
+            if (openStatus == null)
+                return BadRequest("Status 'Open' is missing or inactive.");
+
+            entity.Status = openStatus.Name;
+            entity.TaskCategoryId = null;
+            entity.ActionRequiredOverride = null;
+            entity.LastActivityAt = DateTime.Now;
+
+            entity.Notes = AppendTicketNote(
+                entity.Notes,
+                "Dispatch task marked done",
+                "Dispatcher resolved the task.",
+                "Dispatcher");
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(new UpdateTicketResponse(entity.Id));
+        }
 
         private static DispatchTaskListItemDto MapToDispatchTask(TicketEntity t, string fallbackCategoryName, string fallbackActionRequired)
         {
@@ -253,6 +483,8 @@ namespace SmartGridSuite.Api.Controllers
 
             return new DispatchTaskListItemDto
             {
+                TicketId = t.Id,
+
                 OccurredAt = t.LastActivityAt != default ? t.LastActivityAt : t.CreatedAt,
                 Site = t.Site ?? "",
                 Tech = t.AssignedTech ?? "",
@@ -260,7 +492,7 @@ namespace SmartGridSuite.Api.Controllers
                 WorkOrder = t.CurrentWorkOrder ?? "",
                 WorkOrderType = NormalizeWorkOrderType(t.WorkOrderClass),
                 ActionRequired = actionRequired,
-                Notes = FirstNonBlank(t.Notes, t.Summary, t.Problem, t.NotificationName),
+                Notes = FirstNonBlank(t.DispatchNotes, t.Notes, t.Summary, t.Problem, t.NotificationName),
                 Status = string.IsNullOrWhiteSpace(t.Status) ? "Open" : t.Status,
                 Category = categoryName
             };
@@ -268,9 +500,52 @@ namespace SmartGridSuite.Api.Controllers
 
         private static string NormalizeWorkOrderType(string? workOrderClass)
         {
-            return string.Equals(workOrderClass, "Cap", StringComparison.OrdinalIgnoreCase)
-                ? "Capital"
-                : "Maintenance";
+            var value = (workOrderClass ?? string.Empty).Trim();
+
+            if (value.Equals("Cap", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Capital", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Capital";
+            }
+
+            if (value.Equals("Maint", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Maintenance", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Maintenance";
+            }
+
+            if (value.Equals("Dist", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Distribution", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Distribution";
+            }
+
+            return "";
+        }
+
+        private static string? NormalizeWorkOrderClassForStorage(string? workOrderClass)
+        {
+            var value = (workOrderClass ?? string.Empty).Trim();
+
+            if (value.Equals("Cap", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Capital", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Cap";
+            }
+
+            if (value.Equals("Maint", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Maintenance", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Maint";
+            }
+
+            if (value.Equals("Dist", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Distribution", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Dist";
+            }
+
+            return null;
         }
 
         private static string FirstNonBlank(params string?[] values)
@@ -303,12 +578,10 @@ namespace SmartGridSuite.Api.Controllers
             return cleanExisting + Environment.NewLine + Environment.NewLine + entry;
         }
 
-
         [HttpPost]
         public async Task<ActionResult<CreateTicketResponse>> Create([FromBody] CreateTicketRequest req)
         {
             if (string.IsNullOrWhiteSpace(req.Site)) return BadRequest("Site required");
-            if (string.IsNullOrWhiteSpace(req.Problem)) return BadRequest("Problem required");
 
             var incomingNotificationName = (req.NotificationName ?? string.Empty).Trim();
 
@@ -336,9 +609,6 @@ namespace SmartGridSuite.Api.Controllers
 
             string? notif = string.IsNullOrWhiteSpace(req.Notification) ? null : req.Notification.Trim();
 
-            if (notif is not null && !Regex.IsMatch(notif, @"^\d{10}$"))
-                return BadRequest("Notification must be 10 digits when provided");
-
             if (notif is not null)
             {
                 var exists = await _db.Tickets.AsNoTracking().AnyAsync(t => t.Notification == notif);
@@ -346,9 +616,7 @@ namespace SmartGridSuite.Api.Controllers
                     return Conflict($"A ticket already exists with Notification {notif}.");
             }
 
-            var wo = (req.WorkOrder ?? "").Trim();
-            if (!string.IsNullOrWhiteSpace(wo) && !Regex.IsMatch(wo, @"^\d{9}$"))
-                return BadRequest("WorkOrder must be 9 digits when provided");
+            var wo = (req.WorkOrder ?? "").Trim();            
 
             ulong? taskCategoryId = req.TaskCategoryId;
             string? actionRequiredOverride = string.IsNullOrWhiteSpace(req.ActionRequiredOverride)
@@ -399,17 +667,20 @@ namespace SmartGridSuite.Api.Controllers
                 LastActivityAt = now,
 
                 CurrentWorkOrder = string.IsNullOrWhiteSpace(wo) ? null : wo,
-                WorkOrderClass = string.IsNullOrWhiteSpace(wo) ? null : (req.WorkOrderClass ?? "Maint").Trim(),
+                WorkOrderClass = string.IsNullOrWhiteSpace(wo)
+                    ? null
+                    : NormalizeWorkOrderClassForStorage(req.WorkOrderClass),
                 GroupCode = (req.GroupCode ?? "").Trim(),
                 PriorityDays = (byte)Math.Clamp(req.PriorityDays, 0, 255),
 
                 TaskCategoryId = taskCategoryId,
                 ActionRequiredOverride = actionRequiredOverride,
 
-                Problem = req.Problem.Trim(),
+                Problem = (req.Problem ?? "").Trim(),
                 Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim(),
+                DispatchNotes = string.IsNullOrWhiteSpace(req.DispatchNotes) ? null : req.DispatchNotes.Trim(),
                 CreatedBy = createdBy,
-                Summary = req.Problem.Trim()
+                Summary = FirstNonBlank(req.Problem, req.NotificationName)
             };
 
             try
@@ -437,16 +708,10 @@ namespace SmartGridSuite.Api.Controllers
                 return NotFound();
 
             if (string.IsNullOrWhiteSpace(req.Site))
-                return BadRequest("Site required");
-
-            if (string.IsNullOrWhiteSpace(req.Problem))
-                return BadRequest("Problem required");
+                return BadRequest("Site required");            
 
             string? notif = string.IsNullOrWhiteSpace(req.Notification) ? null : req.Notification.Trim();
-
-            if (notif is not null && !Regex.IsMatch(notif, @"^\d{10}$"))
-                return BadRequest("Notification must be 10 digits when provided");
-
+                        
             if (notif is not null)
             {
                 var exists = await _db.Tickets
@@ -458,8 +723,6 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             var wo = (req.WorkOrder ?? "").Trim();
-            if (!string.IsNullOrWhiteSpace(wo) && !Regex.IsMatch(wo, @"^\d{9}$"))
-                return BadRequest("WorkOrder must be 9 digits when provided");
 
             ulong? taskCategoryId = req.TaskCategoryId;
             string? actionRequiredOverride = string.IsNullOrWhiteSpace(req.ActionRequiredOverride)
@@ -505,7 +768,7 @@ namespace SmartGridSuite.Api.Controllers
             entity.CurrentWorkOrder = string.IsNullOrWhiteSpace(wo) ? null : wo;
             entity.WorkOrderClass = string.IsNullOrWhiteSpace(wo)
                 ? null
-                : (req.WorkOrderClass ?? "").Trim();
+                : NormalizeWorkOrderClassForStorage(req.WorkOrderClass);
             entity.GroupCode = string.IsNullOrWhiteSpace(wo)
                 ? ""
                 : (req.GroupCode ?? "").Trim();
@@ -515,9 +778,17 @@ namespace SmartGridSuite.Api.Controllers
             entity.TaskCategoryId = taskCategoryId;
             entity.ActionRequiredOverride = actionRequiredOverride;
 
-            entity.Problem = req.Problem.Trim();
+            entity.Problem = (req.Problem ?? "").Trim();
             entity.Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim();
-            entity.Summary = req.Problem.Trim();
+
+            if (req.DispatchNotes != null)
+            {
+                entity.DispatchNotes = string.IsNullOrWhiteSpace(req.DispatchNotes)
+                    ? null
+                    : req.DispatchNotes.Trim();
+            }
+
+            entity.Summary = FirstNonBlank(req.Problem, req.NotificationName);
             entity.LastActivityAt = DateTime.Now;
 
             await _db.SaveChangesAsync();
@@ -526,8 +797,7 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPost("sap-import/preview")]
-        public async Task<ActionResult<List<SapQueueImportPreviewResultRow>>> PreviewSapImport(
-            [FromBody] SapQueueImportPreviewRequest req)
+        public async Task<ActionResult<List<SapQueueImportPreviewResultRow>>> PreviewSapImport([FromBody] SapQueueImportPreviewRequest req)
         {
             var rows = req.Rows ?? new List<SapQueueImportPreviewRow>();
             if (rows.Count == 0)
@@ -563,7 +833,7 @@ namespace SmartGridSuite.Api.Controllers
                 if (string.IsNullOrWhiteSpace(notif))
                 {
                     status = "Invalid";
-                    message = "Notification must be exactly 10 digits.";
+                    message = "Notification is required.";
                 }
                 else if (!seenInFile.Add(notif))
                 {
@@ -588,14 +858,14 @@ namespace SmartGridSuite.Api.Controllers
                 else if (!string.IsNullOrWhiteSpace(row.WorkOrder) && string.IsNullOrWhiteSpace(workOrder))
                 {
                     status = "Invalid";
-                    message = "Work Order must be exactly 9 digits when provided.";
+                    message = "Work Order could not be read.";
                 }
                 else
                 {
                     status = "Ready";
                     message = string.IsNullOrWhiteSpace(parsedSite)
                         ? "Site not detected — will import blank site and Needs Review."
-                        : $"Site parsed as {parsedSite}.";
+                        : $"Site parsed as {parsedSite}. Will import as Open.";
                 }
 
                 result.Add(new SapQueueImportPreviewResultRow(
@@ -613,10 +883,8 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(result);
         }
 
-
         [HttpPost("sap-import/commit")]
-        public async Task<ActionResult<SapQueueImportCommitResponse>> CommitSapImport(
-            [FromBody] SapQueueImportCommitRequest req)
+        public async Task<ActionResult<SapQueueImportCommitResponse>> CommitSapImport([FromBody] SapQueueImportCommitRequest req)
         {
             var rows = req.Rows ?? new List<SapQueueImportCommitRow>();
             var createdBy = string.IsNullOrWhiteSpace(req.CreatedBy) ? "Unknown" : req.CreatedBy.Trim();
@@ -668,7 +936,7 @@ namespace SmartGridSuite.Api.Controllers
                         row.RowNumber,
                         rawNotification,
                         "Invalid",
-                        "Notification must be exactly 10 digits.",
+                        "Notification is required.",
                         null));
                     continue;
                 }
@@ -728,7 +996,7 @@ namespace SmartGridSuite.Api.Controllers
                         row.RowNumber,
                         notif,
                         "Invalid",
-                        "Work Order must be exactly 9 digits when provided.",
+                        "Work Order could not be read.",
                         null));
                     continue;
                 }
@@ -739,7 +1007,7 @@ namespace SmartGridSuite.Api.Controllers
                     NotificationName = description,
                     Notification = notif,
 
-                    Status = "Needs Review",
+                    Status = string.IsNullOrWhiteSpace(parsedSite) ? "Needs Review" : "Open",
                     AssignedTech = "(Unassigned)",
 
                     CreatedAt = row.NotificationDate,
@@ -752,6 +1020,7 @@ namespace SmartGridSuite.Api.Controllers
 
                     Problem = "",
                     Notes = null,
+                    DispatchNotes = null,
                     CreatedBy = createdBy,
                     Summary = description
                 };
@@ -770,7 +1039,7 @@ namespace SmartGridSuite.Api.Controllers
                         "Imported",
                         string.IsNullOrWhiteSpace(parsedSite)
                             ? "Imported with blank site. Dispatch review required."
-                            : $"Imported with parsed site {parsedSite}.",
+                            : $"Imported with parsed site {parsedSite} as Open.",
                         entity.Id));
                 }
                 catch (DbUpdateException ex)
@@ -817,21 +1086,14 @@ namespace SmartGridSuite.Api.Controllers
             if (string.IsNullOrWhiteSpace(s))
                 return null;
 
-            if (Regex.IsMatch(s, @"^\d{10}$"))
-                return s;
-
             if (decimal.TryParse(s, out var num))
             {
                 var truncated = decimal.Truncate(num);
                 if (num == truncated)
-                {
-                    var normalized = truncated.ToString("0");
-                    if (Regex.IsMatch(normalized, @"^\d{10}$"))
-                        return normalized;
-                }
+                    return truncated.ToString("0");
             }
 
-            return null;
+            return s;
         }
 
         private static string? NormalizeWorkOrder(string? raw)
@@ -840,21 +1102,14 @@ namespace SmartGridSuite.Api.Controllers
             if (string.IsNullOrWhiteSpace(s))
                 return null;
 
-            if (Regex.IsMatch(s, @"^\d{9}$"))
-                return s;
-
             if (decimal.TryParse(s, out var num))
             {
                 var truncated = decimal.Truncate(num);
                 if (num == truncated)
-                {
-                    var normalized = truncated.ToString("0");
-                    if (Regex.IsMatch(normalized, @"^\d{9}$"))
-                        return normalized;
-                }
+                    return truncated.ToString("0");
             }
 
-            return null;
+            return s;
         }
 
         private static string TryParseSiteFromDescription(string? description)
@@ -900,9 +1155,21 @@ namespace SmartGridSuite.Api.Controllers
             if (string.IsNullOrWhiteSpace(finalWriteUp))
                 return BadRequest("Write-up text is required.");
 
-            entity.Notes = AppendRawTicketNote(entity.Notes, finalWriteUp);
+            var siteHistoryWriteUp = string.IsNullOrWhiteSpace(req.SiteHistoryWriteUpText)
+                ? finalWriteUp
+                : req.SiteHistoryWriteUpText.Trim();
 
-            await InsertSubmittedWriteUpIntoSiteHistoryAsync(entity, finalWriteUp, req.SubmittedBy, ct);
+            entity.Notes = AppendTicketNote(
+                entity.Notes,
+                "Write-up submitted",
+                finalWriteUp,
+                req.SubmittedBy);
+
+            await InsertSubmittedWriteUpIntoSiteHistoryAsync(
+                entity,
+                siteHistoryWriteUp,
+                req.SubmittedBy,
+                ct);
 
             entity.ActionRequiredOverride = "Review submitted site write-up";
             entity.LastActivityAt = DateTime.Now;
@@ -921,24 +1188,8 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(new UpdateTicketResponse(entity.Id));
         }
 
-        private static string AppendRawTicketNote(string? existingNotes, string noteToAppend)
-        {
-            var existing = (existingNotes ?? string.Empty).TrimEnd();
-            var next = (noteToAppend ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(existing))
-                return next;
-
-            if (string.IsNullOrWhiteSpace(next))
-                return existing;
-
-            return existing +
-                   Environment.NewLine +
-                   Environment.NewLine +
-                   next;
-        }
-
-        private async Task InsertSubmittedWriteUpIntoSiteHistoryAsync(TicketEntity ticket, string finalWriteUp, string? submittedByEmployeeId, CancellationToken ct)
+        private async Task InsertSubmittedWriteUpIntoSiteHistoryAsync(TicketEntity ticket, string siteHistoryWriteUp, string? submittedByEmployeeId,
+            CancellationToken ct)
         {
             var siteId = (ticket.Site ?? string.Empty).Trim();
 
@@ -977,7 +1228,7 @@ namespace SmartGridSuite.Api.Controllers
                 {visitDate},
                 {primaryTech},
                 {secondaryTech},
-                {finalWriteUp},
+                {siteHistoryWriteUp},
                 {issueText}
             );", ct);
         }
@@ -1116,6 +1367,5 @@ namespace SmartGridSuite.Api.Controllers
                 ? text
                 : text[..maxLength];
         }
-
     }
 }

@@ -7,6 +7,7 @@
 
     <UserControl.Resources>
 
+        <!-- Text -->
         <Style x:Key="PaneTitleTextStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="20"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -19,22 +20,18 @@
         </Style>
 
         <Style x:Key="SectionHeaderTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
 
-        <Style x:Key="SummaryCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="Padding" Value="14,12"/>
-            <Setter Property="Margin" Value="0,0,10,0"/>
+        <Style x:Key="SmallLabelTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
         </Style>
 
         <Style x:Key="SummaryValueTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontSize" Value="21"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         </Style>
@@ -45,24 +42,40 @@
             <Setter Property="Margin" Value="0,2,0,0"/>
         </Style>
 
-        <Style x:Key="TruckCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="16"/>
-            <Setter Property="Padding" Value="14"/>
-            <Setter Property="Margin" Value="0,0,14,14"/>
-        </Style>
-
-        <Style x:Key="CountPillStyle" TargetType="Border">
+        <!-- Cards -->
+        <Style x:Key="SummaryCardStyle" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="999"/>
-            <Setter Property="Padding" Value="10,4"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="14,12"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
         </Style>
 
+        <Style x:Key="TruckCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Padding" Value="10,10,10,0"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
+        </Style>
+
+        <Style x:Key="TechCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Margin" Value="0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsOnShift}" Value="False">
+                    <Setter Property="Opacity" Value="0.48"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ListBox cleanup -->
         <Style x:Key="BoardListBoxStyle" TargetType="ListBox">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -72,56 +85,83 @@
 
         <Style x:Key="BoardListBoxItemStyle" TargetType="ListBoxItem">
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        <Border x:Name="SelectionChrome"
+                                Padding="0"
+                                CornerRadius="14"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="2">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SelectionChrome"
+                                        Property="Background"
+                                        Value="#F3F7FF"/>
+                                        <Setter TargetName="SelectionChrome"
+                                        Property="BorderBrush"
+                                        Value="#BFDBFE"/>
+                            </Trigger>
+
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="SelectionChrome"
+                                        Property="Background"
+                                        Value="#DBEAFE"/>
+                                        <Setter TargetName="SelectionChrome"
+                                        Property="BorderBrush"
+                                        Value="#2563EB"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
 
-        <Style x:Key="TechCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
-            <Setter Property="Opacity" Value="1"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsOnShift}" Value="False">
-                    <Setter Property="Opacity" Value="0.48"/>
-                </DataTrigger>
-            </Style.Triggers>
+        <!-- Transparent Icon Button -->
+        <Style x:Key="TransparentIconButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Opacity" Value="0.70"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="1"/>
+                                <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
-        <Style x:Key="ShiftPillStyle" TargetType="Border">
-            <Setter Property="CornerRadius" Value="999"/>
-            <Setter Property="Padding" Value="8,3"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Background" Value="{DynamicResource TileFill}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsOnShift}" Value="False">
-                    <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="DropHintTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-            <Setter Property="Opacity" Value="0.9"/>
-        </Style>
-
-        <DataTemplate x:Key="TechnicianCardTemplate">
+        <!-- Tech assigned to a truck card -->
+        <DataTemplate x:Key="AssignedTechnicianTemplate">
             <Border Style="{StaticResource TechCardStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -129,62 +169,150 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel>
-                        <TextBlock Text="{Binding Name}"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextPrimary}"/>
+                    <Grid Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="4"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                        <TextBlock Text="{Binding EmployeeId, StringFormat=ID: {0}}"
-                                   Margin="0,3,0,0"
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding Name}"
+                                       FontWeight="SemiBold"
+                                       FontSize="13"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       TextTrimming="CharacterEllipsis"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding ScheduleText}"
+                                       Margin="10,0,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </Grid>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="{Binding Title}"
                                    Foreground="{DynamicResource TextSecondary}"/>
-                    </StackPanel>
+                    </Grid>
 
-                    <Border Grid.Column="1"
-                            Style="{StaticResource ShiftPillStyle}"
-                            Margin="10,0,0,0">
-                        <TextBlock Text="On Duty"
-                                   FontSize="11"
+                    <Button Grid.Column="1"
+                            Style="{StaticResource TransparentIconButtonStyle}"
+                            Margin="10,0,0,0"
+                            Tag="{Binding}"
+                            ToolTip="Remove from truck"
+                            Click="RemoveTechFromTruck_Click">
+                        <TextBlock Text="&#xE74D;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="15"
                                    FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextPrimary}">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Text" Value="On Duty"/>
-                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsOnShift}" Value="False">
-                                            <Setter Property="Text" Value="Off Shift"/>
-                                            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Border>
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"/>
+                    </Button>
                 </Grid>
             </Border>
         </DataTemplate>
 
+        <!-- Right drawer technician card -->
+        <DataTemplate x:Key="TechnicianDrawerTemplate">
+            <Border Style="{StaticResource TechCardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <CheckBox Grid.Column="0"
+                              VerticalAlignment="Top"
+                              Margin="0,9,0,0"
+                              IsChecked="{Binding IsSelected,
+                                          RelativeSource={RelativeSource AncestorType=ListBoxItem},
+                                          Mode=TwoWay}"/>
+
+                    <Grid Grid.Column="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left: name/title -->
+                        <StackPanel Grid.Column="0"
+                                    VerticalAlignment="Top">
+                            <TextBlock Text="{Binding Name}"
+                                       FontWeight="SemiBold"
+                                       FontSize="13"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       TextTrimming="CharacterEllipsis"/>
+
+                            <TextBlock Text="{Binding Title}"
+                                       Margin="0,3,0,0"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </StackPanel>
+
+                        <!-- Right: assignment/schedule -->
+                        <StackPanel Grid.Column="1"
+                                    Margin="12,0,0,0"
+                                    VerticalAlignment="Top"
+                                    HorizontalAlignment="Right">
+                            <TextBlock FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       HorizontalAlignment="Right">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text"
+                                        Value="{Binding TruckNumber, StringFormat=Assigned: Truck {0}}"/>
+                                        <Setter Property="TextAlignment" Value="Right"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding TruckNumber}" Value="">
+                                                <Setter Property="Text" Value="Unassigned"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding TruckNumber}" Value="{x:Null}">
+                                                <Setter Property="Text" Value="Unassigned"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <TextBlock Text="{Binding ScheduleText}"
+                                       Margin="0,3,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       HorizontalAlignment="Right"
+                                       TextAlignment="Right"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    
     </UserControl.Resources>
 
-    <Grid>
+    <Grid PreviewMouseDown="RootGrid_PreviewMouseDown">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="8"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Top card -->
+        <!-- Header / Summary -->
         <Border Grid.Row="0"
                 Style="{StaticResource Card}"
-                Padding="16">
+                Padding="10">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="14"/>
+                    <RowDefinition Height="8"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Header -->
                 <Grid Grid.Row="0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -192,43 +320,41 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel>
-                        <TextBlock Text="Truck Assignments"
+                        <TextBlock Text="Daily Truck Board"
                                    Style="{StaticResource PaneTitleTextStyle}"/>
 
-                        <TextBlock Text="Drag technicians between available and truck assignments"
+                        <TextBlock Text="Build today’s crews by assigning technicians to trucks."
                                    Margin="0,4,0,0"
                                    Style="{StaticResource PaneSubtitleTextStyle}"/>
-
-                        <TextBlock x:Name="StatusText"
-                                   Margin="0,6,0,0"
-                                   Foreground="{DynamicResource TextSecondary}"
-                                   Text=""/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
                                 VerticalAlignment="Top">
-                        <Button x:Name="ToggleUnassignedBtn"
-                                Content="Hide Available"
+                        <Button Content="Clear All"
+                                Height="34"
+                                MinWidth="100"
                                 Margin="0,0,8,0"
-                                Click="ToggleUnassigned_Click"/>
+                                Click="ClearAll_Click"/>
+
+                        <Button Content="Set Home"
+                                Height="34"
+                                MinWidth="100"
+                                Margin="0,0,8,0"
+                                Click="SetHome_Click"/>
 
                         <Button Content="Refresh"
+                                Height="34"
+                                MinWidth="100"
+                                Style="{StaticResource PrimaryButtonStyle}"
                                 Click="Refresh_Click"/>
                     </StackPanel>
                 </Grid>
 
-                <!-- Summary -->
-                <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <Border Grid.Column="0"
-                            Style="{StaticResource SummaryCardStyle}">
+                <UniformGrid Grid.Row="2"
+                             Rows="1"
+                             Columns="4">
+                    <Border Style="{StaticResource SummaryCardStyle}">
                         <StackPanel>
                             <TextBlock Text="{Binding OnDutyCount}"
                                        Style="{StaticResource SummaryValueTextStyle}"/>
@@ -237,18 +363,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="1"
-                            Style="{StaticResource SummaryCardStyle}">
-                        <StackPanel>
-                            <TextBlock Text="{Binding OffDutyCount}"
-                                       Style="{StaticResource SummaryValueTextStyle}"/>
-                            <TextBlock Text="Off Shift"
-                                       Style="{StaticResource SummaryLabelTextStyle}"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Grid.Column="2"
-                            Style="{StaticResource SummaryCardStyle}">
+                    <Border Style="{StaticResource SummaryCardStyle}">
                         <StackPanel>
                             <TextBlock Text="{Binding AssignedCount}"
                                        Style="{StaticResource SummaryValueTextStyle}"/>
@@ -257,119 +372,44 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="3"
-                            Style="{StaticResource SummaryCardStyle}"
-                            Margin="0">
+                    <Border Style="{StaticResource SummaryCardStyle}">
                         <StackPanel>
                             <TextBlock Text="{Binding UnassignedCount}"
                                        Style="{StaticResource SummaryValueTextStyle}"/>
-                            <TextBlock Text="Available / Unassigned"
+                            <TextBlock Text="Unassigned"
                                        Style="{StaticResource SummaryLabelTextStyle}"/>
                         </StackPanel>
                     </Border>
-                </Grid>
+
+                    <Border Style="{StaticResource SummaryCardStyle}"
+                            Margin="0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding TrucksUsedCount}"
+                                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Trucks Used"
+                                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
             </Grid>
         </Border>
 
         <!-- Workspace -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="UnassignedColumn" Width="320"/>
-                <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="360"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Available / Unassigned -->
-            <Border x:Name="UnassignedCard"
-                    Grid.Column="0"
+            <!-- Truck board -->
+            <Border Grid.Column="0"
                     Style="{StaticResource Card}"
                     Padding="14">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel>
-                            <TextBlock Text="Available"
-                                       Style="{StaticResource SectionHeaderTextStyle}"/>
-
-                            <TextBlock Text="Drop here to remove a technician from a truck"
-                                       Margin="0,3,0,0"
-                                       Style="{StaticResource PaneSubtitleTextStyle}"/>
-                        </StackPanel>
-
-                        <Border Grid.Column="1"
-                                Style="{StaticResource CountPillStyle}">
-                            <TextBlock Text="{Binding Board.Unassigned.Count, StringFormat={}{0} techs}"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextPrimary}"/>
-                        </Border>
-                    </Grid>
-
-                    <Border Grid.Row="2"
-                            Background="{DynamicResource SurfaceBg}"
-                            BorderBrush="{DynamicResource SurfaceBorder}"
-                            BorderThickness="1"
-                            CornerRadius="12"
-                            Padding="10,8">
-                        <TextBlock Text="Unassigned and available technicians"
-                                   Style="{StaticResource DropHintTextStyle}"/>
-                    </Border>
-
-                    <Grid Grid.Row="4">
-                        <ListBox x:Name="UnassignedList"
-                                 ItemsSource="{Binding Board.Unassigned}"
-                                 ItemTemplate="{StaticResource TechnicianCardTemplate}"
-                                 ItemContainerStyle="{StaticResource BoardListBoxItemStyle}"
-                                 Style="{StaticResource BoardListBoxStyle}"
-                                 AllowDrop="True"
-                                 PreviewMouseLeftButtonDown="List_PreviewMouseLeftButtonDown"
-                                 PreviewMouseMove="List_PreviewMouseMove"
-                                 Drop="List_Drop"
-                                 Tag="{x:Null}"/>
-
-                        <Border IsHitTestVisible="False"
-                                Background="Transparent">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Board.Unassigned.Count}" Value="0">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-
-                            <TextBlock Text="Everyone is assigned."
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextSecondary}"
-                                       FontStyle="Italic"/>
-                        </Border>
-                    </Grid>
-                </Grid>
-            </Border>
-
-            <!-- Trucks board -->
-            <Border Grid.Column="2"
-                    Style="{StaticResource Card}"
-                    Padding="14">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="12"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -383,18 +423,15 @@
                             <TextBlock Text="Trucks"
                                        Style="{StaticResource SectionHeaderTextStyle}"/>
 
-                            <TextBlock Text="Assign technicians by dragging cards onto a truck"
+                            <TextBlock Text="Use + Add Tech to build or adjust crews."
                                        Margin="0,3,0,0"
                                        Style="{StaticResource PaneSubtitleTextStyle}"/>
                         </StackPanel>
 
-                        <Border Grid.Column="1"
-                                Style="{StaticResource CountPillStyle}">
-                            <TextBlock Text="{Binding Board.Trucks.Count, StringFormat={}{0} trucks}"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextPrimary}"/>
-                        </Border>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding Board.Trucks.Count, StringFormat={}{0} trucks}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondary}"/>
                     </Grid>
 
                     <ScrollViewer Grid.Row="2"
@@ -410,70 +447,67 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Style="{StaticResource TruckCardStyle}"
-                                            Width="360">
+                                            Width="390"
+                                            MinHeight="170">
                                         <Grid>
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="10"/>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="10"/>
+                                                <RowDefinition Height="8"/>
                                                 <RowDefinition Height="*"/>
                                             </Grid.RowDefinitions>
 
-                                            <!-- Truck header -->
+                                            <!-- Truck header + actions -->
                                             <Grid Grid.Row="0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <StackPanel>
-                                                    <TextBlock FontSize="16"
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock FontSize="17"
                                                                FontWeight="Bold"
                                                                Foreground="{DynamicResource TextPrimary}">
                                                         <Run Text="Truck "/>
                                                         <Run Text="{Binding Truck.TruckNumber}"/>
                                                     </TextBlock>
 
-                                                    <TextBlock Margin="0,3,0,0"
-                                                               Foreground="{DynamicResource TextSecondary}"
-                                                               Text="{Binding Technicians.Count, StringFormat={}{0} assigned}"/>
+                                                    <TextBlock Text="{Binding Truck.TruckStyleName}"
+                                                               Margin="0,-2,0,0"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="{DynamicResource TextSecondary}"/>
                                                 </StackPanel>
 
-                                                <Border Grid.Column="1"
-                                                        Style="{StaticResource CountPillStyle}">
-                                                    <TextBlock Text="{Binding Truck.TruckNumber}"
-                                                               FontSize="11"
-                                                               FontWeight="SemiBold"
-                                                               Foreground="{DynamicResource TextPrimary}"/>
-                                                </Border>
+                                                <StackPanel Grid.Column="1"
+                                                            Orientation="Horizontal"
+                                                            VerticalAlignment="Top"
+                                                            Margin="12,0,0,0">
+                                                    <Button Content="Add Selected"
+                                                            Height="30"
+                                                            MinWidth="120"
+                                                            Margin="0,0,8,0"
+                                                            Style="{StaticResource PrimaryButtonStyle}"
+                                                            Tag="{Binding}"
+                                                            Click="AddSelectedToTruck_Click"/>
+                                                </StackPanel>
                                             </Grid>
-
-                                            <Border Grid.Row="2"
-                                                    Background="{DynamicResource SurfaceBg}"
-                                                    BorderBrush="{DynamicResource SurfaceBorder}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="12"
-                                                    Padding="10,8">
-                                                <TextBlock Text="Drop technicians here"
-                                                           Style="{StaticResource DropHintTextStyle}"/>
-                                            </Border>
-
-                                            <Grid Grid.Row="4">
+                                            
+                                            <!-- Assigned techs -->
+                                            <Grid Grid.Row="2">
                                                 <ListBox ItemsSource="{Binding Technicians}"
-                                                         ItemTemplate="{StaticResource TechnicianCardTemplate}"
+                                                         ItemTemplate="{StaticResource AssignedTechnicianTemplate}"
                                                          ItemContainerStyle="{StaticResource BoardListBoxItemStyle}"
                                                          Style="{StaticResource BoardListBoxStyle}"
-                                                         AllowDrop="True"
-                                                         PreviewMouseLeftButtonDown="List_PreviewMouseLeftButtonDown"
-                                                         PreviewMouseMove="List_PreviewMouseMove"
-                                                         Drop="List_Drop"
-                                                         Tag="{Binding Truck.Id}"/>
+                                                         SelectionMode="Single"
+                                                         SelectionChanged="AssignedTruckTechList_SelectionChanged"/>
 
-                                                <Border IsHitTestVisible="False"
-                                                        Background="Transparent">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
+                                                <TextBlock Text="No technicians assigned yet."
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextSecondary}"
+                                                           FontStyle="Italic"
+                                                           IsHitTestVisible="False">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
                                                             <Setter Property="Visibility" Value="Collapsed"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding Technicians.Count}" Value="0">
@@ -481,14 +515,8 @@
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
-                                                    </Border.Style>
-
-                                                    <TextBlock Text="No technicians assigned yet."
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               Foreground="{DynamicResource TextSecondary}"
-                                                               FontStyle="Italic"/>
-                                                </Border>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </Grid>
                                         </Grid>
                                     </Border>
@@ -496,6 +524,80 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <!-- Technician drawer -->
+            <Border Grid.Column="2"
+                    Style="{StaticResource Card}"
+                    Padding="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock Text="Technicians"
+                                       Style="{StaticResource SectionHeaderTextStyle}"/>
+
+                            <TextBlock Text="Defaults to unassigned technicians."
+                                       Margin="0,3,0,0"
+                                       Style="{StaticResource PaneSubtitleTextStyle}"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding VisibleTechnicianCount, StringFormat={}{0} shown}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                    </Grid>
+
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBox x:Name="TechnicianSearchBox"
+                                 Grid.Row="0"
+                                 Height="32"
+                                 Style="{StaticResource ModernWatermarkTextBox}"
+                                 Tag="Search name, title, truck, schedule..."
+                                 TextChanged="TechnicianSearchBox_TextChanged"/>
+
+                        <StackPanel Grid.Row="2">
+                            <CheckBox x:Name="ShowAllTechniciansCheckBox"
+                                      Content="Show assigned techs too"
+                                      VerticalAlignment="Center"
+                                      Foreground="{DynamicResource TextPrimary}"
+                                      Checked="ShowAllTechnicians_Changed"
+                                      Unchecked="ShowAllTechnicians_Changed"/>
+
+                            <TextBlock Margin="0,4,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Text="{Binding SelectedDrawerTechnicianCount, StringFormat={}{0} selected}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <ListBox x:Name="TechniciansList"
+                             Grid.Row="4"
+                             ItemsSource="{Binding Board.AllTechnicians}"
+                             ItemTemplate="{StaticResource TechnicianDrawerTemplate}"
+                             ItemContainerStyle="{StaticResource BoardListBoxItemStyle}"
+                             Style="{StaticResource BoardListBoxStyle}"
+                             SelectionMode="Multiple"
+                             SelectionChanged="TechniciansList_SelectionChanged"/>
                 </Grid>
             </Border>
         </Grid>

@@ -20,35 +20,20 @@
                 <!-- TOP: Site | Full Site Name | Problem -->
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="240"/>
+                        <ColumnDefinition Width="300"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="420"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Site -->
                     <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                        <TextBlock Text="Site *" Margin="0,0,0,4"/>
+                        <TextBlock Text="Site * (If TOP, just XX-MWB, not sector too)" Margin="0,0,0,4"/>
                         <TextBox Height="34"
                                  Text="{Binding Site, UpdateSourceTrigger=PropertyChanged}"/>
                     </StackPanel>
 
-                    <!-- Full site name (display only for now) -->
-                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
-                        <TextBlock Text="Full Site Name" Margin="0,0,0,4"/>
-                        <Border Background="{DynamicResource SurfaceBg}"
-                                BorderBrush="{DynamicResource SurfaceBorder}"
-                                BorderThickness="1"
-                                CornerRadius="10"
-                                Padding="10,7">
-                            <TextBlock Text="{Binding FullSiteName}"
-                                       Foreground="{DynamicResource TextSecondary}"
-                                       TextTrimming="CharacterEllipsis"/>
-                        </Border>
-                    </StackPanel>
-
                     <!-- Problem (wrap + auto-grow) -->
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Problem *" Margin="0,0,0,4"/>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Problem" Margin="0,0,0,4"/>
                         <TextBox MinHeight="34"
                                  MaxHeight="140"
                                  AcceptsReturn="True"
@@ -60,7 +45,7 @@
                 </Grid>
 
                 <!-- Assigned To + Status + Task Category + Action Override -->
-                <Grid Margin="0,12,0,0">
+                <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -69,11 +54,14 @@
                     <!-- Row 1 -->
                     <Grid Grid.Row="0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="78"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="60"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="20"/>
-                            <ColumnDefinition Width="70"/>
-                            <ColumnDefinition Width="220"/>
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0"
@@ -82,32 +70,34 @@
                                    Foreground="{DynamicResource TextSecondary}"/>
 
                         <ComboBox x:Name="AssignedToBox"
-                                  Grid.Column="1"
+                                  Grid.Column="2"
                                   HorizontalAlignment="Left"
                                   Width="260"
                                   Height="34"
                                   IsTextSearchEnabled="True"
                                   SelectedItem="{Binding AssignedTo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 
-                        <TextBlock Grid.Column="3"
+                        <TextBlock Grid.Column="4"
                                    Text="Status:"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondary}"/>
 
                         <ComboBox x:Name="StatusBox"
-                                  Grid.Column="4"
+                                  Grid.Column="6"
                                   Height="34"
+                                  Width="260"
                                   SelectedItem="{Binding Status, UpdateSourceTrigger=PropertyChanged}"/>
                     </Grid>
 
                     <!-- Row 2 -->
-                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                    <Grid Grid.Row="1" Margin="0,8,0,0">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="110"/>
-                            <ColumnDefinition Width="260"/>
-                            <ColumnDefinition Width="20"/>
-                            <ColumnDefinition Width="140"/>
-                            <ColumnDefinition Width="320"/>
+                            <ColumnDefinition Width="78"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
@@ -117,16 +107,17 @@
                                    Foreground="{DynamicResource TextSecondary}"/>
 
                         <ComboBox x:Name="TaskCategoryComboBox"
-                                  Grid.Column="1"
-                                  Height="34"/>
+                                  Grid.Column="2"
+                                  Height="34"
+                                  Width="260"/>
 
-                        <TextBlock Grid.Column="3"
+                        <TextBlock Grid.Column="4"
                                    Text="Action Required:"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondary}"/>
 
                         <TextBox x:Name="ActionRequiredOverrideTextBox"
-                                 Grid.Column="4"
+                                 Grid.Column="6"
                                  Height="34"
                                  MaxLength="200"/>
                     </Grid>
@@ -135,58 +126,77 @@
                 <Separator Margin="0,16,0,16"/>
 
                 <!-- Work info row -->
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="260"/>
-                        <ColumnDefinition Width="200"/>
-                        <ColumnDefinition Width="180"/>
-                        <ColumnDefinition Width="220"/>
-                        <ColumnDefinition Width="220"/>
-                    </Grid.ColumnDefinitions>
+                <Grid Margin="0,8,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                        <TextBlock Text="Notification Name" Margin="0,0,0,4"/>
-                        <TextBox Height="34"
-                                 Text="{Binding NotificationName, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
-                        <TextBlock Text="Notification #" Margin="0,0,0,4"/>
-                        <TextBox Height="34"
-                                 Text="{Binding NotificationNumber, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
+                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                            <TextBlock Text="Notification #" Margin="0,0,0,4"/>
+                            <TextBox Height="34"
+                                     MinWidth="220"
+                                     Text="{Binding NotificationNumber, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
 
-                    <StackPanel Grid.Column="2" Margin="0,0,12,0">
-                        <TextBlock Text="Work Order" Margin="0,0,0,4"/>
-                        <TextBox Height="34"
-                                 Text="{Binding WorkOrder, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                            <TextBlock Text="Notification Name" Margin="0,0,0,4"/>
+                            <TextBox Height="34"
+                                     Text="{Binding NotificationName, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                    </Grid>
 
-                    <StackPanel Grid.Column="3" Margin="0,0,12,0">
-                        <TextBlock Text="Work Order Type" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="WorkOrderTypeBox"
-                                  Height="34"
-                                  SelectedItem="{Binding WorkOrderType, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
+                    <Grid Grid.Row="1" Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="4">
-                        <TextBlock Text="Work Order Code" Margin="0,0,0,4"/>
-                        <ComboBox Height="34"
-                                  ItemsSource="{Binding WorkOrderCodeOptions}"
-                                  SelectedItem="{Binding WorkOrderCode, UpdateSourceTrigger=PropertyChanged}"/>
-                    </StackPanel>
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                            <TextBlock Text="Work Order" Margin="0,0,0,4"/>
+                            <TextBox Height="34"
+                                     MinWidth="220"
+                                     Text="{Binding WorkOrder, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                            <TextBlock Text="Work Order Type" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="WorkOrderTypeBox"
+                                      Height="34"
+                                      SelectedItem="{Binding WorkOrderType, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Work Order Code" Margin="0,0,0,4"/>
+                            <ComboBox Height="34"
+                                      ItemsSource="{Binding WorkOrderCodeOptions}"
+                                      SelectedItem="{Binding WorkOrderCode, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                    </Grid>
                 </Grid>
 
                 <!-- Priority -->
-                <Grid Margin="0,12,0,0">
+                <Grid Grid.Row="2" Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="140"/>
-                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="200"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0" Text="Priority" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="0" 
+                               Text="Priority" 
+                               VerticalAlignment="Center"
                                Foreground="{DynamicResource TextSecondary}"/>
+                    
                     <ComboBox x:Name="PriorityBox"
                               Grid.Column="1"
                               Height="34"
@@ -195,9 +205,31 @@
 
                 <Separator Margin="0,16,0,16"/>
 
-                <!-- Notes -->
-                <TextBlock Text="Notes" Margin="0,0,0,6"/>
-                <TextBox Height="240"
+                <!-- Dispatch Notes -->
+                <TextBlock Text="Dispatch Notes"
+                           Margin="0,0,0,6"/>
+
+                <TextBlock Text="Visible to the assigned field technician. Use this for remote troubleshooting notes, follow-up instructions, or things dispatch wants checked."
+                           Margin="0,0,0,6"
+                           FontSize="11"
+                           Foreground="{DynamicResource TextSecondary}"
+                           TextWrapping="Wrap"/>
+
+                <TextBox Height="110"
+                         Padding="6,6"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         VerticalContentAlignment="Top"
+                         HorizontalContentAlignment="Left"
+                         Text="{Binding DispatchNotes, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <!-- Notes / Write-Up -->
+                <TextBlock Text="Notes / Write-Up"
+                           Margin="0,14,0,6"/>
+
+                <TextBox Height="180"
+                         Padding="6,6"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Auto"
@@ -209,10 +241,20 @@
         </ScrollViewer>
 
         <!-- Buttons -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button x:Name="CancelBtn" Content="Cancel" MinWidth="110" Margin="0,0,8,0"
+        <StackPanel Grid.Row="1" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right">
+            
+            <Button x:Name="CancelBtn" 
+                    Content="Cancel" 
+                    MinWidth="110" 
+                    Margin="0,0,8,0"
                     Click="Cancel_Click"/>
-            <Button x:Name="CreateBtn" Content="Create Ticket" MinWidth="150"
+            
+            <Button x:Name="CreateBtn" 
+                    Style="{StaticResource PrimaryButtonStyle}" 
+                    Content="Create Ticket" 
+                    MinWidth="150"
                     Click="Create_Click"/>
         </StackPanel>
     </Grid>

@@ -177,6 +177,8 @@ public sealed class TrucksController : ControllerBase
                         LastName = t.LastName,
                         Name = ((t.FirstName ?? "") + " " + (t.LastName ?? "")).Trim(),
                         IsActive = t.IsActive,
+                        Title = t.Title,
+                        ScheduleText = GetScheduleText(t),
                         HomeTruckId = t.HomeTruckId == null ? null : (int?)t.HomeTruckId.Value,
                         HomeTruckNumber = null,
                         HomeTruckDisplayName = null,
@@ -214,6 +216,8 @@ public sealed class TrucksController : ControllerBase
                 LastName = t.LastName,
                 Name = ((t.FirstName ?? "") + " " + (t.LastName ?? "")).Trim(),
                 IsActive = t.IsActive,
+                Title = t.Title,
+                ScheduleText = GetScheduleText(t),
                 HomeTruckId = t.HomeTruckId == null ? null : (int?)t.HomeTruckId.Value,
                 HomeTruckNumber = null,
                 HomeTruckDisplayName = null,
@@ -230,10 +234,62 @@ public sealed class TrucksController : ControllerBase
             })
             .ToListAsync();
 
+        var assignedTruckNumberByTechId = rosterRows
+            .Join(trucks,
+                r => r.TruckId,
+                t => t.Id,
+                (r, t) => new
+                {
+                    r.Tech.Id,
+                    t.TruckNumber
+                })
+                .GroupBy(x => x.Id)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.First().TruckNumber);
+
+        var allTechnicians = await _db.Set<TechnicianEntity>()
+            .AsNoTracking()
+            .Where(t => t.IsActive)
+            .OrderBy(t => t.LastName)
+            .ThenBy(t => t.FirstName)
+            .Select(t => new TechnicianDto
+            {
+                Id = (int)t.Id,
+                EmployeeId = t.EmployeeId,
+                FirstName = t.FirstName,
+                LastName = t.LastName,
+                Name = ((t.FirstName ?? "") + " " + (t.LastName ?? "")).Trim(),
+                Title = t.Title,
+                ScheduleText = GetScheduleText(t),
+                IsActive = t.IsActive,
+                HomeTruckId = t.HomeTruckId == null ? null : (int?)t.HomeTruckId.Value,
+                HomeTruckNumber = null,
+                HomeTruckDisplayName = null,
+                WorksMonday = t.WorksMonday,
+                WorksTuesday = t.WorksTuesday,
+                WorksWednesday = t.WorksWednesday,
+                WorksThursday = t.WorksThursday,
+                WorksFriday = t.WorksFriday,
+                WorksSaturday = t.WorksSaturday,
+                WorksSunday = t.WorksSunday,
+                RoleCodes = new List<string>(),
+                IsOnShift = GetDefaultWorkingStatus(t, workDate.DayOfWeek),
+                TruckNumber = null
+            })
+            .ToListAsync();
+
+        foreach (var tech in allTechnicians)
+        {
+            if (assignedTruckNumberByTechId.TryGetValue(tech.Id, out var truckNumber))
+                tech.TruckNumber = truckNumber;
+        }
+
         return new TruckBoardDto
         {
             WorkDate = workDate,
             Unassigned = unassigned,
+            AllTechnicians = allTechnicians,
             Trucks = trucks.Select(tr => new TruckColumnDto
             {
                 Truck = tr,
@@ -352,6 +408,136 @@ public sealed class TrucksController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("board/clear")]
+    public async Task<IActionResult> ClearBoard([FromQuery] string? date = null)
+    {
+        var workDate = ParseDateOrToday(date);
+
+        // Remove technician-to-crew rows first.
+        var technicianRosterRows = await _db.Set<TechnicianRosterEntity>()
+            .Where(r => r.WorkDate == workDate)
+            .ToListAsync();
+
+        if (technicianRosterRows.Count > 0)
+            _db.Set<TechnicianRosterEntity>().RemoveRange(technicianRosterRows);
+
+        // Clear tickets that may still point at today's crews.
+        var crews = await _db.Set<CrewEntity>()
+            .Where(c => c.WorkDate == workDate)
+            .ToListAsync();
+
+        var crewIds = crews.Select(c => c.Id).ToList();
+
+        if (crewIds.Count > 0)
+        {
+            var ticketsUsingCrews = await _db.Set<TicketEntity>()
+                .Where(t => t.AssignedCrewId != null && crewIds.Contains(t.AssignedCrewId.Value))
+                .ToListAsync();
+
+            foreach (var ticket in ticketsUsingCrews)
+                ticket.AssignedCrewId = null;
+        }
+
+        if (crews.Count > 0)
+            _db.Set<CrewEntity>().RemoveRange(crews);
+
+        // Remove truck board assignments last.
+        var truckRosterRows = await _db.Set<TruckRosterEntity>()
+            .Where(r => r.WorkDate == workDate)
+            .ToListAsync();
+
+        if (truckRosterRows.Count > 0)
+            _db.Set<TruckRosterEntity>().RemoveRange(truckRosterRows);
+
+        await _db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    [HttpPost("board/set-home")]
+    public async Task<IActionResult> SetHomeBoard([FromQuery] string? date = null)
+    {
+        var workDate = ParseDateOrToday(date);
+
+        // Clear existing board safely before applying home trucks.
+        var existingTechnicianRoster = await _db.Set<TechnicianRosterEntity>()
+            .Where(r => r.WorkDate == workDate)
+            .ToListAsync();
+
+        if (existingTechnicianRoster.Count > 0)
+            _db.Set<TechnicianRosterEntity>().RemoveRange(existingTechnicianRoster);
+
+        var existingCrews = await _db.Set<CrewEntity>()
+            .Where(c => c.WorkDate == workDate)
+            .ToListAsync();
+
+        var existingCrewIds = existingCrews.Select(c => c.Id).ToList();
+
+        if (existingCrewIds.Count > 0)
+        {
+            var ticketsUsingCrews = await _db.Set<TicketEntity>()
+                .Where(t => t.AssignedCrewId != null && existingCrewIds.Contains(t.AssignedCrewId.Value))
+                .ToListAsync();
+
+            foreach (var ticket in ticketsUsingCrews)
+                ticket.AssignedCrewId = null;
+        }
+
+        if (existingCrews.Count > 0)
+            _db.Set<CrewEntity>().RemoveRange(existingCrews);
+
+        var existingTruckRoster = await _db.Set<TruckRosterEntity>()
+            .Where(r => r.WorkDate == workDate)
+            .ToListAsync();
+
+        if (existingTruckRoster.Count > 0)
+            _db.Set<TruckRosterEntity>().RemoveRange(existingTruckRoster);
+
+        await _db.SaveChangesAsync();
+
+        var activeTruckIds = await _db.Set<TruckEntity>()
+            .AsNoTracking()
+            .Where(t => t.IsActive)
+            .Select(t => t.Id)
+            .ToListAsync();
+
+        var activeTruckIdSet = activeTruckIds.ToHashSet();
+
+        var techsWithHomeTruck = await _db.Set<TechnicianEntity>()
+            .AsNoTracking()
+            .Where(t => t.IsActive && t.HomeTruckId != null)
+            .ToListAsync();
+
+        foreach (var tech in techsWithHomeTruck)
+        {
+            if (tech.HomeTruckId == null)
+                continue;
+
+            if (!activeTruckIdSet.Contains(tech.HomeTruckId.Value))
+                continue;
+
+            _db.Set<TruckRosterEntity>().Add(new TruckRosterEntity
+            {
+                WorkDate = workDate,
+                TechnicianId = tech.Id,
+                TruckId = tech.HomeTruckId.Value
+            });
+        }
+
+        await _db.SaveChangesAsync();
+
+        var affectedTruckIds = techsWithHomeTruck
+            .Where(t => t.HomeTruckId != null && activeTruckIdSet.Contains(t.HomeTruckId.Value))
+            .Select(t => t.HomeTruckId!.Value)
+            .Distinct()
+            .ToList();
+
+        foreach (var truckId in affectedTruckIds)
+            await SyncCrewForTruckAsync(workDate, truckId);
+
+        return NoContent();
+    }
+
     private static DateTime ParseDateOrToday(string? date)
         => (!string.IsNullOrWhiteSpace(date) && DateTime.TryParse(date, out var parsed))
             ? parsed.Date
@@ -460,4 +646,34 @@ public sealed class TrucksController : ControllerBase
             DayOfWeek.Sunday => t.WorksSunday,
             _ => false
         };
+
+    private static string GetScheduleText(TechnicianEntity t)
+    {
+        var days = new List<string>();
+
+        if (t.WorksMonday) days.Add("Mon");
+        if (t.WorksTuesday) days.Add("Tues");
+        if (t.WorksWednesday) days.Add("Wed");
+        if (t.WorksThursday) days.Add("Thurs");
+        if (t.WorksFriday) days.Add("Fri");
+        if (t.WorksSaturday) days.Add("Sat");
+        if (t.WorksSunday) days.Add("Sun");
+
+        if (days.Count == 0)
+            return "No scheduled days";
+
+        if (t.WorksMonday && t.WorksTuesday && t.WorksWednesday && t.WorksThursday && t.WorksFriday &&
+            !t.WorksSaturday && !t.WorksSunday)
+            return "Mon-Fri";
+
+        if (t.WorksMonday && t.WorksTuesday && t.WorksWednesday && t.WorksThursday &&
+            !t.WorksFriday && !t.WorksSaturday && !t.WorksSunday)
+            return "Mon-Thurs";
+
+        if (!t.WorksMonday && t.WorksTuesday && t.WorksWednesday && t.WorksThursday && t.WorksFriday &&
+            !t.WorksSaturday && !t.WorksSunday)
+            return "Tues-Fri";
+
+        return string.Join(", ", days);
+    }
 }

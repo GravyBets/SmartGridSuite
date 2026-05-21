@@ -1,0 +1,61 @@
+﻿<Window x:Class="SmartGridSuite.Client.Views.Dispatcher.Dialogs.AssignTicketsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Assign Tickets"
+        Width="460"
+        Height="250"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="14"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock x:Name="HeaderTextBlock"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"/>
+
+            <TextBlock Text="Selected tickets will be assigned to this technician and moved to Assigned."
+                       Margin="0,4,0,0"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextSecondary}"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="2"
+                   Text="Assign To"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextPrimary}"/>
+
+        <ComboBox Grid.Row="4"
+                  x:Name="TechnicianComboBox"
+                  Height="34"
+                  IsEditable="True"
+                  IsTextSearchEnabled="True"/>
+
+        <StackPanel Grid.Row="6"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="Cancel"
+                    Width="90"
+                    Height="32"
+                    Margin="0,0,8,0"
+                    IsCancel="True"/>
+
+            <Button Content="Assign"
+                    Width="90"
+                    Height="32"
+                    IsDefault="True"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Click="Assign_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

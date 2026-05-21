@@ -13,6 +13,7 @@
         string? ActionRequiredOverride,
         string AssignedTech,
         string Problem,
-        string Notes
+        string Notes,
+        string? DispatchNotes = null
     );
 }

@@ -1,0 +1,153 @@
+﻿<UserControl x:Class="SmartGridSuite.Client.Views.FieldTechnician.Panes.FieldTechTasksPaneView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+
+    <UserControl.Resources>
+        <Style x:Key="FieldTechTaskCellTextStyle"
+               TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Padding" Value="2,4"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="0">
+        <Border Style="{StaticResource Card}"
+                Padding="16">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="My Tasks"
+                                   FontSize="22"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+
+                        <TextBlock Text="Open tickets assigned to the signed-in technician."
+                                   Margin="0,4,0,0"
+                                   FontSize="13"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Top">
+
+                        <Button Style="{StaticResource SecondaryButtonStyle}"
+                                Content="Open All"
+                                Height="34"
+                                Padding="16,0"
+                                Margin="0,0,10,0"
+                                Click="OpenAll_Click"/>
+
+                        <Button Style="{StaticResource PrimaryButtonStyle}"
+                                Content="Refresh"
+                                Height="34"
+                                Padding="16,0"
+                                Click="Refresh_Click"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Grid -->
+                <DataGrid x:Name="TasksGrid"
+                          Grid.Row="2"
+                          Style="{StaticResource ThemedDataGridStyle}"
+                          ItemsSource="{Binding Tickets}"
+                          SelectedItem="{Binding SelectedTicket, Mode=TwoWay}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          IsReadOnly="True"
+                          HeadersVisibility="Column"
+                          RowHeaderWidth="0"
+                          GridLinesVisibility="None"
+                          FontSize="15"
+                          RowHeight="44"
+                          MouseDoubleClick="TasksGrid_MouseDoubleClick">
+
+                    <DataGrid.Resources>
+                        <Style TargetType="TextBlock"
+                               x:Key="FieldTechGridTextBlockStyle">
+                            <Setter Property="FontSize" Value="15"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                        </Style>
+                    </DataGrid.Resources>
+
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Site"
+                            Binding="{Binding Site}"
+                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
+                            Width="95"/>
+
+                        <DataGridTextColumn Header="Status"
+                            Binding="{Binding Status}"
+                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
+                            Width="125"/>
+
+                        <DataGridTextColumn Header="Notification Name"
+                            Binding="{Binding NotificationName}"
+                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
+                            Width="2*"/>
+
+                        <DataGridTextColumn Header="Problem / Issue"
+                            Binding="{Binding Problem}"
+                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
+                            Width="2*"/>
+
+                        <DataGridTextColumn Header="Action Required"
+                            Binding="{Binding ActionRequired}"
+                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
+                            Width="2*"/>
+
+                        <DataGridTextColumn Header="Notification"
+                            Binding="{Binding Notification}"
+                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
+                            Width="125"/>
+
+                        <DataGridTextColumn Header="Work Order"
+                            Binding="{Binding WorkOrder}"
+                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
+                            Width="115"/>
+
+                        <DataGridTextColumn Header="Priority"
+                            Binding="{Binding PriorityDays}"
+                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
+                            Width="80"/>
+
+                        <DataGridTextColumn Header="Last Activity"
+                            Binding="{Binding LastActivityAt, StringFormat=MM-dd-yyyy HH:mm}"
+                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
+                            Width="150"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Footer status -->
+                <TextBlock Grid.Row="3"
+                           Text="{Binding StatusMessage}"
+                           Margin="4,10,0,0"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextSecondary}"/>
+                
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

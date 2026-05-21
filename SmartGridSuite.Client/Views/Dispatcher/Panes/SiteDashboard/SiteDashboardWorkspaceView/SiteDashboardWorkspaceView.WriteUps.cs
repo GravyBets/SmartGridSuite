@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using DocumentFormat.OpenXml.Bibliography;
+using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -14,8 +15,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private void SubmitWriteUpButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!TryBuildSubmitWriteUpText(out var finalWriteUpText))
+            if (!TryBuildSubmitWriteUpText(
+                out var finalWriteUpText,
+                out var siteHistoryWriteUpText))
+            {
                 return;
+            }
 
             var confirmed = ShowWriteUpPreviewWindow(finalWriteUpText);
 
@@ -26,6 +31,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 this,
                 new WriteUpSubmitRequestedEventArgs(
                     finalWriteUpText,
+                    siteHistoryWriteUpText,
                     true,
                     IncludePingStatsCheckBox.IsChecked == true,
                     IncludeSnmpStatsCheckBox.IsChecked == true));
@@ -34,9 +40,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private bool IsTowerDashboard => string.Equals(EquipmentDashboardKind, SmartGridSuite.Contracts.SiteDashboard.SiteDashboardKinds.Tower,
             StringComparison.OrdinalIgnoreCase);
 
-        private bool TryBuildSubmitWriteUpText(out string finalWriteUpText)
+        private bool TryBuildSubmitWriteUpText(out string finalWriteUpText, out string siteHistoryWriteUpText)
         {
             finalWriteUpText = string.Empty;
+            siteHistoryWriteUpText = string.Empty;
 
             var sections = new List<string>();
 
@@ -122,11 +129,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 }
             }
 
+            var dispatcherSections = sections.ToList();
+            var siteHistorySections = sections.ToList();
+
             var ticketSection = BuildTicketWriteUpFooterSection();
 
             if (!string.IsNullOrWhiteSpace(ticketSection))
             {
-                sections.Add(BuildSimpleWriteUpSection(
+                siteHistorySections.Add(BuildSimpleWriteUpSection(
                     TicketWriteUpHeader,
                     ticketSection));
             }
@@ -134,11 +144,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             var cnpTechFooter = BuildCnpTechFooterSection();
 
             if (!string.IsNullOrWhiteSpace(cnpTechFooter))
-                sections.Add(cnpTechFooter);
+            {
+                dispatcherSections.Add(cnpTechFooter);
+                siteHistorySections.Add(cnpTechFooter);
+            }
 
             finalWriteUpText = string.Join(
                 Environment.NewLine + Environment.NewLine,
-                sections.Where(x => !string.IsNullOrWhiteSpace(x)));
+                dispatcherSections.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+            siteHistoryWriteUpText = string.Join(
+                Environment.NewLine + Environment.NewLine,
+                siteHistorySections.Where(x => !string.IsNullOrWhiteSpace(x)));
 
             if (string.IsNullOrWhiteSpace(finalWriteUpText))
             {
@@ -665,17 +682,21 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         {
             public WriteUpSubmitRequestedEventArgs(
                 string finalWriteUpText,
+                string siteHistoryWriteUpText,
                 bool includeEquipmentReplacements,
                 bool includePingStats,
                 bool includeSnmpStats)
             {
                 FinalWriteUpText = finalWriteUpText;
+                SiteHistoryWriteUpText = siteHistoryWriteUpText;
                 IncludeEquipmentReplacements = includeEquipmentReplacements;
                 IncludePingStats = includePingStats;
                 IncludeSnmpStats = includeSnmpStats;
             }
 
             public string FinalWriteUpText { get; }
+            public string SiteHistoryWriteUpText { get; }
+
             public bool IncludeEquipmentReplacements { get; }
             public bool IncludePingStats { get; }
             public bool IncludeSnmpStats { get; }

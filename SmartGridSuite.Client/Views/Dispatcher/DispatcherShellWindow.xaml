@@ -92,7 +92,7 @@
                                                FontSize="14"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}"/>
-                                    <TextBlock Text="Crews, pairings, and trucks"
+                                    <TextBlock Text="Lookup, diagnostics, write-ups"
                                                Margin="0,2,0,0"
                                                FontSize="11"
                                                Foreground="{DynamicResource TextSecondary}"/>
@@ -185,7 +185,37 @@
                             </Grid>
                         </ListBoxItem>
 
-                        
+                        <ListBoxItem Tag="Daily Assignments">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Style="{StaticResource NavBadgeStyle}">
+                                    <TextBlock Text="A"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="14"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource TextPrimary}"/>
+                                </Border>
+
+                                <StackPanel Grid.Column="1"
+                                            Margin="10,0,0,0">
+                                    <TextBlock Text="Daily Assignments"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}"/>
+                                    <TextBlock Text="Crew routes and ticket order"
+                                               Margin="0,2,0,0"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondary}"/>
+                                </StackPanel>
+                            </Grid>
+                        </ListBoxItem>
+
+
                     </ListBox>
 
                     <!-- Collapsed nav -->
@@ -196,13 +226,12 @@
                              SelectionChanged="NavList_SelectionChanged"
                              Visibility="Collapsed">
 
-                        <ListBoxItem Tag="Dashboard" ToolTip="Dashboard">
+                        <ListBoxItem Tag="Site Dashboard" ToolTip="Site Dashboard">
                             <Border Style="{StaticResource NavBadgeStyle}">
-                                <TextBlock Text="D"
+                                <TextBlock Text="S"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource TextPrimary}"/>
+                                           FontSize="14"/>
                             </Border>
                         </ListBoxItem>
 
@@ -234,12 +263,14 @@
                             </Border>
                         </ListBoxItem>
 
-                        <ListBoxItem Tag="Site Dashboard" ToolTip="Site Dashboard">
+                        <ListBoxItem Tag="Daily Assignments" ToolTip="Daily Assignments">
                             <Border Style="{StaticResource NavBadgeStyle}">
-                                <TextBlock Text="S"
+                                <TextBlock Text="A"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
-                                           FontSize="14"/>
+                                           FontSize="14"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
                             </Border>
                         </ListBoxItem>
                     </ListBox>

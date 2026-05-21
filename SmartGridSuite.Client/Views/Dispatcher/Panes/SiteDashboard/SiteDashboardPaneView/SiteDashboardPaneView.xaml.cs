@@ -17,6 +17,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private string _currentCnpTechName = string.Empty;
 
+        public bool CanManageSiteNotes
+        {
+            get => WorkspaceView.CanManageSiteNotes;
+            set => WorkspaceView.CanManageSiteNotes = value;
+        }
+
         private readonly List<SiteDashboardTabSession> _sessions = new();
         private string? _selectedSessionKey;
         private int _blankTabCounter = 1;
@@ -28,6 +34,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private List<CommunicationDeviceTypeDto> _communicationDeviceTypes = new();
         private bool _communicationDeviceTypesLoaded;
+
+        
 
         public SiteDashboardPaneView()
             : this(new ApiClient("https://localhost:7140"))

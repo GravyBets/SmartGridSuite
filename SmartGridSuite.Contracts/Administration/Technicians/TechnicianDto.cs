@@ -13,6 +13,7 @@ public sealed class TechnicianDto
     public string LastName { get; set; } = "";
     public string Name { get; set; } = "";
     public string Title { get; set; } = "";
+    public string ScheduleText { get; set; } = "";
 
     public bool IsActive { get; set; }
 

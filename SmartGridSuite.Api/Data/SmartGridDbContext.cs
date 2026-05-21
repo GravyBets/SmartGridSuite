@@ -28,7 +28,13 @@ namespace SmartGridSuite.Api.Data
 
         public DbSet<AppSettingEntity> AppSettings => Set<AppSettingEntity>();
 
+        public DbSet<SiteNoteEntity> SiteNotes => Set<SiteNoteEntity>();
+
         public virtual DbSet<CommunicationDeviceTypeEntity> CommunicationDeviceTypes { get; set; }
+
+        public DbSet<DailyTicketAssignmentEntity> DailyTicketAssignments => Set<DailyTicketAssignmentEntity>();
+
+        public DbSet<DailyTicketAssignmentPublishedEntity> DailyTicketAssignmentPublished => Set<DailyTicketAssignmentPublishedEntity>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -52,6 +58,7 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.PriorityDays).HasColumnName("priority_days");
                 e.Property(x => x.Problem).HasColumnName("problem");
                 e.Property(x => x.Notes).HasColumnName("notes");
+                e.Property(x => x.DispatchNotes).HasColumnName("dispatch_notes");
                 e.Property(x => x.CreatedBy).HasColumnName("created_by");
                 e.Property(x => x.AssignedCrewId).HasColumnName("assigned_crew_id");
 
@@ -90,23 +97,31 @@ namespace SmartGridSuite.Api.Data
             modelBuilder.Entity<TechnicianRosterEntity>(e =>
             {
                 e.ToTable("technician_roster");
+
                 e.HasKey(x => new { x.WorkDate, x.TechnicianId });
 
-                e.Property(x => x.WorkDate).HasColumnName("work_date").HasColumnType("date");
-                e.Property(x => x.TechnicianId).HasColumnName("technician_id");
-                e.Property(x => x.CrewId).HasColumnName("crew_id");
+                e.Property(x => x.WorkDate)
+                    .HasColumnName("work_date")
+                    .HasColumnType("date");
 
-                e.HasIndex(x => new { x.CrewId, x.WorkDate }).HasDatabaseName("ix_roster_crew");
+                e.Property(x => x.TechnicianId)
+                    .HasColumnName("technician_id");
+
+                e.Property(x => x.CrewId)
+                    .HasColumnName("crew_id");
+
+                e.HasIndex(x => x.CrewId)
+                    .HasDatabaseName("ix_technician_roster_crew");
 
                 e.HasOne(x => x.Technician)
-                 .WithMany(t => t.TechnicianRosters)
-                 .HasForeignKey(x => x.TechnicianId)
-                 .OnDelete(DeleteBehavior.Cascade);
+                    .WithMany(t => t.TechnicianRosters)
+                    .HasForeignKey(x => x.TechnicianId)
+                    .OnDelete(DeleteBehavior.Cascade);
 
-                e.HasOne(x => x.Technician)
-                 .WithMany()
-                 .HasForeignKey(x => x.TechnicianId)
-                 .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(x => x.Crew)
+                    .WithMany(c => c.TechnicianRosters)
+                    .HasForeignKey(x => x.CrewId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<TechnicianEntity>(e =>
@@ -381,6 +396,273 @@ namespace SmartGridSuite.Api.Data
                 entity.HasIndex(e => e.DisplayName)
                     .IsUnique()
                     .HasDatabaseName("ux_communication_device_types_display_name");
+            });
+
+            modelBuilder.Entity<SiteNoteEntity>(e =>
+            {
+                e.ToTable("site_notes");
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.Id).HasColumnName("id");
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(64)
+                    .IsRequired();
+
+                e.Property(x => x.NoteType)
+                    .HasColumnName("note_type")
+                    .HasMaxLength(50);
+
+                e.Property(x => x.NoteText)
+                    .HasColumnName("note_text")
+                    .IsRequired();
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active");
+
+                e.Property(x => x.CreatedBy)
+                    .HasColumnName("created_by")
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedBy)
+                    .HasColumnName("updated_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.Property(x => x.DeletedBy)
+                    .HasColumnName("deleted_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.DeletedAt)
+                    .HasColumnName("deleted_at");
+
+                e.HasIndex(x => x.SiteId)
+                    .HasDatabaseName("ix_site_notes_site_id");
+
+                e.HasIndex(x => x.IsActive)
+                    .HasDatabaseName("ix_site_notes_active");
+
+                e.HasIndex(x => new { x.SiteId, x.IsActive })
+                    .HasDatabaseName("ix_site_notes_site_active");
+            });
+
+            modelBuilder.Entity<DailyTicketAssignmentEntity>(e =>
+            {
+                e.ToTable("daily_ticket_assignments");
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.Id).HasColumnName("id");
+
+                e.Property(x => x.AssignmentDate)
+                    .HasColumnName("assignment_date")
+                    .HasColumnType("date");
+
+                e.Property(x => x.TicketId)
+                    .HasColumnName("ticket_id");
+
+                e.Property(x => x.TargetType)
+                    .HasColumnName("target_type")
+                    .HasMaxLength(20)
+                    .IsRequired();
+
+                e.Property(x => x.TruckId)
+                    .HasColumnName("truck_id");
+
+                e.Property(x => x.TechnicianId)
+                    .HasColumnName("technician_id");
+
+                e.Property(x => x.CrewId)
+                    .HasColumnName("crew_id");
+
+                e.Property(x => x.SortOrder)
+                    .HasColumnName("sort_order");
+
+                e.Property(x => x.IsPublished)
+                    .HasColumnName("is_published");
+
+                e.Property(x => x.PublishedVersion)
+                    .HasColumnName("published_version");
+
+                e.Property(x => x.PublishedAt)
+                    .HasColumnName("published_at");
+
+                e.Property(x => x.PublishedBy)
+                    .HasColumnName("published_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.CarriedFromAssignmentId)
+                    .HasColumnName("carried_from_assignment_id");
+
+                e.Property(x => x.AssignmentNotes)
+                    .HasColumnName("assignment_notes");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.CreatedBy)
+                    .HasColumnName("created_by")
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.Property(x => x.UpdatedBy)
+                    .HasColumnName("updated_by")
+                    .HasMaxLength(100);
+
+                e.HasIndex(x => new { x.AssignmentDate, x.TicketId })
+                    .IsUnique()
+                    .HasDatabaseName("ux_daily_assignment_date_ticket");
+
+                e.HasIndex(x => x.AssignmentDate)
+                    .HasDatabaseName("ix_daily_assignments_date");
+
+                e.HasIndex(x => x.TicketId)
+                    .HasDatabaseName("ix_daily_assignments_ticket");
+
+                e.HasIndex(x => new { x.AssignmentDate, x.TruckId })
+                    .HasDatabaseName("ix_daily_assignments_truck");
+
+                e.HasIndex(x => new { x.AssignmentDate, x.TechnicianId })
+                    .HasDatabaseName("ix_daily_assignments_technician");
+
+                e.HasIndex(x => new { x.AssignmentDate, x.CrewId })
+                    .HasDatabaseName("ix_daily_assignments_crew");
+
+                e.HasIndex(x => new { x.AssignmentDate, x.IsPublished })
+                    .HasDatabaseName("ix_daily_assignments_published");
+
+                e.HasIndex(x => x.CarriedFromAssignmentId)
+                    .HasDatabaseName("ix_daily_assignments_carried_from");
+
+                e.HasOne(x => x.Ticket)
+                    .WithMany()
+                    .HasForeignKey(x => x.TicketId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.Truck)
+                    .WithMany()
+                    .HasForeignKey(x => x.TruckId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(x => x.Technician)
+                    .WithMany()
+                    .HasForeignKey(x => x.TechnicianId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(x => x.Crew)
+                    .WithMany()
+                    .HasForeignKey(x => x.CrewId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(x => x.CarriedFromAssignment)
+                    .WithMany()
+                    .HasForeignKey(x => x.CarriedFromAssignmentId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<DailyTicketAssignmentPublishedEntity>(e =>
+            {
+                e.ToTable("daily_ticket_assignment_published");
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.Id).HasColumnName("id");
+
+                e.Property(x => x.AssignmentDate)
+                    .HasColumnName("assignment_date")
+                    .HasColumnType("date");
+
+                e.Property(x => x.PublishedVersion)
+                    .HasColumnName("published_version");
+
+                e.Property(x => x.TicketId)
+                    .HasColumnName("ticket_id");
+
+                e.Property(x => x.SourceAssignmentId)
+                    .HasColumnName("source_assignment_id");
+
+                e.Property(x => x.TargetType)
+                    .HasColumnName("target_type")
+                    .HasMaxLength(20)
+                    .IsRequired();
+
+                e.Property(x => x.TruckId)
+                    .HasColumnName("truck_id");
+
+                e.Property(x => x.TechnicianId)
+                    .HasColumnName("technician_id");
+
+                e.Property(x => x.CrewId)
+                    .HasColumnName("crew_id");
+
+                e.Property(x => x.SortOrder)
+                    .HasColumnName("sort_order");
+
+                e.Property(x => x.AssignmentNotes)
+                    .HasColumnName("assignment_notes");
+
+                e.Property(x => x.PublishedAt)
+                    .HasColumnName("published_at");
+
+                e.Property(x => x.PublishedBy)
+                    .HasColumnName("published_by")
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                e.HasIndex(x => new { x.AssignmentDate, x.PublishedVersion, x.TicketId })
+                    .IsUnique()
+                    .HasDatabaseName("ux_daily_published_date_version_ticket");
+
+                e.HasIndex(x => new { x.AssignmentDate, x.PublishedVersion })
+                    .HasDatabaseName("ix_daily_published_date_version");
+
+                e.HasIndex(x => x.TicketId)
+                    .HasDatabaseName("ix_daily_published_ticket");
+
+                e.HasIndex(x => new { x.AssignmentDate, x.PublishedVersion, x.TruckId })
+                    .HasDatabaseName("ix_daily_published_truck");
+
+                e.HasIndex(x => new { x.AssignmentDate, x.PublishedVersion, x.TechnicianId })
+                    .HasDatabaseName("ix_daily_published_technician");
+
+                e.HasIndex(x => new { x.AssignmentDate, x.PublishedVersion, x.CrewId })
+                    .HasDatabaseName("ix_daily_published_crew");
+
+                e.HasIndex(x => x.SourceAssignmentId)
+                    .HasDatabaseName("ix_daily_published_source_assignment");
+
+                e.HasOne(x => x.Ticket)
+                    .WithMany()
+                    .HasForeignKey(x => x.TicketId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.SourceAssignment)
+                    .WithMany()
+                    .HasForeignKey(x => x.SourceAssignmentId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(x => x.Truck)
+                    .WithMany()
+                    .HasForeignKey(x => x.TruckId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(x => x.Technician)
+                    .WithMany()
+                    .HasForeignKey(x => x.TechnicianId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(x => x.Crew)
+                    .WithMany()
+                    .HasForeignKey(x => x.CrewId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
         }
     }

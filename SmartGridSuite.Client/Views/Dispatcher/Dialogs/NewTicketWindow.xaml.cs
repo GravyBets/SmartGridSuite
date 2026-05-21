@@ -30,10 +30,7 @@ public partial class NewTicketWindow : Window
 
     private NewTicketDraft Draft => (NewTicketDraft)DataContext;
 
-    public NewTicketWindow(
-        TicketsApi ticketsApi,
-        IEnumerable<string>? techNames = null,
-        DispatchTicket? existingTicket = null)
+    public NewTicketWindow(TicketsApi ticketsApi, IEnumerable<string>? techNames = null, DispatchTicket? existingTicket = null)
     {
         InitializeComponent();
 
@@ -103,6 +100,7 @@ public partial class NewTicketWindow : Window
         Draft.WorkOrderCode = ticket.GroupCode ?? "";
         Draft.PriorityDays = ticket.PriorityDays > 0 ? ticket.PriorityDays.ToString() : "";
         Draft.Notes = ticket.Notes ?? "";
+        Draft.DispatchNotes = ticket.DispatchNotes ?? "";
         Draft.CreatedBy = string.IsNullOrWhiteSpace(ticket.CreatedBy) ? fallbackCreatedBy : ticket.CreatedBy;
     }
 
@@ -258,11 +256,6 @@ public partial class NewTicketWindow : Window
         }
 
         var problem = (Draft.Problem ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(problem))
-        {
-            MessageBox.Show("Problem is required.", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
 
         var status = (Draft.Status ?? "").Trim();
         if (string.IsNullOrWhiteSpace(status))
@@ -272,26 +265,12 @@ public partial class NewTicketWindow : Window
         }
 
         var notif = (Draft.NotificationNumber ?? "").Trim();
-        if (!string.IsNullOrWhiteSpace(notif) && !Regex.IsMatch(notif, @"^\d{10}$"))
-        {
-            MessageBox.Show("Notification # must be exactly 10 digits when provided.", Title,
-                MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
 
         string? workOrder = null;
         var wo = (Draft.WorkOrder ?? "").Trim();
-        if (!string.IsNullOrWhiteSpace(wo))
-        {
-            if (!Regex.IsMatch(wo, @"^\d{9}$"))
-            {
-                MessageBox.Show("Work Order must be exactly 9 digits when provided.", Title,
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
 
+        if (!string.IsNullOrWhiteSpace(wo))
             workOrder = wo;
-        }
 
         int priority = 0;
         var pri = (Draft.PriorityDays ?? "").Trim();
@@ -346,7 +325,8 @@ public partial class NewTicketWindow : Window
                     ActionRequiredOverride: actionRequiredOverride,
                     AssignedTech: assignedTech,
                     Problem: problem,
-                    Notes: (Draft.Notes ?? "").Trim()
+                    Notes: (Draft.Notes ?? "").Trim(),
+                    DispatchNotes: (Draft.DispatchNotes ?? "").Trim()
                 );
 
                 CreatedTicketId = await _ticketsApi.UpdateTicketAsync(_editingTicketId!.Value, updateReq);
@@ -371,6 +351,7 @@ public partial class NewTicketWindow : Window
                     AssignedTech: assignedTech,
                     Problem: problem,
                     Notes: (Draft.Notes ?? "").Trim(),
+                    DispatchNotes: (Draft.DispatchNotes ?? "").Trim(),
                     CreatedBy: createdBy
                 );
 

@@ -1,0 +1,618 @@
+﻿<UserControl x:Class="SmartGridSuite.Client.Views.Dispatcher.Panes.DailyAssignmentsPaneView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <Style x:Key="CleanListBoxStyle" TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+
+        <Style x:Key="CleanListBoxItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="SelectionChrome"
+                                Padding="0"
+                                CornerRadius="12"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="2">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SelectionChrome" Property="Background" Value="#F3F7FF"/>
+                                <Setter TargetName="SelectionChrome" Property="BorderBrush" Value="#BFDBFE"/>
+                            </Trigger>
+
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="SelectionChrome" Property="Background" Value="#DBEAFE"/>
+                                <Setter TargetName="SelectionChrome" Property="BorderBrush" Value="#2563EB"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PaneTitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+
+        <Style x:Key="PaneSubtitleTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        </Style>
+
+        <Style x:Key="SectionHeaderTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+
+        <Style x:Key="SummaryValueTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="21"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+
+        <Style x:Key="SummaryLabelTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
+
+        <Style x:Key="SummaryCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="14,12"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+
+        <Style x:Key="TicketCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsFieldComplete}" Value="True">
+                    <Setter Property="Opacity" Value="0.45"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsClosed}" Value="True">
+                    <Setter Property="Opacity" Value="0.35"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="TransparentIconButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Opacity" Value="0.70"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="1"/>
+                                <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="AssignmentTargetComboTemplate">
+            <Grid Margin="0,3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="24"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="⚠"
+                           FontSize="16"
+                           Foreground="#DC2626"
+                           VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasNoTickets}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="{Binding PrimaryText}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextTrimming="CharacterEllipsis"/>
+
+                    <TextBlock Text="{Binding SecondaryText}"
+                               Margin="0,2,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondary}"
+                               TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="TicketCardTemplate">
+            <Border Style="{StaticResource TicketCardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <CheckBox Grid.Column="0"
+                              VerticalAlignment="Top"
+                              Margin="0,4,0,0"
+                              IsChecked="{Binding IsSelected,
+                                                  RelativeSource={RelativeSource AncestorType=ListBoxItem},
+                                                  Mode=TwoWay}"/>
+
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="4"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="6"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="{Binding Site}"
+                                       FontSize="15"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       TextTrimming="CharacterEllipsis"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Status}"
+                                       Margin="10,0,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </Grid>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="{Binding NotificationName}"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   TextWrapping="Wrap"/>
+
+                        <StackPanel Grid.Row="4"
+                                    Orientation="Vertical">
+                            <TextBlock FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       TextWrapping="Wrap">
+                                <Run Text="Priority: "/>
+                                <Run Text="{Binding PriorityDays, Mode=OneWay}"/>
+                                <Run Text="d"/>
+                            </TextBlock>
+
+                            <TextBlock Margin="0,2,0,0"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       TextWrapping="Wrap">
+                                <Run Text="WO: "/>
+                                <Run Text="{Binding WorkOrder, Mode=OneWay}"/>
+                                <Run Text="  "/>
+                                <Run Text="{Binding WorkOrderClass, Mode=OneWay}"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="AssignedTicketTemplate">
+            <Border Style="{StaticResource TicketCardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="34"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding SortOrder}"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextSecondary}"
+                               VerticalAlignment="Top"/>
+
+                    <Grid Grid.Column="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="4"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="4"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="{Binding Site}"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       TextTrimming="CharacterEllipsis"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Status}"
+                                       Margin="8,0,0,0"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </Grid>
+
+                        <TextBlock Grid.Row="2"
+                                   Text="{Binding NotificationName}"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   TextWrapping="Wrap"/>
+
+                        <TextBlock Grid.Row="4"
+                                   Text="{Binding Problem}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   TextWrapping="Wrap"/>
+                    </Grid>
+
+                    <StackPanel Grid.Column="2"
+                                Margin="10,0,0,0"
+                                VerticalAlignment="Top">
+
+                        <Button Style="{StaticResource TransparentIconButtonStyle}"
+                                Tag="{Binding}"
+                                ToolTip="Move up"
+                                Click="MoveAssignedTicketUp_Click">
+                            <TextBlock Text="▲"
+                                       FontSize="12"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </Button>
+
+                        <Button Style="{StaticResource TransparentIconButtonStyle}"
+                                Margin="0,2,0,0"
+                                Tag="{Binding}"
+                                ToolTip="Move down"
+                                Click="MoveAssignedTicketDown_Click">
+                            <TextBlock Text="▼"
+                                       FontSize="12"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </Button>
+
+                        <Button Style="{StaticResource TransparentIconButtonStyle}"
+                                Margin="0,6,0,0"
+                                Tag="{Binding}"
+                                ToolTip="Remove from assignment"
+                                Click="RemoveAssignedTicket_Click">
+                            <TextBlock Text="&#xE74D;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Style="{StaticResource Card}"
+                Padding="10">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="6"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="Daily Assignments"
+                                   Style="{StaticResource PaneTitleTextStyle}"/>
+
+                        <TextBlock Text="{Binding HeaderSubtitle}"
+                                   Margin="0,4,0,0"
+                                   Style="{StaticResource PaneSubtitleTextStyle}"/>
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Content="Refresh"
+                            Height="34"
+                            MinWidth="100"
+                            Click="Refresh_Click"/>
+                </Grid>
+
+                <UniformGrid Grid.Row="2"
+                             Rows="1"
+                             Columns="4">
+                    <Border Style="{StaticResource SummaryCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding TicketPoolCount}"
+                                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Ticket Pool"
+                                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SummaryCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding AssignedTicketCount}"
+                                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Assigned"
+                                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SummaryCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding FieldCompleteCount}"
+                                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Field Complete"
+                                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SummaryCardStyle}"
+                            Margin="0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding BoardStatusText}"
+                                       Style="{StaticResource SummaryValueTextStyle}"/>
+                            <TextBlock Text="Board Status"
+                                       Style="{StaticResource SummaryLabelTextStyle}"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <TextBlock Grid.Row="4"
+                           Text="{Binding StatusText}"
+                           Foreground="{DynamicResource TextSecondary}"
+                           FontSize="12"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="420"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Style="{StaticResource Card}"
+                    Padding="14">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="Ticket Pool"
+                                   Style="{StaticResource SectionHeaderTextStyle}"/>
+
+                        <TextBlock Text="Defaults to unassigned, non-closed tickets."
+                                   Margin="0,4,0,0"
+                                   Style="{StaticResource PaneSubtitleTextStyle}"/>
+                    </StackPanel>
+
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="6"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="6"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBox x:Name="TicketPoolSearchBox"
+                                 Grid.Row="0"
+                                 Height="32"
+                                 Style="{StaticResource ModernWatermarkTextBox}"
+                                 Tag="Search site, WO, notification, problem..."
+                                 TextChanged="TicketPoolSearchBox_TextChanged"/>
+
+                        <CheckBox x:Name="IncludeAssignedTicketsCheckBox"
+                                  Grid.Row="2"
+                                  Content="Include assigned tickets"
+                                  Foreground="{DynamicResource TextPrimary}"
+                                  Checked="IncludeAssignedTickets_Changed"
+                                  Unchecked="IncludeAssignedTickets_Changed"/>
+
+                        <TextBlock Grid.Row="4"
+                                   Text="{Binding TicketPoolSummaryText}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                    </Grid>
+
+                    <ListBox x:Name="TicketPoolList"
+                             Grid.Row="4"
+                             ItemsSource="{Binding FilteredTicketPool}"
+                             ItemTemplate="{StaticResource TicketCardTemplate}"
+                             ItemContainerStyle="{StaticResource CleanListBoxItemStyle}"
+                             Style="{StaticResource CleanListBoxStyle}"
+                             SelectionMode="Multiple"
+                             SelectionChanged="TicketPoolList_SelectionChanged"/>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2"
+                    Style="{StaticResource Card}"
+                    Padding="14">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock Text="Crew / Technician Work List"
+                                       Style="{StaticResource SectionHeaderTextStyle}"/>
+
+                            <TextBlock Text="{Binding SelectedTargetSubtitle}"
+                                       Margin="0,4,0,0"
+                                       Style="{StaticResource PaneSubtitleTextStyle}"/>
+                        </StackPanel>
+
+                        <Button Grid.Column="1"
+                                Content="Publish This List"
+                                Height="34"
+                                MinWidth="140"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                IsEnabled="{Binding HasSelectedTarget}"
+                                Click="PublishSelectedTarget_Click"/>
+                    </Grid>
+
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <ComboBox x:Name="AssignmentTargetComboBox"
+                                  Grid.Column="0"
+                                  Height="42"
+                                  Width="Auto"
+                                  ItemsSource="{Binding AssignmentTargets}"
+                                  SelectedItem="{Binding SelectedTarget, Mode=TwoWay}"
+                                  ItemTemplate="{StaticResource AssignmentTargetComboTemplate}"/>
+
+                        <Button Grid.Column="2"
+                                Content="Add Selected"
+                                Height="34"
+                                MinWidth="120"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                IsEnabled="{Binding HasSelectedTickets}"
+                                Click="AddSelectedToSelectedTarget_Click"/>
+                    </Grid>
+
+                    <Grid Grid.Row="4">
+                        <ListBox ItemsSource="{Binding SelectedTarget.AssignedTickets}"
+                                 ItemTemplate="{StaticResource AssignedTicketTemplate}"
+                                 ItemContainerStyle="{StaticResource CleanListBoxItemStyle}"
+                                 Style="{StaticResource CleanListBoxStyle}"
+                                 SelectionMode="Single"/>
+
+                        <TextBlock Text="Select a crew or technician to view their work list."
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   FontStyle="Italic"
+                                   IsHitTestVisible="False">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasSelectedTarget}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <TextBlock Text="No tickets assigned to this crew/technician."
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   FontStyle="Italic"
+                                   IsHitTestVisible="False">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding HasSelectedTarget}" Value="True"/>
+                                                <Condition Binding="{Binding SelectedTarget.AssignedTicketCount}" Value="0"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

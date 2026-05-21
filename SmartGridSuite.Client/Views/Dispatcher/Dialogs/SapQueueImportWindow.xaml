@@ -99,94 +99,207 @@
         <!-- Summary -->
         <Border Grid.Row="2" Style="{StaticResource Card}" Padding="14">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="180"/>
-                    <ColumnDefinition Width="180"/>
-                    <ColumnDefinition Width="180"/>
-                    <ColumnDefinition Width="180"/>
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <StackPanel>
-                    <TextBlock Text="Preview Summary"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimary}"/>
-                    <TextBlock Text="Only rows marked Ready will be imported."
-                               Margin="0,4,0,0"
-                               Foreground="{DynamicResource TextSecondary}"/>
-                </StackPanel>
-
-                <Border Grid.Column="1"
-                        Margin="10,0,0,0"
-                        Background="{DynamicResource SurfaceBg}"
-                        BorderBrush="{DynamicResource SurfaceBorder}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="12,10">
+                <DockPanel Grid.Row="0">
                     <StackPanel>
-                        <TextBlock Text="Total"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-                        <TextBlock Text="{Binding TotalRows}"
-                                   Margin="0,4,0,0"
-                                   FontSize="18"
-                                   FontWeight="Bold"
+                        <TextBlock Text="Preview Summary"
+                                   FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextPrimary}"/>
-                    </StackPanel>
-                </Border>
 
-                <Border Grid.Column="2"
-                        Margin="10,0,0,0"
-                        Background="{DynamicResource SurfaceBg}"
-                        BorderBrush="{DynamicResource SurfaceBorder}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="12,10">
-                    <StackPanel>
-                        <TextBlock Text="Ready"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-                        <TextBlock Text="{Binding ReadyCount}"
+                        <TextBlock Text="Only rows marked Ready will be imported. Rows with a parsed site import as Open. Rows missing a site import as Needs Review."
                                    Margin="0,4,0,0"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource TextPrimary}"/>
+                                   Foreground="{DynamicResource TextSecondary}"/>
                     </StackPanel>
-                </Border>
+                </DockPanel>
 
-                <Border Grid.Column="3"
-                        Margin="10,0,0,0"
-                        Background="{DynamicResource SurfaceBg}"
-                        BorderBrush="{DynamicResource SurfaceBorder}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="12,10">
-                    <StackPanel>
-                        <TextBlock Text="Already Exists"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-                        <TextBlock Text="{Binding AlreadyExistsCount}"
-                                   Margin="0,4,0,0"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource TextPrimary}"/>
-                    </StackPanel>
-                </Border>
+                <UniformGrid Grid.Row="2"
+                             Columns="10"
+                             Rows="1">
 
-                <Border Grid.Column="4"
-                        Margin="10,0,0,0"
-                        Background="{DynamicResource SurfaceBg}"
-                        BorderBrush="{DynamicResource SurfaceBorder}"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="12,10">
-                    <StackPanel>
-                        <TextBlock Text="Invalid"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-                        <TextBlock Text="{Binding InvalidCount}"
-                                   Margin="0,4,0,0"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource TextPrimary}"/>
-                    </StackPanel>
-                </Border>
+                    <Border Margin="0,0,8,0"
+                            Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="10,8">
+                        <StackPanel>
+                            <TextBlock Text="Total"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="{Binding TotalRows}"
+                                        Margin="0,3,0,0"
+                                        FontSize="18"
+                                        FontWeight="Bold"
+                                        Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Margin="0,0,8,0"
+                            Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="10,8">
+                        <StackPanel>
+                            <TextBlock Text="Ready"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="{Binding ReadyCount}"
+                                       Margin="0,3,0,0"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Margin="0,0,8,0"
+                            Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="10,8">
+                        <StackPanel>
+                            <TextBlock Text="Exists"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="{Binding AlreadyExistsCount}"
+                                       Margin="0,3,0,0"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Margin="0,0,8,0"
+                            Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="10,8">
+                        <StackPanel>
+                            <TextBlock Text="Invalid"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="{Binding InvalidCount}"
+                                       Margin="0,3,0,0"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Margin="0,0,8,0"
+                            Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="10,8">
+                        <StackPanel>
+                            <TextBlock Text="As Open"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="{Binding WillImportOpenCount}"
+                                       Margin="0,3,0,0"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Margin="0,0,8,0"
+                            Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="10,8">
+                        <StackPanel>
+                            <TextBlock Text="Review"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="{Binding WillImportNeedsReviewCount}"
+                                       Margin="0,3,0,0"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Margin="0,0,8,0"
+                            Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="10,8">
+                        <StackPanel>
+                            <TextBlock Text="Missing Site"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="{Binding MissingSiteCount}"
+                                       Margin="0,3,0,0"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Margin="0,0,8,0"
+                            Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="10,8">
+                        <StackPanel>
+                            <TextBlock Text="With WO"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="{Binding WithWorkOrderCount}"
+                                       Margin="0,3,0,0"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Margin="0,0,8,0"
+                            Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="10,8">
+                        <StackPanel>
+                            <TextBlock Text="No WO"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="{Binding WithoutWorkOrderCount}"
+                                       Margin="0,3,0,0"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="10,8">
+                        <StackPanel>
+                            <TextBlock Text="No Problem"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="{Binding MissingProblemCount}"
+                                       Margin="0,3,0,0"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
             </Grid>
         </Border>
 
@@ -213,7 +326,10 @@
                           ItemsSource="{Binding PreviewRows}">
 
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Status" Width="130" Binding="{Binding ImportStatus}"/>
+                        <DataGridTextColumn Header="Status" Width="120" Binding="{Binding ImportStatus}"/>
+                        <DataGridTextColumn Header="Will Become" Width="130" Binding="{Binding WillBecome}"/>
+                        <DataGridTextColumn Header="Site Check" Width="120" Binding="{Binding SiteCheck}"/>
+                        <DataGridTextColumn Header="WO Check" Width="90" Binding="{Binding WorkOrderCheck}"/>
                         <DataGridTextColumn Header="Row" Width="70" Binding="{Binding RowNumber}"/>
                         <DataGridTextColumn Header="Notification" Width="130" Binding="{Binding Notification}"/>
                         <DataGridTextColumn Header="Work Order" Width="120" Binding="{Binding WorkOrder}"/>
@@ -222,7 +338,7 @@
                                             Binding="{Binding NotificationDate, StringFormat={}{0:MM/dd/yyyy}}"/>
                         <DataGridTextColumn Header="Parsed Site" Width="120" Binding="{Binding ParsedSite}"/>
                         <DataGridTextColumn Header="Description" Width="*" Binding="{Binding Description}"/>
-                        <DataGridTextColumn Header="Message" Width="260" Binding="{Binding Message}"/>
+                        <DataGridTextColumn Header="Message" Width="Auto" Binding="{Binding Message}"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>

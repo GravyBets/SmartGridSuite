@@ -93,6 +93,78 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             }
         }
 
+        private int _willImportOpenCount;
+        public int WillImportOpenCount
+        {
+            get => _willImportOpenCount;
+            set
+            {
+                if (_willImportOpenCount == value) return;
+                _willImportOpenCount = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private int _willImportNeedsReviewCount;
+        public int WillImportNeedsReviewCount
+        {
+            get => _willImportNeedsReviewCount;
+            set
+            {
+                if (_willImportNeedsReviewCount == value) return;
+                _willImportNeedsReviewCount = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private int _missingSiteCount;
+        public int MissingSiteCount
+        {
+            get => _missingSiteCount;
+            set
+            {
+                if (_missingSiteCount == value) return;
+                _missingSiteCount = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private int _withWorkOrderCount;
+        public int WithWorkOrderCount
+        {
+            get => _withWorkOrderCount;
+            set
+            {
+                if (_withWorkOrderCount == value) return;
+                _withWorkOrderCount = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private int _withoutWorkOrderCount;
+        public int WithoutWorkOrderCount
+        {
+            get => _withoutWorkOrderCount;
+            set
+            {
+                if (_withoutWorkOrderCount == value) return;
+                _withoutWorkOrderCount = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private int _missingProblemCount;
+        public int MissingProblemCount
+        {
+            get => _missingProblemCount;
+            set
+            {
+                if (_missingProblemCount == value) return;
+                _missingProblemCount = value;
+                OnPropertyChanged();
+            }
+        }
+
         public SapQueueImportWindow(TicketsApi ticketsApi)
         {
             InitializeComponent();
@@ -167,6 +239,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
                 UpdateCounts();
             }
+            catch (IOException ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "SAP Export File Is Locked",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
             catch (Exception ex)
             {
                 MessageBox.Show(
@@ -203,10 +283,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             }
 
             var confirm = MessageBox.Show(
-                $"Import {readyRows.Count} ready rows?",
-                "Confirm SAP Import",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+                    $"Import {readyRows.Count} ready row(s)?\n\n" +
+                    $"Will import as Open: {WillImportOpenCount}\n" +
+                    $"Will import as Needs Review: {WillImportNeedsReviewCount}\n" +
+                    $"Missing Problem/Issue: {MissingProblemCount}\n" +
+                    $"With Work Order: {WithWorkOrderCount}\n" +
+                    $"Without Work Order: {WithoutWorkOrderCount}",
+                    "Confirm SAP Import",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
 
             if (confirm != MessageBoxResult.Yes)
                 return;
@@ -225,7 +310,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                 UpdateCounts();
 
                 MessageBox.Show(
-                    $"Imported: {result.ImportedCount}\nAlready Exists: {result.AlreadyExistsCount}\nInvalid: {result.InvalidCount}",
+                    $"Imported {result.ImportedCount} Successfully!",
                     "SAP Import Complete",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -269,11 +354,44 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
         private void UpdateCounts()
         {
             TotalRows = PreviewRows.Count;
-            ReadyCount = PreviewRows.Count(r => string.Equals(r.ImportStatus, "Ready", StringComparison.OrdinalIgnoreCase));
-            AlreadyExistsCount = PreviewRows.Count(r => string.Equals(r.ImportStatus, "Already Exists", StringComparison.OrdinalIgnoreCase));
-            InvalidCount = PreviewRows.Count(r => string.Equals(r.ImportStatus, "Invalid", StringComparison.OrdinalIgnoreCase));
+
+            ReadyCount = PreviewRows.Count(IsReadyRow);
+            AlreadyExistsCount = PreviewRows.Count(r =>
+                string.Equals(r.ImportStatus, "Already Exists", StringComparison.OrdinalIgnoreCase));
+
+            InvalidCount = PreviewRows.Count(r =>
+                string.Equals(r.ImportStatus, "Invalid", StringComparison.OrdinalIgnoreCase));
+
+            WillImportOpenCount = PreviewRows.Count(r =>
+                IsReadyRow(r) &&
+                !string.IsNullOrWhiteSpace(r.ParsedSite));
+
+            WillImportNeedsReviewCount = PreviewRows.Count(r =>
+                IsReadyRow(r) &&
+                string.IsNullOrWhiteSpace(r.ParsedSite));
+
+            MissingSiteCount = PreviewRows.Count(r =>
+                IsReadyRow(r) &&
+                string.IsNullOrWhiteSpace(r.ParsedSite));
+
+            WithWorkOrderCount = PreviewRows.Count(r =>
+                IsReadyRow(r) &&
+                !string.IsNullOrWhiteSpace(r.WorkOrder));
+
+            WithoutWorkOrderCount = PreviewRows.Count(r =>
+                IsReadyRow(r) &&
+                string.IsNullOrWhiteSpace(r.WorkOrder));
+
+            // SAP import currently does not parse a Problem/Issue field,
+            // so every Ready imported row will land with a blank Problem.
+            MissingProblemCount = ReadyCount;
 
             ImportBtn.IsEnabled = ReadyCount > 0;
+        }
+
+        private static bool IsReadyRow(SapQueuePreviewDisplayRow row)
+        {
+            return string.Equals(row.ImportStatus, "Ready", StringComparison.OrdinalIgnoreCase);
         }
 
         private void SetBusy(bool busy, string message = "Working...")
@@ -297,7 +415,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
         private static List<SapQueueImportPreviewRow> ReadSapRowsFromExcel(string filePath)
         {
-            using var workbook = new XLWorkbook(filePath);
+            using var workbookStream = OpenWorkbookSnapshot(filePath);
+            using var workbook = new XLWorkbook(workbookStream);
+
             var worksheet = workbook.Worksheets.First();
 
             var headerRow = worksheet.FirstRowUsed()
@@ -343,6 +463,30 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             }
 
             return result;
+        }
+
+        private static MemoryStream OpenWorkbookSnapshot(string filePath)
+        {
+            try
+            {
+                using var source = new FileStream(
+                    filePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete);
+
+                var memory = new MemoryStream();
+                source.CopyTo(memory);
+                memory.Position = 0;
+
+                return memory;
+            }
+            catch (IOException ex)
+            {
+                throw new IOException(
+                    "The SAP export file is open or locked by another program. Close Excel, close File Explorer preview pane, or save a copy of the file and try again.",
+                    ex);
+            }
         }
 
         private static int GetRequiredColumn(Dictionary<string, int> headerMap, string header)
@@ -395,6 +539,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
             return null;
         }
+
+
     }
 
     public sealed class SapQueuePreviewDisplayRow
@@ -407,5 +553,52 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
         public string ParsedSite { get; set; } = "";
         public string ImportStatus { get; set; } = "";
         public string Message { get; set; } = "";
+
+        public string WillBecome
+        {
+            get
+            {
+                if (string.Equals(ImportStatus, "Ready", StringComparison.OrdinalIgnoreCase))
+                {
+                    return string.IsNullOrWhiteSpace(ParsedSite)
+                        ? "Needs Review"
+                        : "Open Ticket";
+                }
+
+                if (string.Equals(ImportStatus, "Imported", StringComparison.OrdinalIgnoreCase))
+                    return "Imported";
+
+                if (string.Equals(ImportStatus, "Already Exists", StringComparison.OrdinalIgnoreCase))
+                    return "No Change";
+
+                if (string.Equals(ImportStatus, "Invalid", StringComparison.OrdinalIgnoreCase))
+                    return "Will Not Import";
+
+                return "";
+            }
+        }
+
+        public string SiteCheck
+        {
+            get
+            {
+                if (!string.IsNullOrWhiteSpace(ParsedSite))
+                    return "Site Parsed";
+
+                return string.Equals(ImportStatus, "Ready", StringComparison.OrdinalIgnoreCase)
+                    ? "Missing Site"
+                    : "";
+            }
+        }
+
+        public string WorkOrderCheck
+        {
+            get
+            {
+                return string.IsNullOrWhiteSpace(WorkOrder)
+                    ? "No WO"
+                    : "Has WO";
+            }
+        }
     }
 }

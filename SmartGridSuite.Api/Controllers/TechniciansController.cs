@@ -311,20 +311,60 @@ public sealed class TechniciansController : ControllerBase
         if (string.IsNullOrWhiteSpace(employeeId))
             return BadRequest("Employee ID is required.");
 
+        var workDate = DateTime.Today.Date;
+
         var tech = await _db.Technicians
             .AsNoTracking()
+            .Include(t => t.HomeTruck)
+            .Include(t => t.TechnicianRoles)
+                .ThenInclude(tr => tr.Role)
             .FirstOrDefaultAsync(x => x.EmployeeId == employeeId && x.IsActive, ct);
 
         if (tech is null)
             return NotFound();
 
+        var overrideValue = await _db.TechnicianWorkdayOverrides
+            .AsNoTracking()
+            .Where(x => x.WorkDate == workDate && x.TechnicianId == tech.Id)
+            .Select(x => (bool?)x.IsWorking)
+            .FirstOrDefaultAsync(ct);
+
+        var effectiveIsWorking = overrideValue
+            ?? GetDefaultWorkingStatus(tech, workDate.DayOfWeek);
+
+        var fullName = $"{tech.FirstName} {tech.LastName}".Trim();
+
         return Ok(new TechnicianDto
         {
             Id = (int)tech.Id,
+            EmployeeId = tech.EmployeeId,
+
             FirstName = tech.FirstName,
             LastName = tech.LastName,
-            EmployeeId = tech.EmployeeId,
-            IsActive = tech.IsActive
+            Name = fullName,
+            Title = tech.Title,
+
+            IsActive = tech.IsActive,
+
+            HomeTruckId = tech.HomeTruckId == null ? null : (int?)tech.HomeTruckId.Value,
+            HomeTruckNumber = tech.HomeTruck?.TruckNumber,
+            HomeTruckDisplayName = tech.HomeTruck?.DisplayName,
+
+            WorksMonday = tech.WorksMonday,
+            WorksTuesday = tech.WorksTuesday,
+            WorksWednesday = tech.WorksWednesday,
+            WorksThursday = tech.WorksThursday,
+            WorksFriday = tech.WorksFriday,
+            WorksSaturday = tech.WorksSaturday,
+            WorksSunday = tech.WorksSunday,
+
+            RoleCodes = tech.TechnicianRoles
+                .Select(x => x.Role.Code)
+                .OrderBy(x => x)
+                .ToList(),
+
+            IsOnShift = effectiveIsWorking,
+            TruckNumber = tech.HomeTruck?.TruckNumber
         });
     }
 

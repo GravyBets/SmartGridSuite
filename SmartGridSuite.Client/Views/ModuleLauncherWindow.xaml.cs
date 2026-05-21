@@ -1,6 +1,8 @@
 ﻿using SmartGridSuite.Client.Services;
-using SmartGridSuite.Client.Views;
+using SmartGridSuite.Client.Views.FieldTechnician;
 using SmartGridSuite.Client.Views.Administration;
+using System;
+using System.Threading.Tasks;
 using System.Windows;
 
 namespace SmartGridSuite.Client.Views
@@ -23,25 +25,80 @@ namespace SmartGridSuite.Client.Views
         private void ThemeToggle_Unchecked(object sender, RoutedEventArgs e)
             => ThemeService.Apply(AppTheme.Light);
 
-        private void Tech_Click(object sender, RoutedEventArgs e)
-            => MessageBox.Show("Tech module (next).");
-
-        private void Dispatch_Click(object sender, RoutedEventArgs e)
+        private async void Tech_Click(object sender, RoutedEventArgs e)
         {
+            if (!await CurrentUserHasRequiredRoleAsync("TECHNICIAN", "Field Technician"))
+                return;
+
+            var wnd = new FieldTechnicianShellWindow();
+            wnd.Show();
+            Close();
+        }
+
+        private async void Dispatch_Click(object sender, RoutedEventArgs e)
+        {
+            if (!await CurrentUserHasRequiredRoleAsync("DISPATCH", "Dispatcher"))
+                return;
+
             var wnd = new DispatcherShellWindow();
             wnd.Show();
             Close();
         }
 
-        private void Admin_Click(object sender, RoutedEventArgs e)
+        private async void Admin_Click(object sender, RoutedEventArgs e)
         {
+            if (!await CurrentUserHasRequiredRoleAsync("ADMIN", "Administration"))
+                return;
+
             var win = new AdministrationShellWindow
             {
                 Owner = this
             };
 
             win.Show();
-            this.Hide(); // or Close() if you never want to return to launcher
+            Hide();
+        }
+
+        private async Task<bool> CurrentUserHasRequiredRoleAsync(string requiredRoleCode, string moduleName)
+        {
+            try
+            {
+                var technician = await CurrentUserService.LoadCurrentTechnicianAsync(forceRefresh: true);
+
+                if (technician == null)
+                {
+                    MessageBox.Show(
+                        $"Access denied. Your Windows user '{CurrentUserService.CurrentEmployeeId}' was not found as an active technician.",
+                        $"{moduleName} Access",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    return false;
+                }
+
+                if (!CurrentUserService.HasRole(technician, requiredRoleCode))
+                {
+                    MessageBox.Show(
+                        $"Access denied. Your Windows user '{CurrentUserService.CurrentEmployeeId}' does not have the {requiredRoleCode} role.",
+                        $"{moduleName} Access",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Unable to verify {moduleName} access.\n\n{ex.Message}",
+                    $"{moduleName} Access",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                return false;
+            }
         }
 
         private void Rma_Click(object sender, RoutedEventArgs e)

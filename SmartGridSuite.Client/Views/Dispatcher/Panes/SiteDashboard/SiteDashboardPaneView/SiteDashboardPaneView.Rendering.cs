@@ -210,6 +210,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 WorkspaceView.RefreshEquipmentDisplay();
 
                 WorkspaceView.RestoreEquipmentReplacementSessionEntries(session.EquipmentReplacementEntries);
+
+                QueueLoadSiteNotesForRenderedSession(session);
             }
             finally
             {
@@ -217,6 +219,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
+        private void QueueLoadSiteNotesForRenderedSession(SiteDashboardTabSession session)
+        {
+            var siteId = ResolveSiteNotesSiteId(session);
+
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                await WorkspaceView.LoadSiteNotesAsync(siteId);
+            });
+        }
+                
         private void ShowPoppedOutOverlay(SiteDashboardTabSession session)
         {
             if (PoppedOutOverlay is null)
