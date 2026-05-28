@@ -10,7 +10,6 @@ using System.Windows.Data;
 using System.Windows.Threading;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Runtime.CompilerServices;
 using SmartGridSuite.Contracts.SiteNotes;
 using SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard;
 using System.Security.Principal;
@@ -77,6 +76,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private bool _detailsOpen;
 
         private readonly DispatcherTimer _searchDebounceTimer;
+        private CancellationTokenSource? _ticketQueryCts;
 
         public ICollectionView TicketsView { get; }
 
@@ -274,7 +274,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
 
             TicketsView = CollectionViewSource.GetDefaultView(_tickets);
-            TicketsView.Filter = FilterTicket;
             TicketsView.SortDescriptions.Clear();
             TicketsView.SortDescriptions.Add(
                 new SortDescription(nameof(DispatchTicket.LastActivityAt), ListSortDirection.Descending));
@@ -420,10 +419,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private void SearchDebounceTimer_Tick(object? sender, EventArgs e)
+        private async void SearchDebounceTimer_Tick(object? sender, EventArgs e)
         {
             _searchDebounceTimer.Stop();
-            RefreshView();
+            await LoadTicketsFromApiAsync();
         }
 
         private void InitializeStatusOptions()
@@ -528,24 +527,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async Task LoadTicketsFromApiAsync(CancellationToken ct = default)
         {
+            _ticketQueryCts?.Cancel();
+            _ticketQueryCts?.Dispose();
+
+            _ticketQueryCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var queryCt = _ticketQueryCts.Token;
+
             try
             {
-                // Load the dataset, then do all UI filtering locally.
-                // This makes the multi-status filter and created-date filter behave consistently.
-                var dtos = await _ticketsApi.GetTicketsAsync(
-                    status: null,
-                    tech: null,
-                    from: null,
-                    to: null,
-                    ct);
+                var req = BuildTicketQueryRequest();
+
+                var response = await _ticketsApi.QueryTicketsAsync(req, queryCt);
 
                 _tickets.Clear();
-                foreach (var dto in dtos)
-                    _tickets.Add(Map(dto));
-                                
-                RefreshView();
-            }
 
+                foreach (var dto in response.Items)
+                    _tickets.Add(Map(dto));
+
+                VisibleTicketCount = response.TotalCount;
+                TotalLoadedTicketCount = response.TotalCount;
+
+                TicketsView.Refresh();
+                UpdateTicketListUiState();
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when filters/search change quickly.
+            }
             catch (Exception ex)
             {
                 MessageBox.Show(
@@ -554,6 +562,42 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
+        }
+
+        private TicketQueryRequest BuildTicketQueryRequest()
+        {
+            var (from, to) = GetLastActivityDateRangeFromUi();
+
+            return new TicketQueryRequest
+            {
+                Search = SearchBox?.Text?.Trim(),
+                Statuses = GetSelectedStatuses()
+                    .OrderBy(x => x)
+                    .ToList(),
+
+                AssignedTech = TechFilter?.SelectedItem as string ?? "All",
+
+                DateField = "LastActivity",
+                From = from,
+                To = to,
+
+                QuickFilter = GetActiveQuickFilterApiValue(),
+
+                Skip = 0,
+                Take = 2000
+            };
+        }
+
+        private string? GetActiveQuickFilterApiValue()
+        {
+            return _activeQuickFilter switch
+            {
+                TicketQuickFilter.MissingProblems => "MissingProblems",
+                TicketQuickFilter.Unassigned => "Unassigned",
+                TicketQuickFilter.ReadyToAssign => "ReadyToAssign",
+                TicketQuickFilter.Assigned => "Assigned",
+                _ => null
+            };
         }
 
         private async Task LoadSummaryFromApiAsync(CancellationToken ct = default)
@@ -930,7 +974,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return _activeQuickFilter == filter;
         }
 
-        private void SetSelectedStatuses(params string[] statusNames)
+        private async void SetSelectedStatuses(params string[] statusNames)
+        {
+            SetSelectedStatusesWithoutRefresh(statusNames);
+            await LoadTicketsFromApiAsync();
+        }
+
+        private void SetSelectedStatusesWithoutRefresh(params string[] statusNames)
         {
             var selected = new HashSet<string>(statusNames, StringComparer.OrdinalIgnoreCase);
 
@@ -938,7 +988,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 option.IsSelected = selected.Contains(option.Name);
 
             OnPropertyChanged(nameof(SelectedStatusesSummary));
-            RefreshView();
         }
 
         private void UpdateCustomDateVisibility()
@@ -992,16 +1041,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _searchDebounceTimer.Start();
         }
 
-        private void Filters_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void Filters_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressFilterEvents)
                 return;
 
             UpdateCustomDateVisibility();
-            RefreshView();
+            await LoadTicketsFromApiAsync();
         }
 
-        private void InlineCustomDate_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
+        private async void InlineCustomDate_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressFilterEvents)
                 return;
@@ -1009,7 +1058,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if ((DateRangeFilter?.SelectedItem as string) != "Custom")
                 return;
 
-            RefreshView();
+            await LoadTicketsFromApiAsync();
         }
 
         private void StatusFilterButton_Click(object sender, RoutedEventArgs e)
@@ -1017,10 +1066,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             StatusPopup.IsOpen = !StatusPopup.IsOpen;
         }
 
-        private void StatusOption_Changed(object sender, RoutedEventArgs e)
+        private async void StatusOption_Changed(object sender, RoutedEventArgs e)
         {
             OnPropertyChanged(nameof(SelectedStatusesSummary));
-            RefreshView();
+            await LoadTicketsFromApiAsync();
         }
 
         private void SelectAllOpenStatuses_Click(object sender, RoutedEventArgs e)
@@ -1044,7 +1093,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 "Closed");
         }
 
-        private void ClearFilters_Click(object sender, RoutedEventArgs e)
+        private async void ClearFilters_Click(object sender, RoutedEventArgs e)
         {
             _suppressFilterEvents = true;
             try
@@ -1058,7 +1107,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 FromDatePicker.SelectedDate = null;
                 ToDatePicker.SelectedDate = null;
 
-                SetSelectedStatuses(
+                SetSelectedStatusesWithoutRefresh(
                     "Needs Review",
                     "Open",
                     "Assigned",
@@ -1072,7 +1121,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             UpdateCustomDateVisibility();
             OnPropertyChanged(nameof(SelectedStatusesSummary));
-            RefreshView();
+
+            await LoadTicketsFromApiAsync();
         }
 
         private void TicketsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1212,7 +1262,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 "Assigned");
         }
 
-        private void ClearQuickFilter_Click(object sender, RoutedEventArgs e)
+        private async void ClearQuickFilter_Click(object sender, RoutedEventArgs e)
         {
             _activeQuickFilter = TicketQuickFilter.None;
 
@@ -1226,7 +1276,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 FromDatePicker.SelectedDate = null;
                 ToDatePicker.SelectedDate = null;
 
-                SetSelectedStatuses(
+                SetSelectedStatusesWithoutRefresh(
                     "Needs Review",
                     "Open",
                     "Assigned",
@@ -1240,7 +1290,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             UpdateCustomDateVisibility();
             OnPropertyChanged(nameof(SelectedStatusesSummary));
-            RefreshView();
+
+            await LoadTicketsFromApiAsync();
         }
 
         private void SelectVisibleTickets_Click(object sender, RoutedEventArgs e)
@@ -1261,7 +1312,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             UpdateTicketListUiState();
         }
 
-        private void ApplyQuickFilter(TicketQuickFilter quickFilter, params string[] statusesToShow)
+        private async void ApplyQuickFilter(TicketQuickFilter quickFilter, params string[] statusesToShow)
         {
             _activeQuickFilter = quickFilter;
 
@@ -1275,7 +1326,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 FromDatePicker.SelectedDate = null;
                 ToDatePicker.SelectedDate = null;
 
-                SetSelectedStatuses(statusesToShow);
+                SetSelectedStatusesWithoutRefresh(statusesToShow);
             }
             finally
             {
@@ -1283,7 +1334,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
 
             UpdateCustomDateVisibility();
-            RefreshView();
+            OnPropertyChanged(nameof(SelectedStatusesSummary));
+
+            await LoadTicketsFromApiAsync();
         }
 
         private List<DispatchTicket> GetSelectedTickets()

@@ -105,7 +105,7 @@
 
             <TextBox x:Name="SearchBox"
                      Grid.Column="0"
-                     Style="{StaticResource ModernWatermarkTextBox}"
+                     Style="{StaticResource ClearableSearchTextBox}"
                      Tag="Search site, tech, notification, WO, action, notes…"
                      Height="34"
                      TextChanged="SearchBox_TextChanged"/>

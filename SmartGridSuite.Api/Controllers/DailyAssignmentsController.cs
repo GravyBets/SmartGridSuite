@@ -14,6 +14,7 @@ namespace SmartGridSuite.Api.Controllers
         private readonly SmartGridDbContext _db;
 
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
+        private const string TechnicianRoleCode = "TECHNICIAN";
 
         public DailyAssignmentsController(SmartGridDbContext db)
         {
@@ -82,9 +83,9 @@ namespace SmartGridSuite.Api.Controllers
 
             var rosterRows = await (
                 from roster in _db.TruckRosters.AsNoTracking()
-                join tech in _db.Technicians.AsNoTracking()
+                join tech in ActiveFieldTechniciansQuery()
                     on roster.TechnicianId equals tech.Id
-                where roster.WorkDate == rosterDate && tech.IsActive
+                where roster.WorkDate == rosterDate
                 select new
                 {
                     TruckId = roster.TruckId,
@@ -126,17 +127,7 @@ namespace SmartGridSuite.Api.Controllers
                     g => g.Key,
                     g => g.Select(x => MapTechnician(x.Technician, rosterDate, (int?)x.TruckId, null))
                           .OrderBy(x => x.Name)
-                          .ToList());
-
-            var assignmentsByTruckId = assignments
-                .Where(x => IsTargetType(x.TargetType, "Truck") && x.TruckId.HasValue)
-                .GroupBy(x => x.TruckId!.Value)
-                .ToDictionary(
-                    g => g.Key,
-                    g => g.OrderBy(x => x.SortOrder)
-                          .ThenBy(x => x.Id)
-                          .Select(x => MapAssignedTicket(x, closedStatusNames, fieldCompleteStatusNames))
-                          .ToList());
+                          .ToList());            
 
             var assignedTruckNumberByTechId = rosterRows
                 .Join(trucks,
@@ -152,9 +143,7 @@ namespace SmartGridSuite.Api.Controllers
                     g => g.Key,
                     g => g.First().TruckNumber);
 
-            var allActiveTechs = await _db.Technicians
-                .AsNoTracking()
-                .Where(t => t.IsActive)
+            var allActiveTechs = await ActiveFieldTechniciansQuery()
                 .OrderBy(t => t.LastName)
                 .ThenBy(t => t.FirstName)
                 .ToListAsync(ct);
@@ -169,10 +158,84 @@ namespace SmartGridSuite.Api.Controllers
                           .Select(x => MapAssignedTicket(x, closedStatusNames, fieldCompleteStatusNames))
                           .ToList());
 
+            var rosterTechEntitiesByTruckId = rosterRows
+                .GroupBy(x => x.TruckId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(x => x.Technician)
+                          .OrderByDescending(GetTitleRank)
+                          .ThenBy(x => x.LastName)
+                          .ThenBy(x => x.FirstName)
+                          .ToList());
+
+            var truckTargets = trucks
+                .Select(truck =>
+                {
+                    var truckNumber = (truck.TruckNumber ?? string.Empty).Trim();
+
+                    CrewEntity? crew = null;
+
+                    if (!string.IsNullOrWhiteSpace(truckNumber))
+                        crewByTruckNumber.TryGetValue(truckNumber, out crew);
+
+                    var rosterTechs = rosterTechEntitiesByTruckId.TryGetValue(truck.Id, out var techEntities)
+                        ? techEntities
+                        : new List<TechnicianEntity>();
+
+                    var leadTech = PickLeadTechnician(
+                        rosterTechs,
+                        truck.Id,
+                        crew?.LeadTechnicianId);
+
+                    if (leadTech == null)
+                        return null;
+
+                    var leadTechId = leadTech.Id;
+
+                    return new DailyAssignmentTargetDto
+                    {
+                        TargetKey = $"CrewLead:{leadTechId}",
+                        TargetType = "Technician",
+
+                        // Truck is display context only now.
+                        // The assignment owner is TechnicianId / lead tech.
+                        TruckId = (int)truck.Id,
+                        TruckNumber = truckNumber,
+                        TruckStyleName = truck.TruckStyle?.Name,
+
+                        TechnicianId = (int)leadTechId,
+                        TechnicianName = FormatTechnicianName(
+                            leadTech.FirstName,
+                            leadTech.LastName,
+                            leadTech.EmployeeId),
+                        TechnicianTitle = leadTech.Title,
+
+                        CrewId = crew == null ? null : (int?)crew.Id,
+
+                        Technicians = techsByTruckId.TryGetValue(truck.Id, out var techs)
+                            ? techs
+                            : new List<DailyAssignmentTechnicianDto>(),
+
+                        AssignedTickets = technicianAssignmentsByTechId.TryGetValue(leadTechId, out var assigned)
+                            ? assigned
+                            : new List<DailyAssignedTicketDto>()
+                    };
+                })
+                .Where(x => x != null)
+                .Select(x => x!)
+                .ToList();
+
+            var leadTechnicianIds = truckTargets
+                .Where(x => x.TechnicianId.HasValue)
+                .Select(x => (uint)x.TechnicianId!.Value)
+                .ToHashSet();
+
+            var rosteredTechnicianIds = assignedTruckNumberByTechId.Keys.ToHashSet();
+
             var technicianTargetIds = allActiveTechs
-                .Where(t => !assignedTruckNumberByTechId.ContainsKey(t.Id))
+                .Where(t => !rosteredTechnicianIds.Contains(t.Id))
                 .Select(t => t.Id)
-                .Union(technicianAssignmentsByTechId.Keys)
+                .Union(technicianAssignmentsByTechId.Keys.Where(id => !leadTechnicianIds.Contains(id)))
                 .Distinct()
                 .ToList();
 
@@ -191,7 +254,7 @@ namespace SmartGridSuite.Api.Controllers
                         TechnicianTitle = t.Title,
                         Technicians = new List<DailyAssignmentTechnicianDto>
                         {
-                            MapTechnician(t, rosterDate, null, truckNumber)
+                MapTechnician(t, rosterDate, null, truckNumber)
                         },
                         AssignedTickets = technicianAssignmentsByTechId.TryGetValue(t.Id, out var assigned)
                             ? assigned
@@ -199,38 +262,6 @@ namespace SmartGridSuite.Api.Controllers
                     };
                 })
                 .OrderBy(x => x.TechnicianName)
-                .ToList();
-
-            var truckTargets = trucks
-                .Select(truck =>
-                {
-                    var truckNumber = (truck.TruckNumber ?? string.Empty).Trim();
-
-                    CrewEntity? crew = null;
-
-                    if (!string.IsNullOrWhiteSpace(truckNumber))
-                        crewByTruckNumber.TryGetValue(truckNumber, out crew);
-
-                    return new DailyAssignmentTargetDto
-                    {
-                        TargetKey = $"Truck:{truck.Id}",
-                        TargetType = "Truck",
-
-                        TruckId = (int)truck.Id,
-                        TruckNumber = truckNumber,
-                        TruckStyleName = truck.TruckStyle?.Name,
-
-                        CrewId = crew == null ? null : (int?)crew.Id,
-
-                        Technicians = techsByTruckId.TryGetValue(truck.Id, out var techs)
-                            ? techs
-                            : new List<DailyAssignmentTechnicianDto>(),
-
-                        AssignedTickets = assignmentsByTruckId.TryGetValue(truck.Id, out var assigned)
-                            ? assigned
-                            : new List<DailyAssignedTicketDto>()
-                    };
-                })
                 .ToList();
 
             var ticketPool = nonClosedTickets
@@ -312,9 +343,8 @@ namespace SmartGridSuite.Api.Controllers
 
                 technicianId = (uint)req.TechnicianId.Value;
 
-                var technicianExists = await _db.Technicians
-                    .AsNoTracking()
-                    .AnyAsync(x => x.Id == technicianId.Value && x.IsActive, ct);
+                var technicianExists = await ActiveFieldTechniciansQuery()
+                    .AnyAsync(x => x.Id == technicianId.Value, ct);
 
                 if (!technicianExists)
                     return NotFound($"Technician {req.TechnicianId.Value} was not found or is inactive.");
@@ -489,6 +519,137 @@ namespace SmartGridSuite.Api.Controllers
             });
         }
 
+        [HttpPost("migrate-truck-targets-to-lead-techs")]
+        public async Task<IActionResult> MigrateTruckTargetAssignmentsToLeadTechs([FromQuery] string? date = null, CancellationToken ct = default)
+        {
+            var rosterDate = ParseDateOrToday(date);
+            var assignmentDate = ActiveAssignmentDate;
+            var now = DateTime.Now;
+
+            var truckAssignments = await _db.DailyTicketAssignments
+                .Where(x =>
+                    x.AssignmentDate == assignmentDate &&
+                    x.TargetType == "Truck" &&
+                    x.TruckId.HasValue)
+                .OrderBy(x => x.TruckId)
+                .ThenBy(x => x.SortOrder)
+                .ThenBy(x => x.Id)
+                .ToListAsync(ct);
+
+            if (truckAssignments.Count == 0)
+                return Ok("No truck-owned assignments were found to migrate.");
+
+            var trucks = await _db.Trucks
+                .AsNoTracking()
+                .Where(x => x.IsActive)
+                .ToListAsync(ct);
+
+            var truckById = trucks.ToDictionary(x => x.Id);
+
+            var truckNumbers = trucks
+                .Select(x => x.TruckNumber)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var crews = await _db.Crews
+                .AsNoTracking()
+                .Where(c =>
+                    c.WorkDate == rosterDate &&
+                    c.TruckNumber != null &&
+                    truckNumbers.Contains(c.TruckNumber))
+                .ToListAsync(ct);
+
+            var crewByTruckNumber = crews
+                .Select(c => new
+                {
+                    Crew = c,
+                    TruckNumber = (c.TruckNumber ?? string.Empty).Trim()
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.TruckNumber))
+                .GroupBy(x => x.TruckNumber, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(x => x.Crew).OrderBy(x => x.Id).First(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            var rosterRows = await (
+                from roster in _db.TruckRosters.AsNoTracking()
+                join tech in ActiveFieldTechniciansQuery()
+                    on roster.TechnicianId equals tech.Id
+                where roster.WorkDate == rosterDate
+                select new
+                {
+                    roster.TruckId,
+                    Technician = tech
+                })
+                .ToListAsync(ct);
+
+            var rosterTechsByTruckId = rosterRows
+                .GroupBy(x => x.TruckId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(x => x.Technician)
+                          .OrderByDescending(GetTitleRank)
+                          .ThenBy(x => x.LastName)
+                          .ThenBy(x => x.FirstName)
+                          .ToList());
+
+            var migrated = 0;
+            var skipped = 0;
+
+            foreach (var assignment in truckAssignments)
+            {
+                if (!assignment.TruckId.HasValue ||
+                    !truckById.TryGetValue(assignment.TruckId.Value, out var truck))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                var truckNumber = (truck.TruckNumber ?? string.Empty).Trim();
+
+                CrewEntity? crew = null;
+
+                if (!string.IsNullOrWhiteSpace(truckNumber))
+                    crewByTruckNumber.TryGetValue(truckNumber, out crew);
+
+                var rosterTechs = rosterTechsByTruckId.TryGetValue(truck.Id, out var techs)
+                    ? techs
+                    : new List<TechnicianEntity>();
+
+                var leadTech = PickLeadTechnician(
+                    rosterTechs,
+                    truck.Id,
+                    crew?.LeadTechnicianId);
+
+                if (leadTech == null)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                assignment.TargetType = "Technician";
+                assignment.TechnicianId = leadTech.Id;
+
+                // TruckId is no longer part of the assignment identity.
+                // The truck comes from today's roster.
+                assignment.TruckId = null;
+
+                assignment.CrewId = crew?.Id;
+                assignment.IsPublished = false;
+                assignment.UpdatedAt = now;
+                assignment.UpdatedBy = "Truck-to-lead migration";
+
+                migrated++;
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok($"Migrated {migrated} assignment(s). Skipped {skipped} assignment(s).");
+        }
+
         [HttpPost("reorder")]
         public async Task<ActionResult<ReorderDailyTicketAssignmentsResponse>> ReorderAssignments([FromBody] ReorderDailyTicketAssignmentsRequest req, 
             CancellationToken ct)
@@ -532,9 +693,8 @@ namespace SmartGridSuite.Api.Controllers
 
                 technicianId = (uint)req.TechnicianId.Value;
 
-                var technicianExists = await _db.Technicians
-                    .AsNoTracking()
-                    .AnyAsync(x => x.Id == technicianId.Value && x.IsActive, ct);
+                var technicianExists = await ActiveFieldTechniciansQuery()
+                    .AnyAsync(x => x.Id == technicianId.Value, ct);
 
                 if (!technicianExists)
                     return NotFound($"Technician {req.TechnicianId.Value} was not found or is inactive.");
@@ -1123,9 +1283,8 @@ namespace SmartGridSuite.Api.Controllers
 
                 technicianId = (uint)req.TechnicianId.Value;
 
-                var techExists = await _db.Technicians
-                    .AsNoTracking()
-                    .AnyAsync(x => x.Id == technicianId.Value && x.IsActive, ct);
+                var techExists = await ActiveFieldTechniciansQuery()
+                    .AnyAsync(x => x.Id == technicianId.Value, ct);
 
                 if (!techExists)
                     return NotFound($"Technician {req.TechnicianId.Value} was not found or is inactive.");
@@ -1145,8 +1304,41 @@ namespace SmartGridSuite.Api.Controllers
                 .ThenBy(x => x.Id)
                 .ToListAsync(ct);
 
+            var nextPublishedVersion = (await _db.DailyTicketAssignmentPublished
+                .AsNoTracking()
+                .Where(x => x.AssignmentDate == workDate)
+                .Select(x => (int?)x.PublishedVersion)
+                .MaxAsync(ct) ?? 0) + 1;
+
+            var now = DateTime.Now;
+
             if (draftAssignments.Count == 0)
-                return BadRequest("There are no assignments to publish for this crew/technician.");
+            {
+                var existingPublishedRows = await _db.DailyTicketAssignmentPublished
+                    .Where(x =>
+                        x.AssignmentDate == workDate &&
+                        x.TargetType == cleanTargetType &&
+                        x.TruckId == truckId &&
+                        x.TechnicianId == technicianId)
+                    .ToListAsync(ct);
+
+                if (existingPublishedRows.Count > 0)
+                    _db.DailyTicketAssignmentPublished.RemoveRange(existingPublishedRows);
+
+                await _db.SaveChangesAsync(ct);
+
+                return Ok(new PublishDailyAssignmentTargetResponse
+                {
+                    WorkDate = rosterDate,
+                    TargetType = cleanTargetType,
+                    TruckId = truckId == null ? null : (int?)truckId.Value,
+                    TechnicianId = technicianId == null ? null : (int?)technicianId.Value,
+                    PublishedCount = 0,
+                    PublishedVersion = nextPublishedVersion,
+                    PublishedAt = now,
+                    PublishedBy = publishedBy
+                });
+            }
 
             var ticketIds = draftAssignments
                 .Select(x => x.TicketId)
@@ -1164,14 +1356,7 @@ namespace SmartGridSuite.Api.Controllers
                 .ToList();
 
             if (missingTicketIds.Count > 0)
-                return NotFound($"One or more tickets were not found: {string.Join(", ", missingTicketIds)}");
-
-            var nextPublishedVersion =
-                (await _db.DailyTicketAssignmentPublished
-                    .AsNoTracking()
-                    .Where(x => x.AssignmentDate == workDate)
-                    .Select(x => (int?)x.PublishedVersion)
-                    .MaxAsync(ct) ?? 0) + 1;
+                return NotFound($"One or more tickets were not found: {string.Join(", ", missingTicketIds)}");            
 
             var truckIds = draftAssignments
                 .Where(x => x.TruckId.HasValue)
@@ -1228,7 +1413,6 @@ namespace SmartGridSuite.Api.Controllers
                         .OrderBy(x => x)
                         .ToList());
 
-            var now = DateTime.Now;
             var publishedRows = new List<DailyTicketAssignmentPublishedEntity>();
 
             foreach (var assignment in draftAssignments)
@@ -1436,6 +1620,59 @@ namespace SmartGridSuite.Api.Controllers
                 TruckId = truckId,
                 TruckNumber = truckNumber
             };
+        }
+
+        private IQueryable<TechnicianEntity> ActiveFieldTechniciansQuery()
+        {
+            return _db.Technicians
+                .AsNoTracking()
+                .Where(t =>
+                    t.IsActive &&
+                    t.TechnicianRoles.Any(tr => tr.Role.Code == TechnicianRoleCode));
+        }
+
+        private static TechnicianEntity? PickLeadTechnician(IReadOnlyList<TechnicianEntity> technicians, uint truckId, uint? crewLeadTechnicianId)
+        {
+            if (technicians.Count == 0)
+                return null;
+
+            if (crewLeadTechnicianId.HasValue)
+            {
+                var crewLead = technicians.FirstOrDefault(t => t.Id == crewLeadTechnicianId.Value);
+
+                if (crewLead != null)
+                    return crewLead;
+            }
+
+            var homeTruckLead = technicians.FirstOrDefault(t => t.HomeTruckId == truckId);
+
+            if (homeTruckLead != null)
+                return homeTruckLead;
+
+            return technicians
+                .OrderByDescending(GetTitleRank)
+                .ThenBy(t => t.LastName)
+                .ThenBy(t => t.FirstName)
+                .FirstOrDefault();
+        }
+
+        private static int GetTitleRank(TechnicianEntity tech)
+        {
+            var title = (tech.Title ?? string.Empty).Trim();
+
+            if (title.Equals("Supervisor", StringComparison.OrdinalIgnoreCase))
+                return 400;
+
+            if (title.Equals("Head Journeyman", StringComparison.OrdinalIgnoreCase))
+                return 300;
+
+            if (title.Equals("Journeyman", StringComparison.OrdinalIgnoreCase))
+                return 200;
+
+            if (title.Equals("Apprentice", StringComparison.OrdinalIgnoreCase))
+                return 100;
+
+            return 0;
         }
 
         private static DateTime ParseDateOrToday(string? date)

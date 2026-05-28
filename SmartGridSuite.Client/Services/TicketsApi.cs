@@ -36,6 +36,15 @@ namespace SmartGridSuite.Client.Services
             return await _api.GetAsync<List<TicketListItemDto>>(path, ct) ?? new();
         }
 
+        public async Task<TicketQueryResponse> QueryTicketsAsync(TicketQueryRequest req, CancellationToken ct = default)
+        {
+            return await _api.PostAsync<TicketQueryRequest, TicketQueryResponse>(
+                       "api/tickets/query",
+                       req,
+                       ct)
+                   ?? new TicketQueryResponse();
+        }
+
         public async Task<List<TicketListItemDto>> GetTicketsBySiteAsync(string siteId, CancellationToken ct = default)
         {
             siteId = (siteId ?? string.Empty).Trim();

@@ -3,151 +3,26 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:SmartGridSuite.Client.Views.Dispatcher.Panes"
              mc:Ignorable="d">
 
     <UserControl.Resources>
-        <Style x:Key="CleanListBoxStyle" TargetType="ListBox">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
-            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
-        </Style>
-
-        <Style x:Key="CleanListBoxItemStyle" TargetType="ListBoxItem">
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Margin" Value="0"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="SelectionChrome"
-                                Padding="0"
-                                CornerRadius="12"
-                                Background="Transparent"
-                                BorderBrush="Transparent"
-                                BorderThickness="2">
-                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
-                        </Border>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="SelectionChrome" Property="Background" Value="#F3F7FF"/>
-                                <Setter TargetName="SelectionChrome" Property="BorderBrush" Value="#BFDBFE"/>
-                            </Trigger>
-
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="SelectionChrome" Property="Background" Value="#DBEAFE"/>
-                                <Setter TargetName="SelectionChrome" Property="BorderBrush" Value="#2563EB"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="PaneTitleTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-        </Style>
-
-        <Style x:Key="PaneSubtitleTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-        </Style>
-
-        <Style x:Key="SectionHeaderTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-        </Style>
-
-        <Style x:Key="SummaryValueTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="21"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-        </Style>
-
-        <Style x:Key="SummaryLabelTextStyle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-            <Setter Property="Margin" Value="0,2,0,0"/>
-        </Style>
-
-        <Style x:Key="SummaryCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="Padding" Value="14,12"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
-        </Style>
-
-        <Style x:Key="TicketCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="Padding" Value="10"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsFieldComplete}" Value="True">
-                    <Setter Property="Opacity" Value="0.45"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding IsClosed}" Value="True">
-                    <Setter Property="Opacity" Value="0.35"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="TransparentIconButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="30"/>
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Opacity" Value="0.70"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Opacity" Value="1"/>
-                                <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-                            </Trigger>
-
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Opacity" Value="0.85"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
+        <local:OneBasedIndexConverter x:Key="OneBasedIndexConverter"/>
+       
+        <!-- Crew / Technician ComboBox Item -->
         <DataTemplate x:Key="AssignmentTargetComboTemplate">
-            <Grid Margin="0,3">
+            <Grid Margin="0,4">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="24"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
+                <!-- Warning icon only for no-ticket targets -->
                 <TextBlock Grid.Column="0"
-                           Text="⚠"
-                           FontSize="16"
-                           Foreground="#DC2626"
-                           VerticalAlignment="Center">
+                   Text="⚠"
+                   FontSize="15"
+                   Foreground="#DC2626"
+                   VerticalAlignment="Center">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -160,21 +35,56 @@
                     </TextBlock.Style>
                 </TextBlock>
 
-                <StackPanel Grid.Column="1">
-                    <TextBlock Text="{Binding PrimaryText}"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimary}"
-                               TextTrimming="CharacterEllipsis"/>
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                    <TextBlock Text="{Binding SecondaryText}"
-                               Margin="0,2,0,0"
-                               FontSize="12"
-                               Foreground="{DynamicResource TextSecondary}"
-                               TextTrimming="CharacterEllipsis"/>
-                </StackPanel>
+                    <!-- Name / Crew -->
+                    <TextBlock Grid.Row="0"
+                       Text="{Binding PrimaryText}"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"
+                       TextTrimming="CharacterEllipsis"/>
+
+                    <!-- Truck / Title -->
+                    <TextBlock Grid.Row="1"
+                       Text="{Binding SecondaryText}"
+                       Margin="0,1,0,0"
+                       FontSize="12"
+                       Foreground="{DynamicResource TextSecondary}"
+                       TextTrimming="CharacterEllipsis"/>
+
+                    <!-- Assignment Status -->
+                    <TextBlock Grid.Row="2"
+                       Text="{Binding ComboStatusText}"
+                       Margin="0,1,0,0"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#15803D"/>
+
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasNoTickets}" Value="True">
+                                        <Setter Property="Foreground" Value="#DC2626"/>
+                                    </DataTrigger>
+
+                                    <DataTrigger Binding="{Binding HasUnpublishedChanges}" Value="True">
+                                        <Setter Property="Foreground" Value="#B45309"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
             </Grid>
         </DataTemplate>
 
+        <!-- Ticket Card Template (LEFT)-->
         <DataTemplate x:Key="TicketCardTemplate">
             <Border Style="{StaticResource TicketCardStyle}">
                 <Grid>
@@ -185,21 +95,22 @@
                     </Grid.ColumnDefinitions>
 
                     <CheckBox Grid.Column="0"
-                              VerticalAlignment="Top"
-                              Margin="0,4,0,0"
-                              IsChecked="{Binding IsSelected,
-                                                  RelativeSource={RelativeSource AncestorType=ListBoxItem},
-                                                  Mode=TwoWay}"/>
+                      VerticalAlignment="Top"
+                      Margin="0,5,0,0"
+                      IsChecked="{Binding IsSelected,
+                                          RelativeSource={RelativeSource AncestorType=ListBoxItem},
+                                          Mode=TwoWay}"/>
 
                     <Grid Grid.Column="2">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="4"/>
+                            <RowDefinition Height="5"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="6"/>
+                            <RowDefinition Height="5"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
+                        <!-- Site + Status -->
                         <Grid Grid.Row="0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -207,143 +118,201 @@
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Text="{Binding Site}"
-                                       FontSize="15"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource TextPrimary}"
-                                       TextTrimming="CharacterEllipsis"/>
+                               FontSize="15"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextTrimming="CharacterEllipsis"/>
 
                             <TextBlock Grid.Column="1"
-                                       Text="{Binding Status}"
-                                       Margin="10,0,0,0"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextSecondary}"/>
+                               Text="{Binding Status}"
+                               Margin="10,0,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondary}"
+                               TextTrimming="CharacterEllipsis"/>
                         </Grid>
 
+                        <!-- Notification Name -->
                         <TextBlock Grid.Row="2"
-                                   Text="{Binding NotificationName}"
-                                   Foreground="{DynamicResource TextPrimary}"
-                                   TextWrapping="Wrap"/>
+                           Text="{Binding NotificationName}"
+                           Foreground="{DynamicResource TextPrimary}"
+                           TextWrapping="Wrap"/>
 
-                        <StackPanel Grid.Row="4"
-                                    Orientation="Vertical">
-                            <TextBlock FontSize="11"
-                                       Foreground="{DynamicResource TextSecondary}"
-                                       TextWrapping="Wrap">
-                                <Run Text="Priority: "/>
-                                <Run Text="{Binding PriorityDays, Mode=OneWay}"/>
-                                <Run Text="d"/>
-                            </TextBlock>
-
-                            <TextBlock Margin="0,2,0,0"
-                                       FontSize="11"
-                                       Foreground="{DynamicResource TextSecondary}"
-                                       TextWrapping="Wrap">
-                                <Run Text="WO: "/>
-                                <Run Text="{Binding WorkOrder, Mode=OneWay}"/>
-                                <Run Text="  "/>
-                                <Run Text="{Binding WorkOrderClass, Mode=OneWay}"/>
-                            </TextBlock>
-                        </StackPanel>
+                        <!-- Problem / Issue -->
+                        <TextBlock Grid.Row="4"
+                           Text="{Binding Problem}"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextSecondary}"
+                           TextWrapping="Wrap"/>
                     </Grid>
                 </Grid>
             </Border>
         </DataTemplate>
 
+        <!-- Ticket Card Template (RIGHT)-->
         <DataTemplate x:Key="AssignedTicketTemplate">
             <Border Style="{StaticResource TicketCardStyle}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="34"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="215"/>
                     </Grid.ColumnDefinitions>
 
+                    <!-- Route order, no bubble -->
                     <TextBlock Grid.Column="0"
-                               Text="{Binding SortOrder}"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource TextSecondary}"
-                               VerticalAlignment="Top"/>
+                       Margin="0,0,8,0"
+                       FontSize="14"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource TextSecondary}"
+                       VerticalAlignment="Top"
+                       TextAlignment="Right"
+                       Text="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem},
+                                      Path=(ItemsControl.AlternationIndex),
+                                      Converter={StaticResource OneBasedIndexConverter},
+                                      StringFormat={}{0}.}"/>
 
+                    <!-- Left: site / notification / problem -->
                     <Grid Grid.Column="1">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="4"/>
+                            <RowDefinition Height="2"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="4"/>
+                            <RowDefinition Height="3"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <Grid Grid.Row="0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-
-                            <TextBlock Text="{Binding Site}"
-                                       FontSize="14"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource TextPrimary}"
-                                       TextTrimming="CharacterEllipsis"/>
-
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding Status}"
-                                       Margin="8,0,0,0"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextSecondary}"/>
-                        </Grid>
+                        <TextBlock Grid.Row="0"
+                           FontSize="14"
+                           FontWeight="Bold"
+                           TextTrimming="CharacterEllipsis">
+                    <Run Text="{Binding Site}"
+                         Foreground="{DynamicResource TextPrimary}"/>
+                    <Run Text=" "/>
+                    <Run Text="("
+                         Foreground="{DynamicResource TextSecondary}"/>
+                    <Run Text="{Binding Status}"
+                         Foreground="{DynamicResource TextSecondary}"/>
+                    <Run Text=")"
+                         Foreground="{DynamicResource TextSecondary}"/>
+                        </TextBlock>
 
                         <TextBlock Grid.Row="2"
-                                   Text="{Binding NotificationName}"
-                                   Foreground="{DynamicResource TextPrimary}"
-                                   TextWrapping="Wrap"/>
+                           Text="{Binding NotificationName}"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextPrimary}"
+                           TextWrapping="Wrap"/>
 
                         <TextBlock Grid.Row="4"
-                                   Text="{Binding Problem}"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource TextSecondary}"
-                                   TextWrapping="Wrap"/>
+                           Text="{Binding Problem}"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextSecondary}"
+                           TextWrapping="Wrap"/>
                     </Grid>
 
-                    <StackPanel Grid.Column="2"
-                                Margin="10,0,0,0"
-                                VerticalAlignment="Top">
+                    <!-- Right: ticket numbers + row actions -->
+                    <Grid Grid.Column="2"
+                  Margin="12,0,0,0"
+                  VerticalAlignment="Top">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="3"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="3"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                        <Button Style="{StaticResource TransparentIconButtonStyle}"
-                                Tag="{Binding}"
-                                ToolTip="Move up"
-                                Click="MoveAssignedTicketUp_Click">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Notification # + Up -->
+                        <StackPanel Grid.Row="0"
+                            Grid.Column="0">
+                            <TextBlock Text="Notification #"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextSecondary}"/>
+
+                            <TextBlock Text="{Binding Notification}"
+                               Margin="0,0,0,0"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+
+                        <Button Grid.Row="0"
+                        Grid.Column="1"
+                        Style="{StaticResource TransparentIconButtonStyle}"
+                        Tag="{Binding}"
+                        ToolTip="Move up"
+                        Click="MoveAssignedTicketUp_Click">
                             <TextBlock Text="▲"
-                                       FontSize="12"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource TextSecondary}"/>
+                               FontSize="11"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextSecondary}"/>
                         </Button>
 
-                        <Button Style="{StaticResource TransparentIconButtonStyle}"
-                                Margin="0,2,0,0"
-                                Tag="{Binding}"
-                                ToolTip="Move down"
-                                Click="MoveAssignedTicketDown_Click">
+                        <!-- Work Order # + Down -->
+                        <StackPanel Grid.Row="2"
+                            Grid.Column="0">
+                            <TextBlock Text="Work Order #"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextSecondary}"/>
+
+                            <TextBlock Text="{Binding WorkOrder}"
+                               Margin="0,0,0,0"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+
+                        <Button Grid.Row="2"
+                        Grid.Column="1"
+                        Style="{StaticResource TransparentIconButtonStyle}"
+                        Tag="{Binding}"
+                        ToolTip="Move down"
+                        Click="MoveAssignedTicketDown_Click">
                             <TextBlock Text="▼"
-                                       FontSize="12"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource TextSecondary}"/>
+                               FontSize="11"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextSecondary}"/>
                         </Button>
 
-                        <Button Style="{StaticResource TransparentIconButtonStyle}"
-                                Margin="0,6,0,0"
-                                Tag="{Binding}"
-                                ToolTip="Remove from assignment"
-                                Click="RemoveAssignedTicket_Click">
-                            <TextBlock Text="&#xE74D;"
-                                       FontFamily="Segoe MDL2 Assets"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextSecondary}"/>
+                        <!-- WO Type + Trash -->
+                        <StackPanel Grid.Row="4"
+                            Grid.Column="0">
+                            <TextBlock Text="WO Type"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextSecondary}"/>
+
+                            <TextBlock Text="{Binding WorkOrderClass}"
+                               Margin="0,0,0,0"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+
+                        <Button Grid.Row="4"
+                        Grid.Column="1"
+                        Style="{StaticResource TransparentIconButtonStyle}"
+                        Tag="{Binding}"
+                        ToolTip="Remove from assignment"
+                        Click="RemoveAssignedTicket_Click">
+                            <Viewbox Width="14"
+                                     Height="14"
+                                     VerticalAlignment="Center"
+                                     HorizontalAlignment="Center">
+                                        <Path Style="{StaticResource TrashCanIconPathStyle}"/>
+                            </Viewbox>
                         </Button>
-                    </StackPanel>
+                    </Grid>
                 </Grid>
             </Border>
         </DataTemplate>
+            
     </UserControl.Resources>
 
     <Grid>
@@ -442,6 +411,7 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
+            <!-- Ticket Pool -->
             <Border Grid.Column="0"
                     Style="{StaticResource Card}"
                     Padding="14">
@@ -475,7 +445,7 @@
                         <TextBox x:Name="TicketPoolSearchBox"
                                  Grid.Row="0"
                                  Height="32"
-                                 Style="{StaticResource ModernWatermarkTextBox}"
+                                 Style="{StaticResource ClearableSearchTextBox}"
                                  Tag="Search site, WO, notification, problem..."
                                  TextChanged="TicketPoolSearchBox_TextChanged"/>
 
@@ -503,18 +473,18 @@
                 </Grid>
             </Border>
 
+            <!-- Crew / Technician Work List -->
             <Border Grid.Column="2"
                     Style="{StaticResource Card}"
                     Padding="14">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="8"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
+                    <!-- Header outside the bordered work area -->
                     <Grid Grid.Row="0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -530,87 +500,121 @@
                                        Style="{StaticResource PaneSubtitleTextStyle}"/>
                         </StackPanel>
 
-                        <Button Grid.Column="1"
-                                Content="Publish This List"
-                                Height="34"
-                                MinWidth="140"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                IsEnabled="{Binding HasSelectedTarget}"
-                                Click="PublishSelectedTarget_Click"/>
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Top">
+
+                            <Button Content="Clear List"
+                                    Height="34"
+                                    MinWidth="105"
+                                    Margin="0,0,8,0"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    IsEnabled="{Binding HasSelectedTargetAssignedTickets}"
+                                    Click="ClearSelectedTargetList_Click"/>
+
+                            <Button Content="Save &amp; Publish"
+                                    Height="34"
+                                    MinWidth="140"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    IsEnabled="{Binding HasSelectedTarget}"
+                                    Click="PublishSelectedTarget_Click"/>
+                        </StackPanel>
                     </Grid>
 
-                    <Grid Grid.Row="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+                    <!-- Bordered routing/work-list area -->
+                    <Border Grid.Row="2"
+                            Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="14"
+                            VerticalAlignment="Stretch">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
 
-                        <ComboBox x:Name="AssignmentTargetComboBox"
-                                  Grid.Column="0"
-                                  Height="42"
-                                  Width="Auto"
-                                  ItemsSource="{Binding AssignmentTargets}"
-                                  SelectedItem="{Binding SelectedTarget, Mode=TwoWay}"
-                                  ItemTemplate="{StaticResource AssignmentTargetComboTemplate}"/>
+                            <!-- Crew selector + Add Selected -->
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                        <Button Grid.Column="2"
-                                Content="Add Selected"
-                                Height="34"
-                                MinWidth="120"
-                                VerticalAlignment="Center"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                IsEnabled="{Binding HasSelectedTickets}"
-                                Click="AddSelectedToSelectedTarget_Click"/>
-                    </Grid>
+                                <ComboBox x:Name="AssignmentTargetComboBox"
+                                          Grid.Column="2"
+                                          Height="64"
+                                          Width="Auto"
+                                          Padding="8,3"
+                                          ItemsSource="{Binding AssignmentTargets}"
+                                          SelectedItem="{Binding SelectedTarget, Mode=TwoWay}"
+                                          ItemTemplate="{StaticResource AssignmentTargetComboTemplate}"
+                                          MaxDropDownHeight="340"/>
 
-                    <Grid Grid.Row="4">
-                        <ListBox ItemsSource="{Binding SelectedTarget.AssignedTickets}"
-                                 ItemTemplate="{StaticResource AssignedTicketTemplate}"
-                                 ItemContainerStyle="{StaticResource CleanListBoxItemStyle}"
-                                 Style="{StaticResource CleanListBoxStyle}"
-                                 SelectionMode="Single"/>
+                                <Button Grid.Column="0"
+                                        Content="Add Selected"
+                                        Height="64"
+                                        MinWidth="130"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        IsEnabled="{Binding HasSelectedTickets}"
+                                        Click="AddSelectedToSelectedTarget_Click"/>
+                            </Grid>
 
-                        <TextBlock Text="Select a crew or technician to view their work list."
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextSecondary}"
-                                   FontStyle="Italic"
-                                   IsHitTestVisible="False">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasSelectedTarget}" Value="False">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                            <!-- Selected crew/tech tickets -->
+                            <Grid Grid.Row="2">
+                                <ListBox ItemsSource="{Binding SelectedTarget.AssignedTickets}"
+                                         ItemTemplate="{StaticResource AssignedTicketTemplate}"
+                                         ItemContainerStyle="{StaticResource CleanListBoxItemStyle}"
+                                         Style="{StaticResource CleanListBoxStyle}"
+                                         AlternationCount="999"
+                                         SelectionMode="Single"/>
 
-                        <TextBlock Text="No tickets assigned to this crew/technician."
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextSecondary}"
-                                   FontStyle="Italic"
-                                   IsHitTestVisible="False">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding HasSelectedTarget}" Value="True"/>
-                                                <Condition Binding="{Binding SelectedTarget.AssignedTicketCount}" Value="0"/>
-                                            </MultiDataTrigger.Conditions>
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </MultiDataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
+                                <TextBlock Text="Select a crew or technician to view their work list."
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           FontStyle="Italic"
+                                           IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasSelectedTarget}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <TextBlock Text="No tickets assigned to this crew/technician."
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           FontStyle="Italic"
+                                           IsHitTestVisible="False">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding HasSelectedTarget}" Value="True"/>
+                                                        <Condition Binding="{Binding SelectedTarget.AssignedTicketCount}" Value="0"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </Grid>
+                    </Border>
                 </Grid>
             </Border>
         </Grid>

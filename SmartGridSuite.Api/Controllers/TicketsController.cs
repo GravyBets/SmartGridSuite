@@ -17,6 +17,7 @@ namespace SmartGridSuite.Api.Controllers
         public TicketsController(SmartGridDbContext db) => _db = db;
 
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
+        private const string TechnicianRoleCode = "TECHNICIAN";
 
         [HttpGet]
         public async Task<ActionResult<List<TicketListItemDto>>> Get([FromQuery] string? status = null, [FromQuery] string? tech = null,
@@ -68,6 +69,157 @@ namespace SmartGridSuite.Api.Controllers
             )).ToList();
 
             return Ok(result);
+        }
+
+        [HttpPost("query")]
+        public async Task<ActionResult<TicketQueryResponse>> QueryTickets([FromBody] TicketQueryRequest req, CancellationToken ct)
+        {
+            req ??= new TicketQueryRequest();
+
+            var take = Math.Clamp(req.Take <= 0 ? 500 : req.Take, 1, 2000);
+            var skip = Math.Max(0, req.Skip);
+
+            var statuses = (req.Statuses ?? new List<string>())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var query = _db.Tickets
+                .Include(t => t.TaskCategory)
+                .AsNoTracking()
+                .AsQueryable();
+
+            // Status filter
+            if (statuses.Count > 0)
+            {
+                query = query.Where(t => statuses.Contains(t.Status));
+            }
+
+            // Tech filter
+            var cleanTech = (req.AssignedTech ?? string.Empty).Trim();
+
+            if (!string.IsNullOrWhiteSpace(cleanTech) &&
+                !cleanTech.Equals("All", StringComparison.OrdinalIgnoreCase))
+            {
+                if (cleanTech.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(t =>
+                        string.IsNullOrWhiteSpace(t.AssignedTech) ||
+                        t.AssignedTech == "(Unassigned)");
+                }
+                else
+                {
+                    query = query.Where(t => t.AssignedTech == cleanTech);
+                }
+            }
+
+            // Quick filter
+            var quickFilter = (req.QuickFilter ?? string.Empty).Trim();
+
+            if (quickFilter.Equals("MissingProblems", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(t => string.IsNullOrWhiteSpace(t.Problem));
+            }
+            else if (quickFilter.Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(t =>
+                    string.IsNullOrWhiteSpace(t.AssignedTech) ||
+                    t.AssignedTech == "(Unassigned)");
+            }
+            else if (quickFilter.Equals("ReadyToAssign", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(t =>
+                    t.Status == "Open" &&
+                    !string.IsNullOrWhiteSpace(t.Site) &&
+                    (string.IsNullOrWhiteSpace(t.AssignedTech) ||
+                     t.AssignedTech == "(Unassigned)"));
+            }
+            else if (quickFilter.Equals("Assigned", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(t => t.Status == "Assigned");
+            }
+
+            // Date filter
+            var dateField = (req.DateField ?? "LastActivity").Trim();
+
+            if (req.From.HasValue)
+            {
+                var from = req.From.Value.Date;
+
+                if (dateField.Equals("Created", StringComparison.OrdinalIgnoreCase))
+                    query = query.Where(t => t.CreatedAt >= from);
+                else
+                    query = query.Where(t => t.LastActivityAt >= from);
+            }
+
+            if (req.To.HasValue)
+            {
+                var toExclusive = req.To.Value.Date.AddDays(1);
+
+                if (dateField.Equals("Created", StringComparison.OrdinalIgnoreCase))
+                    query = query.Where(t => t.CreatedAt < toExclusive);
+                else
+                    query = query.Where(t => t.LastActivityAt < toExclusive);
+            }
+
+            // Search filter
+            var search = (req.Search ?? string.Empty).Trim();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(t =>
+                    (t.Site != null && t.Site.Contains(search)) ||
+                    (t.NotificationName != null && t.NotificationName.Contains(search)) ||
+                    (t.Notification != null && t.Notification.Contains(search)) ||
+                    (t.CurrentWorkOrder != null && t.CurrentWorkOrder.Contains(search)) ||
+                    (t.WorkOrderClass != null && t.WorkOrderClass.Contains(search)) ||
+                    (t.GroupCode != null && t.GroupCode.Contains(search)) ||
+                    (t.Status != null && t.Status.Contains(search)) ||
+                    (t.AssignedTech != null && t.AssignedTech.Contains(search)) ||
+                    (t.Problem != null && t.Problem.Contains(search)) ||
+                    (t.Summary != null && t.Summary.Contains(search)) ||
+                    (t.Notes != null && t.Notes.Contains(search)) ||
+                    (t.DispatchNotes != null && t.DispatchNotes.Contains(search)) ||
+                    (t.CreatedBy != null && t.CreatedBy.Contains(search)));
+            }
+
+            var totalCount = await query.CountAsync(ct);
+
+            var rows = await query
+                .OrderByDescending(t => t.LastActivityAt)
+                .ThenByDescending(t => t.Id)
+                .Skip(skip)
+                .Take(take)
+                .ToListAsync(ct);
+
+            var items = rows.Select(t => new TicketListItemDto(
+                t.Id,
+                t.Site,
+                t.NotificationName ?? "",
+                t.Notification ?? "",
+                t.Status,
+                t.TaskCategoryId,
+                t.TaskCategory != null ? t.TaskCategory.Name : null,
+                t.ActionRequiredOverride,
+                t.AssignedTech,
+                t.CreatedAt,
+                t.LastActivityAt,
+                t.CurrentWorkOrder ?? "",
+                NormalizeWorkOrderType(t.WorkOrderClass),
+                t.GroupCode,
+                t.PriorityDays,
+                t.Problem,
+                t.Notes ?? "",
+                t.CreatedBy,
+                t.DispatchNotes ?? ""
+            )).ToList();
+
+            return Ok(new TicketQueryResponse
+            {
+                Items = items,
+                TotalCount = totalCount
+            });
         }
 
         [HttpGet("dispatch-tasks")]
@@ -176,36 +328,17 @@ namespace SmartGridSuite.Api.Controllers
                 .Select(x => (uint?)x.TruckId)
                 .FirstOrDefaultAsync(ct);
 
-            var publishedAssignments = new List<DailyTicketAssignmentPublishedEntity>();
+            uint targetTechnicianId = tech.Id;
 
             if (truckId.HasValue)
             {
-                var latestTruckVersion = await _db.DailyTicketAssignmentPublished
-                    .AsNoTracking()
-                    .Where(x =>
-                        x.AssignmentDate == assignmentDate &&
-                        x.TargetType == "Truck" &&
-                        x.TruckId == truckId.Value)
-                    .Select(x => (int?)x.PublishedVersion)
-                    .MaxAsync(ct);
+                var leadTech = await ResolveLeadTechnicianForTruckAsync(
+                    rosterDate,
+                    truckId.Value,
+                    ct);
 
-                if (latestTruckVersion.HasValue)
-                {
-                    var truckRows = await _db.DailyTicketAssignmentPublished
-                        .AsNoTracking()
-                        .Include(x => x.Ticket)
-                            .ThenInclude(t => t!.TaskCategory)
-                        .Where(x =>
-                            x.AssignmentDate == assignmentDate &&
-                            x.TargetType == "Truck" &&
-                            x.TruckId == truckId.Value &&
-                            x.PublishedVersion == latestTruckVersion.Value)
-                        .OrderBy(x => x.SortOrder)
-                        .ThenBy(x => x.Id)
-                        .ToListAsync(ct);
-
-                    publishedAssignments.AddRange(truckRows);
-                }
+                if (leadTech != null)
+                    targetTechnicianId = leadTech.Id;
             }
 
             var latestTechnicianVersion = await _db.DailyTicketAssignmentPublished
@@ -213,33 +346,28 @@ namespace SmartGridSuite.Api.Controllers
                 .Where(x =>
                     x.AssignmentDate == assignmentDate &&
                     x.TargetType == "Technician" &&
-                    x.TechnicianId == tech.Id)
+                    x.TechnicianId == targetTechnicianId)
                 .Select(x => (int?)x.PublishedVersion)
                 .MaxAsync(ct);
 
-            if (latestTechnicianVersion.HasValue)
-            {
-                var technicianRows = await _db.DailyTicketAssignmentPublished
-                    .AsNoTracking()
-                    .Include(x => x.Ticket)
-                        .ThenInclude(t => t!.TaskCategory)
-                    .Where(x =>
-                        x.AssignmentDate == assignmentDate &&
-                        x.TargetType == "Technician" &&
-                        x.TechnicianId == tech.Id &&
-                        x.PublishedVersion == latestTechnicianVersion.Value)
-                    .OrderBy(x => x.SortOrder)
-                    .ThenBy(x => x.Id)
-                    .ToListAsync(ct);
+            if (!latestTechnicianVersion.HasValue)
+                return Ok(new List<FieldTechTicketListItemDto>());
 
-                publishedAssignments.AddRange(technicianRows);
-            }
+            var publishedAssignments = await _db.DailyTicketAssignmentPublished
+                .AsNoTracking()
+                .Include(x => x.Ticket)
+                    .ThenInclude(t => t!.TaskCategory)
+                .Where(x =>
+                    x.AssignmentDate == assignmentDate &&
+                    x.TargetType == "Technician" &&
+                    x.TechnicianId == targetTechnicianId &&
+                    x.PublishedVersion == latestTechnicianVersion.Value)
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Id)
+                .ToListAsync(ct);
 
             var result = publishedAssignments
                 .Where(x => x.Ticket != null)
-                .OrderBy(x => x.TargetType == "Truck" ? 0 : 1)
-                .ThenBy(x => x.SortOrder)
-                .ThenBy(x => x.Id)
                 .Select(x => x.Ticket!)
                 .Where(t => !IsClosedTicketStatus(t.Status))
                 .Select(MapToFieldTechTicket)
@@ -286,9 +414,97 @@ namespace SmartGridSuite.Api.Controllers
             if (string.IsNullOrWhiteSpace(employeeId))
                 return null;
 
-            return await _db.Technicians
+            return await ActiveFieldTechniciansQuery()
+                .FirstOrDefaultAsync(t => t.EmployeeId == employeeId, ct);
+        }
+
+        private IQueryable<TechnicianEntity> ActiveFieldTechniciansQuery()
+        {
+            return _db.Technicians
                 .AsNoTracking()
-                .FirstOrDefaultAsync(t => t.EmployeeId == employeeId && t.IsActive, ct);
+                .Where(t =>
+                    t.IsActive &&
+                    t.TechnicianRoles.Any(tr => tr.Role.Code == TechnicianRoleCode));
+        }
+
+        private async Task<TechnicianEntity?> ResolveLeadTechnicianForTruckAsync(DateTime workDate, uint truckId, CancellationToken ct)
+        {
+            var truck = await _db.Trucks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == truckId && x.IsActive, ct);
+
+            if (truck == null)
+                return null;
+
+            var truckNumber = (truck.TruckNumber ?? string.Empty).Trim();
+
+            CrewEntity? crew = null;
+
+            if (!string.IsNullOrWhiteSpace(truckNumber))
+            {
+                crew = await _db.Crews
+                    .AsNoTracking()
+                    .Where(x => x.WorkDate == workDate && x.TruckNumber == truckNumber)
+                    .OrderBy(x => x.Id)
+                    .FirstOrDefaultAsync(ct);
+            }
+
+            var technicians = await (
+                from roster in _db.TruckRosters.AsNoTracking()
+                join tech in ActiveFieldTechniciansQuery()
+                    on roster.TechnicianId equals tech.Id
+                where roster.WorkDate == workDate && roster.TruckId == truckId
+                select tech)
+                .ToListAsync(ct);
+
+            return PickLeadTechnician(
+                technicians,
+                truckId,
+                crew?.LeadTechnicianId);
+        }
+
+        private static TechnicianEntity? PickLeadTechnician(IReadOnlyList<TechnicianEntity> technicians, uint truckId, uint? crewLeadTechnicianId)
+        {
+            if (technicians.Count == 0)
+                return null;
+
+            if (crewLeadTechnicianId.HasValue)
+            {
+                var crewLead = technicians.FirstOrDefault(t => t.Id == crewLeadTechnicianId.Value);
+
+                if (crewLead != null)
+                    return crewLead;
+            }
+
+            var homeTruckLead = technicians.FirstOrDefault(t => t.HomeTruckId == truckId);
+
+            if (homeTruckLead != null)
+                return homeTruckLead;
+
+            return technicians
+                .OrderByDescending(GetTitleRank)
+                .ThenBy(t => t.LastName)
+                .ThenBy(t => t.FirstName)
+                .FirstOrDefault();
+        }
+
+        private static int GetTitleRank(TechnicianEntity tech)
+        {
+            var title = (tech.Title ?? string.Empty).Trim();
+
+            if (title.Equals("Supervisor", StringComparison.OrdinalIgnoreCase))
+                return 400;
+
+            if (title.Equals("Head Journeyman", StringComparison.OrdinalIgnoreCase))
+                return 300;
+
+            if (title.Equals("Journeyman", StringComparison.OrdinalIgnoreCase))
+                return 200;
+
+            if (title.Equals("Apprentice", StringComparison.OrdinalIgnoreCase))
+                return 100;
+
+            return 0;
         }
 
         private static List<string> BuildAssignedTechMatchValues(TechnicianEntity tech)

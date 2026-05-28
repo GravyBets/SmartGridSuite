@@ -1,5 +1,6 @@
 ﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="clr-namespace:SmartGridSuite.Client.Controls">
 
     <!-- Card border style -->
     <Style x:Key="Card" TargetType="Border">
@@ -173,6 +174,101 @@
         </Setter>
     </Style>
 
+    <!-- Clearable Search TextBox WITH watermark.
+  Uses Tag for watermark text.
+  Uses TextBoxCommands.ClearText for the X button. -->
+    <Style x:Key="ClearableSearchTextBox"
+            TargetType="TextBox"
+            BasedOn="{StaticResource ModernTextBox}">
+
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Padding" Value="12,0,38,0"/>
+
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Grid SnapsToDevicePixels="True">
+
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10"/>
+
+                        <TextBlock x:Name="Watermark"
+                                Text="{TemplateBinding Tag}"
+                                Foreground="{DynamicResource WatermarkText}"
+                                Margin="14,0,38,0"
+                                VerticalAlignment="Center"
+                                IsHitTestVisible="False"
+                                Visibility="Collapsed"
+                                TextTrimming="CharacterEllipsis"
+                                FontSize="{TemplateBinding FontSize}"
+                                FontFamily="{TemplateBinding FontFamily}"/>
+
+                        <ScrollViewer x:Name="PART_ContentHost"
+                               Padding="{TemplateBinding Padding}"/>
+
+                        <Button x:Name="ClearButton"
+                                 Width="28"
+                                 Height="24"
+                                 Margin="0,0,6,0"
+                                 HorizontalAlignment="Right"
+                                 VerticalAlignment="Center"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Cursor="Hand"
+                                 Focusable="False"
+                                 Command="{x:Static local:TextBoxCommands.ClearText}"
+                                 CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                 Visibility="Visible">
+                                    <TextBlock Text="✕"
+                                        FontSize="10"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource TextSecondary}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                        </Button>
+                    </Grid>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Text" Value="">
+                            <Setter TargetName="Watermark" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="ClearButton" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+
+                        <Trigger Property="Text" Value="{x:Null}">
+                            <Setter TargetName="Watermark" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="ClearButton" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="Text" Value=""/>
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="ClearButton" Property="Visibility" Value="Collapsed"/>
+                        </MultiTrigger>
+
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderHover}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="1.5"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillHover}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.60"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Secondary button -->
     <Style x:Key="SecondaryButtonStyle" TargetType="Button">
         <Setter Property="Height" Value="34"/>
@@ -268,6 +364,243 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- =========================================================
+     SHARED PANE / CARD / LIST STYLES
+     ========================================================= -->
+
+    <!-- Pane text -->
+    <Style x:Key="PaneTitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+    </Style>
+
+    <Style x:Key="PaneSubtitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+    </Style>
+
+    <Style x:Key="SectionHeaderTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+    </Style>
+
+    <Style x:Key="SmallLabelTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+    </Style>
+
+    <!-- Summary cards -->
+    <Style x:Key="SummaryValueTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="21"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+    </Style>
+
+    <Style x:Key="SummaryLabelTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="Margin" Value="0,2,0,0"/>
+    </Style>
+
+    <Style x:Key="SummaryCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="14,12"/>
+        <Setter Property="Margin" Value="0,0,6,0"/>
+    </Style>
+
+    <!-- Generic card variants used inside dispatch panes -->
+    <Style x:Key="TruckCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
+        <Setter Property="BorderThickness" Value="1.5"/>
+        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="Padding" Value="10,10,10,0"/>
+        <Setter Property="Margin" Value="0"/>
+    </Style>
+
+    <Style x:Key="TechCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="10"/>
+        <Setter Property="Margin" Value="0"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsOnShift}" Value="False">
+                <Setter Property="Opacity" Value="0.48"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="TicketCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="8"/>
+        <Setter Property="Margin" Value="0"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsFieldComplete}" Value="True">
+                <Setter Property="Opacity" Value="0.45"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding IsClosed}" Value="True">
+                <Setter Property="Opacity" Value="0.35"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Clean ListBox style used by card lists -->
+    <Style x:Key="CleanListBoxStyle" TargetType="ListBox">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+    </Style>
+
+    <Style x:Key="CleanListBoxItemStyle" TargetType="ListBoxItem">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="SelectionChrome"
+                        Padding="0"
+                        CornerRadius="12"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="1.5">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="SelectionChrome"
+                                Property="Background"
+                                Value="#F8FAFC"/>
+                            <Setter TargetName="SelectionChrome"
+                                Property="BorderBrush"
+                                Value="#CBD5E1"/>
+                        </Trigger>
+
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="SelectionChrome"
+                                Property="Background"
+                                Value="#F8FBFF"/>
+                            <Setter TargetName="SelectionChrome"
+                                Property="BorderBrush"
+                                Value="#2563EB"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Board ListBox style used by Truck Assignments -->
+    <Style x:Key="BoardListBoxStyle" TargetType="ListBox">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+    </Style>
+
+    <Style x:Key="BoardListBoxItemStyle" TargetType="ListBoxItem">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,0,0,6"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="SelectionChrome"
+                        Padding="0"
+                        CornerRadius="14"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="2">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="SelectionChrome"
+                                Property="Background"
+                                Value="#F3F7FF"/>
+                            <Setter TargetName="SelectionChrome"
+                                Property="BorderBrush"
+                                Value="#BFDBFE"/>
+                        </Trigger>
+
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="SelectionChrome"
+                                Property="Background"
+                                Value="#DBEAFE"/>
+                            <Setter TargetName="SelectionChrome"
+                                Property="BorderBrush"
+                                Value="#2563EB"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Transparent icon button -->
+    <Style x:Key="TransparentIconButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="30"/>
+        <Setter Property="Height" Value="30"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Opacity" Value="0.70"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                        CornerRadius="8">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Opacity" Value="1"/>
+                            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Opacity" Value="0.85"/>
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Reusable vector trashcan icon -->
+    <Style x:Key="TrashCanIconPathStyle" TargetType="Path">
+        <Setter Property="Fill" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="Data" Value="M7 4V2.75C7 1.78 7.78 1 8.75 1H15.25C16.22 1 17 1.78 17 2.75V4H21V6H19.85L18.94 20.1C18.84 21.73 17.49 23 15.86 23H8.14C6.51 23 5.16 21.73 5.06 20.1L4.15 6H3V4H7ZM9 4H15V3H9V4ZM6.15 6L7.05 19.97C7.09 20.55 7.57 21 8.14 21H15.86C16.43 21 16.91 20.55 16.95 19.97L17.85 6H6.15ZM9 8H11V19H9V8ZM13 8H15V19H13V8Z"/>
     </Style>
 
     <!-- ===========

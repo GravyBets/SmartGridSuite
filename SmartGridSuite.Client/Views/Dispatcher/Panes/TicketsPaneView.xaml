@@ -202,7 +202,7 @@
             <TextBox x:Name="SearchBox"
                      Grid.Row="2"
                      Grid.Column="0"
-                     Style="{StaticResource ModernWatermarkTextBox}"
+                     Style="{StaticResource ClearableSearchTextBox}"
                      Tag="Search site, Notification, WO, Tech, Notes, Serial #..."
                      Height="36"
                      TextChanged="SearchBox_TextChanged"/>

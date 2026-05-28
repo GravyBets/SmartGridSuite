@@ -1,9 +1,9 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using SmartGridSuite.Client.Views.Dispatcher.Panes;
-using System.Text.Json;
+using System.ComponentModel;
 using SmartGridSuite.Client.Services;
-using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace SmartGridSuite.Client.Views
 {
@@ -12,7 +12,10 @@ namespace SmartGridSuite.Client.Views
         private bool _navCollapsed;
         private bool _syncingNav;
         private SiteDashboardPaneView? _siteDashboardPaneView;
-        private DailyAssignmentsPaneView? _dailyAssignmentsPaneView;
+        private DailyAssignmentsPaneView? _dailyAssignmentsPaneView; 
+        private int _currentNavIndex;
+        private bool _allowCloseWithoutPrompt;
+        private bool _closePromptRunning;
 
         private readonly ApiClient _api = new("https://localhost:7140");
 
@@ -22,12 +25,12 @@ namespace SmartGridSuite.Client.Views
 
             UiScaleService.ApplyToWindow(this);
 
-            // Default selection =  Site Dashboard
-            SelectNavIndex(0);
+            Closing += DispatcherShellWindow_Closing;
 
+            // Default selection = Site Dashboard
+            SelectNavIndex(0);
         }
 
-        
         private void SelectNavIndex(int index)
         {
             _syncingNav = true;
@@ -41,7 +44,8 @@ namespace SmartGridSuite.Client.Views
                 NavListExpanded.Items[index] is ListBoxItem item)
             {
                 ShowPane(item);
-            }
+                _currentNavIndex = index;
+            }            
         }
 
         private static string? GetNavKey(ListBoxItem item)
@@ -51,7 +55,7 @@ namespace SmartGridSuite.Client.Views
                    ?? item.Content?.ToString();
         }
 
-        private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_syncingNav)
                 return;
@@ -62,16 +66,40 @@ namespace SmartGridSuite.Client.Views
             if (lb.SelectedItem is not ListBoxItem item)
                 return;
 
+            var requestedIndex = lb.SelectedIndex;
+
+            var canLeave = await ConfirmCurrentPaneCanCloseAsync();
+
+            if (!canLeave)
+            {
+                _syncingNav = true;
+
+                NavListExpanded.SelectedIndex = _currentNavIndex;
+                NavListCollapsed.SelectedIndex = _currentNavIndex;
+
+                _syncingNav = false;
+                return;
+            }
+
             _syncingNav = true;
 
             if (lb == NavListExpanded)
-                NavListCollapsed.SelectedIndex = lb.SelectedIndex;
+                NavListCollapsed.SelectedIndex = requestedIndex;
             else
-                NavListExpanded.SelectedIndex = lb.SelectedIndex;
+                NavListExpanded.SelectedIndex = requestedIndex;
 
             _syncingNav = false;
 
             ShowPane(item);
+            _currentNavIndex = requestedIndex;
+        }
+
+        private async Task<bool> ConfirmCurrentPaneCanCloseAsync()
+        {
+            if (MainPaneHost.Content is TechniciansPaneView techniciansPane)
+                return await techniciansPane.ConfirmLeaveIfDirtyAsync();
+
+            return true;
         }
 
         private void ShowPane(ListBoxItem item)
@@ -136,11 +164,56 @@ namespace SmartGridSuite.Client.Views
                 : Visibility.Collapsed;
         }
 
-        private void HomeButton_Click(object sender, RoutedEventArgs e)
+        private async void HomeButton_Click(object sender, RoutedEventArgs e)
         {
+            var canLeave = await ConfirmCurrentPaneCanCloseAsync();
+
+            if (!canLeave)
+                return;
+
+            _allowCloseWithoutPrompt = true;
+
             var home = new ModuleLauncherWindow();
             home.Show();
+
             Close();
-        }       
+        }
+
+        private async void DispatcherShellWindow_Closing(object? sender, CancelEventArgs e)
+        {
+            if (_allowCloseWithoutPrompt)
+                return;
+
+            if (_closePromptRunning)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            if (MainPaneHost.Content is not TechniciansPaneView)
+                return;
+
+            e.Cancel = true;
+            _closePromptRunning = true;
+
+            try
+            {
+                var canClose = await ConfirmCurrentPaneCanCloseAsync();
+
+                if (!canClose)
+                    return;
+
+                _allowCloseWithoutPrompt = true;
+
+                _ = Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    Close();
+                }), DispatcherPriority.Background);
+            }
+            finally
+            {
+                _closePromptRunning = false;
+            }
+        }
     }
 }

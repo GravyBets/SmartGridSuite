@@ -1,16 +1,14 @@
 ﻿#nullable enable
 using SmartGridSuite.Client.Services;
 using SmartGridSuite.Contracts.Dispatcher.DailyAssignments;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using System.Globalization;
+using System.Windows.Data;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
@@ -73,11 +71,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(HasSelectedTarget));
+                OnPropertyChanged(nameof(HasSelectedTargetAssignedTickets));
                 OnPropertyChanged(nameof(SelectedTargetSubtitle));
+                OnPropertyChanged(nameof(SelectedTargetPublishStatusText));
             }
         }
 
         public bool HasSelectedTarget => SelectedTarget != null;
+
+        public bool HasSelectedTargetAssignedTickets => SelectedTarget?.AssignedTicketCount > 0;
 
         public string HeaderSubtitle =>
             $"Assign tickets for {Board.WorkDate:dddd, MMMM d, yyyy}.";
@@ -86,6 +88,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             SelectedTarget == null
                 ? "Choose a crew or individual technician."
                 : $"{SelectedTarget.PrimaryText} · {SelectedTarget.SecondaryText}";
+
+        public string SelectedTargetPublishStatusText => SelectedTarget?.PublishStatusText ?? "";
 
         public string StatusText
         {
@@ -403,23 +407,25 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (sender is not Button button || button.Tag is not DailyAssignedTicketDto ticket)
                 return;
 
-            var confirm = MessageBox.Show(
-                $"Remove {ticket.Site} from this assignment list?",
-                "Remove Assignment",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+            await RemoveAssignedTicketsAsync(
+                new List<long> { ticket.TicketId },
+                "Removing assigned ticket...",
+                $"Removed {ticket.Site} from the selected list.");
+        }
 
-            if (confirm != MessageBoxResult.Yes)
+        private async Task RemoveAssignedTicketsAsync(List<long> ticketIds, string workingStatus, string successStatus)
+        {
+            if (ticketIds.Count == 0)
                 return;
 
             try
             {
-                StatusText = "Removing assigned ticket...";
+                StatusText = workingStatus;
 
                 var req = new RemoveDailyTicketAssignmentsRequest
                 {
                     WorkDate = Board.WorkDate,
-                    TicketIds = new List<long> { ticket.TicketId },
+                    TicketIds = ticketIds,
                     UpdatedBy = Environment.UserName
                 };
 
@@ -429,7 +435,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 await LoadBoardAsync();
 
-                StatusText = $"Removed {result?.RemovedCount ?? 1} ticket assignment.";
+                StatusText = successStatus;
             }
             catch (ApiClient.ApiException ex)
             {
@@ -465,6 +471,38 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
 
             await MoveAssignedTicketAsync(ticket, 1);
+        }
+
+        private async void ClearSelectedTargetList_Click(object sender, RoutedEventArgs e)
+        {
+            var target = SelectedTarget;
+
+            if (target == null)
+                return;
+
+            var ticketIds = target.AssignedTickets
+                .Select(x => x.TicketId)
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            if (ticketIds.Count == 0)
+                return;
+
+            var confirm = MessageBox.Show(
+                $"Clear all {ticketIds.Count} ticket(s) from {target.PrimaryText}?\n\n" +
+                "This clears the dispatcher list only. Click Save & Publish after this if the field tech task list should also be emptied.",
+                "Clear Assignment List",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            await RemoveAssignedTicketsAsync(
+                ticketIds,
+                $"Clearing list for {target.PrimaryText}...",
+                $"Cleared {ticketIds.Count} ticket(s) from {target.PrimaryText}. Click Save & Publish to update field tech tasks.");
         }
 
         private async Task MoveAssignedTicketAsync(DailyAssignedTicketDto ticket, int direction)
@@ -543,26 +581,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 MessageBox.Show(
                     "Select a crew or technician first.",
-                    "Publish This List",
+                    "Save & Publish",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
             }
 
-            if (target.AssignedTicketCount == 0)
-            {
-                MessageBox.Show(
-                    "There are no tickets assigned to this crew/technician.",
-                    "Publish This List",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
+            var confirmText = target.AssignedTicketCount == 0
+                ? $"Save and publish an EMPTY task list for {target.PrimaryText}?\n\n" +
+                  "This will remove all tickets from the field tech task list for this crew/technician."
+                : $"Save and publish the current list for {target.PrimaryText}?\n\n" +
+                  $"Ticket count: {target.AssignedTicketCount}\n\n" +
+                  "Only this selected crew/technician will receive the updated list.";
 
             var confirm = MessageBox.Show(
-                $"Publish the current list for {target.PrimaryText}?\n\n" +
-                "Only this selected crew/technician will receive the updated list.",
-                "Publish This List",
+                confirmText,
+                "Save & Publish",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
@@ -571,7 +605,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             try
             {
-                StatusText = $"Publishing list for {target.PrimaryText}...";
+                StatusText = $"Saving and publishing list for {target.PrimaryText}...";
 
                 var req = new PublishDailyAssignmentTargetRequest
                 {
@@ -588,26 +622,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 await LoadBoardAsync();
 
-                StatusText =
-                    result == null
-                        ? $"Published list for {target.PrimaryText}."
-                        : $"Published {result.PublishedCount} ticket(s) for {target.PrimaryText} as version {result.PublishedVersion}.";
+                if (target.AssignedTicketCount == 0)
+                {
+                    StatusText = $"Saved and published an empty list for {target.PrimaryText}.";
+                }
+                else
+                {
+                    StatusText =
+                        result == null
+                            ? $"Saved and published list for {target.PrimaryText}."
+                            : $"Saved and published {result.PublishedCount} ticket(s) for {target.PrimaryText} as version {result.PublishedVersion}.";
+                }
             }
             catch (ApiClient.ApiException ex)
             {
-                StatusText = $"Publish failed: {ex.Body ?? ex.Message}";
+                StatusText = $"Save & Publish failed: {ex.Body ?? ex.Message}";
                 MessageBox.Show(
                     ex.Body ?? ex.Message,
-                    "Publish Failed",
+                    "Save & Publish Failed",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
             catch (Exception ex)
             {
-                StatusText = "Publish failed: " + ex.Message;
+                StatusText = "Save & Publish failed: " + ex.Message;
                 MessageBox.Show(
                     ex.Message,
-                    "Publish Failed",
+                    "Save & Publish Failed",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -656,6 +697,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             OnPropertyChanged(nameof(SelectedTarget));
             OnPropertyChanged(nameof(HasSelectedTarget));
             OnPropertyChanged(nameof(SelectedTargetSubtitle));
+            OnPropertyChanged(nameof(SelectedTargetPublishStatusText));
+            OnPropertyChanged(nameof(HasSelectedTargetAssignedTickets));
         }
 
         private static void NormalizeBoardForDisplay(DailyAssignmentsBoardDto board)
@@ -691,6 +734,25 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
+    public sealed class OneBasedIndexConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is int index)
+                return (index + 1).ToString(culture);
+
+            if (int.TryParse(value?.ToString(), out var parsed))
+                return (parsed + 1).ToString(culture);
+
+            return "";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
     public sealed class AssignmentTargetVm
     {
         public string TargetKey { get; set; } = "";
@@ -705,11 +767,40 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         public List<DailyAssignedTicketDto> AssignedTickets { get; set; } = new();
 
         public int AssignedTicketCount => AssignedTickets.Count;
+
         public bool HasNoTickets => AssignedTicketCount == 0;
+
+        public bool HasUnpublishedChanges => AssignedTickets.Any(x => !x.IsPublished);
+
+        public string ComboStatusText
+        {
+            get
+            {
+                if (AssignedTicketCount == 0)
+                    return "No Tickets Assigned";
+
+                return HasUnpublishedChanges
+                    ? $"Unpublished Changes ({AssignedTicketCount} tickets)"
+                    : $"Published ({AssignedTicketCount} tickets)";
+            }
+        }
+
+        public string PublishStatusText
+        {
+            get
+            {
+                if (AssignedTicketCount == 0)
+                    return "No tickets assigned";
+
+                return HasUnpublishedChanges
+                    ? "Unpublished changes"
+                    : "Published";
+            }
+        }
 
         public static AssignmentTargetVm FromDto(DailyAssignmentTargetDto dto)
         {
-            var isTruck = string.Equals(dto.TargetType, "Truck", StringComparison.OrdinalIgnoreCase);
+            var isTruck = dto.TruckId.HasValue && dto.Technicians.Count > 0;
 
             var names = dto.Technicians
                 .Select(x => x.Name)

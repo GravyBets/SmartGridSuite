@@ -15,4 +15,6 @@ public sealed class TruckColumnDto
 {
     public TruckDto Truck { get; set; } = new();
     public List<TechnicianDto> Technicians { get; set; } = new();
+    public int? LeadTechnicianId { get; set; }
+    public string? LeadTechnicianName { get; set; }
 }

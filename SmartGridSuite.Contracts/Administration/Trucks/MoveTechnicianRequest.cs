@@ -11,3 +11,11 @@ public sealed class MoveTechnicianRequest
     public int TechnicianId { get; set; }
     public int? ToTruckId { get; set; }                    // null => Unassigned
 }
+public sealed class SetTruckCrewLeadRequest
+{
+    public DateTime WorkDate { get; set; }
+
+    public int TruckId { get; set; }
+
+    public int TechnicianId { get; set; }
+}

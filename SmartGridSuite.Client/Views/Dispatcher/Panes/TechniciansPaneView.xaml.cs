@@ -1,21 +1,18 @@
 ﻿#nullable enable
-using SmartGridSuite.Client.Views.Dispatcher.Dialogs;
 using SmartGridSuite.Contracts.Administration.Technicians;
 using SmartGridSuite.Contracts.Administration.Trucks;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Globalization;
+using System.Windows.Media.Media3D;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
@@ -26,15 +23,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
         private readonly HttpClient _http;
-        private readonly object _queueLock = new();
-        private readonly Queue<int> _techQueue = new();
-        private readonly HashSet<int> _pendingTechs = new();
-        private readonly Dictionary<int, MoveTechnicianRequest> _latestMoveByTech = new();
+
+        private bool _hasUnsavedChanges;
+
+        private Point _dragStartPoint;
+        private const string TechnicianDragFormat = "SmartGridSuite.TechnicianDrag";
+        private const string TechnicianDragIdsFormat = "SmartGridSuite.TechnicianDragIds";
+        private List<int> _dragTechnicianIdsSnapshot = new();
 
         private bool _busyLoading;
         private bool _showAllTechnicians;
         private string _technicianSearchText = "";
-        private Task? _moveRunner;
+        private bool _isCommitting;
 
         private readonly HashSet<int> _selectedTechnicianIds = new();
 
@@ -47,6 +47,40 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         public int AssignedCount => Board.Trucks.Sum(t => t.Technicians.Count);
         public int UnassignedCount => Board.AllTechnicians.Count(t => string.IsNullOrWhiteSpace(t.TruckNumber));
         public int TrucksUsedCount => Board.Trucks.Count(t => t.Technicians.Count > 0);
+        public bool HasUnsavedChanges
+        {
+            get => _hasUnsavedChanges;
+            private set
+            {
+                if (_hasUnsavedChanges == value)
+                    return;
+
+                _hasUnsavedChanges = value;
+                NotifyDraftStateChanged();
+            }
+        }
+        public string DraftStatusText =>
+            HasUnsavedChanges
+                ? "Unsaved truck board changes"
+                : "Truck board saved";
+
+        //Committing Changes
+        public bool IsCommitting
+        {
+            get => _isCommitting;
+            private set
+            {
+                if (_isCommitting == value)
+                    return;
+
+                _isCommitting = value;
+                NotifyDraftStateChanged();
+            }
+        }
+        public bool CanEditBoard => !IsCommitting;
+        public bool CanCommitChanges => HasUnsavedChanges && !IsCommitting;
+        public bool CanDiscardChanges => HasUnsavedChanges && !IsCommitting;
+        public string CommitButtonText => IsCommitting ? "Committing..." : "Save";
 
         public int VisibleTechnicianCount
         {
@@ -86,10 +120,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             try
             {
                 _busyLoading = true;
-                SetStatus("Initializing board...");
-
-                var d = DateTime.Today.ToString("yyyy-MM-dd");
-                await _http.PostAsync($"api/trucks/board/initialize?date={d}", content: null);
+                SetStatus("Loading board...");
 
                 await LoadBoardAsync();
             }
@@ -114,6 +145,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 Board = TruckBoardVm.FromDto(dto);
                 NormalizeTruckAssignments();
+                RecalculateLocalLeads();
+                HasUnsavedChanges = false;
                 RefreshBoardMetrics();
                 RefreshTechnicianFilter();
 
@@ -134,6 +167,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             OnPropertyChanged(nameof(UnassignedCount));
             OnPropertyChanged(nameof(TrucksUsedCount));
             OnPropertyChanged(nameof(VisibleTechnicianCount));
+            OnPropertyChanged(nameof(HasUnsavedChanges));
+            OnPropertyChanged(nameof(DraftStatusText));
+            OnPropertyChanged(nameof(IsCommitting));
+            OnPropertyChanged(nameof(CanEditBoard));
+            OnPropertyChanged(nameof(CanCommitChanges));
+            OnPropertyChanged(nameof(CanDiscardChanges));
+            OnPropertyChanged(nameof(CommitButtonText));
         }
 
         private void NormalizeTruckAssignments()
@@ -156,8 +196,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)
         {
+            if (IsCommitting)
+                return;
+
             if (_busyLoading)
                 return;
+
+            if (HasUnsavedChanges)
+            {
+                var confirm = MessageBox.Show(
+                    "Refresh will discard your uncommitted truck board changes. Continue?",
+                    "Discard Changes?",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (confirm != MessageBoxResult.Yes)
+                    return;
+            }
 
             _busyLoading = true;
 
@@ -171,10 +226,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private async void ClearAll_Click(object sender, RoutedEventArgs e)
+        private void ClearAll_Click(object sender, RoutedEventArgs e)
         {
+            if (IsCommitting)
+                return;
+
             var confirm = MessageBox.Show(
-                "Clear all truck assignments for today?",
+                "Clear all truck assignments locally?\n\nNothing will be saved until you click Commit Changes.",
                 "Clear All",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -182,28 +240,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (confirm != MessageBoxResult.Yes)
                 return;
 
-            try
-            {
-                SetStatus("Clearing board...");
-                var d = DateTime.Today.ToString("yyyy-MM-dd");
+            ClearBoardLocally();
 
-                var resp = await _http.PostAsync($"api/trucks/board/clear?date={d}", content: null);
-                resp.EnsureSuccessStatusCode();
-
-                await LoadBoardAsync();
-                SetStatus("Board cleared.");
-            }
-            catch (Exception ex)
-            {
-                SetStatus("Clear all failed: " + ex.Message);
-                MessageBox.Show(ex.Message, "Clear All Failed", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            HasUnsavedChanges = true;
+            SetStatus("Board cleared locally. Click Commit Changes to save.");
         }
 
-        private async void SetHome_Click(object sender, RoutedEventArgs e)
+        private void SetHome_Click(object sender, RoutedEventArgs e)
         {
+            if (IsCommitting)
+                return;
+
             var confirm = MessageBox.Show(
-                "Set all active technicians to their home trucks for today?\n\nThis will replace the current board.",
+                "Set all active technicians to their home trucks locally?\n\nThis will replace the current draft board. Nothing will be saved until you click Commit Changes.",
                 "Set Home",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -211,22 +260,27 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (confirm != MessageBoxResult.Yes)
                 return;
 
-            try
-            {
-                SetStatus("Setting home trucks...");
-                var d = DateTime.Today.ToString("yyyy-MM-dd");
+            ClearBoardLocally(markChanged: false);
 
-                var resp = await _http.PostAsync($"api/trucks/board/set-home?date={d}", content: null);
-                resp.EnsureSuccessStatusCode();
+            var activeTruckIds = Board.Trucks
+                .Select(t => t.Truck.Id)
+                .ToHashSet();
 
-                await LoadBoardAsync();
-                SetStatus("Home trucks applied.");
-            }
-            catch (Exception ex)
+            foreach (var tech in Board.AllTechnicians.ToList())
             {
-                SetStatus("Set home failed: " + ex.Message);
-                MessageBox.Show(ex.Message, "Set Home Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (tech.HomeTruckId.HasValue &&
+                    activeTruckIds.Contains(tech.HomeTruckId.Value))
+                {
+                    ApplyMoveLocally(tech.Id, tech.HomeTruckId.Value, refreshAfterMove: false);
+                }
             }
+
+            NormalizeTruckAssignments();
+            RecalculateLocalLeads();
+            RefreshBoardMetrics();
+            RefreshTechnicianFilter();
+
+            MarkBoardDirty("Home trucks applied locally. Click Commit Changes to save.");
         }
 
         private void TechnicianSearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -283,10 +337,43 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void RemoveTechFromTruck_Click(object sender, RoutedEventArgs e)
         {
+            if (IsCommitting)
+                return;
+
             if (sender is not Button button || button.Tag is not TechnicianDto tech)
                 return;
 
             MoveTechnicianToTruck(tech.Id, null);
+        }
+
+        private void SetLeadTechnician_Click(object sender, RoutedEventArgs e)
+        {
+            if (IsCommitting)
+                return;
+
+            if (sender is not Button button || button.Tag is not TechnicianDto tech)
+                return;
+
+            var truckVm = Board.Trucks.FirstOrDefault(t =>
+                t.Technicians.Any(x => x.Id == tech.Id));
+
+            if (truckVm == null)
+                return;
+
+            if (truckVm.Technicians.Count < 2)
+            {
+                MessageBox.Show(
+                    "A lead can only be set when two or more technicians are assigned to the truck.",
+                    "Set Lead",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            truckVm.LeadTechnicianId = tech.Id;
+            MarkBoardDirty();
+
+            SetStatus($"{tech.Name} set as local lead for Truck {truckVm.Truck.TruckNumber}. Click Commit Changes to save.");
         }
 
         private void ClearTruck_Click(object sender, RoutedEventArgs e)
@@ -310,19 +397,184 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 MoveTechnicianToTruck(tech.Id, null);
         }
 
-        private void MoveTechnicianToTruck(int technicianId, int? toTruckId)
+        private async void CommitChanges_Click(object sender, RoutedEventArgs e)
         {
-            ApplyMoveLocally(technicianId, toTruckId);
-
-            EnqueueMove(new MoveTechnicianRequest
-            {
-                WorkDate = DateTime.Today,
-                TechnicianId = technicianId,
-                ToTruckId = toTruckId
-            });
+            await CommitBoardChangesAsync(showConfirmation: true);
         }
 
-        private void ApplyMoveLocally(int techId, int? toTruckId)
+        private async Task<bool> CommitBoardChangesAsync(bool showConfirmation)
+        {
+            if (!HasUnsavedChanges || IsCommitting)
+                return true;
+
+            var assignments = Board.Trucks
+                .SelectMany(truck => truck.Technicians.Select(tech => new CommitTruckAssignmentDto
+                {
+                    TechnicianId = tech.Id,
+                    TruckId = truck.Truck.Id
+                }))
+                .ToList();
+
+            var leadOverrides = Board.Trucks
+                .Where(truck =>
+                    truck.Technicians.Count >= 2 &&
+                    truck.LeadTechnicianId.HasValue &&
+                    truck.Technicians.Any(tech => tech.Id == truck.LeadTechnicianId.Value))
+                .Select(truck => new CommitTruckLeadOverrideDto
+                {
+                    TruckId = truck.Truck.Id,
+                    TechnicianId = truck.LeadTechnicianId!.Value
+                })
+                .ToList();
+
+            if (showConfirmation)
+            {
+                var confirm = MessageBox.Show(
+                    $"Commit today's truck board changes?\n\n" +
+                    $"Assigned technicians: {assignments.Count}\n" +
+                    $"Lead overrides: {leadOverrides.Count}\n\n" +
+                    "This will save the current truck/crew layout to the server.",
+                    "Commit Truck Board",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (confirm != MessageBoxResult.Yes)
+                    return false;
+            }
+
+            try
+            {
+                IsCommitting = true;
+                SetStatus("Committing truck board changes...");
+
+                var req = new CommitTruckBoardRequest
+                {
+                    WorkDate = DateTime.Today,
+                    Assignments = assignments,
+                    LeadOverrides = leadOverrides
+                };
+
+                var resp = await _http.PutAsJsonAsync("api/trucks/board/commit", req);
+
+                if (!resp.IsSuccessStatusCode)
+                {
+                    var body = await resp.Content.ReadAsStringAsync();
+
+                    MessageBox.Show(
+                        string.IsNullOrWhiteSpace(body)
+                            ? $"Commit failed: {(int)resp.StatusCode} {resp.ReasonPhrase}"
+                            : body,
+                        "Commit Changes Failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+
+                    return false;
+                }
+
+                await LoadBoardAsync();
+
+                SetStatus("Truck board changes committed.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Commit failed: " + ex.Message);
+
+                MessageBox.Show(
+                    ex.ToString(),
+                    "Commit Changes Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
+                return false;
+            }
+            finally
+            {
+                IsCommitting = false;
+            }
+        }
+
+        public async Task<bool> ConfirmLeaveIfDirtyAsync()
+        {
+            if (!HasUnsavedChanges)
+                return true;
+
+            if (IsCommitting)
+                return false;
+
+            var result = MessageBox.Show(
+                "You have unsaved truck board changes.\n\n" +
+                "Do you want to commit these changes before leaving?\n\n" +
+                "Yes = Commit changes and continue\n" +
+                "No = Discard changes and continue\n" +
+                "Cancel = Stay on Truck Assignments",
+                "Unsaved Truck Board Changes",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Cancel)
+                return false;
+
+            if (result == MessageBoxResult.No)
+            {
+                HasUnsavedChanges = false;
+                return true;
+            }
+
+            return await CommitBoardChangesAsync(showConfirmation: false);
+        }
+
+        private void NotifyDraftStateChanged()
+        {
+            OnPropertyChanged(nameof(HasUnsavedChanges));
+            OnPropertyChanged(nameof(DraftStatusText));
+            OnPropertyChanged(nameof(IsCommitting));
+            OnPropertyChanged(nameof(CanEditBoard));
+            OnPropertyChanged(nameof(CanCommitChanges));
+            OnPropertyChanged(nameof(CanDiscardChanges));
+            OnPropertyChanged(nameof(CommitButtonText));
+        }
+
+        private void MarkBoardDirty(string? status = null)
+        {
+            HasUnsavedChanges = true;
+            NotifyDraftStateChanged();
+
+            if (!string.IsNullOrWhiteSpace(status))
+                SetStatus(status);
+        }
+
+        private async void DiscardChanges_Click(object sender, RoutedEventArgs e)
+        {
+            if (IsCommitting)
+                return;
+
+            if (!HasUnsavedChanges)
+                return;
+
+            var confirm = MessageBox.Show(
+                "Discard all uncommitted truck board changes and reload from the server?",
+                "Discard Changes",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            await LoadBoardAsync();
+        }
+
+        private void MoveTechnicianToTruck(int technicianId, int? toTruckId)
+        {
+            if (IsCommitting)
+                return;
+
+            ApplyMoveLocally(technicianId, toTruckId);
+
+            MarkBoardDirty("Truck board changed locally. Click Commit Changes to save.");
+        }
+
+        private void ApplyMoveLocally(int techId, int? toTruckId, bool refreshAfterMove = true)
         {
             var tech = Board.RemoveTechEverywhere(techId)
                 ?? Board.AllTechnicians.FirstOrDefault(x => x.Id == techId);
@@ -344,65 +596,37 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     Board.InsertSorted(truck.Technicians, tech);
             }
 
+            if (!refreshAfterMove)
+                return;
+
             NormalizeTruckAssignments();
+            RecalculateLocalLeads();
             RefreshBoardMetrics();
             RefreshTechnicianFilter();
         }
 
-        private void EnqueueMove(MoveTechnicianRequest req)
+        private void ClearBoardLocally(bool markChanged = true)
         {
-            lock (_queueLock)
+            foreach (var truck in Board.Trucks)
             {
-                _latestMoveByTech[req.TechnicianId] = req;
-
-                if (_pendingTechs.Add(req.TechnicianId))
-                    _techQueue.Enqueue(req.TechnicianId);
-
-                _moveRunner ??= Task.Run(ProcessMoveQueueAsync);
+                truck.Technicians.Clear();
+                truck.LeadTechnicianId = null;
             }
-        }
 
-        private async Task ProcessMoveQueueAsync()
-        {
-            while (true)
+            Board.Unassigned.Clear();
+
+            foreach (var tech in Board.AllTechnicians)
             {
-                int techId;
-                MoveTechnicianRequest req;
-
-                lock (_queueLock)
-                {
-                    if (_techQueue.Count == 0)
-                    {
-                        _moveRunner = null;
-                        return;
-                    }
-
-                    techId = _techQueue.Dequeue();
-                    _pendingTechs.Remove(techId);
-
-                    if (!_latestMoveByTech.TryGetValue(techId, out req!))
-                        continue;
-
-                    _latestMoveByTech.Remove(techId);
-                }
-
-                try
-                {
-                    await Dispatcher.InvokeAsync(() => SetStatus("Saving changes..."));
-
-                    var resp = await _http.PutAsJsonAsync("api/trucks/board/move", req);
-                    resp.EnsureSuccessStatusCode();
-                }
-                catch (Exception ex)
-                {
-                    await Dispatcher.InvokeAsync(() => SetStatus("Save error — reloading: " + ex.Message));
-                    await Dispatcher.InvokeAsync(async () => await LoadBoardAsync());
-                }
-                finally
-                {
-                    await Dispatcher.InvokeAsync(() => SetStatus("Ready."));
-                }
+                tech.TruckNumber = null;
+                Board.InsertSorted(Board.Unassigned, tech);
             }
+
+            NormalizeTruckAssignments();
+            RefreshBoardMetrics();
+            RefreshTechnicianFilter();
+
+            if (markChanged)
+                MarkBoardDirty();
         }
 
         private void TechniciansList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -436,6 +660,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void AddSelectedToTruck_Click(object sender, RoutedEventArgs e)
         {
+            if (IsCommitting)
+                return;
+
             if (sender is not Button button || button.Tag is not TruckColumnVm truckVm)
                 return;
 
@@ -527,7 +754,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 if (ReferenceEquals(current, parent))
                     return true;
 
-                current = VisualTreeHelper.GetParent(current);
+                current = GetParentObject(current);
             }
 
             return false;
@@ -541,10 +768,35 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 if (current is T match)
                     return match;
 
-                current = VisualTreeHelper.GetParent(current);
+                current = GetParentObject(current);
             }
 
             return null;
+        }
+
+        private static DependencyObject? GetParentObject(DependencyObject? child)
+        {
+            if (child == null)
+                return null;
+
+            // Normal visual tree path.
+            if (child is Visual || child is Visual3D)
+                return VisualTreeHelper.GetParent(child);
+
+            // Handles TextBlock child content like Run, Span, Bold, etc.
+            if (child is ContentElement contentElement)
+            {
+                var parent = ContentOperations.GetParent(contentElement);
+
+                if (parent != null)
+                    return parent;
+
+                if (contentElement is FrameworkContentElement frameworkContentElement)
+                    return frameworkContentElement.Parent;
+            }
+
+            // Fallback for logical tree-only objects.
+            return LogicalTreeHelper.GetParent(child);
         }
 
         private void AssignedTruckTechList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -624,6 +876,278 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 ClearAllListBoxSelections(child);
             }
         }
+
+        private void RecalculateLocalLeads()
+        {
+            foreach (var truck in Board.Trucks)
+            {
+                if (truck.Technicians.Count <= 1)
+                {
+                    truck.LeadTechnicianId = null;
+                    continue;
+                }
+
+                if (truck.LeadTechnicianId.HasValue &&
+                    truck.Technicians.Any(t => t.Id == truck.LeadTechnicianId.Value))
+                {
+                    continue;
+                }
+
+                var lead = PickLocalLeadTechnician(truck);
+
+                truck.LeadTechnicianId = lead?.Id;
+            }
+        }
+
+        private static TechnicianDto? PickLocalLeadTechnician(TruckColumnVm truck)
+        {
+            var homeTruckLead = truck.Technicians
+                .FirstOrDefault(t => t.HomeTruckId == truck.Truck.Id);
+
+            if (homeTruckLead != null)
+                return homeTruckLead;
+
+            return truck.Technicians
+                .OrderByDescending(GetTitleRank)
+                .ThenBy(t => t.Name)
+                .FirstOrDefault();
+        }
+
+        private static int GetTitleRank(TechnicianDto tech)
+        {
+            var title = (tech.Title ?? string.Empty).Trim();
+
+            if (title.Equals("Supervisor", StringComparison.OrdinalIgnoreCase))
+                return 400;
+
+            if (title.Equals("Head Journeyman", StringComparison.OrdinalIgnoreCase))
+                return 300;
+
+            if (title.Equals("Journeyman", StringComparison.OrdinalIgnoreCase))
+                return 200;
+
+            if (title.Equals("Apprentice", StringComparison.OrdinalIgnoreCase))
+                return 100;
+
+            return 0;
+        }
+
+        private void TechCardList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _dragStartPoint = e.GetPosition(null);
+            _dragTechnicianIdsSnapshot.Clear();
+
+            if (IsCommitting)
+                return;
+
+            var source = e.OriginalSource as DependencyObject;
+
+            // Let buttons and checkboxes behave normally.
+            if (FindAncestor<Button>(source) != null ||
+                FindAncestor<CheckBox>(source) != null)
+            {
+                return;
+            }
+
+            var item = FindAncestor<ListBoxItem>(source);
+
+            if (item?.DataContext is not TechnicianDto tech)
+                return;
+
+            var listBox = FindAncestor<ListBox>(item);
+
+            // Drawer supports multi-select.
+            if (ReferenceEquals(listBox, TechniciansList))
+            {
+                if (_selectedTechnicianIds.Contains(tech.Id))
+                {
+                    _dragTechnicianIdsSnapshot = _selectedTechnicianIds
+                        .Where(id => id > 0)
+                        .Distinct()
+                        .ToList();
+
+                    // Important: prevents WPF from toggling this selected card off
+                    // on the click used to start dragging.
+                    e.Handled = true;
+                    return;
+                }
+
+                _dragTechnicianIdsSnapshot = new List<int> { tech.Id };
+                return;
+            }
+
+            // Assigned truck lists are single-card drags.
+            _dragTechnicianIdsSnapshot = new List<int> { tech.Id };
+
+            if (item.IsSelected)
+                e.Handled = true;
+        }
+
+
+        //Drag and Drop
+        private void TechCardList_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (IsCommitting)
+                return;
+
+            if (e.LeftButton != MouseButtonState.Pressed)
+                return;
+
+            var currentPosition = e.GetPosition(null);
+
+            if (Math.Abs(currentPosition.X - _dragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(currentPosition.Y - _dragStartPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
+            {
+                return;
+            }
+
+            if (FindAncestor<Button>(e.OriginalSource as DependencyObject) != null)
+                return;
+
+            var item = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
+
+            if (item?.DataContext is not TechnicianDto tech)
+                return;
+
+            var draggedIds = _dragTechnicianIdsSnapshot.Count > 0
+                ? _dragTechnicianIdsSnapshot
+                : GetDraggedTechnicianIds(tech.Id);
+
+            if (draggedIds.Count == 0)
+                return;
+
+            var data = new DataObject();
+            data.SetData(TechnicianDragFormat, tech.Id);
+            data.SetData(TechnicianDragIdsFormat, draggedIds.ToArray());
+
+            DragDrop.DoDragDrop(item, data, DragDropEffects.Move);
+
+            _dragTechnicianIdsSnapshot.Clear();
+            e.Handled = true;
+        }
+
+        private void TruckCard_DragOver(object sender, DragEventArgs e)
+        {
+            if (IsCommitting || !e.Data.GetDataPresent(TechnicianDragFormat))
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
+                return;
+            }
+
+            e.Effects = DragDropEffects.Move;
+            e.Handled = true;
+        }
+
+        private void TruckCard_Drop(object sender, DragEventArgs e)
+        {
+            if (IsCommitting)
+                return;
+
+            if (sender is not Border border || border.Tag is not TruckColumnVm truckVm)
+                return;
+
+            var techIdsToMove = GetDraggedTechnicianIdsFromDrop(e);
+
+            if (techIdsToMove.Count == 0)
+                return;
+
+            foreach (var techId in techIdsToMove)
+            {
+                if (truckVm.Technicians.Any(t => t.Id == techId))
+                    continue;
+
+                MoveTechnicianToTruck(techId, truckVm.Truck.Id);
+            }
+
+            ClearTechnicianDrawerSelection();
+
+            e.Handled = true;
+        }
+
+        private void TechnicianDrawer_DragOver(object sender, DragEventArgs e)
+        {
+            if (IsCommitting || !e.Data.GetDataPresent(TechnicianDragFormat))
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
+                return;
+            }
+
+            e.Effects = DragDropEffects.Move;
+            e.Handled = true;
+        }
+
+        private void TechnicianDrawer_Drop(object sender, DragEventArgs e)
+        {
+            if (IsCommitting)
+                return;
+
+            var techIdsToMove = GetDraggedTechnicianIdsFromDrop(e);
+
+            if (techIdsToMove.Count == 0)
+                return;
+
+            foreach (var techId in techIdsToMove)
+                MoveTechnicianToTruck(techId, null);
+
+            ClearTechnicianDrawerSelection();
+
+            e.Handled = true;
+        }
+
+        private bool TryGetDraggedTechnicianId(DragEventArgs e, out int technicianId)
+        {
+            technicianId = 0;
+
+            if (!e.Data.GetDataPresent(TechnicianDragFormat))
+                return false;
+
+            var value = e.Data.GetData(TechnicianDragFormat);
+
+            if (value is int id)
+            {
+                technicianId = id;
+                return technicianId > 0;
+            }
+
+            return int.TryParse(value?.ToString(), out technicianId) && technicianId > 0;
+        }
+
+        private List<int> GetDraggedTechnicianIds(int draggedTechId)
+        {
+            // If the dragged tech is part of the selected drawer group, move the whole group.
+            if (_selectedTechnicianIds.Contains(draggedTechId))
+            {
+                return _selectedTechnicianIds
+                    .Where(id => id > 0)
+                    .Distinct()
+                    .ToList();
+            }
+
+            // Otherwise, only move the card being dragged.
+            return new List<int> { draggedTechId };
+        }
+
+        private List<int> GetDraggedTechnicianIdsFromDrop(DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(TechnicianDragIdsFormat))
+            {
+                var value = e.Data.GetData(TechnicianDragIdsFormat);
+
+                if (value is int[] ids)
+                {
+                    return ids
+                        .Where(id => id > 0)
+                        .Distinct()
+                        .ToList();
+                }
+            }
+
+            return TryGetDraggedTechnicianId(e, out var singleId)
+                ? new List<int> { singleId }
+                : new List<int>();
+        }
     }
 
     public sealed class TruckBoardVm
@@ -652,14 +1176,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     .ThenBy(t => t.Name));
 
             vm.Trucks = new ObservableCollection<TruckColumnVm>(
-                (dto.Trucks ?? new List<TruckColumnDto>())
-                .Select(c => new TruckColumnVm
-                {
-                    Truck = c.Truck,
-                    Technicians = new ObservableCollection<TechnicianDto>(
-                        (c.Technicians ?? new List<TechnicianDto>())
-                            .OrderBy(t => t.Name))
-                }));
+            (dto.Trucks ?? new List<TruckColumnDto>())
+            .Select(c => new TruckColumnVm
+            {
+                Truck = c.Truck,
+                LeadTechnicianId = c.LeadTechnicianId,
+                Technicians = new ObservableCollection<TechnicianDto>(
+                    (c.Technicians ?? new List<TechnicianDto>())
+                        .OrderBy(t => t.Name))
+            }));
 
             return vm;
         }
@@ -703,9 +1228,83 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         }
     }
 
-    public sealed class TruckColumnVm
+    public sealed class TruckColumnVm : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string? name = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
         public TruckDto Truck { get; set; } = new();
         public ObservableCollection<TechnicianDto> Technicians { get; set; } = new();
+
+        private int? _leadTechnicianId;
+        public int? LeadTechnicianId
+        {
+            get => _leadTechnicianId;
+            set
+            {
+                _leadTechnicianId = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(LeadTechnicianName));
+                OnPropertyChanged(nameof(LeadText));
+            }
+        }
+
+        public string? LeadTechnicianName =>
+            LeadTechnicianId.HasValue
+                ? Technicians.FirstOrDefault(t => t.Id == LeadTechnicianId.Value)?.Name
+                : null;
+
+        public string LeadText =>
+            string.IsNullOrWhiteSpace(LeadTechnicianName)
+                ? "Lead: Not set"
+                : $"Lead: {LeadTechnicianName}";
+    }
+
+    public sealed class LeadStarBrushConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            var gray = new SolidColorBrush(Color.FromRgb(107, 114, 128));
+            var yellow = new SolidColorBrush(Color.FromRgb(250, 204, 21));
+
+            if (values.Length < 2)
+                return gray;
+
+            var techId = TryToInt(values[0]);
+            var leadTechId = TryToInt(values[1]);
+
+            if (techId.HasValue &&
+                leadTechId.HasValue &&
+                techId.Value == leadTechId.Value)
+            {
+                return yellow;
+            }
+
+            return gray;
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            throw new NotSupportedException();
+        }
+
+        private static int? TryToInt(object? value)
+        {
+            if (value == null)
+                return null;
+
+            if (value is int i)
+                return i;
+
+            if (value is uint ui)
+                return unchecked((int)ui);
+
+            if (int.TryParse(value.ToString(), out var parsed))
+                return parsed;
+
+            return null;
+        }
     }
 }

@@ -14,6 +14,7 @@ namespace SmartGridSuite.Api.Controllers;
 public sealed class TrucksController : ControllerBase
 {
     private readonly SmartGridDbContext _db;
+    private const string TechnicianRoleCode = "TECHNICIAN";
 
     public TrucksController(SmartGridDbContext db) => _db = db;
 
@@ -163,7 +164,7 @@ public sealed class TrucksController : ControllerBase
         var rosterRows = await _db.Set<TruckRosterEntity>()
             .AsNoTracking()
             .Where(r => r.WorkDate == workDate)
-            .Join(_db.Set<TechnicianEntity>().AsNoTracking(),
+            .Join(ActiveFieldTechniciansQuery(),
                 r => r.TechnicianId,
                 t => t.Id,
                 (r, t) => new
@@ -202,9 +203,8 @@ public sealed class TrucksController : ControllerBase
                 g => g.Key,
                 g => g.Select(x => x.Tech).OrderBy(x => x.Name).ToList());
 
-        var unassigned = await _db.Set<TechnicianEntity>()
-            .AsNoTracking()
-            .Where(t => t.IsActive && !_db.Set<TruckRosterEntity>()
+        var unassigned = await ActiveFieldTechniciansQuery()
+            .Where(t => !_db.Set<TruckRosterEntity>()
                 .Any(r => r.WorkDate == workDate && r.TechnicianId == t.Id))
             .OrderBy(t => t.LastName)
             .ThenBy(t => t.FirstName)
@@ -248,9 +248,7 @@ public sealed class TrucksController : ControllerBase
                     g => g.Key,
                     g => g.First().TruckNumber);
 
-        var allTechnicians = await _db.Set<TechnicianEntity>()
-            .AsNoTracking()
-            .Where(t => t.IsActive)
+        var allTechnicians = await ActiveFieldTechniciansQuery()
             .OrderBy(t => t.LastName)
             .ThenBy(t => t.FirstName)
             .Select(t => new TechnicianDto
@@ -285,17 +283,63 @@ public sealed class TrucksController : ControllerBase
                 tech.TruckNumber = truckNumber;
         }
 
+        var truckNumberById = trucks
+            .ToDictionary(
+        x => x.Id,
+        x => (x.TruckNumber ?? string.Empty).Trim());
+
+        var crewLeadByTruckId = await _db.Set<CrewEntity>()
+            .AsNoTracking()
+            .Where(c => c.WorkDate == workDate && c.TruckNumber != null)
+            .ToListAsync();
+
+        var leadTechnicianIdByTruckId = crewLeadByTruckId
+            .Select(c => new
+            {
+                Crew = c,
+                TruckNumber = (c.TruckNumber ?? string.Empty).Trim()
+            })
+            .Where(x => !string.IsNullOrWhiteSpace(x.TruckNumber))
+            .Join(
+                truckNumberById,
+                c => c.TruckNumber,
+                t => t.Value,
+                (c, t) => new
+                {
+                    TruckId = t.Key,
+                    c.Crew.LeadTechnicianId
+                },
+                StringComparer.OrdinalIgnoreCase)
+            .Where(x => x.LeadTechnicianId.HasValue)
+            .GroupBy(x => x.TruckId)
+            .ToDictionary(
+                g => g.Key,
+                g => (int?)g.First().LeadTechnicianId!.Value);
+
         return new TruckBoardDto
         {
             WorkDate = workDate,
             Unassigned = unassigned,
             AllTechnicians = allTechnicians,
-            Trucks = trucks.Select(tr => new TruckColumnDto
+            Trucks = trucks.Select(tr =>
             {
-                Truck = tr,
-                Technicians = techsByTruck.TryGetValue(tr.Id, out var list)
+                var technicians = techsByTruck.TryGetValue(tr.Id, out var list)
                     ? list
-                    : new List<TechnicianDto>()
+                    : new List<TechnicianDto>();
+
+                leadTechnicianIdByTruckId.TryGetValue(tr.Id, out var leadTechnicianId);
+
+                var leadTechnicianName = leadTechnicianId.HasValue
+                    ? technicians.FirstOrDefault(t => t.Id == leadTechnicianId.Value)?.Name
+                    : null;
+
+                return new TruckColumnDto
+                {
+                    Truck = tr,
+                    Technicians = technicians,
+                    LeadTechnicianId = leadTechnicianId,
+                    LeadTechnicianName = leadTechnicianName
+                };
             }).ToList()
         };
     }
@@ -322,9 +366,12 @@ public sealed class TrucksController : ControllerBase
         if (priorDate == default)
             return NoContent();
 
-        var priorRows = await _db.Set<TruckRosterEntity>()
-            .AsNoTracking()
-            .Where(r => r.WorkDate == priorDate)
+        var priorRows = await (
+            from roster in _db.Set<TruckRosterEntity>().AsNoTracking()
+            join tech in ActiveFieldTechniciansQuery()
+                on roster.TechnicianId equals tech.Id
+            where roster.WorkDate == priorDate
+            select roster)
             .ToListAsync();
 
         foreach (var r in priorRows)
@@ -346,6 +393,182 @@ public sealed class TrucksController : ControllerBase
         return NoContent();
     }
 
+    [HttpPut("board/commit")]
+    public async Task<IActionResult> CommitBoard([FromBody] CommitTruckBoardRequest req)
+    {
+        var workDate = (req.WorkDate == default ? DateTime.Today : req.WorkDate).Date;
+
+        var submittedAssignments = (req.Assignments ?? new List<CommitTruckAssignmentDto>())
+            .Where(x => x.TechnicianId > 0 && x.TruckId > 0)
+            .GroupBy(x => x.TechnicianId)
+            .Select(g => g.Last())
+            .ToList();
+
+        var leadOverrides = (req.LeadOverrides ?? new List<CommitTruckLeadOverrideDto>())
+            .Where(x => x.TruckId > 0 && x.TechnicianId > 0)
+            .GroupBy(x => x.TruckId)
+            .Select(g => g.Last())
+            .ToList();
+
+        var technicianIds = submittedAssignments
+            .Select(x => (uint)x.TechnicianId)
+            .Distinct()
+            .ToList();
+
+        var truckIds = submittedAssignments
+            .Select(x => (uint)x.TruckId)
+            .Distinct()
+            .ToList();
+
+        if (technicianIds.Count > 0)
+        {
+            var validTechnicianIds = await ActiveFieldTechniciansQuery()
+                .Where(t => technicianIds.Contains(t.Id))
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            var validTechnicianIdSet = validTechnicianIds.ToHashSet();
+
+            var invalidTechnicianIds = technicianIds
+                .Where(id => !validTechnicianIdSet.Contains(id))
+                .OrderBy(id => id)
+                .ToList();
+
+            if (invalidTechnicianIds.Count > 0)
+            {
+                return BadRequest(
+                    "One or more technicians are inactive, missing, or do not have the Technician role: " +
+                    string.Join(", ", invalidTechnicianIds));
+            }
+        }
+
+        if (truckIds.Count > 0)
+        {
+            var validTruckIds = await _db.Set<TruckEntity>()
+                .AsNoTracking()
+                .Where(t => t.IsActive && truckIds.Contains(t.Id))
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            var validTruckIdSet = validTruckIds.ToHashSet();
+
+            var invalidTruckIds = truckIds
+                .Where(id => !validTruckIdSet.Contains(id))
+                .OrderBy(id => id)
+                .ToList();
+
+            if (invalidTruckIds.Count > 0)
+            {
+                return BadRequest(
+                    "One or more trucks are inactive or missing: " +
+                    string.Join(", ", invalidTruckIds));
+            }
+        }
+
+        var submittedTechIdsByTruckId = submittedAssignments
+            .GroupBy(x => x.TruckId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => x.TechnicianId).ToHashSet());
+
+        foreach (var leadOverride in leadOverrides)
+        {
+            if (!submittedTechIdsByTruckId.TryGetValue(leadOverride.TruckId, out var techIdsInTruck))
+                return BadRequest($"Lead override truck {leadOverride.TruckId} has no assigned technicians.");
+
+            if (techIdsInTruck.Count < 2)
+                return BadRequest($"Lead override truck {leadOverride.TruckId} must have two or more technicians.");
+
+            if (!techIdsInTruck.Contains(leadOverride.TechnicianId))
+                return BadRequest($"Lead technician {leadOverride.TechnicianId} is not assigned to truck {leadOverride.TruckId}.");
+        }
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
+
+        try
+        {
+            // Clear today's technician-to-crew rows first.
+            var existingTechnicianRosterRows = await _db.Set<TechnicianRosterEntity>()
+                .Where(r => r.WorkDate == workDate)
+                .ToListAsync();
+
+            if (existingTechnicianRosterRows.Count > 0)
+                _db.Set<TechnicianRosterEntity>().RemoveRange(existingTechnicianRosterRows);
+
+            // Clear today's truck roster rows.
+            var existingTruckRosterRows = await _db.Set<TruckRosterEntity>()
+                .Where(r => r.WorkDate == workDate)
+                .ToListAsync();
+
+            if (existingTruckRosterRows.Count > 0)
+                _db.Set<TruckRosterEntity>().RemoveRange(existingTruckRosterRows);
+
+            await _db.SaveChangesAsync();
+
+            // Insert the submitted board.
+            foreach (var assignment in submittedAssignments)
+            {
+                _db.Set<TruckRosterEntity>().Add(new TruckRosterEntity
+                {
+                    WorkDate = workDate,
+                    TechnicianId = (uint)assignment.TechnicianId,
+                    TruckId = (uint)assignment.TruckId
+                });
+            }
+
+            await _db.SaveChangesAsync();
+
+            // Rebuild crews only for affected/active trucks.
+            var activeTruckIds = await _db.Set<TruckEntity>()
+                .AsNoTracking()
+                .Where(t => t.IsActive)
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            foreach (var truckId in activeTruckIds)
+                await SyncCrewForTruckAsync(workDate, truckId);
+
+            // Apply manual lead overrides after crew sync.
+            foreach (var leadOverride in leadOverrides)
+            {
+                var truckId = (uint)leadOverride.TruckId;
+                var technicianId = (uint)leadOverride.TechnicianId;
+
+                var truck = await _db.Set<TruckEntity>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.Id == truckId && t.IsActive);
+
+                if (truck == null)
+                    continue;
+
+                var truckNumber = (truck.TruckNumber ?? string.Empty).Trim();
+
+                if (string.IsNullOrWhiteSpace(truckNumber))
+                    continue;
+
+                var crew = await _db.Set<CrewEntity>()
+                    .Where(c => c.WorkDate == workDate && c.TruckNumber == truckNumber)
+                    .OrderBy(c => c.Id)
+                    .FirstOrDefaultAsync();
+
+                if (crew == null)
+                    continue;
+
+                crew.LeadTechnicianId = technicianId;
+            }
+
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            return NoContent();
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
+    }
+
     [HttpPut("board/move")]
     public async Task<IActionResult> Move([FromBody] MoveTechnicianRequest req)
     {
@@ -353,12 +576,11 @@ public sealed class TrucksController : ControllerBase
         var techId = (uint)req.TechnicianId;
         uint? toTruckId = req.ToTruckId == null ? null : (uint)req.ToTruckId.Value;
 
-        var techExists = await _db.Set<TechnicianEntity>()
-            .AsNoTracking()
+        var techExists = await ActiveFieldTechniciansQuery()
             .AnyAsync(t => t.Id == techId);
 
         if (!techExists)
-            return NotFound($"Technician {req.TechnicianId} not found.");
+            return NotFound($"Technician {req.TechnicianId} was not found, is inactive, or does not have the Technician role.");
 
         if (toTruckId != null)
         {
@@ -408,6 +630,120 @@ public sealed class TrucksController : ControllerBase
         return NoContent();
     }
 
+    [HttpPut("board/set-lead")]
+    public async Task<IActionResult> SetCrewLead([FromBody] SetTruckCrewLeadRequest req)
+    {
+        var workDate = (req.WorkDate == default ? DateTime.Today : req.WorkDate).Date;
+
+        if (req.TruckId <= 0)
+            return BadRequest("TruckId is required.");
+
+        if (req.TechnicianId <= 0)
+            return BadRequest("TechnicianId is required.");
+
+        var truckId = (uint)req.TruckId;
+        var technicianId = (uint)req.TechnicianId;
+
+        var truck = await _db.Set<TruckEntity>()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.Id == truckId && t.IsActive);
+
+        if (truck == null)
+            return NotFound($"Truck {req.TruckId} was not found or is inactive.");
+
+        var technician = await ActiveFieldTechniciansQuery()
+            .FirstOrDefaultAsync(t => t.Id == technicianId);
+
+        if (technician == null)
+            return NotFound($"Technician {req.TechnicianId} was not found, is inactive, or does not have the Technician role.");
+
+        var rosterRows = await _db.Set<TruckRosterEntity>()
+            .Where(r => r.WorkDate == workDate && r.TruckId == truckId)
+            .ToListAsync();
+
+        if (rosterRows.Count < 2)
+            return BadRequest("A crew lead can only be set when two or more technicians are assigned to the truck.");
+
+        var technicianIsInTruck = rosterRows.Any(r => r.TechnicianId == technicianId);
+
+        if (!technicianIsInTruck)
+            return BadRequest("The selected technician is not assigned to this truck on the selected date.");
+
+        var truckNumber = (truck.TruckNumber ?? string.Empty).Trim();
+
+        if (string.IsNullOrWhiteSpace(truckNumber))
+            return BadRequest("The selected truck does not have a valid truck number.");
+
+        var crew = await _db.Set<CrewEntity>()
+            .Where(c => c.WorkDate == workDate && c.TruckNumber == truckNumber)
+            .OrderBy(c => c.Id)
+            .FirstOrDefaultAsync();
+
+        if (crew == null)
+        {
+            crew = new CrewEntity
+            {
+                WorkDate = workDate,
+                TruckNumber = truckNumber,
+                LeadTechnicianId = technicianId
+            };
+
+            _db.Set<CrewEntity>().Add(crew);
+            await _db.SaveChangesAsync();
+        }
+        else
+        {
+            crew.LeadTechnicianId = technicianId;
+            await _db.SaveChangesAsync();
+        }
+
+        var duplicateCrews = await _db.Set<CrewEntity>()
+            .Where(c => c.WorkDate == workDate && c.TruckNumber == truckNumber && c.Id != crew.Id)
+            .ToListAsync();
+
+        if (duplicateCrews.Count > 0)
+            _db.Set<CrewEntity>().RemoveRange(duplicateCrews);
+
+        var memberIds = rosterRows
+            .Select(r => r.TechnicianId)
+            .Distinct()
+            .ToList();
+
+        var existingForMembers = await _db.Set<TechnicianRosterEntity>()
+            .Where(r => r.WorkDate == workDate && memberIds.Contains(r.TechnicianId))
+            .ToListAsync();
+
+        foreach (var memberId in memberIds)
+        {
+            var existing = existingForMembers.FirstOrDefault(r => r.TechnicianId == memberId);
+
+            if (existing == null)
+            {
+                _db.Set<TechnicianRosterEntity>().Add(new TechnicianRosterEntity
+                {
+                    WorkDate = workDate,
+                    TechnicianId = memberId,
+                    CrewId = crew.Id
+                });
+            }
+            else if (existing.CrewId != crew.Id)
+            {
+                existing.CrewId = crew.Id;
+            }
+        }
+
+        var extraRows = await _db.Set<TechnicianRosterEntity>()
+            .Where(r => r.WorkDate == workDate && r.CrewId == crew.Id && !memberIds.Contains(r.TechnicianId))
+            .ToListAsync();
+
+        if (extraRows.Count > 0)
+            _db.Set<TechnicianRosterEntity>().RemoveRange(extraRows);
+
+        await _db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
     [HttpPost("board/clear")]
     public async Task<IActionResult> ClearBoard([FromQuery] string? date = null)
     {
@@ -436,6 +772,20 @@ public sealed class TrucksController : ControllerBase
 
             foreach (var ticket in ticketsUsingCrews)
                 ticket.AssignedCrewId = null;
+
+            var draftAssignmentsUsingCrews = await _db.Set<DailyTicketAssignmentEntity>()
+                .Where(a => a.CrewId != null && crewIds.Contains(a.CrewId.Value))
+                .ToListAsync();
+
+            foreach (var assignment in draftAssignmentsUsingCrews)
+                assignment.CrewId = null;
+
+            var publishedAssignmentsUsingCrews = await _db.Set<DailyTicketAssignmentPublishedEntity>()
+                .Where(a => a.CrewId != null && crewIds.Contains(a.CrewId.Value))
+                .ToListAsync();
+
+            foreach (var assignment in publishedAssignmentsUsingCrews)
+                assignment.CrewId = null;
         }
 
         if (crews.Count > 0)
@@ -481,6 +831,20 @@ public sealed class TrucksController : ControllerBase
 
             foreach (var ticket in ticketsUsingCrews)
                 ticket.AssignedCrewId = null;
+
+            var draftAssignmentsUsingCrews = await _db.Set<DailyTicketAssignmentEntity>()
+                .Where(a => a.CrewId != null && existingCrewIds.Contains(a.CrewId.Value))
+                .ToListAsync();
+
+            foreach (var assignment in draftAssignmentsUsingCrews)
+                assignment.CrewId = null;
+
+            var publishedAssignmentsUsingCrews = await _db.Set<DailyTicketAssignmentPublishedEntity>()
+                .Where(a => a.CrewId != null && existingCrewIds.Contains(a.CrewId.Value))
+                .ToListAsync();
+
+            foreach (var assignment in publishedAssignmentsUsingCrews)
+                assignment.CrewId = null;
         }
 
         if (existingCrews.Count > 0)
@@ -503,9 +867,8 @@ public sealed class TrucksController : ControllerBase
 
         var activeTruckIdSet = activeTruckIds.ToHashSet();
 
-        var techsWithHomeTruck = await _db.Set<TechnicianEntity>()
-            .AsNoTracking()
-            .Where(t => t.IsActive && t.HomeTruckId != null)
+        var techsWithHomeTruck = await ActiveFieldTechniciansQuery()
+            .Where(t => t.HomeTruckId != null)
             .ToListAsync();
 
         foreach (var tech in techsWithHomeTruck)
@@ -538,6 +901,87 @@ public sealed class TrucksController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("board/cleanup-invalid-roster")]
+    public async Task<ActionResult<string>> CleanupInvalidRosterRows([FromQuery] string? date = null)
+    {
+        var workDate = ParseDateOrToday(date);
+
+        var validTechnicianIds = await ActiveFieldTechniciansQuery()
+            .Select(t => t.Id)
+            .ToListAsync();
+
+        var validTechnicianIdSet = validTechnicianIds.ToHashSet();
+
+        var invalidTruckRosterRows = await _db.Set<TruckRosterEntity>()
+            .Where(r =>
+                r.WorkDate == workDate &&
+                !validTechnicianIdSet.Contains(r.TechnicianId))
+            .ToListAsync();
+
+        var invalidTechnicianRosterRows = await _db.Set<TechnicianRosterEntity>()
+            .Where(r =>
+                r.WorkDate == workDate &&
+                !validTechnicianIdSet.Contains(r.TechnicianId))
+            .ToListAsync();
+
+        var affectedTruckIds = invalidTruckRosterRows
+            .Select(r => r.TruckId)
+            .Distinct()
+            .ToList();
+
+        var affectedCrewIds = invalidTechnicianRosterRows
+            .Select(r => r.CrewId)
+            .Distinct()
+            .ToList();
+
+        if (invalidTechnicianRosterRows.Count > 0)
+            _db.Set<TechnicianRosterEntity>().RemoveRange(invalidTechnicianRosterRows);
+
+        if (invalidTruckRosterRows.Count > 0)
+            _db.Set<TruckRosterEntity>().RemoveRange(invalidTruckRosterRows);
+
+        await _db.SaveChangesAsync();
+
+        foreach (var truckId in affectedTruckIds)
+            await SyncCrewForTruckAsync(workDate, truckId);
+
+        var emptyCrews = await _db.Set<CrewEntity>()
+            .Where(c =>
+                c.WorkDate == workDate &&
+                !_db.Set<TechnicianRosterEntity>().Any(r => r.WorkDate == workDate && r.CrewId == c.Id))
+            .ToListAsync();
+
+        if (emptyCrews.Count > 0)
+        {
+            var emptyCrewIds = emptyCrews.Select(c => c.Id).ToList();
+
+            var ticketsUsingEmptyCrews = await _db.Set<TicketEntity>()
+                .Where(t => t.AssignedCrewId != null && emptyCrewIds.Contains(t.AssignedCrewId.Value))
+                .ToListAsync();
+
+            foreach (var ticket in ticketsUsingEmptyCrews)
+                ticket.AssignedCrewId = null;
+
+            _db.Set<CrewEntity>().RemoveRange(emptyCrews);
+
+            await _db.SaveChangesAsync();
+        }
+
+        return Ok(
+            $"Cleaned {invalidTruckRosterRows.Count} truck roster row(s), " +
+            $"{invalidTechnicianRosterRows.Count} technician roster row(s), " +
+            $"{emptyCrews.Count} empty crew row(s).");
+    }
+
+    private IQueryable<TechnicianEntity> ActiveFieldTechniciansQuery()
+    {
+        return _db.Set<TechnicianEntity>()
+            .AsNoTracking()
+            .Where(t =>
+                t.IsActive &&
+                t.TechnicianRoles.Any(tr => tr.Role.Code == TechnicianRoleCode));
+    }
+
     private static DateTime ParseDateOrToday(string? date)
         => (!string.IsNullOrWhiteSpace(date) && DateTime.TryParse(date, out var parsed))
             ? parsed.Date
@@ -549,15 +993,30 @@ public sealed class TrucksController : ControllerBase
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.Id == truckId);
 
-        if (truck == null) return;
+        if (truck == null)
+            return;
 
         var truckNumber = truck.TruckNumber;
 
-        var memberIds = await _db.Set<TruckRosterEntity>()
-            .AsNoTracking()
-            .Where(r => r.WorkDate == workDate && r.TruckId == truckId)
-            .Select(r => r.TechnicianId)
+        var memberTechsUnordered = await (
+            from roster in _db.Set<TruckRosterEntity>().AsNoTracking()
+            join tech in ActiveFieldTechniciansQuery()
+                on roster.TechnicianId equals tech.Id
+            where roster.WorkDate == workDate && roster.TruckId == truckId
+            select tech)
             .ToListAsync();
+
+        var memberTechs = memberTechsUnordered
+            .OrderByDescending(t => t.HomeTruckId == truckId)
+            .ThenByDescending(GetTitleRank)
+            .ThenBy(t => t.LastName)
+            .ThenBy(t => t.FirstName)
+            .ToList();
+
+        var memberIds = memberTechs
+            .Select(t => t.Id)
+            .Distinct()
+            .ToList();
 
         var crews = await _db.Set<CrewEntity>()
             .Where(c => c.WorkDate == workDate && c.TruckNumber == truckNumber)
@@ -567,21 +1026,60 @@ public sealed class TrucksController : ControllerBase
         {
             if (crews.Count > 0)
             {
+                var crewIds = crews.Select(c => c.Id).ToList();
+
+                var technicianRosterRows = await _db.Set<TechnicianRosterEntity>()
+                    .Where(r => r.WorkDate == workDate && crewIds.Contains(r.CrewId))
+                    .ToListAsync();
+
+                if (technicianRosterRows.Count > 0)
+                    _db.Set<TechnicianRosterEntity>().RemoveRange(technicianRosterRows);
+
+                var ticketsUsingCrews = await _db.Set<TicketEntity>()
+                    .Where(t => t.AssignedCrewId != null && crewIds.Contains(t.AssignedCrewId.Value))
+                    .ToListAsync();
+
+                foreach (var ticket in ticketsUsingCrews)
+                    ticket.AssignedCrewId = null;
+
+                var draftAssignmentsUsingCrews = await _db.Set<DailyTicketAssignmentEntity>()
+                    .Where(a => a.CrewId != null && crewIds.Contains(a.CrewId.Value))
+                    .ToListAsync();
+
+                foreach (var assignment in draftAssignmentsUsingCrews)
+                    assignment.CrewId = null;
+
+                var publishedAssignmentsUsingCrews = await _db.Set<DailyTicketAssignmentPublishedEntity>()
+                    .Where(a => a.CrewId != null && crewIds.Contains(a.CrewId.Value))
+                    .ToListAsync();
+
+                foreach (var assignment in publishedAssignmentsUsingCrews)
+                    assignment.CrewId = null;
+
                 _db.Set<CrewEntity>().RemoveRange(crews);
+
                 await _db.SaveChangesAsync();
             }
+
             return;
         }
 
         CrewEntity crew;
+
         if (crews.Count == 0)
         {
+            var leadTech = PickLeadTechnician(memberTechs, truckId, null);
+
+            if (leadTech == null)
+                return;
+
             crew = new CrewEntity
             {
                 WorkDate = workDate,
                 TruckNumber = truckNumber,
-                LeadTechnicianId = memberIds[0]
+                LeadTechnicianId = leadTech.Id
             };
+
             _db.Set<CrewEntity>().Add(crew);
             await _db.SaveChangesAsync();
         }
@@ -595,9 +1093,17 @@ public sealed class TrucksController : ControllerBase
                 await _db.SaveChangesAsync();
             }
 
-            if (crew.LeadTechnicianId == null || !memberIds.Contains(crew.LeadTechnicianId.Value))
+            var leadTech = PickLeadTechnician(
+                memberTechs,
+                truckId,
+                crew.LeadTechnicianId);
+
+            if (leadTech == null)
+                return;
+
+            if (crew.LeadTechnicianId != leadTech.Id)
             {
-                crew.LeadTechnicianId = memberIds[0];
+                crew.LeadTechnicianId = leadTech.Id;
                 await _db.SaveChangesAsync();
             }
         }
@@ -609,6 +1115,7 @@ public sealed class TrucksController : ControllerBase
         foreach (var techId in memberIds)
         {
             var r = existingForMembers.FirstOrDefault(x => x.TechnicianId == techId);
+
             if (r == null)
             {
                 _db.Set<TechnicianRosterEntity>().Add(new TechnicianRosterEntity
@@ -632,6 +1139,50 @@ public sealed class TrucksController : ControllerBase
             _db.Set<TechnicianRosterEntity>().RemoveRange(extra);
 
         await _db.SaveChangesAsync();
+    }
+
+    private static TechnicianEntity? PickLeadTechnician(IReadOnlyList<TechnicianEntity> technicians, uint truckId, uint? currentLeadTechnicianId)
+    {
+        if (technicians.Count == 0)
+            return null;
+
+        if (currentLeadTechnicianId.HasValue)
+        {
+            var currentLead = technicians.FirstOrDefault(t => t.Id == currentLeadTechnicianId.Value);
+
+            if (currentLead != null)
+                return currentLead;
+        }
+
+        var homeTruckLead = technicians.FirstOrDefault(t => t.HomeTruckId == truckId);
+
+        if (homeTruckLead != null)
+            return homeTruckLead;
+
+        return technicians
+            .OrderByDescending(GetTitleRank)
+            .ThenBy(t => t.LastName)
+            .ThenBy(t => t.FirstName)
+            .FirstOrDefault();
+    }
+
+    private static int GetTitleRank(TechnicianEntity tech)
+    {
+        var title = (tech.Title ?? string.Empty).Trim();
+
+        if (title.Equals("Supervisor", StringComparison.OrdinalIgnoreCase))
+            return 400;
+
+        if (title.Equals("Head Journeyman", StringComparison.OrdinalIgnoreCase))
+            return 300;
+
+        if (title.Equals("Journeyman", StringComparison.OrdinalIgnoreCase))
+            return 200;
+
+        if (title.Equals("Apprentice", StringComparison.OrdinalIgnoreCase))
+            return 100;
+
+        return 0;
     }
 
     private static bool GetDefaultWorkingStatus(TechnicianEntity t, DayOfWeek day)
