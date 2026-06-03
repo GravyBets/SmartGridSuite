@@ -3,11 +3,8 @@ using SmartGridSuite.Client.Services;
 using SmartGridSuite.Client.Views.Dispatcher.Dialogs;
 using SmartGridSuite.Contracts.Dispatcher;
 using SmartGridSuite.Contracts.Tickets;
-using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -31,9 +28,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private readonly TicketAdminApi _ticketAdminApi;
 
         private bool _suppressFilterEvents;
-
+        private bool _filtersInitialized;
         private bool _hasLoadedOnce;
-        private bool _isLoading;
+
+        private readonly DispatcherTimer _searchDebounceTimer;
+        private CancellationTokenSource? _taskQueryCts;
+
+        private bool _suppressTaskSelectionChange;
+
+        private string _lastAppliedTaskSearch = "";
+        private string _lastAppliedTaskStatus = "All";
+
+        public bool HasSelectedTask => SelectedTask != null;
 
         private bool _detailsOpen;
 
@@ -58,7 +64,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     return;
 
                 _selectedTask = value;
+
                 OnPropertyChanged(nameof(SelectedTask));
+                OnPropertyChanged(nameof(HasSelectedTask));
+
+                UpdateTaskToolbarButtons();
             }
         }
 
@@ -77,7 +87,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 OnPropertyChanged(nameof(SelectedTaskActionRequiredDisplay));
                 OnPropertyChanged(nameof(IsSelectedTaskTicketClosed));
                 OnPropertyChanged(nameof(CanEditSelectedTaskTicket));
-                OnPropertyChanged(nameof(SelectedTaskClosedLockText));
 
                 UpdateTaskSaveButtonState();
             }
@@ -116,10 +125,63 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         public bool CanEditSelectedTaskTicket => SelectedTaskTicket != null && !IsSelectedTaskTicketClosed;
 
-        public string SelectedTaskClosedLockText =>
-            IsSelectedTaskTicketClosed
-                ? "This ticket is closed. Reopen it before editing notes."
-                : "";
+        private bool HasUnsavedSelectedTaskDispatchNotes
+        {
+            get
+            {
+                if (SelectedTaskTicket == null || IsSelectedTaskTicketClosed)
+                    return false;
+
+                return !string.Equals(
+                    SelectedTaskTicket.DispatchNotes ?? "",
+                    _selectedTaskOriginalDispatchNotes,
+                    StringComparison.Ordinal);
+            }
+        }
+
+        private bool ConfirmDiscardUnsavedSelectedTaskDispatchNotes()
+        {
+            if (!HasUnsavedSelectedTaskDispatchNotes)
+                return true;
+
+            var result = MessageBox.Show(
+                "You have unsaved Dispatch Notes.\n\n" +
+                "Discard those changes and continue?",
+                "Unsaved Dispatch Notes",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes)
+                return false;
+
+            if (SelectedTaskTicket != null)
+            {
+                SelectedTaskTicket.DispatchNotes = _selectedTaskOriginalDispatchNotes;
+                UpdateTaskSaveButtonState();
+            }
+
+            return true;
+        }
+
+        private void RestoreLastAppliedTaskFilters()
+        {
+            _searchDebounceTimer.Stop();
+
+            _suppressFilterEvents = true;
+
+            try
+            {
+                if (SearchBox != null)
+                    SearchBox.Text = _lastAppliedTaskSearch;
+
+                if (StatusFilter != null)
+                    StatusFilter.SelectedItem = _lastAppliedTaskStatus;
+            }
+            finally
+            {
+                _suppressFilterEvents = false;
+            }
+        }
 
         public TaskPaneView()
         {
@@ -133,8 +195,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _siteNotesApi = new SiteNotesApi(api);
             _techniciansApi = new TechniciansApi(api);
 
+            _searchDebounceTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(250)
+            };
+            _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
+
             TasksView = CollectionViewSource.GetDefaultView(_tasks);
-            TasksView.Filter = FilterTask;
 
             TasksView.SortDescriptions.Clear();
             TasksView.SortDescriptions.Add(
@@ -142,13 +209,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             TasksGrid.ItemsSource = TasksView;
 
-            StatusFilter.ItemsSource = new[] { "All" };
-            StatusFilter.SelectedIndex = 0;
-
-            CategoryFilter.ItemsSource = new[] { "All" };
-            CategoryFilter.SelectedIndex = 0;
+            _suppressFilterEvents = true;
+            try
+            {
+                StatusFilter.ItemsSource = new[] { "All" };
+                StatusFilter.SelectedIndex = 0;
+            }
+            finally
+            {
+                _suppressFilterEvents = false;
+            }
 
             UpdateDetailsVisibility();
+            UpdateTaskToolbarButtons();
         }
 
         private async void UserControl_Loaded(object sender, RoutedEventArgs e)
@@ -159,36 +232,45 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _hasLoadedOnce = true;
 
             await LoadFilterOptionsAsync();
+
+            _filtersInitialized = true;
+
             await LoadTasksAsync();
         }
 
-        private async Task LoadFilterOptionsAsync()
+        private async Task LoadFilterOptionsAsync(CancellationToken ct = default)
         {
+            if (StatusFilter == null)
+                return;
+
+            var statusFilter = StatusFilter;
+            var previousStatus = statusFilter.SelectedItem as string ?? "All";
+
             _suppressFilterEvents = true;
 
             try
             {
-                var statuses = await _ticketAdminApi.GetStatusesAsync();
-                var categories = await _ticketAdminApi.GetTaskCategoriesAsync();
+                var statuses = await _ticketAdminApi.GetStatusesAsync(ct);
 
                 var taskStatuses = statuses
                     .Where(x => x.IsActive && x.SendToDispatchTasks)
                     .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.Name)
                     .Select(x => x.Name)
                     .Where(x => !string.IsNullOrWhiteSpace(x))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-                var taskCategories = categories
-                    .Where(x => x.IsActive)
-                    .OrderBy(x => x.SortOrder)
-                    .Select(x => x.Name)
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                var items = new List<string> { "All" };
+                items.AddRange(taskStatuses);
 
-                SetComboItems(StatusFilter, taskStatuses);
-                SetComboItems(CategoryFilter, taskCategories);
+                statusFilter.ItemsSource = items;
+
+                statusFilter.SelectedItem = items.Contains(
+                    previousStatus,
+                    StringComparer.OrdinalIgnoreCase)
+                        ? previousStatus
+                        : "All";
             }
             catch (Exception ex)
             {
@@ -198,56 +280,84 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
 
-                SetComboItems(StatusFilter, Array.Empty<string>());
-                SetComboItems(CategoryFilter, Array.Empty<string>());
+                statusFilter.ItemsSource = new[] { "All" };
+                statusFilter.SelectedIndex = 0;
             }
             finally
             {
                 _suppressFilterEvents = false;
             }
-
-            RefreshView();
         }
 
-        private static void SetComboItems(ComboBox comboBox, IEnumerable<string> values)
+        private DispatchTaskQueryRequest BuildDispatchTaskQueryRequest()
         {
-            var previous = comboBox.SelectedItem as string ?? "All";
+            var selectedStatus = StatusFilter?.SelectedItem as string ?? "All";
 
-            var items = new List<string> { "All" };
-            items.AddRange(values
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(x => x.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase));
+            var applyStatusFilter =
+                !selectedStatus.Equals("All", StringComparison.OrdinalIgnoreCase);
 
-            comboBox.ItemsSource = items;
-            comboBox.SelectedItem = items.Contains(previous, StringComparer.OrdinalIgnoreCase)
-                ? previous
-                : "All";
+            return new DispatchTaskQueryRequest
+            {
+                Search = SearchBox?.Text?.Trim(),
+
+                Statuses = applyStatusFilter
+                    ? new List<string> { selectedStatus }
+                    : new List<string>(),
+
+                ApplyStatusFilter = applyStatusFilter,
+
+                AssignedTech = "All",
+
+                From = null,
+                To = null,
+
+                Skip = 0,
+                Take = 2000
+            };
         }
 
-        private async Task LoadTasksAsync()
+        private async Task LoadTasksAsync(CancellationToken ct = default)
         {
-            if (_isLoading)
+            if (!_filtersInitialized)
                 return;
 
-            _isLoading = true;
-            var keepNotification = SelectedTask?.Notification;
+            _taskQueryCts?.Cancel();
+            _taskQueryCts?.Dispose();
+
+            _taskQueryCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var queryCt = _taskQueryCts.Token;
+
+            var selectedTicketId = SelectedTask?.TicketId;
 
             try
             {
-                var items = await _ticketsApi.GetDispatchTasksAsync();
+                var request = BuildDispatchTaskQueryRequest();
+                var response = await _ticketsApi.QueryDispatchTasksAsync(request, queryCt);
+
+                if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
+                {
+                    RestoreLastAppliedTaskFilters();
+                    return;
+                }
 
                 _tasks.Clear();
 
-                foreach (var item in items
+                foreach (var item in response.Items
                              .OrderByDescending(x => x.OccurredAt)
                              .Select(MapDtoToModel))
                 {
                     _tasks.Add(item);
                 }
 
-                RefreshView();
-                RestoreSelection(keepNotification);
+                TasksView.Refresh();
+                RestoreSelection(selectedTicketId);
+
+                _lastAppliedTaskSearch = SearchBox?.Text?.Trim() ?? "";
+                _lastAppliedTaskStatus = StatusFilter?.SelectedItem as string ?? "All";
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when search/filter values change quickly.
             }
             catch (Exception ex)
             {
@@ -256,10 +366,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     "Task Load Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
-            }
-            finally
-            {
-                _isLoading = false;
             }
         }
 
@@ -290,13 +396,21 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 OccurredAt = dto.OccurredAt,
                 Site = dto.Site ?? "",
+                NotificationName = dto.NotificationName ?? "",
+                Problem = dto.Problem ?? "",
+
                 Tech = dto.Tech ?? "",
+
                 Notification = dto.Notification ?? "",
                 WorkOrder = dto.WorkOrder ?? "",
                 WorkOrderClass = ParseWorkOrderClass(dto.WorkOrderType),
+
                 ActionRequired = dto.ActionRequired ?? "",
                 Notes = dto.Notes ?? "",
+
                 Status = dto.Status ?? "",
+
+                // Legacy compatibility only. No longer shown in the new Tasks UI.
                 Category = dto.Category ?? ""
             };
         }
@@ -331,71 +445,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             };
         }
 
-        private bool FilterTask(object obj)
+        private void RestoreSelection(long? ticketId)
         {
-            if (obj is not DispatchTask t)
-                return false;
-
-            var status = StatusFilter?.SelectedItem as string ?? "All";
-            if (status != "All" &&
-                !string.Equals(t.Status, status, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            var category = CategoryFilter?.SelectedItem as string ?? "All";
-            if (category != "All" &&
-                !string.Equals(t.Category, category, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            var q = (SearchBox?.Text ?? string.Empty).Trim();
-            if (q.Length == 0)
-                return true;
-
-            static bool Match(string? source, string query) =>
-                !string.IsNullOrWhiteSpace(source) &&
-                source.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
-
-            var timeString = t.OccurredAt.ToString("MM/dd HH:mm");
-
-            return Match(timeString, q)
-                   || Match(t.Site, q)
-                   || Match(t.Tech, q)
-                   || Match(t.Notification, q)
-                   || Match(t.WorkOrder, q)
-                   || Match(t.WorkOrderClassLabel, q)
-                   || Match(t.ActionRequired, q)
-                   || Match(t.Notes, q)
-                   || Match(t.Status, q)
-                   || Match(t.Category, q);
-        }
-
-        private void RefreshView()
-        {
-            TasksView.Refresh();
-
-            if (SelectedTask != null && !FilterTask(SelectedTask))
-            {
-                TasksGrid.SelectedItem = null;
-                SelectedTask = null;
-            }
-
-            UpdateDetailsVisibility();
-        }
-
-        private void RestoreSelection(string? notification)
-        {
-            if (string.IsNullOrWhiteSpace(notification))
+            if (!ticketId.HasValue || ticketId.Value <= 0)
             {
                 UpdateDetailsVisibility();
                 return;
             }
 
-            var found = _tasks.FirstOrDefault(x =>
-                string.Equals(x.Notification, notification, StringComparison.OrdinalIgnoreCase)
-                && FilterTask(x));
+            var found = _tasks.FirstOrDefault(x => x.TicketId == ticketId.Value);
 
             if (found != null)
             {
@@ -406,33 +464,116 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 TasksGrid.SelectedItem = null;
                 SelectedTask = null;
-            }
+                SelectedTaskTicket = null;
 
-            UpdateDetailsVisibility();
+                _detailsOpen = false;
+                UpdateDetailsVisibility();
+            }
         }
 
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            RefreshView();
-        }
-
-        private void Filters_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressFilterEvents)
+            if (_suppressFilterEvents || !_filtersInitialized)
                 return;
 
-            RefreshView();
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
+        }
+
+        private async void SearchDebounceTimer_Tick(object? sender, EventArgs e)
+        {
+            _searchDebounceTimer.Stop();
+
+            if (!_filtersInitialized)
+                return;
+
+            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
+            {
+                RestoreLastAppliedTaskFilters();
+                return;
+            }
+
+            await LoadTasksAsync();
+        }
+
+        private async void Filters_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressFilterEvents || !_filtersInitialized)
+                return;
+
+            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
+            {
+                RestoreLastAppliedTaskFilters();
+                return;
+            }
+
+            await LoadTasksAsync();
         }
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)
         {
+            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
+                return;
+
             await LoadFilterOptionsAsync();
+            await LoadTasksAsync();
+        }
+
+        private async void ClearTaskFilters_Click(object sender, RoutedEventArgs e)
+        {
+            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
+                return;
+
+            _searchDebounceTimer.Stop();
+
+            _suppressFilterEvents = true;
+
+            try
+            {
+                SearchBox.Text = "";
+                StatusFilter.SelectedItem = "All";
+            }
+            finally
+            {
+                _suppressFilterEvents = false;
+            }
+
             await LoadTasksAsync();
         }
 
         private async void TasksGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            SelectedTask = TasksGrid.SelectedItem as DispatchTask;
+            if (_suppressTaskSelectionChange)
+                return;
+
+            var newlySelectedTask = TasksGrid.SelectedItem as DispatchTask;
+
+            var isChangingOpenTask =
+                _detailsOpen &&
+                SelectedTask != null &&
+                newlySelectedTask?.TicketId != SelectedTask.TicketId;
+
+            if (isChangingOpenTask &&
+                !ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
+            {
+                _suppressTaskSelectionChange = true;
+
+                try
+                {
+                    TasksGrid.SelectedItem = SelectedTask;
+
+                    if (SelectedTask != null)
+                        TasksGrid.ScrollIntoView(SelectedTask);
+                }
+                finally
+                {
+                    _suppressTaskSelectionChange = false;
+                }
+
+                return;
+            }
+
+            SelectedTask = newlySelectedTask;
 
             if (!_detailsOpen)
             {
@@ -455,11 +596,28 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
 
             var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+
             if (row?.Item is not DispatchTask task)
                 return;
 
-            TasksGrid.SelectedItem = task;
-            SelectedTask = task;
+            // SelectionChanged handles the unsaved-notes decision first.
+            // If changing rows was cancelled, do not reopen the clicked row here.
+            if (SelectedTask?.TicketId != task.TicketId ||
+                (TasksGrid.SelectedItem as DispatchTask)?.TicketId != task.TicketId)
+            {
+                return;
+            }
+
+            _detailsOpen = true;
+            UpdateDetailsVisibility();
+
+            await LoadTaskDetailsForSelectedTaskAsync();
+        }
+
+        private async void OpenTaskDetails_Click(object sender, RoutedEventArgs e)
+        {
+            if (SelectedTask == null)
+                return;
 
             _detailsOpen = true;
             UpdateDetailsVisibility();
@@ -469,6 +627,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void CloseDetails_Click(object sender, RoutedEventArgs e)
         {
+            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
+                return;
+
             _detailsOpen = false;
             SelectedTask = null;
             SelectedTaskTicket = null;
@@ -504,16 +665,62 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 DetailsSplitter.Visibility = Visibility.Visible;
         }
 
-        private void CopyNotification_Click(object sender, RoutedEventArgs e)
+        private void UpdateTaskToolbarButtons()
         {
-            if (sender is Button b && b.Tag is string s && !string.IsNullOrWhiteSpace(s))
-                Clipboard.SetText(s);
+            var hasSelection = SelectedTask != null;
+            var canCloseSelectedTask =
+                hasSelection &&
+                !HasUnsavedSelectedTaskDispatchNotes &&
+                !IsSelectedTaskTicketClosed;
+
+            if (OpenTaskDetailsButton != null)
+                OpenTaskDetailsButton.IsEnabled = hasSelection;
+
+            if (OpenTaskTicketButton != null)
+                OpenTaskTicketButton.IsEnabled = hasSelection;
+
+            if (MarkTaskClosedButton != null)
+                MarkTaskClosedButton.IsEnabled = canCloseSelectedTask;
+
+            if (MarkDetailsClosedButton != null)
+                MarkDetailsClosedButton.IsEnabled = canCloseSelectedTask;
         }
 
-        private void CopyWorkOrder_Click(object sender, RoutedEventArgs e)
+        private async void CopyNotification_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button b && b.Tag is string s && !string.IsNullOrWhiteSpace(s))
-                Clipboard.SetText(s);
+            await CopyGridValueAsync(sender as Button);
+        }
+
+        private async void CopyWorkOrder_Click(object sender, RoutedEventArgs e)
+        {
+            await CopyGridValueAsync(sender as Button);
+        }
+
+        private async Task CopyGridValueAsync(Button? button)
+        {
+            if (button?.Tag is not string value || string.IsNullOrWhiteSpace(value))
+                return;
+
+            Clipboard.SetText(value);
+
+            var originalContent = button.Content;
+
+            button.Content = new TextBlock
+            {
+                Text = "✓",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = TryFindResource("TextSecondary") as Brush ?? Brushes.Gray,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            button.IsEnabled = false;
+
+            await Task.Delay(3000);
+
+            button.Content = originalContent;
+            button.IsEnabled = true;
         }
 
         private async void CopySummary_Click(object sender, RoutedEventArgs e)
@@ -571,10 +778,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
             }
 
+            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
+                return;
+
             try
             {
-                var tickets = await _ticketsApi.GetTicketsAsync();
-                var dto = tickets.FirstOrDefault(x => x.Id == SelectedTask.TicketId);
+                var dto = await _ticketsApi.GetTicketByIdAsync(SelectedTask.TicketId);
 
                 if (dto == null)
                 {
@@ -614,47 +823,62 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private async void MarkDone_Click(object sender, RoutedEventArgs e)
+        private async void MarkClosed_Click(object sender, RoutedEventArgs e)
         {
             if (SelectedTask == null)
                 return;
 
+            if (HasUnsavedSelectedTaskDispatchNotes)
+            {
+                MessageBox.Show(
+                    "You have unsaved Dispatch Notes.\n\nSave your notes before marking this ticket closed.",
+                    "Save Dispatch Notes First",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return;
+            }
+
             if (SelectedTask.TicketId <= 0)
             {
                 MessageBox.Show(
-                    "This task is missing its ticket ID and cannot be resolved.",
-                    "Mark Done",
+                    "This task is missing its ticket ID and cannot be closed.",
+                    "Mark Closed",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
+
                 return;
             }
 
             var confirm = MessageBox.Show(
-                $"Mark dispatch task for {SelectedTask.Site} as done?",
-                "Mark Done",
+                $"Close the ticket for site {SelectedTask.Site}?\n\n" +
+                "This will move the ticket to the configured closed status and clear its outstanding dispatch action.",
+                "Confirm Ticket Closure",
                 MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+                MessageBoxImage.Warning);
 
             if (confirm != MessageBoxResult.Yes)
                 return;
 
             try
             {
-                await _ticketsApi.ResolveDispatchTaskAsync(SelectedTask.TicketId);
+                await _ticketsApi.CloseDispatchTaskAsync(SelectedTask.TicketId);
 
                 _detailsOpen = false;
                 SelectedTask = null;
+                SelectedTaskTicket = null;
                 TasksGrid.SelectedItem = null;
 
                 await LoadTasksAsync();
 
                 UpdateDetailsVisibility();
+                UpdateTaskToolbarButtons();
             }
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    $"Failed to mark task done.\n\n{ex.Message}",
-                    "Mark Done",
+                    $"Failed to close ticket.\n\n{ex.Message}",
+                    "Mark Closed",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -699,8 +923,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 await LoadKnownTechAliasesAsync();
 
-                var tickets = await _ticketsApi.GetTicketsAsync();
-                var dto = tickets.FirstOrDefault(x => x.Id == task.TicketId);
+                var dto = await _ticketsApi.GetTicketByIdAsync(task.TicketId);
 
                 if (dto == null)
                     return;
@@ -1020,33 +1243,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void UpdateTaskSaveButtonState()
         {
-            if (SaveTaskNotesButton == null)
-                return;
-
-            if (SelectedTaskTicket == null || IsSelectedTaskTicketClosed)
+            if (SaveTaskNotesButton != null)
             {
-                SaveTaskNotesButton.IsEnabled = false;
-                return;
+                SaveTaskNotesButton.IsEnabled = HasUnsavedSelectedTaskDispatchNotes;
             }
 
-            var currentDispatchNotes = SelectedTaskTicket.DispatchNotes ?? "";
-            var currentTechNotes = SelectedTaskTicket.Notes ?? "";
-
-            var dispatchChanged =
-                !string.Equals(currentDispatchNotes, _selectedTaskOriginalDispatchNotes, StringComparison.Ordinal);
-
-            var techChanged =
-                !string.Equals(currentTechNotes, _selectedTaskOriginalTechNotes, StringComparison.Ordinal);
-
-            SaveTaskNotesButton.IsEnabled = dispatchChanged || techChanged;
+            UpdateTaskToolbarButtons();
         }
 
         private void TaskDispatchNotesTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            UpdateTaskSaveButtonState();
-        }
-
-        private void TaskTechWriteUpsTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             UpdateTaskSaveButtonState();
         }

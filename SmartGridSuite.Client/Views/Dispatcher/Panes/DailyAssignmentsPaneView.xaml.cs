@@ -9,6 +9,11 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using System.Globalization;
 using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Runtime.InteropServices;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media.Animation;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
@@ -16,11 +21,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
     {
         public event PropertyChangedEventHandler? PropertyChanged;
 
+        private sealed class TicketPoolDragPayload
+        {
+            public List<long> TicketIds { get; init; } = new();
+        }
+
         private readonly ApiClient _api = new("https://localhost:7140");
         private readonly DispatcherTimer _ticketSearchTimer;
         private readonly ObservableCollection<DailyAssignmentTicketDto> _filteredTicketPool = new();
         private readonly ObservableCollection<AssignmentTargetVm> _assignmentTargets = new();
         private readonly HashSet<long> _selectedTicketIds = new();
+
+        private Point _assignedTicketDragStartPoint;
+        private DailyAssignedTicketDto? _draggedAssignedTicket;
+        private bool _isReorderingByDragDrop;
+
+        private Point _ticketPoolDragStartPoint;
+        private DailyAssignmentTicketDto? _draggedPoolTicket;
+        private readonly List<long> _ticketPoolDragTicketIds = new();
+        private bool _isAssigningByDragDrop;
+
+        private int? _routePreviewIndex;
+        private bool _routePreviewFromPool;
+        private DailyAssignedTicketDto? _routePreviewDraggedTicket;
+        private ListBoxItem? _dimmedDraggedRouteItem;
+
+        private Popup? _dragGhostPopup;
+        private ContentPresenter? _dragGhostPresenter;
 
         private bool _hasLoaded;
         private bool _busyLoading;
@@ -457,6 +484,874 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
+        private void TicketPoolList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _ticketPoolDragStartPoint = e.GetPosition(null);
+            _draggedPoolTicket = null;
+            _ticketPoolDragTicketIds.Clear();
+
+            // Checkbox clicks are selection actions, not drag handles.
+            if (FindVisualParent<CheckBox>(e.OriginalSource as DependencyObject) != null)
+                return;
+
+            var row = FindVisualParent<ListBoxItem>(e.OriginalSource as DependencyObject);
+
+            if (row?.DataContext is not DailyAssignmentTicketDto ticket)
+                return;
+
+            _draggedPoolTicket = ticket;
+
+            /*
+             * Snapshot the drag payload before WPF changes selection as a result
+             * of pressing the mouse button on a selected card.
+             *
+             * Dragging any currently selected card carries the entire current selection.
+             * Dragging an unselected card carries only that card.
+             */
+            if (_selectedTicketIds.Contains(ticket.TicketId))
+            {
+                _ticketPoolDragTicketIds.AddRange(
+                    FilteredTicketPool
+                        .Where(x => _selectedTicketIds.Contains(x.TicketId))
+                        .Select(x => x.TicketId)
+                        .Where(x => x > 0)
+                        .Distinct());
+            }
+            else
+            {
+                _ticketPoolDragTicketIds.Add(ticket.TicketId);
+            }
+        }
+
+        private void TicketPoolList_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed ||
+                _draggedPoolTicket == null ||
+                _isAssigningByDragDrop ||
+                _isReorderingByDragDrop ||
+                SelectedTarget == null)
+            {
+                return;
+            }
+
+            if (FindVisualParent<CheckBox>(e.OriginalSource as DependencyObject) != null)
+                return;
+
+            var currentPosition = e.GetPosition(null);
+
+            var movedEnough =
+                Math.Abs(currentPosition.X - _ticketPoolDragStartPoint.X) >
+                    SystemParameters.MinimumHorizontalDragDistance ||
+                Math.Abs(currentPosition.Y - _ticketPoolDragStartPoint.Y) >
+                    SystemParameters.MinimumVerticalDragDistance;
+
+            if (!movedEnough)
+                return;
+
+            var ticketIds = _ticketPoolDragTicketIds
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            if (ticketIds.Count == 0)
+                return;
+
+            var payload = new TicketPoolDragPayload
+            {
+                TicketIds = ticketIds
+            };
+
+            BeginDragGhost(_draggedPoolTicket, ticketIds.Count);
+
+            try
+            {
+                DragDrop.DoDragDrop(
+                    TicketPoolList,
+                    payload,
+                    DragDropEffects.Move);
+            }
+            finally
+            {
+                ResetRouteCardPreview();
+                EndDragGhost();
+                _draggedPoolTicket = null;
+                _ticketPoolDragTicketIds.Clear();
+            }
+        }
+
+        private void AssignedTicketsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _assignedTicketDragStartPoint = e.GetPosition(null);
+            _draggedAssignedTicket = null;
+
+            if (FindVisualParent<Button>(e.OriginalSource as DependencyObject) != null)
+                return;
+
+            var row = FindVisualParent<ListBoxItem>(e.OriginalSource as DependencyObject);
+
+            if (row?.DataContext is DailyAssignedTicketDto ticket)
+                _draggedAssignedTicket = ticket;
+        }
+
+        private void AssignedTicketsList_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed ||
+                _draggedAssignedTicket == null ||
+                _isReorderingByDragDrop ||
+                _isAssigningByDragDrop)
+            {
+                return;
+            }
+
+            if (FindVisualParent<Button>(e.OriginalSource as DependencyObject) != null)
+                return;
+
+            var currentPosition = e.GetPosition(null);
+
+            var movedEnough =
+                Math.Abs(currentPosition.X - _assignedTicketDragStartPoint.X) >
+                    SystemParameters.MinimumHorizontalDragDistance ||
+                Math.Abs(currentPosition.Y - _assignedTicketDragStartPoint.Y) >
+                    SystemParameters.MinimumVerticalDragDistance;
+
+            if (!movedEnough)
+                return;
+
+            BeginDraggedRouteCardVisual(_draggedAssignedTicket);
+            BeginDragGhost(_draggedAssignedTicket, 1);
+
+            try
+            {
+                DragDrop.DoDragDrop(
+                    AssignedTicketsList,
+                    _draggedAssignedTicket,
+                    DragDropEffects.Move);
+            }
+            finally
+            {
+                ResetRouteCardPreview();
+                EndDragGhost();
+                _draggedAssignedTicket = null;
+            }
+        }
+
+        private void AssignedTicketsList_DragOver(object sender, DragEventArgs e)
+        {
+            var target = SelectedTarget;
+
+            if (_isReorderingByDragDrop ||
+                _isAssigningByDragDrop ||
+                target == null)
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Data.GetDataPresent(typeof(TicketPoolDragPayload)))
+            {
+                var payload = e.Data.GetData(typeof(TicketPoolDragPayload)) as TicketPoolDragPayload;
+
+                if (payload == null || payload.TicketIds.Count == 0)
+                {
+                    e.Effects = DragDropEffects.None;
+                    e.Handled = true;
+                    return;
+                }
+
+                var insertionIndex = GetRouteInsertionIndex(e);
+
+                ShowPoolDropGapPreview(
+                    insertionIndex,
+                    payload.TicketIds.Distinct().Count());
+
+                e.Effects = DragDropEffects.Move;
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Data.GetDataPresent(typeof(DailyAssignedTicketDto)))
+            {
+                var draggedTicket = e.Data.GetData(typeof(DailyAssignedTicketDto)) as DailyAssignedTicketDto;
+
+                if (draggedTicket == null)
+                {
+                    e.Effects = DragDropEffects.None;
+                    e.Handled = true;
+                    return;
+                }
+
+                var destinationIndex = GetAssignedRouteDestinationIndex(e, draggedTicket);
+
+                ShowAssignedMoveGapPreview(
+                    draggedTicket,
+                    destinationIndex);
+
+                e.Effects = DragDropEffects.Move;
+                e.Handled = true;
+                return;
+            }
+
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+        }
+
+        private void AssignedTicketsList_DragLeave(object sender, DragEventArgs e)
+        {
+            if (sender is not ListBox list)
+                return;
+
+            var position = e.GetPosition(list);
+
+            const double tolerance = 3;
+
+            var isActuallyOutside =
+                position.X < -tolerance ||
+                position.Y < -tolerance ||
+                position.X > list.ActualWidth + tolerance ||
+                position.Y > list.ActualHeight + tolerance;
+
+            if (isActuallyOutside)
+                ResetRouteCardPreview();
+        }
+
+        private async void AssignedTicketsList_Drop(object sender, DragEventArgs e)
+        {
+            var target = SelectedTarget;
+
+            if (_isReorderingByDragDrop ||
+                _isAssigningByDragDrop ||
+                target == null)
+            {
+                ResetRouteCardPreview();
+                return;
+            }
+
+            if (e.Data.GetDataPresent(typeof(TicketPoolDragPayload)))
+            {
+                var payload = e.Data.GetData(typeof(TicketPoolDragPayload)) as TicketPoolDragPayload;
+
+                if (payload == null || payload.TicketIds.Count == 0)
+                {
+                    ResetRouteCardPreview();
+                    return;
+                }
+
+                var insertionIndex =
+                    _routePreviewFromPool && _routePreviewIndex.HasValue
+                        ? _routePreviewIndex.Value
+                        : GetRouteInsertionIndex(e);
+
+                long? insertBeforeTicketId =
+                    insertionIndex >= 0 && insertionIndex < target.AssignedTickets.Count
+                        ? target.AssignedTickets[insertionIndex].TicketId
+                        : null;
+
+                e.Effects = DragDropEffects.Move;
+                e.Handled = true;
+
+                ResetRouteCardPreview();
+
+                await AssignDroppedPoolTicketsAsync(
+                    payload.TicketIds,
+                    insertBeforeTicketId);
+
+                return;
+            }
+
+            if (!e.Data.GetDataPresent(typeof(DailyAssignedTicketDto)))
+            {
+                ResetRouteCardPreview();
+                return;
+            }
+
+            var draggedTicket = e.Data.GetData(typeof(DailyAssignedTicketDto)) as DailyAssignedTicketDto;
+
+            if (draggedTicket == null)
+            {
+                ResetRouteCardPreview();
+                return;
+            }
+
+            var originalTickets = target.AssignedTickets.ToList();
+            var originalIndex = originalTickets.IndexOf(draggedTicket);
+
+            var destinationIndex =
+                !_routePreviewFromPool &&
+                ReferenceEquals(_routePreviewDraggedTicket, draggedTicket) &&
+                _routePreviewIndex.HasValue
+                    ? _routePreviewIndex.Value
+                    : GetAssignedRouteDestinationIndex(e, draggedTicket);
+
+            if (originalIndex < 0 ||
+                destinationIndex < 0 ||
+                destinationIndex == originalIndex)
+            {
+                ResetRouteCardPreview();
+                return;
+            }
+
+            originalTickets.RemoveAt(originalIndex);
+            destinationIndex = Math.Clamp(destinationIndex, 0, originalTickets.Count);
+            originalTickets.Insert(destinationIndex, draggedTicket);
+
+            e.Effects = DragDropEffects.Move;
+            e.Handled = true;
+
+            ResetRouteCardPreview();
+
+            await SaveDraggedAssignmentOrderAsync(originalTickets);
+        }
+
+        private void BeginDragGhost(DailyAssignmentTicketDto ticket, int ticketCount)
+        {
+            EndDragGhost();
+
+            var template = TryFindResource("DragGhostTicketTemplate") as DataTemplate;
+
+            if (template == null)
+                return;
+
+            var content = new TicketDragGhostVm
+            {
+                Ticket = ticket,
+                AdditionalCount = Math.Max(0, ticketCount - 1)
+            };
+
+            _dragGhostPresenter = new ContentPresenter
+            {
+                Content = content,
+                ContentTemplate = template,
+                IsHitTestVisible = false,
+                Opacity = 0.94
+            };
+
+            _dragGhostPopup = new Popup
+            {
+                AllowsTransparency = true,
+                IsHitTestVisible = false,
+                StaysOpen = true,
+                Placement = PlacementMode.AbsolutePoint,
+                Child = _dragGhostPresenter
+            };
+
+            _dragGhostPopup.IsOpen = true;
+
+            UpdateDragGhostPosition();
+        }
+
+        private void DragSource_GiveFeedback(object sender, GiveFeedbackEventArgs e)
+        {
+            UpdateDragGhostPosition();
+
+            e.UseDefaultCursors = true;
+            e.Handled = true;
+        }
+
+        private void UpdateDragGhostPosition()
+        {
+            if (_dragGhostPopup == null)
+                return;
+
+            if (!GetCursorPos(out var cursorPosition))
+                return;
+
+            var screenPoint = new Point(cursorPosition.X, cursorPosition.Y);
+
+            /*
+             * GetCursorPos returns device pixels. WPF Popup offsets use
+             * device-independent units, so convert before positioning.
+             */
+            var source = PresentationSource.FromVisual(this);
+
+            if (source?.CompositionTarget != null)
+            {
+                screenPoint = source.CompositionTarget
+                    .TransformFromDevice
+                    .Transform(screenPoint);
+            }
+
+            _dragGhostPopup.HorizontalOffset = screenPoint.X + 18;
+            _dragGhostPopup.VerticalOffset = screenPoint.Y + 18;
+        }
+
+        private void EndDragGhost()
+        {
+            if (_dragGhostPopup != null)
+            {
+                _dragGhostPopup.IsOpen = false;
+                _dragGhostPopup.Child = null;
+            }
+
+            _dragGhostPresenter = null;
+            _dragGhostPopup = null;
+        }
+
+        private void BeginDraggedRouteCardVisual(DailyAssignedTicketDto ticket)
+        {
+            ResetRouteCardPreview();
+
+            _routePreviewDraggedTicket = ticket;
+
+            _dimmedDraggedRouteItem =
+                AssignedTicketsList.ItemContainerGenerator.ContainerFromItem(ticket) as ListBoxItem;
+
+            if (_dimmedDraggedRouteItem != null)
+                _dimmedDraggedRouteItem.Opacity = 0.20;
+        }
+
+        private int GetRouteInsertionIndex(DragEventArgs e)
+        {
+            var target = SelectedTarget;
+
+            if (target == null)
+                return 0;
+
+            var pointerPosition = e.GetPosition(AssignedTicketsList);
+
+            for (var index = 0; index < target.AssignedTickets.Count; index++)
+            {
+                var ticket = target.AssignedTickets[index];
+
+                if (AssignedTicketsList.ItemContainerGenerator.ContainerFromItem(ticket) is not ListBoxItem item ||
+                    item.ActualHeight <= 0)
+                {
+                    continue;
+                }
+
+                /*
+                 * TranslatePoint includes the visual animation offset.
+                 * Subtract that offset so the drop calculation uses the card's
+                 * stable original position instead of chasing the animation.
+                 */
+                var renderedTop = item
+                    .TranslatePoint(new Point(0, 0), AssignedTicketsList)
+                    .Y;
+
+                var animatedOffset = item.RenderTransform is TranslateTransform transform
+                    ? transform.Y
+                    : 0;
+
+                var stableTop = renderedTop - animatedOffset;
+                var stableMiddle = stableTop + item.ActualHeight / 2;
+
+                if (pointerPosition.Y < stableMiddle)
+                    return index;
+            }
+
+            return target.AssignedTickets.Count;
+        }
+
+        private int GetAssignedRouteDestinationIndex(DragEventArgs e, DailyAssignedTicketDto draggedTicket)
+        {
+            var target = SelectedTarget;
+
+            if (target == null)
+                return -1;
+
+            var sourceIndex = target.AssignedTickets.IndexOf(draggedTicket);
+
+            if (sourceIndex < 0)
+                return -1;
+
+            var insertionIndex = GetRouteInsertionIndex(e);
+
+            if (insertionIndex > sourceIndex)
+                insertionIndex--;
+
+            return Math.Clamp(
+                insertionIndex,
+                0,
+                target.AssignedTickets.Count - 1);
+        }
+
+        private void ShowPoolDropGapPreview(int insertionIndex, int ticketCount)
+        {
+            var target = SelectedTarget;
+
+            if (target == null)
+                return;
+
+            var safeInsertionIndex = Math.Clamp(
+                insertionIndex,
+                0,
+                target.AssignedTickets.Count);
+
+            /*
+             * DragOver fires constantly. If the intended position has not changed,
+             * do not restart every card animation.
+             */
+            if (_routePreviewFromPool &&
+                _routePreviewIndex == safeInsertionIndex)
+            {
+                return;
+            }
+
+            _routePreviewFromPool = true;
+            _routePreviewIndex = safeInsertionIndex;
+            _routePreviewDraggedTicket = null;
+
+            var shiftDistance =
+                GetRouteCardShiftDistance() * Math.Max(1, ticketCount);
+
+            for (var index = 0; index < target.AssignedTickets.Count; index++)
+            {
+                var offset = index >= safeInsertionIndex
+                    ? shiftDistance
+                    : 0;
+
+                AnimateRouteCardOffset(
+                    target.AssignedTickets[index],
+                    offset);
+            }
+        }
+
+        private void ShowAssignedMoveGapPreview(DailyAssignedTicketDto draggedTicket, int destinationIndex)
+        {
+            var target = SelectedTarget;
+
+            if (target == null)
+                return;
+
+            var sourceIndex = target.AssignedTickets.IndexOf(draggedTicket);
+
+            if (sourceIndex < 0 || destinationIndex < 0)
+                return;
+
+            var safeDestinationIndex = Math.Clamp(
+                destinationIndex,
+                0,
+                Math.Max(0, target.AssignedTickets.Count - 1));
+
+            /*
+             * Prevent DragOver from restarting identical animations repeatedly.
+             */
+            if (!_routePreviewFromPool &&
+                ReferenceEquals(_routePreviewDraggedTicket, draggedTicket) &&
+                _routePreviewIndex == safeDestinationIndex)
+            {
+                return;
+            }
+
+            _routePreviewFromPool = false;
+            _routePreviewIndex = safeDestinationIndex;
+            _routePreviewDraggedTicket = draggedTicket;
+
+            if (_dimmedDraggedRouteItem == null)
+            {
+                _dimmedDraggedRouteItem =
+                    AssignedTicketsList.ItemContainerGenerator.ContainerFromItem(draggedTicket) as ListBoxItem;
+
+                if (_dimmedDraggedRouteItem != null)
+                    _dimmedDraggedRouteItem.Opacity = 0.20;
+            }
+
+            var shiftDistance = GetRouteCardShiftDistance(draggedTicket);
+
+            for (var index = 0; index < target.AssignedTickets.Count; index++)
+            {
+                var ticket = target.AssignedTickets[index];
+
+                double offset = 0;
+
+                if (!ReferenceEquals(ticket, draggedTicket))
+                {
+                    if (safeDestinationIndex < sourceIndex &&
+                        index >= safeDestinationIndex &&
+                        index < sourceIndex)
+                    {
+                        offset = shiftDistance;
+                    }
+                    else if (safeDestinationIndex > sourceIndex &&
+                             index > sourceIndex &&
+                             index <= safeDestinationIndex)
+                    {
+                        offset = -shiftDistance;
+                    }
+                }
+
+                AnimateRouteCardOffset(ticket, offset);
+            }
+        }
+
+        private double GetRouteCardShiftDistance(DailyAssignedTicketDto? preferredTicket = null)
+        {
+            if (preferredTicket != null &&
+                AssignedTicketsList.ItemContainerGenerator.ContainerFromItem(preferredTicket) is ListBoxItem preferredItem &&
+                preferredItem.ActualHeight > 0)
+            {
+                return preferredItem.ActualHeight;
+            }
+
+            if (SelectedTarget != null)
+            {
+                foreach (var ticket in SelectedTarget.AssignedTickets)
+                {
+                    if (AssignedTicketsList.ItemContainerGenerator.ContainerFromItem(ticket) is ListBoxItem item &&
+                        item.ActualHeight > 0)
+                    {
+                        return item.ActualHeight;
+                    }
+                }
+            }
+
+            return 112;
+        }
+
+        private void AnimateRouteCardOffset(DailyAssignedTicketDto ticket, double targetOffset, bool animate = true)
+        {
+            if (AssignedTicketsList.ItemContainerGenerator.ContainerFromItem(ticket) is not ListBoxItem item)
+                return;
+
+            if (item.RenderTransform is not TranslateTransform transform)
+            {
+                transform = new TranslateTransform();
+                item.RenderTransform = transform;
+            }
+
+            var currentOffset = transform.Y;
+
+            transform.BeginAnimation(TranslateTransform.YProperty, null);
+            transform.Y = currentOffset;
+
+            if (!animate)
+            {
+                transform.Y = targetOffset;
+                return;
+            }
+
+            var animation = new DoubleAnimation
+            {
+                From = currentOffset,
+                To = targetOffset,
+                Duration = TimeSpan.FromMilliseconds(115),
+                FillBehavior = FillBehavior.HoldEnd,
+                EasingFunction = new QuadraticEase
+                {
+                    EasingMode = EasingMode.EaseOut
+                }
+            };
+
+            transform.BeginAnimation(
+                TranslateTransform.YProperty,
+                animation,
+                HandoffBehavior.SnapshotAndReplace);
+        }
+
+        private void ResetRouteCardPreview()
+        {
+            var hadActivePreview =
+                _routePreviewIndex.HasValue ||
+                _dimmedDraggedRouteItem != null;
+
+            if (hadActivePreview && SelectedTarget != null)
+            {
+                foreach (var ticket in SelectedTarget.AssignedTickets)
+                    AnimateRouteCardOffset(ticket, 0);
+            }
+
+            if (_dimmedDraggedRouteItem != null)
+                _dimmedDraggedRouteItem.ClearValue(OpacityProperty);
+
+            _dimmedDraggedRouteItem = null;
+            _routePreviewIndex = null;
+            _routePreviewFromPool = false;
+            _routePreviewDraggedTicket = null;
+        }
+
+        private async Task AssignDroppedPoolTicketsAsync(IReadOnlyList<long> ticketIds, long? insertBeforeTicketId)
+        {
+            var target = SelectedTarget;
+
+            if (target == null)
+                return;
+
+            var cleanTicketIds = ticketIds
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            if (cleanTicketIds.Count == 0)
+                return;
+
+            var targetKey = target.TargetKey;
+
+            try
+            {
+                _isAssigningByDragDrop = true;
+
+                StatusText = cleanTicketIds.Count == 1
+                    ? $"Adding ticket to {target.PrimaryText}..."
+                    : $"Adding {cleanTicketIds.Count} tickets to {target.PrimaryText}...";
+
+                var request = new AssignDailyTicketsRequest
+                {
+                    WorkDate = Board.WorkDate,
+                    TicketIds = cleanTicketIds,
+                    TargetType = target.TargetType,
+                    TruckId = target.TruckId,
+                    TechnicianId = target.TechnicianId,
+                    AssignmentNotes = null,
+                    UpdatedBy = Environment.UserName
+                };
+
+                await _api.PostAsync<AssignDailyTicketsRequest, AssignDailyTicketsResponse>(
+                    "api/daily-assignments/assign",
+                    request);
+
+                ClearSelectedTickets();
+
+                await LoadBoardAsync();
+
+                var refreshedTarget = AssignmentTargets
+                    .FirstOrDefault(x => x.TargetKey == targetKey);
+
+                if (refreshedTarget == null)
+                {
+                    StatusText = "Tickets were assigned, but the selected crew/technician could not be restored.";
+                    return;
+                }
+
+                SelectedTarget = refreshedTarget;
+
+                /*
+                 * Assign already appends newly assigned tickets to the route.
+                 * If the dispatcher dropped in blank space, that is the desired result.
+                 */
+                if (!insertBeforeTicketId.HasValue ||
+                    cleanTicketIds.Contains(insertBeforeTicketId.Value))
+                {
+                    StatusText =
+                        $"Added {cleanTicketIds.Count} ticket(s) to {refreshedTarget.PrimaryText}. " +
+                        "Save & Publish to send the updated list.";
+
+                    return;
+                }
+
+                var currentOrder = refreshedTarget.AssignedTickets
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.AssignmentId)
+                    .ToList();
+
+                var insertedTicketIdSet = cleanTicketIds.ToHashSet();
+
+                var insertedTickets = currentOrder
+                    .Where(x => insertedTicketIdSet.Contains(x.TicketId))
+                    .ToList();
+
+                if (insertedTickets.Count == 0)
+                {
+                    StatusText =
+                        $"Added ticket(s) to {refreshedTarget.PrimaryText}. " +
+                        "Save & Publish to send the updated list.";
+
+                    return;
+                }
+
+                var remainingTickets = currentOrder
+                    .Where(x => !insertedTicketIdSet.Contains(x.TicketId))
+                    .ToList();
+
+                var insertionIndex = remainingTickets
+                    .FindIndex(x => x.TicketId == insertBeforeTicketId.Value);
+
+                if (insertionIndex < 0)
+                    insertionIndex = remainingTickets.Count;
+
+                remainingTickets.InsertRange(insertionIndex, insertedTickets);
+
+                await SaveDraggedAssignmentOrderAsync(remainingTickets);
+
+                StatusText =
+                    $"Added {insertedTickets.Count} ticket(s) to {refreshedTarget.PrimaryText}. " +
+                    "Save & Publish to send the updated route.";
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                StatusText = $"Assign failed: {ex.Body ?? ex.Message}";
+
+                MessageBox.Show(
+                    ex.Body ?? ex.Message,
+                    "Assign Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                StatusText = "Assign failed: " + ex.Message;
+
+                MessageBox.Show(
+                    ex.Message,
+                    "Assign Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                _isAssigningByDragDrop = false;
+                _draggedPoolTicket = null;
+            }
+        }
+
+        private async Task SaveDraggedAssignmentOrderAsync(List<DailyAssignedTicketDto> orderedTickets)
+        {
+            var target = SelectedTarget;
+
+            if (target == null || orderedTickets.Count == 0)
+                return;
+
+            try
+            {
+                _isReorderingByDragDrop = true;
+                StatusText = "Updating ticket order...";
+
+                var req = new ReorderDailyTicketAssignmentsRequest
+                {
+                    WorkDate = Board.WorkDate,
+                    TargetType = target.TargetType,
+                    TruckId = target.TruckId,
+                    TechnicianId = target.TechnicianId,
+                    TicketIdsInOrder = orderedTickets
+                        .Select(x => x.TicketId)
+                        .ToList(),
+                    UpdatedBy = Environment.UserName
+                };
+
+                await _api.PostAsync<ReorderDailyTicketAssignmentsRequest, ReorderDailyTicketAssignmentsResponse>(
+                    "api/daily-assignments/reorder",
+                    req);
+
+                await LoadBoardAsync();
+
+                StatusText = "Ticket order updated. Save & Publish to send the new route order.";
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                StatusText = $"Reorder failed: {ex.Body ?? ex.Message}";
+
+                MessageBox.Show(
+                    ex.Body ?? ex.Message,
+                    "Reorder Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                StatusText = "Reorder failed: " + ex.Message;
+
+                MessageBox.Show(
+                    ex.Message,
+                    "Reorder Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                _isReorderingByDragDrop = false;
+                _draggedAssignedTicket = null;
+            }
+        }
+
         private async void MoveAssignedTicketUp_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Button button || button.Tag is not DailyAssignedTicketDto ticket)
@@ -730,8 +1625,62 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                    ?? "";
         }
 
+        private static T? FindVisualParent<T>(DependencyObject? source)
+            where T : DependencyObject
+        {
+            var current = source;
+
+            while (current != null)
+            {
+                if (current is T match)
+                    return match;
+
+                current = GetParentSafely(current);
+            }
+
+            return null;
+        }
+
+        private static DependencyObject? GetParentSafely(DependencyObject current)
+        {
+            if (current is Visual ||
+                current is System.Windows.Media.Media3D.Visual3D)
+            {
+                return VisualTreeHelper.GetParent(current);
+            }
+
+            if (current is FrameworkContentElement contentElement)
+            {
+                return contentElement.Parent;
+            }
+
+            return LogicalTreeHelper.GetParent(current);
+        }
+
+        [DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out NativeCursorPoint point);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeCursorPoint
+        {
+            public int X;
+            public int Y;
+        }
+
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    public sealed class TicketDragGhostVm
+    {
+        public DailyAssignmentTicketDto Ticket { get; init; } = new();
+
+        public int AdditionalCount { get; init; }
+
+        public string AdditionalCountText =>
+            AdditionalCount <= 0
+                ? ""
+                : $"+{AdditionalCount} more";
     }
 
     public sealed class OneBasedIndexConverter : IValueConverter
@@ -764,7 +1713,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         public string PrimaryText { get; set; } = "";
         public string SecondaryText { get; set; } = "";
 
-        public List<DailyAssignedTicketDto> AssignedTickets { get; set; } = new();
+        public ObservableCollection<DailyAssignedTicketDto> AssignedTickets { get; set; } = new();
 
         public int AssignedTicketCount => AssignedTickets.Count;
 
@@ -825,10 +1774,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 TechnicianId = dto.TechnicianId,
                 PrimaryText = primary,
                 SecondaryText = secondary,
-                AssignedTickets = dto.AssignedTickets
-                    .OrderBy(x => x.SortOrder)
-                    .ThenBy(x => x.AssignmentId)
-                    .ToList()
+                AssignedTickets = new ObservableCollection<DailyAssignedTicketDto>(
+                    dto.AssignedTickets
+                        .OrderBy(x => x.SortOrder)
+                        .ThenBy(x => x.AssignmentId))
             };
         }
 

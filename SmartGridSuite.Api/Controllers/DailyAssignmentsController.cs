@@ -348,6 +348,49 @@ namespace SmartGridSuite.Api.Controllers
 
                 if (!technicianExists)
                     return NotFound($"Technician {req.TechnicianId.Value} was not found or is inactive.");
+
+                /*
+                 * Crew work lists are intentionally owned by their lead technician so that
+                 * tickets remain stable when crew membership changes. When TruckId is also
+                 * supplied, it identifies the crew context used for display and publishing.
+                 */
+                if (req.TruckId.HasValue && req.TruckId.Value > 0)
+                {
+                    truckId = (uint)req.TruckId.Value;
+
+                    var truck = await _db.Trucks
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(
+                            x => x.Id == truckId.Value && x.IsActive,
+                            ct);
+
+                    if (truck == null)
+                        return NotFound($"Truck {req.TruckId.Value} was not found or is inactive.");
+
+                    var leadIsAssignedToTruck = await _db.TruckRosters
+                        .AsNoTracking()
+                        .AnyAsync(
+                            x => x.WorkDate == rosterDate &&
+                                 x.TruckId == truckId.Value &&
+                                 x.TechnicianId == technicianId.Value,
+                            ct);
+
+                    if (!leadIsAssignedToTruck)
+                    {
+                        return BadRequest(
+                            "The selected crew lead is no longer assigned to that truck. " +
+                            "Refresh Daily Assignments and select the crew again.");
+                    }
+
+                    crewId = await _db.Crews
+                        .AsNoTracking()
+                        .Where(c =>
+                            c.WorkDate == rosterDate &&
+                            c.TruckNumber == truck.TruckNumber)
+                        .OrderBy(c => c.Id)
+                        .Select(c => (uint?)c.Id)
+                        .FirstOrDefaultAsync(ct);
+                }
             }
 
             var tickets = await _db.Tickets
@@ -698,6 +741,20 @@ namespace SmartGridSuite.Api.Controllers
 
                 if (!technicianExists)
                     return NotFound($"Technician {req.TechnicianId.Value} was not found or is inactive.");
+
+                // A Technician target with TruckId is a crew work list anchored
+                // to its lead technician. Preserve that context when reordering.
+                if (req.TruckId.HasValue && req.TruckId.Value > 0)
+                {
+                    truckId = (uint)req.TruckId.Value;
+
+                    var truckExists = await _db.Trucks
+                        .AsNoTracking()
+                        .AnyAsync(x => x.Id == truckId.Value && x.IsActive, ct);
+
+                    if (!truckExists)
+                        return NotFound($"Truck {req.TruckId.Value} was not found or is inactive.");
+                }
             }
 
             var assignments = await _db.DailyTicketAssignments
@@ -755,168 +812,6 @@ namespace SmartGridSuite.Api.Controllers
                 TruckId = truckId == null ? null : (int?)truckId.Value,
                 TechnicianId = technicianId == null ? null : (int?)technicianId.Value,
                 ReorderedCount = orderedTicketIds.Count
-            });
-        }
-
-        [HttpPost("publish")]
-        public async Task<ActionResult<PublishDailyAssignmentsResponse>> PublishAssignments([FromBody] PublishDailyAssignmentsRequest req,
-            CancellationToken ct)
-        {
-            var rosterDate = (req.WorkDate == default ? DateTime.Today : req.WorkDate).Date;
-            var workDate = ActiveAssignmentDate;
-
-            var publishedBy = string.IsNullOrWhiteSpace(req.PublishedBy)
-                ? "Dispatcher"
-                : req.PublishedBy.Trim();
-
-            var draftAssignments = await _db.DailyTicketAssignments
-                .Where(x => x.AssignmentDate == workDate)
-                .OrderBy(x => x.TargetType)
-                .ThenBy(x => x.TruckId)
-                .ThenBy(x => x.TechnicianId)
-                .ThenBy(x => x.SortOrder)
-                .ThenBy(x => x.Id)
-                .ToListAsync(ct);
-
-            if (draftAssignments.Count == 0)
-                return BadRequest("There are no daily assignments to publish.");
-
-            var ticketIds = draftAssignments
-                .Select(x => x.TicketId)
-                .Distinct()
-                .ToList();
-
-            var tickets = await _db.Tickets
-                .Where(t => ticketIds.Contains(t.Id))
-                .ToListAsync(ct);
-
-            var ticketsById = tickets.ToDictionary(x => x.Id);
-
-            var missingTicketIds = ticketIds
-                .Where(id => !ticketsById.ContainsKey(id))
-                .ToList();
-
-            if (missingTicketIds.Count > 0)
-                return NotFound($"One or more tickets were not found: {string.Join(", ", missingTicketIds)}");
-
-            var nextPublishedVersion =
-                (await _db.DailyTicketAssignmentPublished
-                    .AsNoTracking()
-                    .Where(x => x.AssignmentDate == workDate)
-                    .Select(x => (int?)x.PublishedVersion)
-                    .MaxAsync(ct) ?? 0) + 1;
-
-            var truckIds = draftAssignments
-                .Where(x => x.TruckId.HasValue)
-                .Select(x => x.TruckId.GetValueOrDefault())
-                .Distinct()
-                .ToList();
-
-            var technicianIds = draftAssignments
-                .Where(x => x.TechnicianId.HasValue)
-                .Select(x => x.TechnicianId.GetValueOrDefault())
-                .Distinct()
-                .ToList();
-
-            var trucks = await _db.Trucks
-                .AsNoTracking()
-                .Where(x => truckIds.Contains(x.Id))
-                .ToListAsync(ct);
-
-            var trucksById = trucks.ToDictionary(x => x.Id);
-
-            var directTechnicians = await _db.Technicians
-                .AsNoTracking()
-                .Where(x => technicianIds.Contains(x.Id))
-                .ToListAsync(ct);
-
-            var techniciansById = directTechnicians.ToDictionary(x => x.Id);
-
-            var truckRosterRows = await (
-                from roster in _db.TruckRosters.AsNoTracking()
-                join tech in _db.Technicians.AsNoTracking()
-                    on roster.TechnicianId equals tech.Id
-                where roster.WorkDate == rosterDate
-                      && truckIds.Contains(roster.TruckId)
-                      && tech.IsActive
-                select new
-                {
-                    roster.TruckId,
-                    tech.EmployeeId,
-                    tech.FirstName,
-                    tech.LastName
-                })
-                .ToListAsync(ct);
-
-            var truckTechNamesByTruckId = truckRosterRows
-                .GroupBy(x => x.TruckId)
-                .ToDictionary(
-                    g => g.Key,
-                    g => g.Select(x => FormatTechnicianName(
-                            x.FirstName,
-                            x.LastName,
-                            x.EmployeeId))
-                        .Where(x => !string.IsNullOrWhiteSpace(x))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .OrderBy(x => x)
-                        .ToList());
-
-            var now = DateTime.Now;
-            var publishedRows = new List<DailyTicketAssignmentPublishedEntity>();
-
-            foreach (var assignment in draftAssignments)
-            {
-                var ticket = ticketsById[assignment.TicketId];
-
-                ticket.AssignedTech = BuildPublishedAssignedTechText(
-                    assignment,
-                    trucksById,
-                    truckTechNamesByTruckId,
-                    techniciansById);
-
-                ticket.AssignedCrewId = assignment.CrewId;
-                ticket.LastActivityAt = now;
-
-                assignment.IsPublished = true;
-                assignment.PublishedVersion = nextPublishedVersion;
-                assignment.PublishedAt = now;
-                assignment.PublishedBy = publishedBy;
-                assignment.UpdatedAt = now;
-                assignment.UpdatedBy = publishedBy;
-
-                publishedRows.Add(new DailyTicketAssignmentPublishedEntity
-                {
-                    AssignmentDate = assignment.AssignmentDate,
-                    PublishedVersion = nextPublishedVersion,
-
-                    TicketId = assignment.TicketId,
-                    SourceAssignmentId = assignment.Id,
-
-                    TargetType = assignment.TargetType,
-                    TruckId = assignment.TruckId,
-                    TechnicianId = assignment.TechnicianId,
-                    CrewId = assignment.CrewId,
-
-                    SortOrder = assignment.SortOrder,
-                    AssignmentNotes = assignment.AssignmentNotes,
-
-                    PublishedAt = now,
-                    PublishedBy = publishedBy
-                });
-            }
-
-            _db.DailyTicketAssignmentPublished.AddRange(publishedRows);
-
-            await _db.SaveChangesAsync(ct);
-
-            return Ok(new PublishDailyAssignmentsResponse
-            {
-                WorkDate = workDate,
-                PublishedVersion = nextPublishedVersion,
-                PublishedAt = now,
-                PublishedBy = publishedBy,
-                PublishedCount = publishedRows.Count,
-                TicketIds = ticketIds.OrderBy(x => x).ToList()
             });
         }
 
@@ -1288,6 +1183,19 @@ namespace SmartGridSuite.Api.Controllers
 
                 if (!techExists)
                     return NotFound($"Technician {req.TechnicianId.Value} was not found or is inactive.");
+
+                // Technician targets with TruckId are crew lists anchored to their lead tech.
+                if (req.TruckId.HasValue && req.TruckId.Value > 0)
+                {
+                    truckId = (uint)req.TruckId.Value;
+
+                    var truckExists = await _db.Trucks
+                        .AsNoTracking()
+                        .AnyAsync(x => x.Id == truckId.Value && x.IsActive, ct);
+
+                    if (!truckExists)
+                        return NotFound($"Truck {req.TruckId.Value} was not found or is inactive.");
+                }
             }
 
             var publishedBy = string.IsNullOrWhiteSpace(req.PublishedBy)
@@ -1304,6 +1212,45 @@ namespace SmartGridSuite.Api.Controllers
                 .ThenBy(x => x.Id)
                 .ToListAsync(ct);
 
+            var currentTicketIds = draftAssignments
+                .Select(x => x.TicketId)
+                .Distinct()
+                .ToList();
+
+            /*
+             * Find the last published list for this specific target.
+             * Any ticket previously published here but no longer in the current draft
+             * list has been removed from this target.
+             */
+            var previousTargetPublishedVersion = await _db.DailyTicketAssignmentPublished
+                .AsNoTracking()
+                .Where(x =>
+                    x.AssignmentDate == workDate &&
+                    x.TargetType == cleanTargetType &&
+                    x.TruckId == truckId &&
+                    x.TechnicianId == technicianId)
+                .Select(x => (int?)x.PublishedVersion)
+                .MaxAsync(ct);
+
+            var previouslyPublishedTicketIds = previousTargetPublishedVersion.HasValue
+                ? await _db.DailyTicketAssignmentPublished
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.AssignmentDate == workDate &&
+                        x.TargetType == cleanTargetType &&
+                        x.TruckId == truckId &&
+                        x.TechnicianId == technicianId &&
+                        x.PublishedVersion == previousTargetPublishedVersion.Value)
+                    .Select(x => x.TicketId)
+                    .Distinct()
+                    .ToListAsync(ct)
+                : new List<long>();
+
+            var releasedTicketIds = previouslyPublishedTicketIds
+                .Except(currentTicketIds)
+                .Distinct()
+                .ToList();
+
             var nextPublishedVersion = (await _db.DailyTicketAssignmentPublished
                 .AsNoTracking()
                 .Where(x => x.AssignmentDate == workDate)
@@ -1312,61 +1259,121 @@ namespace SmartGridSuite.Api.Controllers
 
             var now = DateTime.Now;
 
-            if (draftAssignments.Count == 0)
-            {
-                var existingPublishedRows = await _db.DailyTicketAssignmentPublished
-                    .Where(x =>
-                        x.AssignmentDate == workDate &&
-                        x.TargetType == cleanTargetType &&
-                        x.TruckId == truckId &&
-                        x.TechnicianId == technicianId)
-                    .ToListAsync(ct);
-
-                if (existingPublishedRows.Count > 0)
-                    _db.DailyTicketAssignmentPublished.RemoveRange(existingPublishedRows);
-
-                await _db.SaveChangesAsync(ct);
-
-                return Ok(new PublishDailyAssignmentTargetResponse
+            /*
+             * Resolve configurable workflow statuses.
+             * Assignment Target is needed whenever tickets are being published.
+             * Unassignment Target is only needed when an actual non-terminal ticket
+             * must be returned to unassigned.
+             */
+            var statusRows = await _db.TicketStatuses
+                .AsNoTracking()
+                .Where(x => x.IsActive)
+                .Select(x => new
                 {
-                    WorkDate = rosterDate,
-                    TargetType = cleanTargetType,
-                    TruckId = truckId == null ? null : (int?)truckId.Value,
-                    TechnicianId = technicianId == null ? null : (int?)technicianId.Value,
-                    PublishedCount = 0,
-                    PublishedVersion = nextPublishedVersion,
-                    PublishedAt = now,
-                    PublishedBy = publishedBy
-                });
+                    x.Name,
+                    x.IsClosed,
+                    x.IsFieldComplete,
+                    x.IsAssignmentPublishTarget,
+                    x.IsUnassignmentTarget
+                })
+                .ToListAsync(ct);
+
+            var protectedStatusNames = statusRows
+                .Where(x => x.IsClosed || x.IsFieldComplete)
+                .Select(x => x.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var assignmentTargetStatuses = statusRows
+                .Where(x => x.IsAssignmentPublishTarget)
+                .Select(x => x.Name)
+                .ToList();
+
+            if (currentTicketIds.Count > 0 && assignmentTargetStatuses.Count != 1)
+            {
+                return BadRequest(
+                    "Exactly one active ticket status must be configured as the Assignment Target. " +
+                    "Go to Administration > Tickets and select the status used when Daily Assignments are published.");
             }
 
-            var ticketIds = draftAssignments
-                .Select(x => x.TicketId)
+            var assignmentTargetStatusName = assignmentTargetStatuses.SingleOrDefault();
+
+            var affectedTicketIds = currentTicketIds
+                .Concat(releasedTicketIds)
                 .Distinct()
                 .ToList();
 
-            var tickets = await _db.Tickets
-                .Where(t => ticketIds.Contains(t.Id))
-                .ToListAsync(ct);
+            var affectedTickets = affectedTicketIds.Count == 0
+                ? new List<TicketEntity>()
+                : await _db.Tickets
+                    .Where(x => affectedTicketIds.Contains(x.Id))
+                    .ToListAsync(ct);
 
-            var ticketsById = tickets.ToDictionary(x => x.Id);
+            var ticketsById = affectedTickets.ToDictionary(x => x.Id);
 
-            var missingTicketIds = ticketIds
+            var missingCurrentTicketIds = currentTicketIds
                 .Where(id => !ticketsById.ContainsKey(id))
                 .ToList();
 
-            if (missingTicketIds.Count > 0)
-                return NotFound($"One or more tickets were not found: {string.Join(", ", missingTicketIds)}");            
+            if (missingCurrentTicketIds.Count > 0)
+            {
+                return NotFound(
+                    $"One or more tickets were not found: {string.Join(", ", missingCurrentTicketIds)}");
+            }
 
+            /*
+             * A ticket may have been moved to another target and published there
+             * before this old target is republished. In that case, do not clear the
+             * ticket's newly published assignment.
+             */
+            var publishedElsewhereTicketIds = releasedTicketIds.Count == 0
+                ? new HashSet<long>()
+                : (await _db.DailyTicketAssignments
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.AssignmentDate == workDate &&
+                        x.IsPublished &&
+                        releasedTicketIds.Contains(x.TicketId) &&
+                        !(x.TargetType == cleanTargetType &&
+                          x.TruckId == truckId &&
+                          x.TechnicianId == technicianId))
+                    .Select(x => x.TicketId)
+                    .Distinct()
+                    .ToListAsync(ct))
+                    .ToHashSet();
+
+            var ticketsToUnassign = releasedTicketIds
+                .Where(id => ticketsById.ContainsKey(id))
+                .Where(id => !publishedElsewhereTicketIds.Contains(id))
+                .Where(id => !protectedStatusNames.Contains(ticketsById[id].Status ?? ""))
+                .ToList();
+
+            var unassignmentTargetStatuses = statusRows
+                .Where(x => x.IsUnassignmentTarget)
+                .Select(x => x.Name)
+                .ToList();
+
+            if (ticketsToUnassign.Count > 0 && unassignmentTargetStatuses.Count != 1)
+            {
+                return BadRequest(
+                    "Exactly one active ticket status must be configured as the Unassignment Target. " +
+                    "Go to Administration > Tickets and select the status used when a published ticket becomes unassigned.");
+            }
+
+            var unassignmentTargetStatusName = unassignmentTargetStatuses.SingleOrDefault();
+
+            /*
+             * Load display context for published assignments.
+             * Technician targets with TruckId use crew names for Assigned To.
+             */
             var truckIds = draftAssignments
                 .Where(x => x.TruckId.HasValue)
-                .Select(x => x.TruckId.GetValueOrDefault())
+                .Select(x => x.TruckId!.Value)
                 .Distinct()
                 .ToList();
 
             var technicianIds = draftAssignments
                 .Where(x => x.TechnicianId.HasValue)
-                .Select(x => x.TechnicianId.GetValueOrDefault())
+                .Select(x => x.TechnicianId!.Value)
                 .Distinct()
                 .ToList();
 
@@ -1419,14 +1426,23 @@ namespace SmartGridSuite.Api.Controllers
             {
                 var ticket = ticketsById[assignment.TicketId];
 
-                ticket.AssignedTech = BuildPublishedAssignedTechText(
-                    assignment,
-                    trucksById,
-                    truckTechNamesByTruckId,
-                    techniciansById);
+                /*
+                 * Do not push a completed/closed ticket back into Assigned just
+                 * because its work list is republished.
+                 */
+                if (!protectedStatusNames.Contains(ticket.Status ?? ""))
+                {
+                    ticket.Status = assignmentTargetStatusName!;
 
-                ticket.AssignedCrewId = assignment.CrewId;
-                ticket.LastActivityAt = now;
+                    ticket.AssignedTech = BuildPublishedAssignedTechText(
+                        assignment,
+                        trucksById,
+                        truckTechNamesByTruckId,
+                        techniciansById);
+
+                    ticket.AssignedCrewId = assignment.CrewId;
+                    ticket.LastActivityAt = now;
+                }
 
                 assignment.IsPublished = true;
                 assignment.PublishedVersion = nextPublishedVersion;
@@ -1456,6 +1472,48 @@ namespace SmartGridSuite.Api.Controllers
                 });
             }
 
+            foreach (var ticketId in ticketsToUnassign)
+            {
+                var ticket = ticketsById[ticketId];
+
+                ticket.Status = unassignmentTargetStatusName!;
+                ticket.AssignedTech = "(Unassigned)";
+                ticket.AssignedCrewId = null;
+                ticket.LastActivityAt = now;
+            }
+
+            if (draftAssignments.Count == 0)
+            {
+                /*
+                 * Publishing an empty target removes that target's field-tech task list.
+                 * The ticket records above are also returned to unassigned when eligible.
+                 */
+                var existingPublishedRows = await _db.DailyTicketAssignmentPublished
+                    .Where(x =>
+                        x.AssignmentDate == workDate &&
+                        x.TargetType == cleanTargetType &&
+                        x.TruckId == truckId &&
+                        x.TechnicianId == technicianId)
+                    .ToListAsync(ct);
+
+                if (existingPublishedRows.Count > 0)
+                    _db.DailyTicketAssignmentPublished.RemoveRange(existingPublishedRows);
+
+                await _db.SaveChangesAsync(ct);
+
+                return Ok(new PublishDailyAssignmentTargetResponse
+                {
+                    WorkDate = rosterDate,
+                    TargetType = cleanTargetType,
+                    TruckId = truckId == null ? null : (int?)truckId.Value,
+                    TechnicianId = technicianId == null ? null : (int?)technicianId.Value,
+                    PublishedCount = 0,
+                    PublishedVersion = nextPublishedVersion,
+                    PublishedAt = now,
+                    PublishedBy = publishedBy
+                });
+            }
+
             _db.DailyTicketAssignmentPublished.AddRange(publishedRows);
 
             await _db.SaveChangesAsync(ct);
@@ -1473,7 +1531,7 @@ namespace SmartGridSuite.Api.Controllers
                 PublishedBy = publishedBy,
 
                 PublishedCount = publishedRows.Count,
-                TicketIds = ticketIds.OrderBy(x => x).ToList()
+                TicketIds = currentTicketIds.OrderBy(x => x).ToList()
             });
         }
 
@@ -1758,30 +1816,47 @@ namespace SmartGridSuite.Api.Controllers
             return "";
         }
 
-        private static string BuildPublishedAssignedTechText(DailyTicketAssignmentEntity assignment,
-            Dictionary<uint, TruckEntity> trucksById,
-            Dictionary<uint, List<string>> truckTechNamesByTruckId,
-            Dictionary<uint, TechnicianEntity> techniciansById)
+        private static string BuildPublishedAssignedTechText(DailyTicketAssignmentEntity assignment, Dictionary<uint, TruckEntity> trucksById,
+            Dictionary<uint, List<string>> truckTechNamesByTruckId, Dictionary<uint, TechnicianEntity> techniciansById)
         {
-            if (IsTargetType(assignment.TargetType, "Truck") && assignment.TruckId.HasValue)
+            /*
+             * A Technician target carrying TruckId is a crew assignment anchored to
+             * its lead technician. Assigned To should show the crew names only.
+             *
+             * This also handles any remaining legacy Truck-target assignments.
+             */
+            if (assignment.TruckId.HasValue)
             {
                 var truckId = assignment.TruckId.Value;
 
-                var truckNumber = trucksById.TryGetValue(truckId, out var truck)
-                    ? (truck.TruckNumber ?? string.Empty).Trim()
-                    : truckId.ToString();
+                if (truckTechNamesByTruckId.TryGetValue(truckId, out var techNames) &&
+                    techNames.Count > 0)
+                {
+                    return FormatCrewDisplayText(techNames);
+                }
 
-                var displayTruck = string.IsNullOrWhiteSpace(truckNumber)
-                    ? $"Truck {truckId}"
-                    : $"Truck {truckNumber}";
+                /*
+                 * Fallback for an unexpected roster/context issue: prefer the lead
+                 * technician name rather than writing a truck number into Assigned To.
+                 */
+                if (assignment.TechnicianId.HasValue &&
+                    techniciansById.TryGetValue(assignment.TechnicianId.Value, out var crewLead))
+                {
+                    return FormatTechnicianName(
+                        crewLead.FirstName,
+                        crewLead.LastName,
+                        crewLead.EmployeeId);
+                }
 
-                if (!truckTechNamesByTruckId.TryGetValue(truckId, out var techNames) || techNames.Count == 0)
-                    return displayTruck;
-
-                return $"{displayTruck} - {FormatCrewDisplayText(techNames)}";
+                if (trucksById.TryGetValue(truckId, out var truck) &&
+                    !string.IsNullOrWhiteSpace(truck.TruckNumber))
+                {
+                    return $"Truck {truck.TruckNumber.Trim()}";
+                }
             }
 
-            if (IsTargetType(assignment.TargetType, "Technician") && assignment.TechnicianId.HasValue)
+            if (IsTargetType(assignment.TargetType, "Technician") &&
+                assignment.TechnicianId.HasValue)
             {
                 var technicianId = assignment.TechnicianId.Value;
 

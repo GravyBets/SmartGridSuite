@@ -10,7 +10,7 @@
                 <ResourceDictionary Source="pack://application:,,,/Fluent;Component/Themes/Generic.xaml"/>
 
                 <!-- Controls (always on) -->
-                <ResourceDictionary Source="Themes/Controls.xaml"/>
+                <ResourceDictionary Source="Controls/Controls.xaml"/>
 
                 <!-- Theme (swap later) -->
                 <ResourceDictionary Source="Themes/LightTheme.xaml"/>

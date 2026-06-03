@@ -32,6 +32,18 @@ namespace SmartGridSuite.Api.Data.Entities
         [Column("send_to_dispatch_tasks")]
         public bool SendToDispatchTasks { get; set; }
 
+        [Column("include_in_summary")]
+        public bool IncludeInSummary { get; set; } = true;
+
+        [Column("is_writeup_submit_target")]
+        public bool IsWriteUpSubmitTarget { get; set; }
+
+        [Column("is_assignment_publish_target")]
+        public bool IsAssignmentPublishTarget { get; set; }
+
+        [Column("is_unassignment_target")]
+        public bool IsUnassignmentTarget { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
 

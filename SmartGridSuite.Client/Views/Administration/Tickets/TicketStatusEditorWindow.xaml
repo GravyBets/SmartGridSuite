@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Ticket Status"
-        Width="440"
-        Height="420"
+        Width="540"
+        Height="690"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
 
@@ -12,7 +12,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="10"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="10"/>
+            <RowDefinition Height="14"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="10"/>
             <RowDefinition Height="Auto"/>
@@ -22,52 +22,94 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="10"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="14"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Status Name"
+        <TextBlock Grid.Row="0"
+                   Text="Status Name"
                    FontWeight="SemiBold"/>
+
         <TextBox Grid.Row="2"
                  x:Name="NameTextBox"
                  Height="32"/>
 
-        <TextBlock Grid.Row="4"
-                   Text="Sort Order"
-                   FontWeight="SemiBold"/>
-        <TextBox Grid.Row="6"
-                 x:Name="SortOrderTextBox"
-                 Height="32"/>
-
-        <CheckBox Grid.Row="8"
+        <CheckBox Grid.Row="4"
                   x:Name="IsActiveCheckBox"
                   Content="Active"
                   IsChecked="True"/>
 
-        <CheckBox Grid.Row="10"
+        <CheckBox Grid.Row="6"
                   x:Name="IsClosedCheckBox"
                   Content="Closed status"/>
 
-        <CheckBox Grid.Row="12"
+        <CheckBox Grid.Row="8"
+                  x:Name="IsFieldCompleteCheckBox"
+                  Content="Field complete status"/>
+
+        <CheckBox Grid.Row="10"
                   x:Name="ShowInFilterCheckBox"
                   Content="Show in ticket filters"
                   IsChecked="True"/>
 
-        <CheckBox Grid.Row="13"
-                  x:Name="SendToDispatchTasksCheckBox"
-                  Content="Send tickets in this status to Dispatch Tasks"
-                  VerticalAlignment="Top"/>
-        
-        <TextBlock Grid.Row="13"
-                   x:Name="SystemRequiredTextBlock"
-                   Margin="0,28,0,0"
-                   Text="System-required status. Name, Active, and Closed behavior are protected because SmartGridSuite depends on them."
-                   TextWrapping="Wrap"
-                   Foreground="{DynamicResource TextSecondary}"
-                   Visibility="Collapsed"
-                   VerticalAlignment="Top"/>
+        <CheckBox Grid.Row="12"
+                  x:Name="IncludeInSummaryCheckBox"
+                  Content="Include in ticket summary"
+                  IsChecked="True"/>
 
-        <StackPanel Grid.Row="14"
+        <ScrollViewer Grid.Row="14"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <TextBlock Text="Workflow Behavior"
+                           Margin="0,0,0,10"
+                           FontSize="13"
+                           FontWeight="SemiBold"/>
+
+                <CheckBox x:Name="SendToDispatchTasksCheckBox"
+                          Content="Show tickets in this status on the Tasks pane"/>
+
+                <CheckBox x:Name="IsWriteUpSubmitTargetCheckBox"
+                          Margin="0,14,0,0"
+                          Content="Use this status after a tech submits a write-up"/>
+
+                <TextBlock Margin="22,5,0,0"
+                           Text="Only one status can be the Write-Up Target. Selecting this option clears it from all other statuses."
+                           TextWrapping="Wrap"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextSecondary}"/>
+
+                <CheckBox x:Name="IsAssignmentPublishTargetCheckBox"
+                          Margin="0,14,0,0"
+                          Content="Use this status when Daily Assignments are published"/>
+
+                <TextBlock Margin="22,5,0,0"
+                           Text="Only one status can be the Assignment Target. Tickets move to this status when published to a crew or technician."
+                           TextWrapping="Wrap"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextSecondary}"/>
+
+                <CheckBox x:Name="IsUnassignmentTargetCheckBox"
+                          Margin="0,14,0,0"
+                          Content="Use this status when a published ticket becomes unassigned"/>
+
+                <TextBlock Margin="22,5,0,0"
+                           Text="Only one status can be the Unassignment Target. Tickets move to this status when removed from all published work lists."
+                           TextWrapping="Wrap"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextSecondary}"/>
+
+                <TextBlock x:Name="SystemRequiredTextBlock"
+                           Margin="0,16,0,0"
+                           Text="System-required status. Name, Active, and Closed behavior are protected because SmartGridSuite depends on them."
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextSecondary}"
+                           Visibility="Collapsed"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="15"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,16,0,0">

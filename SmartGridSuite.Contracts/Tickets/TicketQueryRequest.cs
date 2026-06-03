@@ -6,6 +6,8 @@ public sealed class TicketQueryRequest
 
     public List<string> Statuses { get; set; } = new();
 
+    public bool ApplyStatusFilter { get; set; }
+
     public string? AssignedTech { get; set; }
 
     public string DateField { get; set; } = "LastActivity";

@@ -13,8 +13,13 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
         public int SortOrder { get; private set; }
         public bool StatusIsActive => IsActiveCheckBox.IsChecked == true;
         public bool IsClosed => IsClosedCheckBox.IsChecked == true;
+        public bool IsFieldComplete => IsFieldCompleteCheckBox.IsChecked == true;
         public bool ShowInFilter => ShowInFilterCheckBox.IsChecked == true;
+        public bool IncludeInSummary => IncludeInSummaryCheckBox.IsChecked == true;
         public bool SendToDispatchTasks => SendToDispatchTasksCheckBox.IsChecked == true;
+        public bool IsWriteUpSubmitTarget => IsWriteUpSubmitTargetCheckBox.IsChecked == true;
+        public bool IsAssignmentPublishTarget => IsAssignmentPublishTargetCheckBox.IsChecked == true;
+        public bool IsUnassignmentTarget => IsUnassignmentTargetCheckBox.IsChecked == true;
 
         public TicketStatusEditorWindow()
         {
@@ -33,11 +38,17 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
             _isSystemRequiredStatus = IsSystemRequiredStatus(existing.Name);
 
             NameTextBox.Text = existing.Name;
-            SortOrderTextBox.Text = existing.SortOrder.ToString();
+            
             IsActiveCheckBox.IsChecked = existing.IsActive;
             IsClosedCheckBox.IsChecked = existing.IsClosed;
+            IsFieldCompleteCheckBox.IsChecked = existing.IsFieldComplete;
+
             ShowInFilterCheckBox.IsChecked = existing.ShowInFilter;
+            IncludeInSummaryCheckBox.IsChecked = existing.IncludeInSummary;
             SendToDispatchTasksCheckBox.IsChecked = existing.SendToDispatchTasks;
+            IsWriteUpSubmitTargetCheckBox.IsChecked = existing.IsWriteUpSubmitTarget;
+            IsAssignmentPublishTargetCheckBox.IsChecked = existing.IsAssignmentPublishTarget;
+            IsUnassignmentTargetCheckBox.IsChecked = existing.IsUnassignmentTarget;
 
             ApplySystemRequiredProtection();
         }
@@ -80,15 +91,17 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
                 return;
             }
 
-            if (!int.TryParse(SortOrderTextBox.Text.Trim(), out var sortOrder))
+            if (!StatusIsActive &&
+                (IsWriteUpSubmitTarget ||
+                 IsAssignmentPublishTarget ||
+                 IsUnassignmentTarget))
             {
                 MessageBox.Show(
-                    "Sort Order must be a whole number.",
+                    "A status must be active before it can be selected as a workflow target.",
                     "Validation",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
 
-                SortOrderTextBox.Focus();
                 return;
             }
 
@@ -125,7 +138,6 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
                 }
             }
 
-            SortOrder = sortOrder;
             DialogResult = true;
         }
     }

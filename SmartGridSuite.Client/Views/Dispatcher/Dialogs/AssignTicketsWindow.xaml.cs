@@ -4,7 +4,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 {
     public partial class AssignTicketsWindow : Window
     {
-        public string AssignedTech => (TechnicianComboBox.Text ?? "").Trim();
+        public string AssignedTech =>
+            TechnicianComboBox.SelectedItem?.ToString()?.Trim() ?? "";
 
         public AssignTicketsWindow(int ticketCount, IEnumerable<string> techSuggestions)
         {
@@ -12,12 +13,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
             HeaderTextBlock.Text = $"Assign {ticketCount} selected ticket(s)";
 
-            TechnicianComboBox.ItemsSource = techSuggestions
+            var items = techSuggestions
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(x => x)
+                .OrderBy(x => x.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(x => x)
                 .ToList();
+
+            TechnicianComboBox.ItemsSource = items;
+
+            if (items.Count > 0)
+                TechnicianComboBox.SelectedIndex = 0;
 
             Loaded += (_, _) =>
             {
@@ -31,7 +38,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             if (string.IsNullOrWhiteSpace(AssignedTech))
             {
                 MessageBox.Show(
-                    "Choose or type a technician name.",
+                    "Choose a technician or (Unassigned).",
                     "Assign Tickets",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);

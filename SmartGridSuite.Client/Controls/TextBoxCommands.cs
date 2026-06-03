@@ -23,10 +23,8 @@ namespace SmartGridSuite.Client.Controls
 
         private static void CanExecuteClearText(object sender, CanExecuteRoutedEventArgs e)
         {
-            if (sender is TextBox textBox)
-                e.CanExecute = !string.IsNullOrEmpty(textBox.Text);
-            else
-                e.CanExecute = false;
+            e.CanExecute = sender is TextBox textBox &&
+                           !string.IsNullOrEmpty(textBox.Text);
 
             e.Handled = true;
         }

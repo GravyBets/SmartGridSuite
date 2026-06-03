@@ -59,6 +59,34 @@ namespace SmartGridSuite.Client.Models.Dispatcher
             }
         }
 
+        private string _notificationName = "";
+        public string NotificationName
+        {
+            get => _notificationName;
+            set
+            {
+                var cleaned = Clean(value);
+                if (_notificationName == cleaned) return;
+
+                _notificationName = cleaned;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _problem = "";
+        public string Problem
+        {
+            get => _problem;
+            set
+            {
+                var cleaned = Clean(value);
+                if (_problem == cleaned) return;
+
+                _problem = cleaned;
+                OnPropertyChanged();
+            }
+        }
+
         private string _tech = "";
         public string Tech
         {
@@ -125,9 +153,9 @@ namespace SmartGridSuite.Client.Models.Dispatcher
 
                 return WorkOrderClass switch
                 {
-                    WorkOrderClass.Capital => "Cap.",
-                    WorkOrderClass.Maintenance => "Maint.",
-                    WorkOrderClass.Distribution => "Dist.",
+                    WorkOrderClass.Capital => "Capital",
+                    WorkOrderClass.Maintenance => "Maintenance",
+                    WorkOrderClass.Distribution => "Distribution",
                     _ => ""
                 };
             }

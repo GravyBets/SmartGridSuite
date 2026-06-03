@@ -8,13 +8,55 @@
              d:DesignWidth="1100"
              Loaded="UserControl_Loaded">
 
+    <UserControl.Resources>
+        <Style x:Key="DangerButtonStyle"
+           TargetType="Button"
+               BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Setter Property="Background" Value="#DC2626"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#B91C1C"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#B91C1C"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#991B1B"/>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="16"/>
+            <RowDefinition Height="10"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
+        
         <!-- Header -->
         <StackPanel Grid.Row="0">
             <TextBlock Text="Tickets"
@@ -22,188 +64,128 @@
                        FontWeight="Bold"
                        Foreground="{DynamicResource TextPrimary}"/>
 
-            <TextBlock Text="Manage ticket statuses and dispatch task categories."
+            <TextBlock Text="Manage ticket statuses, filters, summaries, Tasks visibility, and automated workflow transitions."
                        Margin="0,4,0,0"
                        Foreground="{DynamicResource TextSecondary}"/>
         </StackPanel>
 
-        <!-- Body -->
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="16"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        <!-- Statuses only -->
+        <Border Grid.Row="2"
+                Style="{StaticResource Card}"
+                Padding="14">
 
-            <!-- Statuses -->
-            <Border Grid.Column="0"
-                    Style="{StaticResource Card}"
-                    Padding="14">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                    <TextBlock Text="Ticket Statuses"
-               FontSize="16"
-               FontWeight="SemiBold"
-               Foreground="{DynamicResource TextPrimary}"/>
+                <TextBlock Text="Ticket Statuses"
+                           FontSize="16"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource TextPrimary}"/>
 
-                    <TextBlock Grid.Row="2"
-               Text="These control available ticket statuses, filter visibility, and whether a status sends tickets into Dispatch Tasks."
-               TextWrapping="Wrap"
-               Foreground="{DynamicResource TextSecondary}"/>
+                <TextBlock Grid.Row="2"
+                           Text="Statuses control filters, summaries, Tasks visibility, field-complete behavior, submitted write-ups, published assignments, and unassignment transitions."
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextSecondary}"/>
 
-                    <!-- Status actions -->
-                    <StackPanel Grid.Row="4"
-                Orientation="Horizontal">
-                        <Button Content="Add Status"
-                Width="110"
-                Height="32"
-                Margin="0,0,8,0"
-                Style="{StaticResource PrimaryButtonStyle}"
-                Click="AddStatus_Click"/>
+                <!-- Status actions -->
+                <StackPanel Grid.Row="4"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Left">
 
-                        <Button x:Name="EditStatusButton"
-                Content="Edit Selected"
-                Width="110"
-                Height="32"
-                Margin="0,0,8,0"
-                Click="EditStatus_Click"
-                IsEnabled="False"/>
+                    <Button Content="Add Status"
+                            Width="102"
+                            Height="32"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Click="AddStatus_Click"/>
 
-                        <Button x:Name="DeactivateStatusButton"
-                Content="Deactivate"
-                Width="110"
-                Height="32"
-                Click="DeactivateStatus_Click"
-                IsEnabled="False"/>
-                    </StackPanel>
+                    <Button x:Name="EditStatusButton"
+                            Content="Edit"
+                            Width="102"
+                            Height="32"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Click="EditStatus_Click"
+                            IsEnabled="False"/>
 
-                    <DataGrid Grid.Row="6"
-              x:Name="StatusesGrid"
-              Style="{StaticResource ThemedDataGridStyle}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              HeadersVisibility="Column"
-              SelectionMode="Single"
-              SelectionChanged="StatusesGrid_SelectionChanged">
+                    <Button x:Name="DeactivateStatusButton"
+                            Content="Deactivate"
+                            Width="102"
+                            Height="32"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Click="DeactivateStatus_Click"
+                            IsEnabled="False"/>
 
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Name"
-                                Width="*"
-                                Binding="{Binding Name}"/>
+                    <Button x:Name="DeleteStatusButton"
+                            Content="Delete"
+                            Width="102"
+                            Height="32"
+                            Style="{StaticResource DangerButtonStyle}"
+                            Click="DeleteStatus_Click"
+                            IsEnabled="False"/>
+                </StackPanel>
 
-                            <DataGridTextColumn Header="Sort"
-                                Width="70"
-                                Binding="{Binding SortOrder}"/>
+                <DataGrid Grid.Row="6"
+                          x:Name="StatusesGrid"
+                          Style="{StaticResource ThemedDataGridStyle}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          HeadersVisibility="Column"
+                          SelectionMode="Single"
+                          SelectionChanged="StatusesGrid_SelectionChanged">
 
-                            <DataGridCheckBoxColumn Header="Active"
-                                    Width="80"
-                                    Binding="{Binding IsActive}"/>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Name"
+                                            Width="*"
+                                            Binding="{Binding Name}"/>
 
-                            <DataGridCheckBoxColumn Header="Closed"
-                                    Width="80"
-                                    Binding="{Binding IsClosed}"/>
+                        <DataGridCheckBoxColumn Header="Active"
+                                                Width="80"
+                                                Binding="{Binding IsActive}"/>
 
-                            <DataGridCheckBoxColumn Header="Filter"
-                                    Width="80"
-                                    Binding="{Binding ShowInFilter}"/>
+                        <DataGridCheckBoxColumn Header="Closed"
+                                                Width="80"
+                                                Binding="{Binding IsClosed}"/>
 
-                            <DataGridCheckBoxColumn Header="Dispatch Tasks"
-                                    Width="120"
-                                    Binding="{Binding SendToDispatchTasks}"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Grid>
-            </Border>
+                        <DataGridCheckBoxColumn Header="Field Complete"
+                                                Width="Auto"
+                                                Binding="{Binding IsFieldComplete}"/>
 
-            <!-- Categories -->
-            <Border Grid.Column="2"
-                    Style="{StaticResource Card}"
-                    Padding="14">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+                        <DataGridCheckBoxColumn Header="Filter"
+                                                Width="80"
+                                                Binding="{Binding ShowInFilter}"/>
 
-                    <TextBlock Text="Task Categories"
-               FontSize="16"
-               FontWeight="SemiBold"
-               Foreground="{DynamicResource TextPrimary}"/>
+                        <DataGridCheckBoxColumn Header="Summary"
+                                                Width="Auto"
+                                                Binding="{Binding IncludeInSummary}"/>
 
-                    <TextBlock Grid.Row="2"
-               Text="These define the available dispatch task categories and their default action-required text."
-               TextWrapping="Wrap"
-               Foreground="{DynamicResource TextSecondary}"/>
+                        <DataGridCheckBoxColumn Header="Tasks Pane"
+                                                Width="Auto"
+                                                Binding="{Binding SendToDispatchTasks}"/>
 
-                    <!-- Category actions -->
-                    <StackPanel Grid.Row="4"
-                Orientation="Horizontal">
-                        <Button Content="Add Category"
-                Width="120"
-                Height="32"
-                Margin="0,0,8,0"
-                Style="{StaticResource PrimaryButtonStyle}"
-                Click="AddCategory_Click"/>
+                        <DataGridCheckBoxColumn Header="Write-Up Target"
+                                                Width="130"
+                                                Binding="{Binding IsWriteUpSubmitTarget}"/>
 
-                        <Button x:Name="EditCategoryButton"
-                Content="Edit Selected"
-                Width="110"
-                Height="32"
-                Margin="0,0,8,0"
-                Click="EditCategory_Click"
-                IsEnabled="False"/>
+                        <DataGridCheckBoxColumn Header="Assignment Target"
+                                                Width="Auto"
+                                                Binding="{Binding IsAssignmentPublishTarget}"/>
 
-                        <Button x:Name="DeactivateCategoryButton"
-                Content="Deactivate"
-                Width="110"
-                Height="32"
-                Click="DeactivateCategory_Click"
-                IsEnabled="False"/>
-                    </StackPanel>
-
-                    <DataGrid Grid.Row="6"
-              x:Name="CategoriesGrid"
-              Style="{StaticResource ThemedDataGridStyle}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              HeadersVisibility="Column"
-              SelectionMode="Single"
-              SelectionChanged="CategoriesGrid_SelectionChanged">
-
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Name"
-                                Width="180"
-                                Binding="{Binding Name}"/>
-
-                            <DataGridTextColumn Header="Default Action Required"
-                                Width="*"
-                                Binding="{Binding DefaultActionRequired}"/>
-
-                            <DataGridTextColumn Header="Sort"
-                                Width="70"
-                                Binding="{Binding SortOrder}"/>
-
-                            <DataGridCheckBoxColumn Header="Active"
-                                    Width="80"
-                                    Binding="{Binding IsActive}"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </Grid>
-            </Border>
-        </Grid>
+                        <DataGridCheckBoxColumn Header="Unassignment Target"
+                                                Width="*"
+                                                Binding="{Binding IsUnassignmentTarget}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

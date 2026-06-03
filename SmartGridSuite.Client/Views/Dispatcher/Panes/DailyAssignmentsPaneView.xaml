@@ -312,7 +312,90 @@
                 </Grid>
             </Border>
         </DataTemplate>
-            
+
+        <!-- Floating ticket card shown while dragging -->
+        <DataTemplate x:Key="DragGhostTicketTemplate">
+            <Border Width="390"
+            Padding="12"
+            CornerRadius="12"
+            Background="{DynamicResource CardBackground}"
+            BorderBrush="{DynamicResource PrimaryBg}"
+            BorderThickness="2"
+            Opacity="0.93">
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="5"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="5"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="{Binding Ticket.Site}"
+                           FontSize="15"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource TextPrimary}"
+                           TextTrimming="CharacterEllipsis"/>
+
+                        <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Margin="10,0,0,0">
+
+                            <Border Padding="7,2"
+                            Margin="0,0,8,0"
+                            CornerRadius="10"
+                            Background="{DynamicResource SurfaceBg}"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1">
+                                <TextBlock Text="{Binding Ticket.Status}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                            </Border>
+
+                            <Border Padding="7,2"
+                            CornerRadius="10"
+                            Background="{DynamicResource PrimaryBg}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding AdditionalCount}" Value="0">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+
+                                <TextBlock Text="{Binding AdditionalCountText}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="White"/>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Grid.Row="2"
+                       Text="{Binding Ticket.NotificationName}"
+                       Foreground="{DynamicResource TextPrimary}"
+                       TextWrapping="Wrap"/>
+
+                    <TextBlock Grid.Row="4"
+                       Text="{Binding Ticket.Problem}"
+                       FontSize="12"
+                       Foreground="{DynamicResource TextSecondary}"
+                       TextWrapping="Wrap"
+                       MaxHeight="36"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
     </UserControl.Resources>
 
     <Grid>
@@ -468,8 +551,11 @@
                              ItemTemplate="{StaticResource TicketCardTemplate}"
                              ItemContainerStyle="{StaticResource CleanListBoxItemStyle}"
                              Style="{StaticResource CleanListBoxStyle}"
-                             SelectionMode="Multiple"
-                             SelectionChanged="TicketPoolList_SelectionChanged"/>
+                             SelectionMode="Extended"
+                             SelectionChanged="TicketPoolList_SelectionChanged"
+                             PreviewMouseLeftButtonDown="TicketPoolList_PreviewMouseLeftButtonDown"
+                             PreviewMouseMove="TicketPoolList_PreviewMouseMove"
+                             GiveFeedback="DragSource_GiveFeedback"/>
                 </Grid>
             </Border>
 
@@ -566,12 +652,20 @@
 
                             <!-- Selected crew/tech tickets -->
                             <Grid Grid.Row="2">
-                                <ListBox ItemsSource="{Binding SelectedTarget.AssignedTickets}"
+                                <ListBox x:Name="AssignedTicketsList"
+                                         ItemsSource="{Binding SelectedTarget.AssignedTickets}"
                                          ItemTemplate="{StaticResource AssignedTicketTemplate}"
                                          ItemContainerStyle="{StaticResource CleanListBoxItemStyle}"
                                          Style="{StaticResource CleanListBoxStyle}"
                                          AlternationCount="999"
-                                         SelectionMode="Single"/>
+                                         SelectionMode="Single"
+                                         AllowDrop="True"
+                                         PreviewMouseLeftButtonDown="AssignedTicketsList_PreviewMouseLeftButtonDown"
+                                         PreviewMouseMove="AssignedTicketsList_PreviewMouseMove"
+                                         GiveFeedback="DragSource_GiveFeedback"
+                                         DragOver="AssignedTicketsList_DragOver"
+                                         DragLeave="AssignedTicketsList_DragLeave"
+                                         Drop="AssignedTicketsList_Drop"/>
 
                                 <TextBlock Text="Select a crew or technician to view their work list."
                                            HorizontalAlignment="Center"

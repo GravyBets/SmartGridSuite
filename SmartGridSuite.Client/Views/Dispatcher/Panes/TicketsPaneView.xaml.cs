@@ -27,21 +27,28 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             public string Name { get; }
 
+            public bool IsClosed { get; }
+
             private bool _isSelected;
             public bool IsSelected
             {
                 get => _isSelected;
                 set
                 {
-                    if (_isSelected == value) return;
+                    if (_isSelected == value)
+                        return;
+
                     _isSelected = value;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+                    PropertyChanged?.Invoke(
+                        this,
+                        new PropertyChangedEventArgs(nameof(IsSelected)));
                 }
             }
 
-            public StatusFilterOption(string name, bool isSelected)
+            public StatusFilterOption(string name, bool isClosed, bool isSelected)
             {
                 Name = name;
+                IsClosed = isClosed;
                 _isSelected = isSelected;
             }
         }
@@ -52,8 +59,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private readonly HashSet<string> _knownTechs = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _createdByDisplayByUserId = new(StringComparer.OrdinalIgnoreCase);
         private string _selectedTicketOriginalDispatchNotes = "";
-        private bool _isSummaryExpanded;
-        private bool _isSummaryLoading;
 
         private readonly SiteNotesApi _siteNotesApi = new(new ApiClient("https://localhost:7140/"));
 
@@ -138,6 +143,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private bool _suppressFilterEvents;
         private bool _hasLoadedOnce;
         private bool _isInitialLoadRunning;
+        private bool _filtersInitialized;
 
         private int _visibleTicketCount;
         public int VisibleTicketCount
@@ -150,6 +156,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 OnPropertyChanged(nameof(VisibleTicketCount));
             }
         }
+
+        public ObservableCollection<TicketSummaryStatusDto> SummaryStatuses { get; } = new();
 
         private int _totalLoadedTicketCount;
         public int TotalLoadedTicketCount
@@ -239,7 +247,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         {
             get
             {
-                var selected = StatusOptions.Where(x => x.IsSelected).Select(x => x.Name).ToList();
+                var selected = StatusOptions
+                    .Where(x => x.IsSelected)
+                    .ToList();
 
                 if (selected.Count == 0)
                     return "No statuses";
@@ -247,19 +257,26 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 if (selected.Count == StatusOptions.Count)
                     return "All statuses";
 
-                bool allOpen =
-                    selected.Count == StatusOptions.Count - 1 &&
-                    !selected.Contains("Closed", StringComparer.OrdinalIgnoreCase);
+                var nonClosedStatuses = StatusOptions
+                    .Where(x => !x.IsClosed)
+                    .ToList();
 
-                if (allOpen)
-                    return "All open";
+                var allNonClosedSelected =
+                    nonClosedStatuses.Count > 0 &&
+                    nonClosedStatuses.All(x => x.IsSelected) &&
+                    StatusOptions.Where(x => x.IsClosed).All(x => !x.IsSelected);
+
+                if (allNonClosedSelected)
+                    return "All Active";
 
                 if (selected.Count <= 2)
-                    return string.Join(", ", selected);
+                    return string.Join(", ", selected.Select(x => x.Name));
 
                 return $"{selected.Count} selected";
             }
         }
+
+
 
         public TicketsPaneView()
         {
@@ -281,24 +298,67 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             TicketsGrid.ItemsSource = TicketsView;
 
-            DateRangeFilter.ItemsSource = new[]
+            _suppressFilterEvents = true;
+            try
             {
-                "All",
-                "Last 24 Hours",
-                "Last 7 Days",
-                "Last 30 Days",
-                "Last 3 Months",
-                "Custom"
-            };
-            DateRangeFilter.SelectedIndex = 0;
+                QuickFilterComboBox.ItemsSource = new[]
+                {
+                    "All Tickets",
+                    "Missing Problems",
+                    "Unassigned",
+                    "Ready to Assign",
+                    "Assigned"
+                };
+                QuickFilterComboBox.SelectedIndex = 0;
 
-            TechFilter.ItemsSource = new[] { "All", "(Unassigned)" };
-            TechFilter.SelectedIndex = 0;
+                DateFieldFilter.ItemsSource = new[]
+                {
+                    "Last Activity",
+                    "Created Date"
+                };
+                DateFieldFilter.SelectedIndex = 0;
 
-            InitializeStatusOptions();
-            UpdateCustomDateVisibility();
+                DateRangeFilter.ItemsSource = new[]
+                {
+                    "All",
+                    "Last 24 Hours",
+                    "Last 7 Days",
+                    "Last 30 Days",
+                    "Last 3 Months",
+                    "Custom"
+                };
+                DateRangeFilter.SelectedIndex = 0;
+
+                TechFilter.ItemsSource = new[] { "All", "(Unassigned)" };
+                TechFilter.SelectedIndex = 0;
+
+                UpdateCustomDateVisibility();
+            }
+            finally
+            {
+                _suppressFilterEvents = false;
+            }
 
             Loaded += TicketsPaneView_Loaded;
+        }
+
+        private async void QuickFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressFilterEvents || !_filtersInitialized)
+                return;
+
+            var selected = QuickFilterComboBox.SelectedItem as string ?? "All Tickets";
+
+            _activeQuickFilter = selected switch
+            {
+                "Missing Problems" => TicketQuickFilter.MissingProblems,
+                "Unassigned" => TicketQuickFilter.Unassigned,
+                "Ready to Assign" => TicketQuickFilter.ReadyToAssign,
+                "Assigned" => TicketQuickFilter.Assigned,
+                _ => TicketQuickFilter.None
+            };
+
+            await LoadTicketsFromApiAsync();
         }
 
         private async void AddSelectedTicketSiteNote_Click(object sender, RoutedEventArgs e)
@@ -422,22 +482,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private async void SearchDebounceTimer_Tick(object? sender, EventArgs e)
         {
             _searchDebounceTimer.Stop();
+
+            if (!_filtersInitialized)
+                return;
+
             await LoadTicketsFromApiAsync();
-        }
-
-        private void InitializeStatusOptions()
-        {
-            StatusOptions.Clear();
-
-            // Closed is OFF by default.
-            StatusOptions.Add(new StatusFilterOption("Needs Review", true));
-            StatusOptions.Add(new StatusFilterOption("Open", true));
-            StatusOptions.Add(new StatusFilterOption("Assigned", true));
-            StatusOptions.Add(new StatusFilterOption("In Progress", true));
-            StatusOptions.Add(new StatusFilterOption("Waiting Dispatch", true));
-            StatusOptions.Add(new StatusFilterOption("Closed", false));
-
-            OnPropertyChanged(nameof(SelectedStatusesSummary));
         }
 
         private async void TicketsPaneView_Loaded(object sender, RoutedEventArgs e)
@@ -451,7 +500,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 await LoadKnownTechsFromApiAsync();
                 RebuildTechFilterFromKnownTechs();
+
+                await LoadStatusOptionsFromApiAsync(
+                    preserveSelections: false);
+
+                _filtersInitialized = true;
+
+                await LoadSummaryFromApiAsync();
                 await LoadTicketsFromApiAsync();
+
                 _hasLoadedOnce = true;
             }
             finally
@@ -459,7 +516,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 _isInitialLoadRunning = false;
             }
         }
-        
+
         private void RebuildTechFilterFromKnownTechs()
         {
             var previous = TechFilter.SelectedItem as string ?? "All";
@@ -527,6 +584,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async Task LoadTicketsFromApiAsync(CancellationToken ct = default)
         {
+            if (!_filtersInitialized)
+                return;
+
             _ticketQueryCts?.Cancel();
             _ticketQueryCts?.Dispose();
 
@@ -568,6 +628,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         {
             var (from, to) = GetLastActivityDateRangeFromUi();
 
+            var selectedDateField = DateFieldFilter?.SelectedItem as string ?? "Last Activity";
+
+            var apiDateField = selectedDateField.Equals("Created Date", StringComparison.OrdinalIgnoreCase)
+                ? "Created"
+                : "LastActivity";
+
             return new TicketQueryRequest
             {
                 Search = SearchBox?.Text?.Trim(),
@@ -575,9 +641,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     .OrderBy(x => x)
                     .ToList(),
 
+                ApplyStatusFilter = true,
+
                 AssignedTech = TechFilter?.SelectedItem as string ?? "All",
 
-                DateField = "LastActivity",
+                DateField = apiDateField,
                 From = from,
                 To = to,
 
@@ -602,22 +670,55 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async Task LoadSummaryFromApiAsync(CancellationToken ct = default)
         {
-            var dtos = await _ticketsApi.GetTicketsAsync(
-                status: null,
-                tech: null,
-                from: null,
-                to: null,
-                ct);
+            var summary = await _ticketsApi.GetSummaryAsync(ct);
 
-            TotalLoadedTicketCount = dtos.Count;
-            NeedsReviewCount = dtos.Count(x => string.Equals(x.Status, "Needs Review", StringComparison.OrdinalIgnoreCase));
-            OpenCount = dtos.Count(x => string.Equals(x.Status, "Open", StringComparison.OrdinalIgnoreCase));
-            AssignedCount = dtos.Count(x => string.Equals(x.Status, "Assigned", StringComparison.OrdinalIgnoreCase));
-            InProgressCount = dtos.Count(x => string.Equals(x.Status, "In Progress", StringComparison.OrdinalIgnoreCase));
-            WaitingDispatchCount = dtos.Count(x => string.Equals(x.Status, "Waiting Dispatch", StringComparison.OrdinalIgnoreCase));
-            ClosedCount = dtos.Count(x => string.Equals(x.Status, "Closed", StringComparison.OrdinalIgnoreCase));
+            TotalLoadedTicketCount = summary.TotalCount;
 
-            UpdateVisibleTicketCount();
+            SummaryStatuses.Clear();
+
+            foreach (var status in summary.Statuses.OrderBy(x => x.SortOrder).ThenBy(x => x.Status))
+                SummaryStatuses.Add(status);
+        }
+
+        private async Task LoadStatusOptionsFromApiAsync(bool preserveSelections, CancellationToken ct = default)
+        {
+            var previousSelections = StatusOptions
+                .ToDictionary(
+                    x => x.Name,
+                    x => x.IsSelected,
+                    StringComparer.OrdinalIgnoreCase);
+
+            var statuses = await _ticketsApi.GetFilterStatusesAsync(ct);
+
+            var previousSuppress = _suppressFilterEvents;
+            _suppressFilterEvents = true;
+
+            try
+            {
+                StatusOptions.Clear();
+
+                foreach (var status in statuses
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.Name))
+                {
+                    var isSelected =
+                        preserveSelections &&
+                        previousSelections.TryGetValue(status.Name, out var previousSelection)
+                            ? previousSelection
+                            : !status.IsClosed;
+
+                    StatusOptions.Add(new StatusFilterOption(
+                        status.Name,
+                        status.IsClosed,
+                        isSelected));
+                }
+            }
+            finally
+            {
+                _suppressFilterEvents = previousSuppress;
+            }
+
+            OnPropertyChanged(nameof(SelectedStatusesSummary));
         }
 
         private static DispatchTicket Map(TicketListItemDto dto)
@@ -766,124 +867,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             };
         }
 
-        private bool FilterTicket(object obj)
-        {
-            if (obj is not DispatchTicket t)
-                return false;
-
-            // Statuses
-            var selectedStatuses = GetSelectedStatuses();
-            if (selectedStatuses.Count == 0)
-                return false;
-
-            if (!selectedStatuses.Contains(t.Status ?? ""))
-                return false;
-
-            if (!PassesQuickFilter(t))
-                return false;
-
-            // Tech
-            var tech = TechFilter?.SelectedItem as string ?? "All";
-            if (tech == "(Unassigned)" && t.AssignedTech != "(Unassigned)")
-                return false;
-
-            if (tech != "All" &&
-                tech != "(Unassigned)" &&
-                !string.Equals(t.AssignedTech, tech, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            // Last activity date range
-            var (from, to) = GetLastActivityDateRangeFromUi();
-            var activityDate = t.LastActivityAt;
-
-            if (DateRangeFilter?.SelectedItem as string == "Custom")
-            {
-                if (from.HasValue && activityDate < from.Value.Date)
-                    return false;
-
-                if (to.HasValue && activityDate >= to.Value.Date.AddDays(1))
-                    return false;
-            }
-            else
-            {
-                if (from.HasValue && activityDate < from.Value)
-                    return false;
-            }
-
-            // Search
-            var q = (SearchBox?.Text ?? "").Trim();
-            if (q.Length == 0)
-                return true;
-
-            bool Match(string? s) =>
-                !string.IsNullOrWhiteSpace(s) &&
-                s.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
-
-            return Match(t.Site) ||
-                   Match(t.NotificationName) ||
-                   Match(t.Notification) ||
-                   Match(t.CurrentWorkOrder) ||
-                   Match(t.WorkOrderClassLabel) ||
-                   Match(t.GroupCode) ||
-                   Match(t.Status) ||
-                   Match(t.AssignedTech) ||
-                   Match(t.Problem) ||
-                   Match(t.Summary) ||
-                   Match(t.Notes) ||
-                   Match(t.DispatchNotes) ||
-                   Match(t.CreatedBy);
-        }
-
-        private bool PassesQuickFilter(DispatchTicket ticket)
-        {
-            return _activeQuickFilter switch
-            {
-                TicketQuickFilter.MissingProblems =>
-                    string.IsNullOrWhiteSpace(ticket.Problem),
-
-                TicketQuickFilter.Unassigned =>
-                    IsUnassigned(ticket),
-
-                TicketQuickFilter.ReadyToAssign =>
-                    IsReadyToAssign(ticket),
-
-                TicketQuickFilter.Assigned =>
-                    string.Equals(ticket.Status, "Assigned", StringComparison.OrdinalIgnoreCase),
-
-                _ => true
-            };
-        }
-
-        private static bool IsUnassigned(DispatchTicket ticket)
-        {
-            return string.IsNullOrWhiteSpace(ticket.AssignedTech)
-                || string.Equals(ticket.AssignedTech, "(Unassigned)", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool IsReadyToAssign(DispatchTicket ticket)
-        {
-            return string.Equals(ticket.Status, "Open", StringComparison.OrdinalIgnoreCase)
-                && IsUnassigned(ticket)
-                && !string.IsNullOrWhiteSpace(ticket.Site);
-        }
-
-        private void RefreshView()
-        {
-            TicketsView?.Refresh();
-            UpdateVisibleTicketCount();
-        }
-
-        private void UpdateVisibleTicketCount()
-        {
-            VisibleTicketCount = TicketsView.Cast<DispatchTicket>().Count();
-            UpdateTicketListUiState();
-        }
-
         private void UpdateTicketListUiState()
         {
             var selectedCount = TicketsGrid?.SelectedItems
                 .OfType<DispatchTicket>()
                 .Count() ?? 0;
+
+            if (HeaderSelectAllCheckBox != null)
+            {
+                var allShowingSelected =
+                    VisibleTicketCount > 0 &&
+                    selectedCount >= VisibleTicketCount;
+
+                HeaderSelectAllCheckBox.IsChecked = allShowingSelected;
+            }
 
             if (BulkSetProblemButton != null)
                 BulkSetProblemButton.IsEnabled = selectedCount > 0;
@@ -891,11 +888,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (AssignSelectedButton != null)
                 AssignSelectedButton.IsEnabled = selectedCount > 0;
 
-            if (ClearSelectionButton != null)
-                ClearSelectionButton.IsEnabled = selectedCount > 0;
+            if (EditSelectedTicketButton != null)
+                EditSelectedTicketButton.IsEnabled = selectedCount > 0;
 
-            if (SelectVisibleTicketsButton != null)
-                SelectVisibleTicketsButton.IsEnabled = VisibleTicketCount > 0;
+            if (OpenDetailsButton != null)
+                OpenDetailsButton.IsEnabled = selectedCount > 0;
 
             if (SelectedCountTextBlock != null)
             {
@@ -904,43 +901,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     : $"{selectedCount} selected";
             }
 
-            if (MissingProblemsButton != null)
-            {
-                MissingProblemsButton.Content = IsQuickFilterActive(TicketQuickFilter.MissingProblems)
-                    ? "Showing Missing"
-                    : "Missing Problems";
-            }
-
-            if (UnassignedTicketsButton != null)
-            {
-                UnassignedTicketsButton.Content = IsQuickFilterActive(TicketQuickFilter.Unassigned)
-                    ? "Showing Unassigned"
-                    : "Unassigned";
-            }
-
-            if (ReadyToAssignButton != null)
-            {
-                ReadyToAssignButton.Content = IsQuickFilterActive(TicketQuickFilter.ReadyToAssign)
-                    ? "Showing Ready"
-                    : "Ready to Assign";
-            }
-
-            if (AssignedTicketsButton != null)
-            {
-                AssignedTicketsButton.Content = IsQuickFilterActive(TicketQuickFilter.Assigned)
-                    ? "Showing Assigned"
-                    : "Assigned";
-            }
-
             var hasQuickFilter = _activeQuickFilter != TicketQuickFilter.None;
             var quickFilterName = GetActiveQuickFilterDisplayName();
-
-            if (ClearMissingProblemsButton != null)
-            {
-                ClearMissingProblemsButton.Visibility = hasQuickFilter
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
 
             if (MissingProblemsBadge != null)
             {
@@ -955,6 +917,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     ? $"{VisibleTicketCount} {quickFilterName.ToLower()} ticket(s)"
                     : "";
             }
+
+            if (QuickFilterComboBox != null)
+            {
+                var expectedText = _activeQuickFilter switch
+                {
+                    TicketQuickFilter.MissingProblems => "Missing Problems",
+                    TicketQuickFilter.Unassigned => "Unassigned",
+                    TicketQuickFilter.ReadyToAssign => "Ready to Assign",
+                    TicketQuickFilter.Assigned => "Assigned",
+                    _ => "All Tickets"
+                };
+
+                if (!Equals(QuickFilterComboBox.SelectedItem, expectedText))
+                {
+                    var previousSuppress = _suppressFilterEvents;
+                    _suppressFilterEvents = true;
+
+                    try
+                    {
+                        QuickFilterComboBox.SelectedItem = expectedText;
+                    }
+                    finally
+                    {
+                        _suppressFilterEvents = previousSuppress;
+                    }
+                }
+            }
         }
 
         private string GetActiveQuickFilterDisplayName()
@@ -967,11 +956,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 TicketQuickFilter.Assigned => "Assigned",
                 _ => ""
             };
-        }
-
-        private bool IsQuickFilterActive(TicketQuickFilter filter)
-        {
-            return _activeQuickFilter == filter;
         }
 
         private async void SetSelectedStatuses(params string[] statusNames)
@@ -996,7 +980,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             bool isCustom = sel == "Custom";
 
             var spacerWidth = isCustom ? new GridLength(12) : new GridLength(0);
-            var dateWidth = isCustom ? new GridLength(170) : new GridLength(0);
+            var dateWidth = isCustom ? new GridLength(190) : new GridLength(0);
 
             CustomFromSpacerCol.Width = spacerWidth;
             CustomFromCol.Width = dateWidth;
@@ -1008,8 +992,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             if (isCustom && FromDatePicker.SelectedDate == null && ToDatePicker.SelectedDate == null)
             {
-                ToDatePicker.SelectedDate = DateTime.Today;
-                FromDatePicker.SelectedDate = DateTime.Today.AddDays(-30);
+                var previousSuppress = _suppressFilterEvents;
+                _suppressFilterEvents = true;
+
+                try
+                {
+                    ToDatePicker.SelectedDate = DateTime.Today;
+                    FromDatePicker.SelectedDate = DateTime.Today.AddDays(-30);
+                }
+                finally
+                {
+                    _suppressFilterEvents = previousSuppress;
+                }
             }
         }
 
@@ -1032,6 +1026,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)
         {
+            await LoadStatusOptionsFromApiAsync(
+                preserveSelections: true);
+
+            await LoadSummaryFromApiAsync();
             await LoadTicketsFromApiAsync();
         }
 
@@ -1043,16 +1041,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void Filters_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_suppressFilterEvents)
+            if (_suppressFilterEvents || !_filtersInitialized)
                 return;
 
             UpdateCustomDateVisibility();
-            await LoadTicketsFromApiAsync();
+
+            await Dispatcher.InvokeAsync(
+                async () => await LoadTicketsFromApiAsync(),
+                DispatcherPriority.Background);
         }
 
         private async void InlineCustomDate_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_suppressFilterEvents)
+            if (_suppressFilterEvents || !_filtersInitialized)
                 return;
 
             if ((DateRangeFilter?.SelectedItem as string) != "Custom")
@@ -1068,6 +1069,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void StatusOption_Changed(object sender, RoutedEventArgs e)
         {
+            if (_suppressFilterEvents || !_filtersInitialized)
+                return;
+
             OnPropertyChanged(nameof(SelectedStatusesSummary));
             await LoadTicketsFromApiAsync();
         }
@@ -1075,22 +1079,26 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private void SelectAllOpenStatuses_Click(object sender, RoutedEventArgs e)
         {
             SetSelectedStatuses(
-                "Needs Review",
-                "Open",
-                "Assigned",
-                "In Progress",
-                "Waiting Dispatch");
+                StatusOptions
+                    .Where(x => !x.IsClosed)
+                    .Select(x => x.Name)
+                    .ToArray());
         }
 
         private void SelectAllStatuses_Click(object sender, RoutedEventArgs e)
         {
             SetSelectedStatuses(
-                "Needs Review",
-                "Open",
-                "Assigned",
-                "In Progress",
-                "Waiting Dispatch",
-                "Closed");
+                StatusOptions
+                    .Select(x => x.Name)
+                    .ToArray());
+        }
+
+        private void SetDefaultStatusSelectionWithoutRefresh()
+        {
+            foreach (var option in StatusOptions)
+                option.IsSelected = !option.IsClosed;
+
+            OnPropertyChanged(nameof(SelectedStatusesSummary));
         }
 
         private async void ClearFilters_Click(object sender, RoutedEventArgs e)
@@ -1101,18 +1109,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 _activeQuickFilter = TicketQuickFilter.None;
 
                 SearchBox.Text = string.Empty;
+                DateFieldFilter.SelectedIndex = 0;
                 DateRangeFilter.SelectedIndex = 0;
                 TechFilter.SelectedItem = "All";
+                QuickFilterComboBox.SelectedItem = "All Tickets";
 
                 FromDatePicker.SelectedDate = null;
                 ToDatePicker.SelectedDate = null;
 
-                SetSelectedStatusesWithoutRefresh(
-                    "Needs Review",
-                    "Open",
-                    "Assigned",
-                    "In Progress",
-                    "Waiting Dispatch");
+                SetDefaultStatusSelectionWithoutRefresh();
             }
             finally
             {
@@ -1123,6 +1128,63 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             OnPropertyChanged(nameof(SelectedStatusesSummary));
 
             await LoadTicketsFromApiAsync();
+        }
+
+        private async void CopyGridValue_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button)
+                return;
+
+            var value = button.Tag?.ToString()?.Trim();
+
+            if (string.IsNullOrWhiteSpace(value))
+                return;
+
+            Clipboard.SetText(value);
+
+            var originalContent = button.Content;
+
+            button.Content = new TextBlock
+            {
+                Text = "✓",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = TryFindResource("TextSecondary") as Brush ?? Brushes.Gray,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            button.IsEnabled = false;
+
+            await Task.Delay(3000);
+
+            button.Content = originalContent;
+            button.IsEnabled = true;
+
+            e.Handled = true;
+        }
+
+        private void HeaderSelectAllCheckBox_Click(object sender, RoutedEventArgs e)
+        {
+            if (TicketsGrid == null)
+                return;
+
+            if (HeaderSelectAllCheckBox.IsChecked == true)
+            {
+                TicketsGrid.SelectedItems.Clear();
+
+                foreach (var ticket in TicketsView.Cast<DispatchTicket>())
+                    TicketsGrid.SelectedItems.Add(ticket);
+            }
+            else
+            {
+                TicketsGrid.SelectedItems.Clear();
+                SelectedTicket = null;
+                _detailsOpen = false;
+                UpdateDetailsVisibility();
+            }
+
+            UpdateTicketListUiState();
         }
 
         private void TicketsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1149,6 +1211,36 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             _detailsOpen = true;
             UpdateDetailsVisibility();
+        }
+
+        private void OpenDetails_Click(object sender, RoutedEventArgs e)
+        {
+            var ticketToOpen = GetTopVisibleSelectedTicket();
+
+            if (ticketToOpen == null)
+                return;
+
+            TicketsGrid.SelectedItem = ticketToOpen;
+            SelectedTicket = ticketToOpen;
+
+            _detailsOpen = true;
+            UpdateDetailsVisibility();
+
+            TicketsGrid.ScrollIntoView(ticketToOpen);
+        }
+
+        private DispatchTicket? GetTopVisibleSelectedTicket()
+        {
+            if (TicketsGrid?.SelectedItems == null || TicketsGrid.SelectedItems.Count == 0)
+                return null;
+
+            var selected = TicketsGrid.SelectedItems
+                .OfType<DispatchTicket>()
+                .ToHashSet();
+
+            return TicketsView
+                .Cast<DispatchTicket>()
+                .FirstOrDefault(ticket => selected.Contains(ticket));
         }
 
         private async void CloseDetails_Click(object sender, RoutedEventArgs e)
@@ -1226,74 +1318,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 await LoadTicketsFromApiAsync();
         }
 
-        private void MissingProblems_Click(object sender, RoutedEventArgs e)
-        {
-            ApplyQuickFilter(
-                TicketQuickFilter.MissingProblems,
-                "Needs Review",
-                "Open",
-                "Assigned",
-                "In Progress",
-                "Waiting Dispatch");
-        }
-
-        private void UnassignedTickets_Click(object sender, RoutedEventArgs e)
-        {
-            ApplyQuickFilter(
-                TicketQuickFilter.Unassigned,
-                "Needs Review",
-                "Open",
-                "Assigned",
-                "In Progress",
-                "Waiting Dispatch");
-        }
-
-        private void ReadyToAssign_Click(object sender, RoutedEventArgs e)
-        {
-            ApplyQuickFilter(
-                TicketQuickFilter.ReadyToAssign,
-                "Open");
-        }
-
-        private void AssignedTickets_Click(object sender, RoutedEventArgs e)
-        {
-            ApplyQuickFilter(
-                TicketQuickFilter.Assigned,
-                "Assigned");
-        }
-
-        private async void ClearQuickFilter_Click(object sender, RoutedEventArgs e)
-        {
-            _activeQuickFilter = TicketQuickFilter.None;
-
-            _suppressFilterEvents = true;
-            try
-            {
-                SearchBox.Text = string.Empty;
-                DateRangeFilter.SelectedIndex = 0;
-                TechFilter.SelectedItem = "All";
-
-                FromDatePicker.SelectedDate = null;
-                ToDatePicker.SelectedDate = null;
-
-                SetSelectedStatusesWithoutRefresh(
-                    "Needs Review",
-                    "Open",
-                    "Assigned",
-                    "In Progress",
-                    "Waiting Dispatch");
-            }
-            finally
-            {
-                _suppressFilterEvents = false;
-            }
-
-            UpdateCustomDateVisibility();
-            OnPropertyChanged(nameof(SelectedStatusesSummary));
-
-            await LoadTicketsFromApiAsync();
-        }
-
         private void SelectVisibleTickets_Click(object sender, RoutedEventArgs e)
         {
             TicketsGrid.SelectedItems.Clear();
@@ -1310,33 +1334,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             SelectedTicket = null;
             UpdateDetailsVisibility();
             UpdateTicketListUiState();
-        }
-
-        private async void ApplyQuickFilter(TicketQuickFilter quickFilter, params string[] statusesToShow)
-        {
-            _activeQuickFilter = quickFilter;
-
-            _suppressFilterEvents = true;
-            try
-            {
-                SearchBox.Text = string.Empty;
-                DateRangeFilter.SelectedIndex = 0;
-                TechFilter.SelectedItem = "All";
-
-                FromDatePicker.SelectedDate = null;
-                ToDatePicker.SelectedDate = null;
-
-                SetSelectedStatusesWithoutRefresh(statusesToShow);
-            }
-            finally
-            {
-                _suppressFilterEvents = false;
-            }
-
-            UpdateCustomDateVisibility();
-            OnPropertyChanged(nameof(SelectedStatusesSummary));
-
-            await LoadTicketsFromApiAsync();
         }
 
         private List<DispatchTicket> GetSelectedTickets()
@@ -1422,18 +1419,39 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
+        private async void EditSelectedTicket_Click(object sender, RoutedEventArgs e)
+        {
+            var ticketToEdit = GetTopVisibleSelectedTicket();
+
+            if (ticketToEdit == null)
+                return;
+
+            await OpenTicketEditorAsync(ticketToEdit);
+        }
+
         private async void EditTicket_Click(object sender, RoutedEventArgs e)
         {
             if (SelectedTicket == null)
                 return;
 
-            var editingId = SelectedTicket.Id;
+            await OpenTicketEditorAsync(SelectedTicket);
+        }
+
+        private async Task OpenTicketEditorAsync(DispatchTicket ticketToEdit)
+        {
+            var editingId = ticketToEdit.Id;
+
+            TicketsGrid.SelectedItem = ticketToEdit;
+            SelectedTicket = ticketToEdit;
+            TicketsGrid.ScrollIntoView(ticketToEdit);
 
             await LoadKnownTechsFromApiAsync();
 
-            var techSuggestions = _knownTechs.OrderBy(x => x).ToList();
+            var techSuggestions = _knownTechs
+                .OrderBy(x => x)
+                .ToList();
 
-            var win = new NewTicketWindow(_ticketsApi, techSuggestions, SelectedTicket)
+            var win = new NewTicketWindow(_ticketsApi, techSuggestions, ticketToEdit)
             {
                 Owner = Window.GetWindow(this)
             };
@@ -1441,13 +1459,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (win.ShowDialog() != true)
                 return;
 
+            await LoadSummaryFromApiAsync();
             await LoadTicketsFromApiAsync();
 
             var targetId = win.CreatedTicketId ?? editingId;
+
             var found = _tickets.FirstOrDefault(t => t.Id == targetId);
+
             if (found != null)
             {
                 TicketsGrid.SelectedItem = found;
+                SelectedTicket = found;
                 TicketsGrid.ScrollIntoView(found);
             }
         }
@@ -1495,44 +1517,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             DetailsNotesTextChangedRefresh();
         }
 
-        private async void SummaryToggleButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isSummaryLoading)
-                return;
-
-            if (_isSummaryExpanded)
-            {
-                SummaryPanel.Visibility = Visibility.Collapsed;
-                SummaryToggleButton.Content = "Summary";
-                _isSummaryExpanded = false;
-                return;
-            }
-
-            _isSummaryLoading = true;
-            SummaryToggleButton.IsEnabled = false;
-
-            try
-            {
-                await LoadSummaryFromApiAsync();
-                SummaryPanel.Visibility = Visibility.Visible;
-                SummaryToggleButton.Content = "Collapse Summary";
-                _isSummaryExpanded = true;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"Failed to load ticket summary.\n\n{ex.Message}",
-                    "Summary",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-            finally
-            {
-                _isSummaryLoading = false;
-                SummaryToggleButton.IsEnabled = true;
-            }
-        }
-
         private async void BulkSetProblem_Click(object sender, RoutedEventArgs e)
         {
             var selected = GetSelectedTickets();
@@ -1562,8 +1546,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             BulkSetProblemButton.IsEnabled = false;
             AssignSelectedButton.IsEnabled = false;
-            SelectVisibleTicketsButton.IsEnabled = false;
-            ClearSelectionButton.IsEnabled = false;
 
             try
             {
@@ -1654,7 +1636,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             await LoadKnownTechsFromApiAsync();
 
-            var win = new AssignTicketsWindow(selected.Count, _knownTechs)
+            var techSuggestions = new List<string> { "(Unassigned)" };
+            techSuggestions.AddRange(
+                _knownTechs
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Where(x => !x.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(x => x));
+
+            var win = new AssignTicketsWindow(selected.Count, techSuggestions)
             {
                 Owner = Window.GetWindow(this)
             };
@@ -1662,15 +1651,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (win.ShowDialog() != true)
                 return;
 
-            var assignedTech = win.AssignedTech;
+            var assignedTech = string.IsNullOrWhiteSpace(win.AssignedTech)
+                ? "(Unassigned)"
+                : win.AssignedTech.Trim();
+
+            var isUnassigning = assignedTech.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase);
+
+            var newStatus = isUnassigning
+                ? "Open"
+                : "Assigned";
+
             var updated = 0;
             var failed = 0;
             var selectedIds = selected.Select(t => t.Id).ToHashSet();
 
             BulkSetProblemButton.IsEnabled = false;
             AssignSelectedButton.IsEnabled = false;
-            SelectVisibleTicketsButton.IsEnabled = false;
-            ClearSelectionButton.IsEnabled = false;
 
             try
             {
@@ -1686,14 +1682,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                             WorkOrderClass: ticket.WorkOrderType ?? "",
                             GroupCode: ticket.GroupCode ?? "",
                             PriorityDays: ticket.PriorityDays,
-                            Status: "Assigned",
+
+                            // Important:
+                            // Assigning to a real tech = Assigned
+                            // Assigning to (Unassigned) = Open
+                            Status: newStatus,
+
                             TaskCategoryId: ticket.TaskCategoryId,
                             ActionRequiredOverride: string.IsNullOrWhiteSpace(ticket.ActionRequiredOverride)
                                 ? null
                                 : ticket.ActionRequiredOverride,
                             AssignedTech: assignedTech,
                             Problem: ticket.Problem ?? "",
-                            Notes: ticket.Notes ?? ""
+                            Notes: ticket.Notes ?? "",
+                            DispatchNotes: ticket.DispatchNotes ?? ""
                         );
 
                         await _ticketsApi.UpdateTicketAsync(ticket.Id, req);
@@ -1711,18 +1713,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     TicketsGrid.SelectedItems.Add(ticket);
 
                 var first = _tickets.FirstOrDefault(t => selectedIds.Contains(t.Id));
+
                 if (first != null)
                 {
                     TicketsGrid.SelectedItem = first;
                     TicketsGrid.ScrollIntoView(first);
                 }
 
-                var message = failed == 0
-                    ? $"Assigned {updated} ticket(s) to {assignedTech}."
+                var successMessage = isUnassigning
+                    ? $"Unassigned {updated} ticket(s)."
+                    : $"Assigned {updated} ticket(s) to {assignedTech}.";
+
+                var failMessage = isUnassigning
+                    ? $"Unassigned {updated} ticket(s). Failed to update {failed}."
                     : $"Assigned {updated} ticket(s) to {assignedTech}. Failed to update {failed}.";
 
                 MessageBox.Show(
-                    message,
+                    failed == 0 ? successMessage : failMessage,
                     "Assign Tickets",
                     MessageBoxButton.OK,
                     failed == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
@@ -1731,6 +1738,34 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 UpdateTicketListUiState();
             }
+        }
+
+        private void TicketRowCheckBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not CheckBox checkBox)
+                return;
+
+            var row = FindVisualParent<DataGridRow>(checkBox);
+
+            if (row?.Item is not DispatchTicket ticket)
+                return;
+
+            if (row.IsSelected)
+            {
+                TicketsGrid.SelectedItems.Remove(ticket);
+
+                if (ReferenceEquals(SelectedTicket, ticket))
+                    SelectedTicket = TicketsGrid.SelectedItems.OfType<DispatchTicket>().FirstOrDefault();
+            }
+            else
+            {
+                TicketsGrid.SelectedItems.Add(ticket);
+                SelectedTicket = ticket;
+            }
+
+            UpdateTicketListUiState();
+
+            e.Handled = true;
         }
 
         private static bool IsInsideButton(DependencyObject? source)

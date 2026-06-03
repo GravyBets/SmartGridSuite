@@ -36,6 +36,12 @@ namespace SmartGridSuite.Client.Services
             return await _api.GetAsync<List<TicketListItemDto>>(path, ct) ?? new();
         }
 
+        public async Task<TicketSummaryDto> GetSummaryAsync(CancellationToken ct = default)
+        {
+            return await _api.GetAsync<TicketSummaryDto>("api/tickets/summary", ct)
+                   ?? new TicketSummaryDto();
+        }
+
         public async Task<TicketQueryResponse> QueryTicketsAsync(TicketQueryRequest req, CancellationToken ct = default)
         {
             return await _api.PostAsync<TicketQueryRequest, TicketQueryResponse>(
@@ -56,6 +62,14 @@ namespace SmartGridSuite.Client.Services
                        $"api/tickets/by-site/{Uri.EscapeDataString(siteId)}",
                        ct)
                    ?? new();
+        }
+
+        public async Task<List<TicketFilterStatusDto>> GetFilterStatusesAsync(CancellationToken ct = default)
+        {
+            return await _api.GetAsync<List<TicketFilterStatusDto>>(
+                       "api/tickets/filter-statuses",
+                       ct)
+                   ?? new List<TicketFilterStatusDto>();
         }
 
         public async Task<long> CreateTicketAsync(CreateTicketRequest req, CancellationToken ct = default)
@@ -93,10 +107,29 @@ namespace SmartGridSuite.Client.Services
             return await _api.GetAsync<List<DispatchTaskListItemDto>>("api/tickets/dispatch-tasks", ct) ?? new();
         }
 
-        public async Task<long> ResolveDispatchTaskAsync(long ticketId, CancellationToken ct = default)
+        public async Task<DispatchTaskQueryResponse> QueryDispatchTasksAsync(DispatchTaskQueryRequest request, CancellationToken ct = default)
+        {
+            return await _api.PostAsync<DispatchTaskQueryRequest, DispatchTaskQueryResponse>(
+                       "api/tickets/dispatch-tasks/query",
+                       request,
+                       ct)
+                   ?? new DispatchTaskQueryResponse();
+        }
+
+        public async Task<TicketListItemDto?> GetTicketByIdAsync(long ticketId, CancellationToken ct = default)
+        {
+            if (ticketId <= 0)
+                return null;
+
+            return await _api.GetAsync<TicketListItemDto>(
+                $"api/tickets/{ticketId}",
+                ct);
+        }
+
+        public async Task<long> CloseDispatchTaskAsync(long ticketId, CancellationToken ct = default)
         {
             var res = await _api.PostAsync<object, UpdateTicketResponse>(
-                $"api/tickets/{ticketId}/resolve-dispatch-task",
+                $"api/tickets/{ticketId}/close-dispatch-task",
                 new { },
                 ct);
 

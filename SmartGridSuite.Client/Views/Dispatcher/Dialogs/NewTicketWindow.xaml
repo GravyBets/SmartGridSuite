@@ -3,37 +3,46 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:SmartGridSuite.Client.Views.Dispatcher.Dialogs"
         Title="New Ticket"
-        Width="1080" Height="760"
+        Width="1080"
+        Height="760"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Loaded="Window_Loaded">
 
-    <Grid Margin="16">
+    <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto">
             <StackPanel>
 
-                <!-- TOP: Site | Full Site Name | Problem -->
+                <!-- TOP: Site | Problem -->
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="300"/>
+                        <ColumnDefinition Width="260"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Site -->
-                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                        <TextBlock Text="Site * (If TOP, just XX-MWB, not sector too)" Margin="0,0,0,4"/>
+                    <StackPanel Grid.Column="0"
+                                Margin="0,0,10,0">
+                        <TextBlock Text="Site * (If TOP, just XX-MWB, not sector too)"
+                                   FontWeight="SemiBold"
+                                   Margin="2,0,0,4"/>
+
                         <TextBox Height="34"
                                  Text="{Binding Site, UpdateSourceTrigger=PropertyChanged}"/>
                     </StackPanel>
 
-                    <!-- Problem (wrap + auto-grow) -->
+                    <!-- Problem -->
                     <StackPanel Grid.Column="1">
-                        <TextBlock Text="Problem" Margin="0,0,0,4"/>
+                        <TextBlock Text="Problem"
+                                   Margin="2,0,0,4"
+                                   FontWeight="SemiBold"/>
+
                         <TextBox MinHeight="34"
                                  MaxHeight="140"
                                  AcceptsReturn="True"
@@ -44,218 +53,226 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Assigned To + Status + Task Category + Action Override -->
+                <!-- Assignment / Workflow -->
+                <Grid Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Assigned To -->
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Assigned To"
+                                   Margin="2,0,0,4"
+                                   FontWeight="SemiBold"/>
+
+                        <ComboBox x:Name="AssignedToBox"
+                                  Height="34"
+                                  Width="Auto"
+                                  HorizontalAlignment="Stretch"
+                                  IsTextSearchEnabled="True"
+                                  SelectedItem="{Binding AssignedTo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <!-- Status -->
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Status"
+                                   Margin="2,0,0,4"
+                                   FontWeight="SemiBold"/>
+
+                        <ComboBox x:Name="StatusBox"
+                                  Height="34"
+                                  Width="Auto"
+                                  HorizontalAlignment="Stretch"
+                                  SelectedItem="{Binding Status, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+                </Grid>
+
+                <Separator Margin="0,10,0,4"/>
+
+                <!-- Work Information -->
                 <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Row 1 -->
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="78"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="60"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Grid.Column="0"
-                                   Text="Assigned To:"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-
-                        <ComboBox x:Name="AssignedToBox"
-                                  Grid.Column="2"
-                                  HorizontalAlignment="Left"
-                                  Width="260"
-                                  Height="34"
-                                  IsTextSearchEnabled="True"
-                                  SelectedItem="{Binding AssignedTo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-
-                        <TextBlock Grid.Column="4"
-                                   Text="Status:"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-
-                        <ComboBox x:Name="StatusBox"
-                                  Grid.Column="6"
-                                  Height="34"
-                                  Width="260"
-                                  SelectedItem="{Binding Status, UpdateSourceTrigger=PropertyChanged}"/>
-                    </Grid>
-
-                    <!-- Row 2 -->
-                    <Grid Grid.Row="1" Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="78"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Grid.Column="0"
-                                   Text="Task Category:"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-
-                        <ComboBox x:Name="TaskCategoryComboBox"
-                                  Grid.Column="2"
-                                  Height="34"
-                                  Width="260"/>
-
-                        <TextBlock Grid.Column="4"
-                                   Text="Action Required:"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-
-                        <TextBox x:Name="ActionRequiredOverrideTextBox"
-                                 Grid.Column="6"
-                                 Height="34"
-                                 MaxLength="200"/>
-                    </Grid>
-                </Grid>
-
-                <Separator Margin="0,16,0,16"/>
-
-                <!-- Work info row -->
-                <Grid Margin="0,8,0,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
+                    <!-- Notification -->
                     <Grid Grid.Row="0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                            <TextBlock Text="Notification #" Margin="0,0,0,4"/>
+                        <StackPanel Grid.Column="0"
+                                    Margin="0,0,8,0">
+                            <TextBlock Text="Notification #"
+                                       Margin="2,0,0,4"
+                                       FontWeight="SemiBold"/>
+
                             <TextBox Height="34"
                                      MinWidth="220"
                                      Text="{Binding NotificationNumber, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
 
-                        <StackPanel Grid.Column="1" Margin="0,0,12,0">
-                            <TextBlock Text="Notification Name" Margin="0,0,0,4"/>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Notification Name"
+                                       Margin="2,0,0,4"
+                                       FontWeight="SemiBold"/>
+
                             <TextBox Height="34"
                                      Text="{Binding NotificationName, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                     </Grid>
 
-                    <Grid Grid.Row="1" Margin="0,8,0,0">
+                    <!-- Work Order -->
+                    <Grid Grid.Row="1"
+                          Margin="0,8,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                            <TextBlock Text="Work Order" Margin="0,0,0,4"/>
+                        <StackPanel Grid.Column="0"
+                                    Margin="0,0,10,0">
+                            <TextBlock Text="Work Order"
+                                       Margin="2,0,0,4"
+                                       FontWeight="SemiBold"/>
+
                             <TextBox Height="34"
-                                     MinWidth="220"
+                                     MinWidth="160"
                                      Text="{Binding WorkOrder, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
 
-                        <StackPanel Grid.Column="1" Margin="0,0,12,0">
-                            <TextBlock Text="Work Order Type" Margin="0,0,0,4"/>
+                        <StackPanel Grid.Column="1"
+                                    Margin="0,0,10,0">
+                            <TextBlock Text="Work Order Type"
+                                       Margin="2,0,0,4"
+                                       FontWeight="SemiBold"/>
+
                             <ComboBox x:Name="WorkOrderTypeBox"
+                                      Width="Auto"
                                       Height="34"
                                       SelectedItem="{Binding WorkOrderType, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
 
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="Work Order Code" Margin="0,0,0,4"/>
+                        <StackPanel Grid.Column="2"
+                                    Margin="0,0,10,0">
+                            <TextBlock Text="Work Order Code"
+                                       Margin="2,0,0,4"
+                                       FontWeight="SemiBold"/>
+
                             <ComboBox Height="34"
                                       ItemsSource="{Binding WorkOrderCodeOptions}"
                                       SelectedItem="{Binding WorkOrderCode, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
+
+                        <StackPanel Grid.Column="3">
+                            <TextBlock Text="Priority"
+                                       Margin="2,0,0,4"
+                                       FontWeight="SemiBold"/>
+
+                            <ComboBox x:Name="PriorityBox"
+                                      Height="34"
+                                      SelectedItem="{Binding PriorityDays, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
                     </Grid>
                 </Grid>
 
-                <!-- Priority -->
-                <Grid Grid.Row="2" Margin="0,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="200"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0" 
-                               Text="Priority" 
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextSecondary}"/>
-                    
-                    <ComboBox x:Name="PriorityBox"
-                              Grid.Column="1"
-                              Height="34"
-                              SelectedItem="{Binding PriorityDays, UpdateSourceTrigger=PropertyChanged}"/>
-                </Grid>
-
-                <Separator Margin="0,16,0,16"/>
+                <Separator Margin="0,10,0,8"/>
 
                 <!-- Dispatch Notes -->
                 <TextBlock Text="Dispatch Notes"
-                           Margin="0,0,0,6"/>
+                           Margin="2,0,0,0"
+                           FontWeight="SemiBold"/>
 
                 <TextBlock Text="Visible to the assigned field technician. Use this for remote troubleshooting notes, follow-up instructions, or things dispatch wants checked."
-                           Margin="0,0,0,6"
+                           Margin="2,0,0,6"
                            FontSize="11"
                            Foreground="{DynamicResource TextSecondary}"
                            TextWrapping="Wrap"/>
 
-                <TextBox Height="110"
+                <TextBox x:Name="DispatchNotesTextBox"
+                         MaxHeight="360"
                          Padding="6,6"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Auto"
                          VerticalContentAlignment="Top"
                          HorizontalContentAlignment="Left"
-                         Text="{Binding DispatchNotes, UpdateSourceTrigger=PropertyChanged}"/>
+                         Text="{Binding DispatchNotes, UpdateSourceTrigger=PropertyChanged}">
 
-                <!-- Notes / Write-Up -->
-                <TextBlock Text="Notes / Write-Up"
-                           Margin="0,14,0,6"/>
+                    <TextBox.Style>
+                        <Style TargetType="TextBox"
+                               BasedOn="{StaticResource ModernTextBox}">
+                            <!-- Edit Ticket with technician notes shown -->
+                            <Setter Property="Height" Value="110"/>
+                            <Setter Property="MinHeight" Value="110"/>
 
-                <TextBox Height="180"
-                         Padding="6,6"
-                         AcceptsReturn="True"
-                         TextWrapping="Wrap"
-                         VerticalScrollBarVisibility="Auto"
-                         VerticalContentAlignment="Top"
-                         HorizontalContentAlignment="Left"
-                         Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"/>
+                            <Style.Triggers>
+                                <!-- New Ticket, or Edit Ticket with no technician notes -->
+                                <DataTrigger Binding="{Binding ElementName=TechnicianNotesPanel, Path=Visibility}"
+                                             Value="Collapsed">
+                                    <Setter Property="Height" Value="340"/>
+                                    <Setter Property="MinHeight" Value="340"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
 
+                <!-- Technician Notes / Submitted Write-Ups - Edit mode only -->
+                <StackPanel x:Name="TechnicianNotesPanel"
+                            Margin="0,10,0,0"
+                            Visibility="Collapsed">
+
+                    <TextBlock Text="Technician Notes / Write-Ups"
+                               Margin="2,0,0,2"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <TextBlock Text="Submitted field notes are shown for reference only. Changes to submitted write-ups should be handled through Site History."
+                               Margin="2,0,0,6"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextSecondary}"
+                               TextWrapping="Wrap"/>
+
+                    <TextBox x:Name="TechnicianNotesTextBox"
+                             Height="180"
+                             Padding="6,6"
+                             IsReadOnly="True"
+                             IsReadOnlyCaretVisible="True"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             VerticalContentAlignment="Top"
+                             HorizontalContentAlignment="Left"
+                             Text="{Binding Notes, Mode=OneWay}"/>
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
 
         <!-- Buttons -->
-        <StackPanel Grid.Row="1" 
-                    Orientation="Horizontal" 
-                    HorizontalAlignment="Right">
-            
-            <Button x:Name="CancelBtn" 
-                    Content="Cancel" 
-                    MinWidth="110" 
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,10,0,0">
+
+            <Button x:Name="CancelBtn"
+                    Content="Cancel"
+                    MinWidth="110"
                     Margin="0,0,8,0"
                     Click="Cancel_Click"/>
-            
-            <Button x:Name="CreateBtn" 
-                    Style="{StaticResource PrimaryButtonStyle}" 
-                    Content="Create Ticket" 
+
+            <Button x:Name="CreateBtn"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Content="Create Ticket"
                     MinWidth="150"
                     Click="Create_Click"/>
         </StackPanel>
     </Grid>
 </Window>
+

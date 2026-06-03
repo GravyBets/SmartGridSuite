@@ -59,8 +59,13 @@ namespace SmartGridSuite.Api.Controllers
                     SortOrder = x.SortOrder,
                     IsActive = x.IsActive,
                     IsClosed = x.IsClosed,
+                    IsFieldComplete = x.IsFieldComplete,
                     ShowInFilter = x.ShowInFilter,
-                    SendToDispatchTasks = x.SendToDispatchTasks
+                    IncludeInSummary = x.IncludeInSummary,
+                    SendToDispatchTasks = x.SendToDispatchTasks,
+                    IsWriteUpSubmitTarget = x.IsWriteUpSubmitTarget,
+                    IsAssignmentPublishTarget = x.IsAssignmentPublishTarget,
+                    IsUnassignmentTarget = x.IsUnassignmentTarget
                 })
                 .ToListAsync(ct);
 
@@ -88,47 +93,70 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPost("statuses")]
-        public async Task<ActionResult<TicketStatusDto>> CreateStatus([FromBody] CreateTicketStatusRequest request,
-                CancellationToken ct)
-                    {
-                        var name = (request.Name ?? "").Trim();
+        public async Task<ActionResult<TicketStatusDto>> CreateStatus([FromBody] CreateTicketStatusRequest request, CancellationToken ct)
+        {
+            var name = (request.Name ?? "").Trim();
 
-                        if (string.IsNullOrWhiteSpace(name))
-                            return BadRequest("Status name is required.");
+            if (string.IsNullOrWhiteSpace(name))
+                return BadRequest("Status name is required.");
 
-                        var exists = await _db.TicketStatuses
-                            .AsNoTracking()
-                            .AnyAsync(x => x.Name.ToLower() == name.ToLower(), ct);
+            var exists = await _db.TicketStatuses
+                .AsNoTracking()
+                .AnyAsync(x => x.Name.ToLower() == name.ToLower(), ct);
 
-                        if (exists)
-                            return Conflict($"A ticket status named '{name}' already exists.");
+            if (exists)
+                return Conflict($"A ticket status named '{name}' already exists.");
 
-                        var entity = new TicketStatusEntity
-                        {
-                            Name = name,
-                            SortOrder = request.SortOrder,
-                            IsActive = request.IsActive,
-                            IsClosed = request.IsClosed,
-                            ShowInFilter = request.ShowInFilter,
-                            SendToDispatchTasks = request.SendToDispatchTasks
-                        };
+            if (!request.IsActive &&
+                (request.IsWriteUpSubmitTarget ||
+                 request.IsAssignmentPublishTarget ||
+                 request.IsUnassignmentTarget))
+            {
+                return BadRequest(
+                    "A status must be active before it can be selected as a workflow target.");
+            }
 
-                        _db.TicketStatuses.Add(entity);
-                        await _db.SaveChangesAsync(ct);
+            var nextSortOrder =
+                            (await _db.TicketStatuses.AsNoTracking().Select(x => (int?)x.SortOrder).MaxAsync(ct) ?? 0) + 10;
 
-                        var dto = new TicketStatusDto
-                        {
-                            Id = entity.Id,
-                            Name = entity.Name,
-                            SortOrder = entity.SortOrder,
-                            IsActive = entity.IsActive,
-                            IsClosed = entity.IsClosed,
-                            ShowInFilter = entity.ShowInFilter,
-                            SendToDispatchTasks = entity.SendToDispatchTasks
-                        };
+            var entity = new TicketStatusEntity
+            {
+                Name = name,
+                SortOrder = nextSortOrder,
+                IsActive = request.IsActive,
+                IsClosed = request.IsClosed,
+                IsFieldComplete = request.IsFieldComplete,
+                ShowInFilter = request.ShowInFilter,
+                IncludeInSummary = request.IncludeInSummary,
+                SendToDispatchTasks = request.SendToDispatchTasks,
+                IsWriteUpSubmitTarget = request.IsWriteUpSubmitTarget,
+                IsAssignmentPublishTarget = request.IsAssignmentPublishTarget,
+                IsUnassignmentTarget = request.IsUnassignmentTarget,
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
+            };
 
-                        return Ok(dto);
-                    }
+            _db.TicketStatuses.Add(entity);
+            await _db.SaveChangesAsync(ct);
+
+            if (entity.IsWriteUpSubmitTarget)
+                await ClearOtherWriteUpSubmitTargetsAsync(entity.Id, ct);
+
+            if (entity.IsAssignmentPublishTarget)
+                await ClearOtherAssignmentPublishTargetsAsync(entity.Id, ct);
+
+            if (entity.IsUnassignmentTarget)
+                await ClearOtherUnassignmentTargetsAsync(entity.Id, ct);
+
+            if (entity.IsWriteUpSubmitTarget ||
+                entity.IsAssignmentPublishTarget ||
+                entity.IsUnassignmentTarget)
+            {
+                await _db.SaveChangesAsync(ct);
+            }
+
+            return Ok(MapStatusDto(entity));
+        }
 
         [HttpPut("statuses/{id:long}")]
         public async Task<ActionResult<TicketStatusDto>> UpdateStatus(ulong id, [FromBody] UpdateTicketStatusRequest request,
@@ -184,27 +212,39 @@ namespace SmartGridSuite.Api.Controllers
             if (duplicateExists)
                 return Conflict($"A ticket status named '{name}' already exists.");
 
+            if (!request.IsActive &&
+                (request.IsWriteUpSubmitTarget ||
+                 request.IsAssignmentPublishTarget ||
+                 request.IsUnassignmentTarget))
+            {
+                return BadRequest(
+                    "A status must be active before it can be selected as a workflow target.");
+            }
+
             entity.Name = name;
-            entity.SortOrder = request.SortOrder;
             entity.IsActive = request.IsActive;
             entity.IsClosed = request.IsClosed;
+            entity.IsFieldComplete = request.IsFieldComplete;
             entity.ShowInFilter = request.ShowInFilter;
+            entity.IncludeInSummary = request.IncludeInSummary;
             entity.SendToDispatchTasks = request.SendToDispatchTasks;
+            entity.IsWriteUpSubmitTarget = request.IsWriteUpSubmitTarget;
+            entity.IsAssignmentPublishTarget = request.IsAssignmentPublishTarget;
+            entity.IsUnassignmentTarget = request.IsUnassignmentTarget;
+            entity.UpdatedAt = DateTime.Now;
+
+            if (entity.IsWriteUpSubmitTarget)
+                await ClearOtherWriteUpSubmitTargetsAsync(entity.Id, ct);
+
+            if (entity.IsAssignmentPublishTarget)
+                await ClearOtherAssignmentPublishTargetsAsync(entity.Id, ct);
+
+            if (entity.IsUnassignmentTarget)
+                await ClearOtherUnassignmentTargetsAsync(entity.Id, ct);
 
             await _db.SaveChangesAsync(ct);
 
-            var dto = new TicketStatusDto
-            {
-                Id = entity.Id,
-                Name = entity.Name,
-                SortOrder = entity.SortOrder,
-                IsActive = entity.IsActive,
-                IsClosed = entity.IsClosed,
-                ShowInFilter = entity.ShowInFilter,
-                SendToDispatchTasks = entity.SendToDispatchTasks
-            };
-
-            return Ok(dto);
+            return Ok(MapStatusDto(entity));
         }
 
         [HttpPost("statuses/{id:long}/deactivate")]
@@ -223,8 +263,48 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             entity.IsActive = false;
+            entity.ShowInFilter = false;
+            entity.IncludeInSummary = false;
             entity.SendToDispatchTasks = false;
+            entity.IsWriteUpSubmitTarget = false;
+            entity.IsAssignmentPublishTarget = false;
+            entity.IsUnassignmentTarget = false;
+            entity.UpdatedAt = DateTime.Now;
 
+            await _db.SaveChangesAsync(ct);
+
+            return NoContent();
+        }
+
+        [HttpPost("statuses/{id:long}/delete")]
+        public async Task<IActionResult> DeleteStatus(ulong id, CancellationToken ct)
+        {
+            var entity = await _db.TicketStatuses
+                .FirstOrDefaultAsync(x => x.Id == id, ct);
+
+            if (entity == null)
+                return NotFound();
+
+            if (IsRequiredTicketStatus(entity.Name))
+            {
+                return BadRequest(
+                    $"'{entity.Name}' is required by SmartGridSuite and cannot be deleted.");
+            }
+
+            var statusName = (entity.Name ?? string.Empty).Trim();
+
+            var usedByTickets = await _db.Tickets
+                .AsNoTracking()
+                .AnyAsync(x => x.Status == statusName, ct);
+
+            if (usedByTickets)
+            {
+                return BadRequest(
+                    $"'{statusName}' is already used by one or more tickets. " +
+                    "Deactivate it instead so ticket history remains intact.");
+            }
+
+            _db.TicketStatuses.Remove(entity);
             await _db.SaveChangesAsync(ct);
 
             return NoContent();
@@ -335,6 +415,55 @@ namespace SmartGridSuite.Api.Controllers
             await _db.SaveChangesAsync(ct);
 
             return NoContent();
+        }
+
+        private static TicketStatusDto MapStatusDto(TicketStatusEntity entity)
+        {
+            return new TicketStatusDto
+            {
+                Id = entity.Id,
+                Name = entity.Name,
+                SortOrder = entity.SortOrder,
+                IsActive = entity.IsActive,
+                IsClosed = entity.IsClosed,
+                IsFieldComplete = entity.IsFieldComplete,
+                ShowInFilter = entity.ShowInFilter,
+                IncludeInSummary = entity.IncludeInSummary,
+                SendToDispatchTasks = entity.SendToDispatchTasks,
+                IsWriteUpSubmitTarget = entity.IsWriteUpSubmitTarget,
+                IsAssignmentPublishTarget = entity.IsAssignmentPublishTarget,
+                IsUnassignmentTarget = entity.IsUnassignmentTarget
+            };
+        }
+
+        private async Task ClearOtherWriteUpSubmitTargetsAsync(ulong currentStatusId, CancellationToken ct)
+        {
+            var otherTargets = await _db.TicketStatuses
+                .Where(x => x.Id != currentStatusId && x.IsWriteUpSubmitTarget)
+                .ToListAsync(ct);
+
+            foreach (var status in otherTargets)
+                status.IsWriteUpSubmitTarget = false;
+        }
+
+        private async Task ClearOtherAssignmentPublishTargetsAsync(ulong currentStatusId, CancellationToken ct)
+        {
+            var otherTargets = await _db.TicketStatuses
+                .Where(x => x.Id != currentStatusId && x.IsAssignmentPublishTarget)
+                .ToListAsync(ct);
+
+            foreach (var status in otherTargets)
+                status.IsAssignmentPublishTarget = false;
+        }
+
+        private async Task ClearOtherUnassignmentTargetsAsync(ulong currentStatusId, CancellationToken ct)
+        {
+            var otherTargets = await _db.TicketStatuses
+                .Where(x => x.Id != currentStatusId && x.IsUnassignmentTarget)
+                .ToListAsync(ct);
+
+            foreach (var status in otherTargets)
+                status.IsUnassignmentTarget = false;
         }
     }
 }

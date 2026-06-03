@@ -191,26 +191,6 @@ namespace SmartGridSuite.Contracts.Dispatcher.DailyAssignments
         public int ReorderedCount { get; set; }
     }
 
-    public sealed class PublishDailyAssignmentsRequest
-    {
-        public DateTime WorkDate { get; set; }
-
-        public string? PublishedBy { get; set; }
-    }
-
-    public sealed class PublishDailyAssignmentsResponse
-    {
-        public DateTime WorkDate { get; set; }
-
-        public int PublishedVersion { get; set; }
-        public DateTime PublishedAt { get; set; }
-        public string PublishedBy { get; set; } = "";
-
-        public int PublishedCount { get; set; }
-
-        public List<long> TicketIds { get; set; } = new();
-    }
-
     public sealed class CarryOverDailyAssignmentsRequest
     {
         public DateTime WorkDate { get; set; }

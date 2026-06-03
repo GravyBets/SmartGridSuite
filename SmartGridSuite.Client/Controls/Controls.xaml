@@ -1842,7 +1842,6 @@
     
 
     <!-- Modern DatePicker -->
-    <!-- Modern DatePicker text box -->
     <Style x:Key="ModernDatePickerTextBoxStyle" TargetType="{x:Type DatePickerTextBox}">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="Background" Value="Transparent"/>
@@ -1887,7 +1886,7 @@
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="44"/>
+                                <ColumnDefinition Width="54"/>
                             </Grid.ColumnDefinitions>
 
                             <DatePickerTextBox x:Name="PART_TextBox"
@@ -1898,41 +1897,43 @@
                                            BorderThickness="0"/>
 
                             <Button x:Name="PART_Button"
-                                Grid.Column="1"
-                                Margin="6"
-                                Background="Transparent"
-                                BorderThickness="0"
-                                Focusable="False"
-                                Cursor="Hand">
+                                    Grid.Column="1"
+                                    Margin="2"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Focusable="False"
+                                    Cursor="Hand">
                                 <Border x:Name="ButtonBd"
-                                    Background="{DynamicResource TileFill}"
-                                    BorderBrush="{DynamicResource SurfaceBorder}"
-                                    BorderThickness="1"
-                                    CornerRadius="8">
-                                    <TextBlock Text="&#xE787;"
-                                           FontFamily="Segoe MDL2 Assets"
-                                           FontSize="14"
-                                           Foreground="{DynamicResource TextSecondary}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
+                                        Background="{DynamicResource TileFill}"
+                                        BorderBrush="{DynamicResource SurfaceBorder}"
+                                        BorderThickness="0"
+                                        CornerRadius="10">
+                                    <Viewbox Width="15"
+                                             Height="15"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center">
+                                        <Path Fill="{DynamicResource TextSecondary}"
+                                              Stretch="Uniform"
+                                              Data="M7 2V4H17V2H19V4H21C22.1 4 23 4.9 23 6V21C23 22.1 22.1 23 21 23H3C1.9 23 1 22.1 1 21V6C1 4.9 1.9 4 3 4H5V2H7ZM3 10V21H21V10H3ZM3 6V8H21V6H3ZM6 13H9V16H6V13ZM11 13H14V16H11V13ZM16 13H19V16H16V13ZM6 18H9V20H6V18ZM11 18H14V20H11V18Z"/>
+                                    </Viewbox>
                                 </Border>
                             </Button>
 
                             <Popup x:Name="PART_Popup"
-                               Placement="Bottom"
-                               AllowsTransparency="True"
-                               PopupAnimation="Fade"
-                               IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   PopupAnimation="Fade"
+                                   IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}">
                                 <Border Margin="0,6,0,0"
-                                    Background="{DynamicResource CardBackground}"
-                                    BorderBrush="{DynamicResource CardBorder}"
-                                    BorderThickness="1"
-                                    CornerRadius="12"
-                                    Padding="8">
+                                        Background="{DynamicResource CardBackground}"
+                                        BorderBrush="{DynamicResource CardBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="12"
+                                        Padding="8">
                                     <Calendar x:Name="PART_Calendar"
-                                          Background="{DynamicResource CardBackground}"
-                                          Foreground="{DynamicResource TextPrimary}"
-                                          BorderThickness="0"/>
+                                              Background="{DynamicResource CardBackground}"
+                                              Foreground="{DynamicResource TextPrimary}"
+                                              BorderThickness="0"/>
                                 </Border>
                             </Popup>
                         </Grid>
@@ -1991,8 +1992,8 @@
 
     <!-- Toggle button in nav header -->
     <Style x:Key="NavRailToggleButtonStyle"
-       TargetType="Button"
-       BasedOn="{StaticResource SecondaryButtonStyle}">
+           TargetType="Button"
+           BasedOn="{StaticResource SecondaryButtonStyle}">
         <Setter Property="Width" Value="42"/>
         <Setter Property="MinWidth" Value="42"/>
         <Setter Property="Height" Value="42"/>
@@ -2089,8 +2090,8 @@
 
     <!-- Collapsed home button -->
     <Style x:Key="NavRailCollapsedFooterButtonStyle"
-       TargetType="Button"
-       BasedOn="{StaticResource SecondaryButtonStyle}">
+           TargetType="Button"
+           BasedOn="{StaticResource SecondaryButtonStyle}">
         <Setter Property="Width" Value="52"/>
         <Setter Property="MinWidth" Value="52"/>
         <Setter Property="Height" Value="52"/>
@@ -2136,6 +2137,39 @@
         <Setter Property="Margin" Value="8,0,0,0"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Opacity" Value="0.9"/>
+    </Style>
+
+    <Style x:Key="FlatCopyIconButton"
+       TargetType="Button">
+        <Setter Property="Width" Value="24"/>
+        <Setter Property="Height" Value="24"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="4,0,0,0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Opacity" Value="0.85"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <ContentPresenter HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"/>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Opacity" Value="1"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Opacity" Value="0.75"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>

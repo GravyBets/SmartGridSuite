@@ -24,7 +24,7 @@
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource TextPrimary}"/>
 
-            <TextBlock Text="Selected tickets will be assigned to this technician and moved to Assigned."
+            <TextBlock Text="Choose a technician, or choose (Unassigned) to clear the assignment."
                        Margin="0,4,0,0"
                        TextWrapping="Wrap"
                        Foreground="{DynamicResource TextSecondary}"/>
@@ -38,7 +38,10 @@
         <ComboBox Grid.Row="4"
                   x:Name="TechnicianComboBox"
                   Height="34"
-                  IsEditable="True"
+                  Width="Auto"
+                  MinWidth="0"
+                  HorizontalAlignment="Stretch"
+                  IsEditable="False"
                   IsTextSearchEnabled="True"/>
 
         <StackPanel Grid.Row="6"

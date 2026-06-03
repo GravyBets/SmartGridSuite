@@ -26,18 +26,14 @@ namespace SmartGridSuite.Client.Services
             return await _api.GetAsync<List<TicketTaskCategoryDto>>("api/admin/tickets/task-categories", ct) ?? new();
         }
 
-        public async Task<TicketStatusDto> CreateStatusAsync(
-                    CreateTicketStatusRequest request,
-                    CancellationToken ct = default)
+        public async Task<TicketStatusDto> CreateStatusAsync(CreateTicketStatusRequest request, CancellationToken ct = default)
         {
             return await _api.PostAsync<CreateTicketStatusRequest, TicketStatusDto>(
                        "api/admin/tickets/statuses", request, ct)
                    ?? new TicketStatusDto();
         }
 
-        public async Task UpdateStatusAsync(
-                    UpdateTicketStatusRequest request,
-                    CancellationToken ct = default)
+        public async Task UpdateStatusAsync(UpdateTicketStatusRequest request, CancellationToken ct = default)
         {
             await _api.PutAsync<UpdateTicketStatusRequest>(
                 $"api/admin/tickets/statuses/{request.Id}",
@@ -45,9 +41,7 @@ namespace SmartGridSuite.Client.Services
                 ct);
         }
 
-        public async Task DeactivateStatusAsync(
-            ulong id,
-            CancellationToken ct = default)
+        public async Task DeactivateStatusAsync(ulong id, CancellationToken ct = default)
         {
             await _api.PostAsync<object, object?>(
                 $"api/admin/tickets/statuses/{id}/deactivate",
@@ -55,18 +49,14 @@ namespace SmartGridSuite.Client.Services
                 ct);
         }
 
-        public async Task<TicketTaskCategoryDto> CreateTaskCategoryAsync(
-    CreateTicketTaskCategoryRequest request,
-    CancellationToken ct = default)
+        public async Task<TicketTaskCategoryDto> CreateTaskCategoryAsync(CreateTicketTaskCategoryRequest request, CancellationToken ct = default)
         {
             return await _api.PostAsync<CreateTicketTaskCategoryRequest, TicketTaskCategoryDto>(
                        "api/admin/tickets/task-categories", request, ct)
                    ?? new TicketTaskCategoryDto();
         }
 
-        public async Task UpdateTaskCategoryAsync(
-            UpdateTicketTaskCategoryRequest request,
-            CancellationToken ct = default)
+        public async Task UpdateTaskCategoryAsync(UpdateTicketTaskCategoryRequest request, CancellationToken ct = default)
         {
             await _api.PutAsync<UpdateTicketTaskCategoryRequest>(
                 $"api/admin/tickets/task-categories/{request.Id}",
@@ -74,12 +64,18 @@ namespace SmartGridSuite.Client.Services
                 ct);
         }
 
-        public async Task DeactivateTaskCategoryAsync(
-            ulong id,
-            CancellationToken ct = default)
+        public async Task DeactivateTaskCategoryAsync(ulong id, CancellationToken ct = default)
         {
             await _api.PostAsync<object, object?>(
                 $"api/admin/tickets/task-categories/{id}/deactivate",
+                new { },
+                ct);
+        }
+
+        public async Task DeleteStatusAsync(ulong id, CancellationToken ct = default)
+        {
+            await _api.PostAsync<object, object?>(
+                $"api/admin/tickets/statuses/{id}/delete",
                 new { },
                 ct);
         }

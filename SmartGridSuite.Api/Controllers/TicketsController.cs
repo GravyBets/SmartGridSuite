@@ -91,7 +91,18 @@ namespace SmartGridSuite.Api.Controllers
                 .AsQueryable();
 
             // Status filter
-            if (statuses.Count > 0)
+            if (req.ApplyStatusFilter)
+            {
+                if (statuses.Count == 0)
+                {
+                    query = query.Where(t => false);
+                }
+                else
+                {
+                    query = query.Where(t => statuses.Contains(t.Status));
+                }
+            }
+            else if (statuses.Count > 0)
             {
                 query = query.Where(t => statuses.Contains(t.Status));
             }
@@ -222,6 +233,74 @@ namespace SmartGridSuite.Api.Controllers
             });
         }
 
+        [HttpGet("summary")]
+        public async Task<ActionResult<TicketSummaryDto>> GetSummary(CancellationToken ct)
+        {
+            var configuredStatuses = await _db.TicketStatuses
+                .AsNoTracking()
+                .Where(x => x.IsActive && x.IncludeInSummary)
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Name)
+                .Select(x => new
+                {
+                    x.Name,
+                    x.SortOrder
+                })
+                .ToListAsync(ct);
+
+            var countsByStatus = await _db.Tickets
+                .AsNoTracking()
+                .GroupBy(x => x.Status)
+                .Select(g => new
+                {
+                    Status = g.Key ?? "",
+                    Count = g.Count()
+                })
+                .ToDictionaryAsync(
+                    x => x.Status,
+                    x => x.Count,
+                    StringComparer.OrdinalIgnoreCase,
+                    ct);
+
+            var totalCount = await _db.Tickets
+                .AsNoTracking()
+                .CountAsync(ct);
+
+            return Ok(new TicketSummaryDto
+            {
+                TotalCount = totalCount,
+                Statuses = configuredStatuses
+                    .Select(x => new TicketSummaryStatusDto
+                    {
+                        Status = x.Name,
+                        SortOrder = x.SortOrder,
+                        Count = countsByStatus.TryGetValue(x.Name, out var count)
+                            ? count
+                            : 0
+                    })
+                    .ToList()
+            });
+        }
+
+        [HttpGet("filter-statuses")]
+        public async Task<ActionResult<List<TicketFilterStatusDto>>> GetFilterStatuses(CancellationToken ct)
+        {
+            var statuses = await _db.TicketStatuses
+                .AsNoTracking()
+                .Where(x => x.IsActive && x.ShowInFilter)
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Name)
+                .Select(x => new TicketFilterStatusDto
+                {
+                    Name = x.Name,
+                    SortOrder = x.SortOrder,
+                    IsClosed = x.IsClosed
+                })
+                .ToListAsync(ct);
+
+            return Ok(statuses);
+        }
+
         [HttpGet("dispatch-tasks")]
         public async Task<ActionResult<List<DispatchTaskListItemDto>>> GetDispatchTasks(CancellationToken ct)
         {
@@ -260,6 +339,113 @@ namespace SmartGridSuite.Api.Controllers
                 .ToList();
 
             return Ok(items);
+        }
+
+        [HttpPost("dispatch-tasks/query")]
+        public async Task<ActionResult<DispatchTaskQueryResponse>> QueryDispatchTasks([FromBody] DispatchTaskQueryRequest req,
+            CancellationToken ct)
+        {
+            req ??= new DispatchTaskQueryRequest();
+
+            var take = Math.Clamp(req.Take <= 0 ? 500 : req.Take, 1, 2000);
+            var skip = Math.Max(0, req.Skip);
+
+            var requestedStatuses = (req.Statuses ?? new List<string>())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var taskStatuses = _db.TicketStatuses
+                .AsNoTracking()
+                .Where(x => x.IsActive && x.SendToDispatchTasks)
+                .Select(x => x.Name);
+
+            var query = _db.Tickets
+                .AsNoTracking()
+                .Where(t => taskStatuses.Contains(t.Status));
+
+            // Optional status filter inside the set of statuses configured for Tasks.
+            if (req.ApplyStatusFilter)
+            {
+                if (requestedStatuses.Count == 0)
+                {
+                    query = query.Where(t => false);
+                }
+                else
+                {
+                    query = query.Where(t => requestedStatuses.Contains(t.Status));
+                }
+            }
+
+            // Technician filter.
+            var assignedTech = (req.AssignedTech ?? string.Empty).Trim();
+
+            if (!string.IsNullOrWhiteSpace(assignedTech) &&
+                !assignedTech.Equals("All", StringComparison.OrdinalIgnoreCase))
+            {
+                if (assignedTech.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(t =>
+                        string.IsNullOrWhiteSpace(t.AssignedTech) ||
+                        t.AssignedTech == "(Unassigned)");
+                }
+                else
+                {
+                    query = query.Where(t => t.AssignedTech == assignedTech);
+                }
+            }
+
+            // Date filter based on last task/ticket activity.
+            if (req.From.HasValue)
+            {
+                var from = req.From.Value.Date;
+                query = query.Where(t => t.LastActivityAt >= from);
+            }
+
+            if (req.To.HasValue)
+            {
+                var toExclusive = req.To.Value.Date.AddDays(1);
+                query = query.Where(t => t.LastActivityAt < toExclusive);
+            }
+
+            // Search.
+            var search = (req.Search ?? string.Empty).Trim();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(t =>
+                    (t.Site != null && t.Site.Contains(search)) ||
+                    (t.NotificationName != null && t.NotificationName.Contains(search)) ||
+                    (t.Notification != null && t.Notification.Contains(search)) ||
+                    (t.CurrentWorkOrder != null && t.CurrentWorkOrder.Contains(search)) ||
+                    (t.WorkOrderClass != null && t.WorkOrderClass.Contains(search)) ||
+                    (t.AssignedTech != null && t.AssignedTech.Contains(search)) ||
+                    (t.Problem != null && t.Problem.Contains(search)) ||
+                    (t.ActionRequiredOverride != null && t.ActionRequiredOverride.Contains(search)) ||
+                    (t.DispatchNotes != null && t.DispatchNotes.Contains(search)) ||
+                    (t.Notes != null && t.Notes.Contains(search)) ||
+                    (t.Status != null && t.Status.Contains(search)));
+            }
+
+            var totalCount = await query.CountAsync(ct);
+
+            var rows = await query
+                .OrderByDescending(t => t.LastActivityAt)
+                .ThenByDescending(t => t.Id)
+                .Skip(skip)
+                .Take(take)
+                .ToListAsync(ct);
+
+            var items = rows
+                .Select(MapToDispatchTaskQueryItem)
+                .ToList();
+
+            return Ok(new DispatchTaskQueryResponse
+            {
+                Items = items,
+                TotalCount = totalCount
+            });
         }
 
         [HttpGet("by-site/{siteId}")]
@@ -309,6 +495,40 @@ namespace SmartGridSuite.Api.Controllers
             )).ToList();
 
             return Ok(result);
+        }
+
+        [HttpGet("{id:long}")]
+        public async Task<ActionResult<TicketListItemDto>> GetById(long id, CancellationToken ct)
+        {
+            var ticket = await _db.Tickets
+                .Include(t => t.TaskCategory)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == id, ct);
+
+            if (ticket == null)
+                return NotFound();
+
+            return Ok(new TicketListItemDto(
+                ticket.Id,
+                ticket.Site,
+                ticket.NotificationName ?? "",
+                ticket.Notification ?? "",
+                ticket.Status,
+                ticket.TaskCategoryId,
+                ticket.TaskCategory != null ? ticket.TaskCategory.Name : null,
+                ticket.ActionRequiredOverride,
+                ticket.AssignedTech,
+                ticket.CreatedAt,
+                ticket.LastActivityAt,
+                ticket.CurrentWorkOrder ?? "",
+                NormalizeWorkOrderType(ticket.WorkOrderClass),
+                ticket.GroupCode,
+                ticket.PriorityDays,
+                ticket.Problem,
+                ticket.Notes ?? "",
+                ticket.CreatedBy,
+                ticket.DispatchNotes ?? ""
+            ));
         }
 
         [HttpGet("field-tech/tasks/{employeeId}")]
@@ -648,31 +868,56 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(new UpdateTicketResponse(entity.Id));
         }
 
-        [HttpPost("{id:long}/resolve-dispatch-task")]
-        public async Task<ActionResult<UpdateTicketResponse>> ResolveDispatchTask(long id, CancellationToken ct)
+        [HttpPost("{id:long}/close-dispatch-task")]
+        public async Task<ActionResult<UpdateTicketResponse>> CloseDispatchTask(long id, CancellationToken ct)
         {
-            var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+            var entity = await _db.Tickets
+                .FirstOrDefaultAsync(t => t.Id == id, ct);
+
             if (entity == null)
                 return NotFound();
 
-            var openStatus = await _db.TicketStatuses
+            var closedStatuses = await _db.TicketStatuses
                 .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    x => x.IsActive && x.Name.ToLower() == "open",
-                    ct);
+                .Where(x => x.IsActive && x.IsClosed)
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Name)
+                .ToListAsync(ct);
 
-            if (openStatus == null)
-                return BadRequest("Status 'Open' is missing or inactive.");
+            var closedStatus = closedStatuses.FirstOrDefault(x =>
+                string.Equals(x.Name, "Closed", StringComparison.OrdinalIgnoreCase));
 
-            entity.Status = openStatus.Name;
+            if (closedStatus == null && closedStatuses.Count == 1)
+                closedStatus = closedStatuses[0];
+
+            if (closedStatus == null)
+            {
+                if (closedStatuses.Count == 0)
+                {
+                    return BadRequest(
+                        "No active closed ticket status is configured. " +
+                        "Go to Administration > Tickets and configure an active status as Closed.");
+                }
+
+                return BadRequest(
+                    "More than one active closed ticket status is configured and none is named 'Closed'. " +
+                    "Configure one active closed status named 'Closed' for dispatcher closure actions.");
+            }
+
+            entity.Status = closedStatus.Name;
+
+            // These are active follow-up fields; once dispatch closes the ticket,
+            // it should no longer carry an outstanding task action.
             entity.TaskCategoryId = null;
             entity.ActionRequiredOverride = null;
+
             entity.LastActivityAt = DateTime.Now;
 
-            entity.Notes = AppendTicketNote(
-                entity.Notes,
-                "Dispatch task marked done",
-                "Dispatcher resolved the task.",
+            // Dispatcher activity belongs in Dispatch Notes, not technician write-ups.
+            entity.DispatchNotes = AppendTicketNote(
+                entity.DispatchNotes,
+                "Ticket closed",
+                "Dispatcher closed the ticket from the Tasks pane.",
                 "Dispatcher");
 
             await _db.SaveChangesAsync(ct);
@@ -711,6 +956,47 @@ namespace SmartGridSuite.Api.Controllers
                 Notes = FirstNonBlank(t.DispatchNotes, t.Notes, t.Summary, t.Problem, t.NotificationName),
                 Status = string.IsNullOrWhiteSpace(t.Status) ? "Open" : t.Status,
                 Category = categoryName
+            };
+        }
+
+        private static DispatchTaskListItemDto MapToDispatchTaskQueryItem(TicketEntity ticket)
+        {
+            var actionRequired = FirstNonBlank(
+                ticket.ActionRequiredOverride,
+                "Review ticket");
+
+            return new DispatchTaskListItemDto
+            {
+                TicketId = ticket.Id,
+
+                OccurredAt = ticket.LastActivityAt != default
+                    ? ticket.LastActivityAt
+                    : ticket.CreatedAt,
+
+                Site = ticket.Site ?? "",
+                NotificationName = ticket.NotificationName ?? "",
+                Problem = ticket.Problem ?? "",
+
+                Tech = ticket.AssignedTech ?? "",
+
+                Notification = ticket.Notification ?? "",
+                WorkOrder = ticket.CurrentWorkOrder ?? "",
+                WorkOrderType = NormalizeWorkOrderType(ticket.WorkOrderClass),
+
+                ActionRequired = actionRequired,
+
+                Notes = FirstNonBlank(
+                    ticket.DispatchNotes,
+                    ticket.Notes,
+                    ticket.Problem,
+                    ticket.NotificationName),
+
+                Status = string.IsNullOrWhiteSpace(ticket.Status)
+                    ? "Open"
+                    : ticket.Status,
+
+                // Legacy category administration is no longer used by the new Tasks query.
+                Category = ""
             };
         }
 
@@ -1390,14 +1676,18 @@ namespace SmartGridSuite.Api.Controllers
             entity.ActionRequiredOverride = "Review submitted site write-up";
             entity.LastActivityAt = DateTime.Now;
 
-            var needsReviewStatus = await _db.TicketStatuses
+            var writeUpSubmitStatus = await _db.TicketStatuses
                 .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    x => x.IsActive && x.Name.ToLower() == "needs review",
-                    ct);
+                .FirstOrDefaultAsync(x => x.IsActive && x.IsWriteUpSubmitTarget, ct);
 
-            if (needsReviewStatus != null)
-                entity.Status = needsReviewStatus.Name;
+            if (writeUpSubmitStatus == null)
+            {
+                return BadRequest(
+                    "No active ticket status is configured for submitted write-ups. " +
+                    "Go to Administration > Tickets and select one status as the write-up submitted target.");
+            }
+
+            entity.Status = writeUpSubmitStatus.Name;
 
             await _db.SaveChangesAsync(ct);
 

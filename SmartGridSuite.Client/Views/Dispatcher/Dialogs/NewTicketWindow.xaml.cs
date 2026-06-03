@@ -1,12 +1,8 @@
 ﻿using SmartGridSuite.Client.Models.Dispatcher;
 using SmartGridSuite.Client.Services;
-using SmartGridSuite.Contracts.Administration.Ticket.Status;
 using SmartGridSuite.Contracts.Tickets;
 using System.Security.Principal;
-using System.Text.RegularExpressions;
 using System.Windows;
-
-
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs;
 
@@ -15,12 +11,17 @@ public partial class NewTicketWindow : Window
     private readonly TicketsApi _ticketsApi;
     private readonly TicketAdminApi _ticketAdminApi;
     private readonly List<string> _techSuggestions;
-    private readonly List<TicketTaskCategoryDto> _taskCategories = new();
 
     private readonly long? _editingTicketId;
-    private readonly ulong? _initialTaskCategoryId;
-    private readonly string _initialTaskCategoryName = "";
-    private readonly string _initialActionRequiredOverride = "";
+
+    // Preserve legacy task/action values until the Tasks pane data model is simplified.
+    // These values are no longer edited from New/Edit Ticket.
+    private readonly ulong? _preservedTaskCategoryId;
+    private readonly string? _preservedActionRequiredOverride;
+
+    // Technician notes/write-ups are visible in Edit mode for reference only.
+    // They are preserved exactly when dispatcher-controlled ticket fields are saved.
+    private readonly string _preservedNotes = "";
 
     private bool _hasLoadedLookups;
 
@@ -37,50 +38,90 @@ public partial class NewTicketWindow : Window
         _ticketsApi = ticketsApi;
         _ticketAdminApi = new TicketAdminApi(new ApiClient("https://localhost:7140"));
 
-        _techSuggestions = (techNames ?? Enumerable.Empty<string>())
-                        .Where(x => !string.IsNullOrWhiteSpace(x))
-                        .Select(x => x.Trim())
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .OrderBy(x => x)
-                        .ToList();
+        _techSuggestions = new List<string> { "(Unassigned)" };
+
+        _techSuggestions.AddRange(
+            (techNames ?? Enumerable.Empty<string>())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Where(x => !x.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x));
 
         if (existingTicket != null &&
             !string.IsNullOrWhiteSpace(existingTicket.AssignedTech) &&
-            !string.Equals(existingTicket.AssignedTech, "(Unassigned)", StringComparison.OrdinalIgnoreCase) &&
+            !existingTicket.AssignedTech.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase) &&
             !_techSuggestions.Contains(existingTicket.AssignedTech, StringComparer.OrdinalIgnoreCase))
-            {
-                _techSuggestions.Add(existingTicket.AssignedTech.Trim());
-                _techSuggestions.Sort(StringComparer.OrdinalIgnoreCase);
-            }
+        {
+            _techSuggestions.Add(existingTicket.AssignedTech.Trim());
 
-        WorkOrderTypeBox.ItemsSource = new[] { "", "Maintenance", "Capital", "Distribution" };
-        PriorityBox.ItemsSource = new[] { "", "1", "3", "5", "15" };
+            var orderedSuggestions = _techSuggestions
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(x => x)
+                .ToList();
+
+            _techSuggestions.Clear();
+            _techSuggestions.AddRange(orderedSuggestions);
+        }
+
+        WorkOrderTypeBox.ItemsSource = new[]
+        {
+            "",
+            "Maintenance",
+            "Capital",
+            "Distribution"
+        };
+
+        PriorityBox.ItemsSource = new[]
+        {
+            "",
+            "1 Day",
+            "3 Days",
+            "5 Days",
+            "15 Days"
+        };
+
         AssignedToBox.ItemsSource = _techSuggestions;
 
-        var createdBy = TryGetDisplayName() ?? (WindowsIdentity.GetCurrent()?.Name ?? Environment.UserName);
+        var createdBy =
+            TryGetDisplayName() ??
+            (WindowsIdentity.GetCurrent()?.Name ?? Environment.UserName);
 
         DataContext = new NewTicketDraft
         {
             CreatedBy = createdBy,
+            AssignedTo = "(Unassigned)",
             PriorityDays = "",
             Status = ""
         };
 
         _editingTicketId = existingTicket?.Id;
-        _initialTaskCategoryId = existingTicket?.TaskCategoryId;
-        _initialTaskCategoryName = existingTicket?.TaskCategoryName ?? "";
-        _initialActionRequiredOverride = existingTicket?.ActionRequiredOverride ?? "";
+        _preservedTaskCategoryId = existingTicket?.TaskCategoryId;
+        _preservedActionRequiredOverride =
+            string.IsNullOrWhiteSpace(existingTicket?.ActionRequiredOverride)
+                ? null
+                : existingTicket.ActionRequiredOverride.Trim();
+        _preservedNotes = existingTicket?.Notes ?? "";
 
         if (existingTicket != null)
         {
             Title = "Edit Ticket";
             CreateBtn.Content = "Save Changes";
+
             PopulateDraftFromExistingTicket(existingTicket, createdBy);
+
+            TechnicianNotesPanel.Visibility =
+                string.IsNullOrWhiteSpace(_preservedNotes)
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
         }
         else
         {
             Title = "New Ticket";
             CreateBtn.Content = "Create Ticket";
+
+            TechnicianNotesPanel.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -89,31 +130,52 @@ public partial class NewTicketWindow : Window
         Draft.Site = ticket.Site ?? "";
         Draft.FullSiteName = "";
         Draft.Problem = ticket.Problem ?? "";
-        Draft.AssignedTo = string.Equals(ticket.AssignedTech, "(Unassigned)", StringComparison.OrdinalIgnoreCase)
-            ? ""
-            : (ticket.AssignedTech ?? "");
+
+        Draft.AssignedTo =
+            string.IsNullOrWhiteSpace(ticket.AssignedTech) ||
+            ticket.AssignedTech.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase)
+                ? "(Unassigned)"
+                : ticket.AssignedTech;
+
         Draft.Status = ticket.Status ?? "";
         Draft.NotificationName = ticket.NotificationName ?? "";
         Draft.NotificationNumber = ticket.Notification ?? "";
         Draft.WorkOrder = ticket.CurrentWorkOrder ?? "";
         Draft.WorkOrderType = ticket.WorkOrderType ?? "";
         Draft.WorkOrderCode = ticket.GroupCode ?? "";
-        Draft.PriorityDays = ticket.PriorityDays > 0 ? ticket.PriorityDays.ToString() : "";
-        Draft.Notes = ticket.Notes ?? "";
+
+        Draft.PriorityDays = ticket.PriorityDays switch
+        {
+            1 => "1 Day",
+            3 => "3 Days",
+            5 => "5 Days",
+            15 => "15 Days",
+            _ => ""
+        };
+
         Draft.DispatchNotes = ticket.DispatchNotes ?? "";
-        Draft.CreatedBy = string.IsNullOrWhiteSpace(ticket.CreatedBy) ? fallbackCreatedBy : ticket.CreatedBy;
+
+        // Visible only in Edit mode when technician notes already exist.
+        // This value is never edited/saved from the UI.
+        Draft.Notes = _preservedNotes;
+
+        Draft.CreatedBy = string.IsNullOrWhiteSpace(ticket.CreatedBy)
+            ? fallbackCreatedBy
+            : ticket.CreatedBy;
     }
 
     private static string? TryGetDisplayName()
     {
         try
         {
-            var full = Environment.GetEnvironmentVariable("FULLNAME");
-            if (!string.IsNullOrWhiteSpace(full))
-                return full.Trim();
+            var fullName = Environment.GetEnvironmentVariable("FULLNAME");
+
+            if (!string.IsNullOrWhiteSpace(fullName))
+                return fullName.Trim();
         }
         catch
         {
+            // Fall back to Windows identity below.
         }
 
         return null;
@@ -129,8 +191,6 @@ public partial class NewTicketWindow : Window
         try
         {
             await LoadStatusesAsync();
-            await LoadTaskCategoriesAsync();
-            ApplyInitialLookupSelections();
             ApplyAssignedTechSelection();
         }
         catch (Exception ex)
@@ -147,85 +207,39 @@ public partial class NewTicketWindow : Window
     {
         var statuses = await _ticketAdminApi.GetStatusesAsync(ct: ct);
 
-        var visibleStatuses = statuses
-            .Where(x => x.IsActive && x.ShowInFilter)
+        var availableStatuses = statuses
+            .Where(x =>
+                x.IsActive ||
+                (IsEditMode &&
+                 string.Equals(x.Name, Draft.Status, StringComparison.OrdinalIgnoreCase)))
             .OrderBy(x => x.SortOrder)
             .ThenBy(x => x.Name)
             .Select(x => x.Name)
             .ToList();
 
-        StatusBox.ItemsSource = visibleStatuses;
+        StatusBox.ItemsSource = availableStatuses;
 
-        if (visibleStatuses.Count == 0)
+        if (availableStatuses.Count == 0)
             return;
 
-        if (string.IsNullOrWhiteSpace(Draft.Status) || !visibleStatuses.Contains(Draft.Status))
+        if (string.IsNullOrWhiteSpace(Draft.Status) ||
+            !availableStatuses.Contains(Draft.Status, StringComparer.OrdinalIgnoreCase))
         {
             Draft.Status =
-                visibleStatuses.FirstOrDefault(x => x.Equals("Open", StringComparison.OrdinalIgnoreCase))
-                ?? visibleStatuses.First();
+                availableStatuses.FirstOrDefault(x =>
+                    x.Equals("Open", StringComparison.OrdinalIgnoreCase))
+                ?? availableStatuses.First();
         }
-    }
-
-    private async Task LoadTaskCategoriesAsync(CancellationToken ct = default)
-    {
-        _taskCategories.Clear();
-
-        _taskCategories.AddRange(
-            (await _ticketAdminApi.GetTaskCategoriesAsync(ct: ct))
-            .Where(x => x.IsActive)
-            .OrderBy(x => x.Name));
-
-        TaskCategoryComboBox.ItemsSource = _taskCategories
-            .Select(x => x.Name)
-            .ToList();
-
-        TaskCategoryComboBox.SelectedIndex = -1;
-    }
-
-    private void ApplyInitialLookupSelections()
-    {
-        ActionRequiredOverrideTextBox.Text = _initialActionRequiredOverride;
-
-        if (_taskCategories.Count == 0)
-            return;
-
-        TicketTaskCategoryDto? selectedCategory = null;
-
-        if (_initialTaskCategoryId.HasValue)
-        {
-            selectedCategory = _taskCategories.FirstOrDefault(x => x.Id == _initialTaskCategoryId.Value);
-        }
-
-        if (selectedCategory == null && !string.IsNullOrWhiteSpace(_initialTaskCategoryName))
-        {
-            selectedCategory = _taskCategories.FirstOrDefault(x =>
-                string.Equals(x.Name, _initialTaskCategoryName, StringComparison.OrdinalIgnoreCase));
-        }
-
-        if (selectedCategory != null)
-            TaskCategoryComboBox.SelectedItem = selectedCategory.Name;
-    }
-
-    private void Cancel_Click(object sender, RoutedEventArgs e)
-    {
-        DialogResult = false;
-        Close();
     }
 
     private void ApplyAssignedTechSelection()
     {
-        var assigned = (Draft.AssignedTo ?? "").Trim();
+        var assigned = string.IsNullOrWhiteSpace(Draft.AssignedTo)
+            ? "(Unassigned)"
+            : Draft.AssignedTo.Trim();
 
         AssignedToBox.ItemsSource = null;
         AssignedToBox.ItemsSource = _techSuggestions;
-
-        if (string.IsNullOrWhiteSpace(assigned))
-        {
-            AssignedToBox.SelectedItem = null;
-            Draft.AssignedTo = "";
-            return;
-        }
 
         var match = _techSuggestions.FirstOrDefault(x =>
             string.Equals(x, assigned, StringComparison.OrdinalIgnoreCase));
@@ -233,7 +247,15 @@ public partial class NewTicketWindow : Window
         if (match == null)
         {
             _techSuggestions.Add(assigned);
-            _techSuggestions.Sort(StringComparer.OrdinalIgnoreCase);
+
+            var orderedSuggestions = _techSuggestions
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(x => x)
+                .ToList();
+
+            _techSuggestions.Clear();
+            _techSuggestions.AddRange(orderedSuggestions);
 
             AssignedToBox.ItemsSource = null;
             AssignedToBox.ItemsSource = _techSuggestions;
@@ -242,69 +264,81 @@ public partial class NewTicketWindow : Window
                 string.Equals(x, assigned, StringComparison.OrdinalIgnoreCase));
         }
 
-        AssignedToBox.SelectedItem = match;
-        Draft.AssignedTo = match ?? "";
+        AssignedToBox.SelectedItem = match ?? "(Unassigned)";
+        Draft.AssignedTo = match ?? "(Unassigned)";
+    }
+
+    private void Cancel_Click(object sender, RoutedEventArgs e)
+    {
+        DialogResult = false;
+        Close();
     }
 
     private async void Create_Click(object sender, RoutedEventArgs e)
     {
         var site = (Draft.Site ?? "").Trim();
+
         if (string.IsNullOrWhiteSpace(site))
         {
-            MessageBox.Show("Site is required.", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(
+                "Site is required.",
+                Title,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+
             return;
         }
 
         var problem = (Draft.Problem ?? "").Trim();
 
         var status = (Draft.Status ?? "").Trim();
+
         if (string.IsNullOrWhiteSpace(status))
         {
-            MessageBox.Show("Status is required.", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(
+                "Status is required.",
+                Title,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+
             return;
         }
 
-        var notif = (Draft.NotificationNumber ?? "").Trim();
+        var notification = (Draft.NotificationNumber ?? "").Trim();
 
-        string? workOrder = null;
-        var wo = (Draft.WorkOrder ?? "").Trim();
+        var workOrderText = (Draft.WorkOrder ?? "").Trim();
 
-        if (!string.IsNullOrWhiteSpace(wo))
-            workOrder = wo;
+        string? workOrder = string.IsNullOrWhiteSpace(workOrderText)
+            ? null
+            : workOrderText;
 
-        int priority = 0;
-        var pri = (Draft.PriorityDays ?? "").Trim();
-        if (!string.IsNullOrWhiteSpace(pri))
+        var priority = ParsePriorityDays(Draft.PriorityDays);
+
+        if (priority < 0)
         {
-            if (!int.TryParse(pri, out priority) || (priority != 1 && priority != 3 && priority != 5 && priority != 15))
-            {
-                MessageBox.Show("Priority must be blank or one of: 1, 3, 5, 15.", Title,
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            MessageBox.Show(
+                "Priority must be blank or one of: 1 Day, 3 Days, 5 Days, or 15 Days.",
+                Title,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+
+            return;
         }
 
         var assigned = (AssignedToBox.SelectedItem as string ?? Draft.AssignedTo ?? "").Trim();
-        var assignedTech = string.IsNullOrWhiteSpace(assigned) ? "(Unassigned)" : assigned;
 
-        var woType = (Draft.WorkOrderType ?? "").Trim();
-        var woCode = (Draft.WorkOrderCode ?? "").Trim();
+        var assignedTech = string.IsNullOrWhiteSpace(assigned)
+            ? "(Unassigned)"
+            : assigned;
+
+        var workOrderType = (Draft.WorkOrderType ?? "").Trim();
+        var workOrderCode = (Draft.WorkOrderCode ?? "").Trim();
+
         if (workOrder == null)
         {
-            woType = "";
-            woCode = "";
+            workOrderType = "";
+            workOrderCode = "";
         }
-
-        var selectedTaskCategoryName = (TaskCategoryComboBox.SelectedItem as string)?.Trim();
-
-        var selectedTaskCategory = string.IsNullOrWhiteSpace(selectedTaskCategoryName)
-            ? null
-            : _taskCategories.FirstOrDefault(x =>
-                string.Equals(x.Name, selectedTaskCategoryName, StringComparison.OrdinalIgnoreCase));
-
-        var actionRequiredOverride = string.IsNullOrWhiteSpace(ActionRequiredOverrideTextBox.Text)
-            ? null
-            : ActionRequiredOverrideTextBox.Text.Trim();
 
         SetBusy(true);
 
@@ -312,50 +346,59 @@ public partial class NewTicketWindow : Window
         {
             if (IsEditMode)
             {
-                var updateReq = new UpdateTicketRequest(
+                var updateRequest = new UpdateTicketRequest(
                     Site: site,
                     NotificationName: (Draft.NotificationName ?? "").Trim(),
-                    Notification: notif ?? "",
+                    Notification: notification,
                     WorkOrder: workOrder,
-                    WorkOrderClass: woType,
-                    GroupCode: woCode,
+                    WorkOrderClass: workOrderType,
+                    GroupCode: workOrderCode,
                     PriorityDays: priority,
                     Status: status,
-                    TaskCategoryId: selectedTaskCategory?.Id,
-                    ActionRequiredOverride: actionRequiredOverride,
+                    TaskCategoryId: _preservedTaskCategoryId,
+                    ActionRequiredOverride: _preservedActionRequiredOverride,
                     AssignedTech: assignedTech,
                     Problem: problem,
-                    Notes: (Draft.Notes ?? "").Trim(),
+
+                    // Technician write-ups are shown read-only and preserved exactly.
+                    Notes: _preservedNotes,
+
                     DispatchNotes: (Draft.DispatchNotes ?? "").Trim()
                 );
 
-                CreatedTicketId = await _ticketsApi.UpdateTicketAsync(_editingTicketId!.Value, updateReq);
+                CreatedTicketId = await _ticketsApi.UpdateTicketAsync(
+                    _editingTicketId!.Value,
+                    updateRequest);
             }
             else
             {
                 var createdBy = (Draft.CreatedBy ?? "").Trim();
+
                 if (string.IsNullOrWhiteSpace(createdBy))
                     createdBy = WindowsIdentity.GetCurrent()?.Name ?? Environment.UserName;
 
-                var createReq = new CreateTicketRequest(
+                var createRequest = new CreateTicketRequest(
                     Site: site,
                     NotificationName: (Draft.NotificationName ?? "").Trim(),
-                    Notification: notif ?? "",
+                    Notification: notification,
                     WorkOrder: workOrder,
-                    WorkOrderClass: woType,
-                    GroupCode: woCode,
+                    WorkOrderClass: workOrderType,
+                    GroupCode: workOrderCode,
                     PriorityDays: priority,
                     Status: status,
-                    TaskCategoryId: selectedTaskCategory?.Id,
-                    ActionRequiredOverride: actionRequiredOverride,
+                    TaskCategoryId: null,
+                    ActionRequiredOverride: null,
                     AssignedTech: assignedTech,
                     Problem: problem,
-                    Notes: (Draft.Notes ?? "").Trim(),
+
+                    // New tickets cannot create technician write-ups.
+                    Notes: "",
+
                     DispatchNotes: (Draft.DispatchNotes ?? "").Trim(),
                     CreatedBy: createdBy
                 );
 
-                CreatedTicketId = await _ticketsApi.CreateTicketAsync(createReq);
+                CreatedTicketId = await _ticketsApi.CreateTicketAsync(createRequest);
             }
 
             DialogResult = true;
@@ -379,12 +422,29 @@ public partial class NewTicketWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, $"{Title} Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(
+                ex.Message,
+                $"{Title} Failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
         finally
         {
             SetBusy(false);
         }
+    }
+
+    private static int ParsePriorityDays(string? priorityValue)
+    {
+        return (priorityValue ?? "").Trim() switch
+        {
+            "" => 0,
+            "1 Day" => 1,
+            "3 Days" => 3,
+            "5 Days" => 5,
+            "15 Days" => 15,
+            _ => -1
+        };
     }
 
     private void SetBusy(bool busy)

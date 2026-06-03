@@ -10,18 +10,6 @@
 
     <UserControl.Resources>
 
-        <!-- Small icon-ish button -->
-        <Style x:Key="MiniIconButton" TargetType="Button">
-            <Setter Property="Width" Value="28"/>
-            <Setter Property="Height" Value="28"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Margin" Value="6,0,0,0"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="ToolTipService.ShowDuration" Value="4000"/>
-        </Style>
-
         <!-- Copy glyph -->
         <Style x:Key="CopyGlyph" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
@@ -30,24 +18,6 @@
             <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
-        </Style>
-
-        <!-- Tight single-line cell text -->
-        <Style x:Key="TrimCellText" TargetType="{x:Type TextBlock}">
-            <Setter Property="TextWrapping" Value="NoWrap"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <!-- Small badge for Work Order class -->
-        <Style x:Key="WoBadge" TargetType="Border">
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Padding" Value="8,3"/>
-            <Setter Property="Margin" Value="8,0,0,0"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
         <Style x:Key="TaskDetailLabelText" TargetType="TextBlock">
@@ -71,194 +41,345 @@
             <Setter Property="Padding" Value="12"/>
         </Style>
 
+        <Style x:Key="FilterLabelText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="Opacity" Value="0.88"/>
+            <Setter Property="Margin" Value="2,0,0,0"/>
+        </Style>
+
+        <Style x:Key="TrimCellText" TargetType="{x:Type TextBlock}">
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="2,0,2,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        </Style>
+
+        <Style x:Key="TasksGridColumnHeaderStyle"
+               TargetType="DataGridColumnHeader"
+               BasedOn="{StaticResource ThemedDataGridColumnHeaderStyle}">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+        
     </UserControl.Resources>
 
-    <Grid>
+    <Grid Margin="0,8,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <StackPanel Grid.Row="0">
-            <TextBlock Text="Tasks"
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel>
+                <TextBlock Text="Tasks"
                        FontSize="18"
                        FontWeight="Bold"
                        Foreground="{DynamicResource TextPrimary}"/>
-            <TextBlock Text="Items waiting on dispatch action (work order conversion, finalize notes, parts follow-up, closeout, escalation)."
-                       Margin="0,4,0,0"
+
+                <TextBlock Text="Items waiting on dispatch action."
+                       Margin="0,0,0,0"
                        Foreground="{DynamicResource TextSecondary}"/>
-        </StackPanel>
+            </StackPanel>            
+        </Grid>
 
         <!-- Filters -->
-        <Grid Grid.Row="1" Margin="0,14,0,12">
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="6"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="10"/>
-                <ColumnDefinition Width="170"/>
-                <ColumnDefinition Width="10"/>
-                <ColumnDefinition Width="190"/>
-                <ColumnDefinition Width="10"/>
-                <ColumnDefinition Width="140"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="220"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
+            <!-- Labels -->
+            <TextBlock Grid.Row="0"
+                   Grid.Column="0"
+                   Text="Search"
+                   Style="{StaticResource FilterLabelText}"/>
+
+            <TextBlock Grid.Row="0"
+                   Grid.Column="2"
+                   Text="Status"
+                   Style="{StaticResource FilterLabelText}"/>
+
+            <!-- Controls -->
             <TextBox x:Name="SearchBox"
-                     Grid.Column="0"
-                     Style="{StaticResource ClearableSearchTextBox}"
-                     Tag="Search site, tech, notification, WO, action, notes…"
-                     Height="34"
-                     TextChanged="SearchBox_TextChanged"/>
+                 Grid.Row="2"
+                 Grid.Column="0"
+                 Style="{StaticResource ClearableSearchTextBox}"
+                 Tag="Search site, notification, WO, tech, action required..."
+                 Height="36"
+                 TextChanged="SearchBox_TextChanged"/>
 
             <ComboBox x:Name="StatusFilter"
-                      Grid.Column="2"
-                      Height="34"
-                      SelectionChanged="Filters_SelectionChanged"/>
+                  Grid.Row="2"
+                  Grid.Column="2"
+                  Height="36"
+                  Width="Auto"
+                  MinWidth="0"
+                  HorizontalAlignment="Stretch"
+                  SelectionChanged="Filters_SelectionChanged"/>
 
-            <ComboBox x:Name="CategoryFilter"
-                      Grid.Column="4"
-                      Height="34"
-                      SelectionChanged="Filters_SelectionChanged"/>
+            <Button Grid.Row="2"
+                Grid.Column="4"
+                Content="Clear Filters"
+                Height="36"
+                Padding="14,0"
+                Click="ClearTaskFilters_Click"/>
 
-            <Button Grid.Column="6"
-                    Style="{StaticResource PrimaryButtonStyle}"
-                    Height="34"
+            <Button Grid.Row="2"
+                    Grid.Column="6"
                     Content="Refresh"
+                    VerticalAlignment="Top"
                     Click="Refresh_Click"/>
         </Grid>
 
-        <!-- Body -->
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="10"/>
-                <ColumnDefinition x:Name="DetailsCol" Width="0"/>
-            </Grid.ColumnDefinitions>
+        <!-- Main workspace -->
+        <Border Grid.Row="4"
+            Style="{StaticResource Card}"
+            Padding="14">
 
-            <!-- Tasks table -->
-            <DataGrid Grid.Column="0"
-                      x:Name="TasksGrid"
-                      Style="{StaticResource ThemedDataGridStyle}"
-                      AutoGenerateColumns="False"
-                      HeadersVisibility="Column"
-                      IsReadOnly="True"
-                      SelectionMode="Single"
-                      SelectionChanged="TasksGrid_SelectionChanged"
-                      MouseDoubleClick="TasksGrid_MouseDoubleClick">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition x:Name="DetailsSplitterCol" Width="0"/>
+                    <ColumnDefinition x:Name="DetailsCol" Width="0"/>
+                </Grid.ColumnDefinitions>
 
-                <DataGrid.Columns>
+                <!-- Task List -->
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                    <DataGridTextColumn Header="Date/Time"
-                                        Width="150"
-                                        Binding="{Binding OccurredAt, StringFormat={}{0:MM/dd HH:mm}}"/>
+                    <!-- Toolbar -->
+                    <DockPanel Grid.Row="0"
+                           LastChildFill="True">
 
-                    <DataGridTextColumn Header="Site"
-                                        Width="140"
-                                        Binding="{Binding Site}"
-                                        ElementStyle="{StaticResource TrimCellText}"/>
+                        <StackPanel DockPanel.Dock="Right"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
 
-                    <DataGridTextColumn Header="Tech"
-                                        Width="150"
-                                        Binding="{Binding Tech}"
-                                        ElementStyle="{StaticResource TrimCellText}"/>
+                            <Button x:Name="OpenTaskDetailsButton"
+                                Content="Open Details"
+                                Height="30"
+                                Padding="12,0"
+                                Margin="0,0,8,0"
+                                IsEnabled="False"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="OpenTaskDetails_Click"/>
 
-                    <!-- Notification + copy -->
-                    <DataGridTemplateColumn Header="Notification" Width="170">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <DockPanel LastChildFill="True">
-                                    <Button DockPanel.Dock="Right"
-                                            Style="{StaticResource MiniIconButton}"
-                                            ToolTip="Copy Notification"
-                                            Tag="{Binding Notification}"
-                                            Click="CopyNotification_Click">
-                                        <TextBlock Style="{StaticResource CopyGlyph}"/>
-                                    </Button>
+                            <Button x:Name="OpenTaskTicketButton"
+                                Content="Edit Ticket"
+                                Height="30"
+                                Padding="12,0"
+                                Margin="0,0,8,0"
+                                IsEnabled="False"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="OpenNotification_Click"/>
 
-                                    <TextBlock Text="{Binding Notification}"
-                                               Style="{StaticResource TrimCellText}"/>
-                                </DockPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                            <Button x:Name="MarkTaskClosedButton"
+                                Content="Mark Closed"
+                                Height="30"
+                                Width="84"
+                                Padding="12,0"
+                                IsEnabled="False"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Click="MarkClosed_Click"/>
+                        </StackPanel>
 
-                    <!-- Work Order + badge + copy -->
-                    <DataGridTemplateColumn Header="Work Order" Width="220">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <DockPanel LastChildFill="True">
+                        <TextBlock Text="Task List"
+                               Margin="2,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+                    </DockPanel>
 
-                                    <Button DockPanel.Dock="Right"
-                                            ToolTip="Copy Work Order"
-                                            Tag="{Binding WorkOrder}"
-                                            Click="CopyWorkOrder_Click">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource MiniIconButton}">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding WorkOrder}" Value="">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding WorkOrder}" Value="{x:Null}">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <TextBlock Style="{StaticResource CopyGlyph}"/>
-                                    </Button>
+                    <!-- Grid -->
+                    <DataGrid Grid.Row="2"
+                          x:Name="TasksGrid"
+                          Style="{StaticResource ThemedDataGridStyle}"
+                          AutoGenerateColumns="False"
+                          HeadersVisibility="Column"
+                          IsReadOnly="True"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          RowHeight="34"
+                          MinRowHeight="34"
+                          CanUserResizeRows="False"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="{DynamicResource SurfaceBorder}"
+                          ColumnHeaderStyle="{StaticResource TasksGridColumnHeaderStyle}"
+                          SelectionChanged="TasksGrid_SelectionChanged"
+                          MouseDoubleClick="TasksGrid_MouseDoubleClick">
 
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding WorkOrder}"
+                        <DataGrid.Columns>
+
+                            <DataGridTextColumn Header="Site"
+                                            Width="105"
+                                            Binding="{Binding Site}"
+                                            ElementStyle="{StaticResource TrimCellText}"/>
+
+                            <DataGridTextColumn Header="Notification Name"
+                                            Width="2*"
+                                            Binding="{Binding NotificationName}"
+                                            ElementStyle="{StaticResource TrimCellText}"/>
+
+                            <DataGridTextColumn Header="Problem / Issue"
+                                            Width="2*"
+                                            Binding="{Binding Problem}"
+                                            ElementStyle="{StaticResource TrimCellText}"/>
+
+                            <DataGridTemplateColumn Header="Notification"
+                                                Width="128">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="28"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Grid.Column="0"
+                                                   Text="{Binding Notification}"
                                                    Style="{StaticResource TrimCellText}"/>
 
-                                        <Border>
-                                            <Border.Style>
-                                                <Style TargetType="Border" BasedOn="{StaticResource WoBadge}">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding WorkOrder}" Value="">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding WorkOrder}" Value="{x:Null}">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding WorkOrderClassLabel}" Value="">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding WorkOrderClassLabel}" Value="{x:Null}">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
+                                            <Button Grid.Column="1"
+                                                Width="24"
+                                                Height="24"
+                                                Margin="4,0,0,0"
+                                                Tag="{Binding Notification}"
+                                                ToolTip="Copy notification"
+                                                Click="CopyNotification_Click">
+                                                <Button.Style>
+                                                    <Style TargetType="Button"
+                                                       BasedOn="{StaticResource FlatCopyIconButton}">
+                                                        <Setter Property="Visibility" Value="Visible"/>
 
-                                            <TextBlock Text="{Binding WorkOrderClassLabel}"
-                                                       Foreground="{DynamicResource TextSecondary}"
-                                                       FontSize="12"
-                                                       VerticalAlignment="Center"/>
-                                        </Border>
-                                    </StackPanel>
-                                </DockPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Notification}" Value="">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
 
-                    <DataGridTextColumn Header="Action Required"
-                                        Width="*"
-                                        Binding="{Binding ActionRequired}"
-                                        ElementStyle="{StaticResource TrimCellText}"/>
+                                                            <DataTrigger Binding="{Binding Notification}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
 
-                    <DataGridTextColumn Header="Status"
-                                        Width="110"
-                                        Binding="{Binding Status}"
-                                        ElementStyle="{StaticResource TrimCellText}"/>
+                                                <TextBlock Style="{StaticResource CopyGlyph}"
+                                                       FontSize="13"/>
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
 
-                </DataGrid.Columns>
-            </DataGrid>
+                            <DataGridTemplateColumn Header="Work Order"
+                                                Width="130">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="28"/>
+                                            </Grid.ColumnDefinitions>
 
-            <!-- Splitter -->
-            <GridSplitter Grid.Column="1"
+                                            <TextBlock Grid.Column="0"
+                                                   Text="{Binding WorkOrder}"
+                                                   Style="{StaticResource TrimCellText}"/>
+
+                                            <Button Grid.Column="1"
+                                                Width="24"
+                                                Height="24"
+                                                Margin="4,0,0,0"
+                                                Tag="{Binding WorkOrder}"
+                                                ToolTip="Copy work order"
+                                                Click="CopyWorkOrder_Click">
+                                                <Button.Style>
+                                                    <Style TargetType="Button"
+                                                       BasedOn="{StaticResource FlatCopyIconButton}">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding WorkOrder}" Value="">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+
+                                                            <DataTrigger Binding="{Binding WorkOrder}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+
+                                                <TextBlock Style="{StaticResource CopyGlyph}"
+                                                       FontSize="13"/>
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="WO Type"
+                                            Width="105"
+                                            Binding="{Binding WorkOrderClassLabel}"
+                                            ElementStyle="{StaticResource TrimCellText}"/>
+
+                            <DataGridTextColumn Header="Status"
+                                            Width="125"
+                                            Binding="{Binding Status}"
+                                            ElementStyle="{StaticResource TrimCellText}"/>
+
+                            <DataGridTextColumn Header="Tech"
+                                            Width="140"
+                                            Binding="{Binding Tech}"
+                                            ElementStyle="{StaticResource TrimCellText}"/>
+
+                            <DataGridTextColumn Header="Action Required"
+                                            Width="2*"
+                                            Binding="{Binding ActionRequired}"
+                                            ElementStyle="{StaticResource TrimCellText}"/>
+
+                            <DataGridTextColumn Header="Last Activity"
+                                            Width="132"
+                                            Binding="{Binding OccurredAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"
+                                            ElementStyle="{StaticResource TrimCellText}"/>
+
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+
+                <!-- Splitter -->
+                <GridSplitter Grid.Column="1"
                           x:Name="DetailsSplitter"
                           Width="10"
                           HorizontalAlignment="Stretch"
@@ -267,328 +388,293 @@
                           ShowsPreview="True"
                           Visibility="Collapsed"/>
 
-            <!-- Details panel -->
-            <Border Grid.Column="2"
-        x:Name="DetailsPanel"
-        Style="{StaticResource Card}"
-        Padding="14"
-        Visibility="Collapsed">
+                <!-- Details panel -->
+                <Border Grid.Column="2"
+                    x:Name="DetailsPanel"
+                    Style="{StaticResource Card}"
+                    Padding="14"
+                    Visibility="Collapsed">
 
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="12"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="10"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="12"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                    <!-- Header -->
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel>
-                            <TextBlock Text="{Binding SelectedTask.Site, TargetNullValue=Task Details}"
-                           FontSize="20"
-                           FontWeight="Bold"
-                           Foreground="{DynamicResource TextPrimary}"/>
-
-                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                                <Border Padding="8,3"
-                            CornerRadius="10"
-                            Background="{DynamicResource SurfaceBg}"
-                            BorderBrush="{DynamicResource SurfaceBorder}"
-                            BorderThickness="1">
-                                    <TextBlock Text="{Binding SelectedTask.Category}"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-                                </Border>
-
-                                <Border Margin="8,0,0,0"
-                            Padding="8,3"
-                            CornerRadius="10"
-                            Background="{DynamicResource SurfaceBg}"
-                            BorderBrush="{DynamicResource SurfaceBorder}"
-                            BorderThickness="1">
-                                    <TextBlock Text="{Binding SelectedTask.Status}"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-                                </Border>
-                            </StackPanel>
-                        </StackPanel>
-
-                        <Button Grid.Column="1"
-                    Width="32"
-                    Height="32"
-                    Margin="10,0,0,0"
-                    ToolTip="Close details"
-                    Click="CloseDetails_Click"
-                    Background="Transparent"
-                    BorderThickness="0">
-                            <TextBlock Text="✕"
-                           FontSize="14"
-                           Foreground="{DynamicResource TextSecondary}"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Center"/>
-                        </Button>
-                    </Grid>
-
-                    <!-- Main info card -->
-                    <Border Grid.Row="2"
-                Style="{StaticResource TaskDetailSectionCard}">
-                        <Grid>
+                        <!-- Header -->
+                        <Grid Grid.Row="0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="14"/>
-                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="12"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="12"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="12"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="{Binding SelectedTask.Site, TargetNullValue=Task Details}"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
 
-                            <!-- LEFT 1 -->
-                            <StackPanel Grid.Row="0" Grid.Column="0">
-                                <TextBlock Text="Notification Name"
-                               Style="{StaticResource TaskDetailLabelText}"/>
-                                <TextBlock Text="{Binding SelectedTaskTicket.NotificationName}"
-                               Style="{StaticResource TaskDetailValueText}"/>
+                                <Border Margin="0,5,0,0"
+                                    HorizontalAlignment="Left"
+                                    Padding="8,3"
+                                    CornerRadius="10"
+                                    Background="{DynamicResource SurfaceBg}"
+                                    BorderBrush="{DynamicResource SurfaceBorder}"
+                                    BorderThickness="1">
+                                    <TextBlock Text="{Binding SelectedTask.Status}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                                </Border>
                             </StackPanel>
 
-                            <!-- RIGHT 1 -->
-                            <StackPanel Grid.Row="0" Grid.Column="2">
-                                <TextBlock Text="Problem / Issue"
-                               Style="{StaticResource TaskDetailLabelText}"/>
-                                <TextBlock Text="{Binding SelectedTaskTicket.Problem}"
-                               Style="{StaticResource TaskDetailValueText}"/>
-                            </StackPanel>
+                            <Button Grid.Column="1"
+                                Width="32"
+                                Height="32"
+                                Margin="10,0,0,0"
+                                ToolTip="Close details"
+                                Click="CloseDetails_Click"
+                                Background="Transparent"
+                                BorderThickness="0">
+                                <TextBlock Text="✕"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"/>
+                            </Button>
+                        </Grid>
 
-                            <!-- LEFT 2 -->
-                            <StackPanel Grid.Row="2" Grid.Column="0">
-                                <TextBlock Text="Notification"
-                               Style="{StaticResource TaskDetailLabelText}"/>
-                                <TextBlock Text="{Binding SelectedTask.Notification}"
-                               Style="{StaticResource TaskDetailValueText}"/>
-                            </StackPanel>
+                        <!-- Main info card -->
+                        <Border Grid.Row="2"
+                            Style="{StaticResource TaskDetailSectionCard}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                            <!-- RIGHT 2 -->
-                            <StackPanel Grid.Row="2" Grid.Column="2">
-                                <TextBlock Text="Work Order"
-                               Style="{StaticResource TaskDetailLabelText}"/>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="12"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="12"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="12"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
 
-                                <StackPanel Orientation="Horizontal"
-                                VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding SelectedTask.WorkOrder}"
-                                   Style="{StaticResource TaskDetailValueText}"
-                                   VerticalAlignment="Center"/>
+                                <!-- LEFT 1 -->
+                                <StackPanel Grid.Row="0" Grid.Column="0">
+                                    <TextBlock Text="Notification Name"
+                                           Style="{StaticResource TaskDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTaskTicket.NotificationName}"
+                                           Style="{StaticResource TaskDetailValueText}"/>
+                                </StackPanel>
 
-                                    <Border>
-                                        <Border.Style>
-                                            <Style TargetType="Border" BasedOn="{StaticResource WoBadge}">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding SelectedTask.WorkOrder}" Value="">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding SelectedTask.WorkOrder}" Value="{x:Null}">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding SelectedTask.WorkOrderClassLabel}" Value="">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding SelectedTask.WorkOrderClassLabel}" Value="{x:Null}">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
+                                <!-- RIGHT 1 -->
+                                <StackPanel Grid.Row="0" Grid.Column="2">
+                                    <TextBlock Text="Problem / Issue"
+                                           Style="{StaticResource TaskDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTaskTicket.Problem}"
+                                           Style="{StaticResource TaskDetailValueText}"/>
+                                </StackPanel>
+
+                                <!-- LEFT 2 -->
+                                <StackPanel Grid.Row="2" Grid.Column="0">
+                                    <TextBlock Text="Notification"
+                                           Style="{StaticResource TaskDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTask.Notification}"
+                                           Style="{StaticResource TaskDetailValueText}"/>
+                                </StackPanel>
+
+                                <!-- RIGHT 2 -->
+                                <StackPanel Grid.Row="2" Grid.Column="2">
+                                    <TextBlock Text="Work Order"
+                                           Style="{StaticResource TaskDetailLabelText}"/>
+
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding SelectedTask.WorkOrder}"
+                                               Style="{StaticResource TaskDetailValueText}"/>
 
                                         <TextBlock Text="{Binding SelectedTask.WorkOrderClassLabel}"
-                                       Foreground="{DynamicResource TextSecondary}"
-                                       FontSize="12"
-                                       VerticalAlignment="Center"/>
-                                    </Border>
+                                               Margin="0,3,0,0"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondary}"/>
+                                    </StackPanel>
                                 </StackPanel>
-                            </StackPanel>
 
-                            <!-- LEFT 3 -->
-                            <StackPanel Grid.Row="4" Grid.Column="0">
-                                <TextBlock Text="Task Category"
-                               Style="{StaticResource TaskDetailLabelText}"/>
-                                <TextBlock Text="{Binding SelectedTask.Category}"
-                               Style="{StaticResource TaskDetailValueText}"/>
-                            </StackPanel>
+                                <!-- LEFT 3 -->
+                                <StackPanel Grid.Row="4" Grid.Column="0">
+                                    <TextBlock Text="Assigned Tech"
+                                           Style="{StaticResource TaskDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTask.Tech}"
+                                           Style="{StaticResource TaskDetailValueText}"/>
+                                </StackPanel>
 
-                            <!-- RIGHT 3 -->
-                            <StackPanel Grid.Row="4" Grid.Column="2">
-                                <TextBlock Text="Action Required"
-                               Style="{StaticResource TaskDetailLabelText}"/>
-                                <TextBlock Text="{Binding SelectedTaskActionRequiredDisplay}"
-                               Style="{StaticResource TaskDetailValueText}"/>
-                            </StackPanel>
+                                <!-- RIGHT 3 -->
+                                <StackPanel Grid.Row="4" Grid.Column="2">
+                                    <TextBlock Text="Action Required"
+                                           Style="{StaticResource TaskDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTaskActionRequiredDisplay}"
+                                           Style="{StaticResource TaskDetailValueText}"/>
+                                </StackPanel>
 
-                            <!-- LEFT 4 -->
-                            <StackPanel Grid.Row="6" Grid.Column="0">
-                                <TextBlock Text="Last Activity"
-                               Style="{StaticResource TaskDetailLabelText}"/>
-                                <TextBlock Text="{Binding SelectedTask.OccurredAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"
-                               Style="{StaticResource TaskDetailValueText}"/>
-                            </StackPanel>
+                                <!-- LEFT 4 -->
+                                <StackPanel Grid.Row="6" Grid.Column="0">
+                                    <TextBlock Text="Last Activity"
+                                           Style="{StaticResource TaskDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTask.OccurredAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"
+                                           Style="{StaticResource TaskDetailValueText}"/>
+                                </StackPanel>
 
-                            <!-- RIGHT 4 -->
-                            <StackPanel Grid.Row="6" Grid.Column="2">
-                                <TextBlock Text="Created By"
-                               Style="{StaticResource TaskDetailLabelText}"/>
-                                <TextBlock Text="{Binding SelectedTaskCreatedByDisplay}"
-                               Style="{StaticResource TaskDetailValueText}"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
+                                <!-- RIGHT 4 -->
+                                <StackPanel Grid.Row="6" Grid.Column="2">
+                                    <TextBlock Text="Created By"
+                                           Style="{StaticResource TaskDetailLabelText}"/>
+                                    <TextBlock Text="{Binding SelectedTaskCreatedByDisplay}"
+                                           Style="{StaticResource TaskDetailValueText}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
 
-                    <!-- Collapsible sections -->
-                    <ScrollViewer Grid.Row="4"
+                        <!-- Collapsible sections -->
+                        <ScrollViewer Grid.Row="4"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel>
+                            <StackPanel>
 
-                            <!-- Site Notes -->
-                            <Expander x:Name="TaskSiteNotesExpander"
+                                <!-- Site Notes -->
+                                <Expander x:Name="TaskSiteNotesExpander"
                                       IsExpanded="False"
                                       Expanded="TaskDetailExpander_ExpandedChanged"
                                       Collapsed="TaskDetailExpander_ExpandedChanged">
 
-                                <Expander.Header>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Site Notes"
+                                    <Expander.Header>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Site Notes"
                                                    VerticalAlignment="Center"/>
 
-                                        <Border Margin="8,0,0,0"
+                                            <Border Margin="8,0,0,0"
                                                 MinWidth="17"
                                                 Height="17"
                                                 Padding="4,0"
                                                 CornerRadius="11"
                                                 Background="#D92D20"
                                                 VerticalAlignment="Center">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding SelectedTaskSiteNotesCount}" Value="0">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding SelectedTaskSiteNotesCount}" Value="0">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
 
-                                            <TextBlock Text="{Binding SelectedTaskSiteNotesCount}"
+                                                <TextBlock Text="{Binding SelectedTaskSiteNotesCount}"
                                                        FontSize="12"
                                                        FontWeight="Bold"
                                                        Foreground="White"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"/>
-                                        </Border>
-                                    </StackPanel>
-                                </Expander.Header>
+                                            </Border>
+                                        </StackPanel>
+                                    </Expander.Header>
 
-                                <Border Style="{StaticResource TaskDetailSectionCard}"
+                                    <Border Style="{StaticResource TaskDetailSectionCard}"
                                         Margin="0,8,0,0">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="8"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="8"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
 
-                                        <Grid Grid.Row="0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
+                                            <Grid Grid.Row="0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
 
-                                            <TextBlock Text="Reusable notes tied to this site."
+                                                <TextBlock Text="Reusable notes tied to this site."
                                                        FontSize="11"
                                                        TextWrapping="Wrap"
                                                        Foreground="{DynamicResource TextSecondary}"
                                                        VerticalAlignment="Center"/>
 
-                                            <Button Grid.Column="1"
+                                                <Button Grid.Column="1"
                                                     Content="+ Add"
                                                     Height="28"
                                                     Width="60"
                                                     Padding="8,0"
                                                     Click="AddSelectedTaskSiteNote_Click">
-                                                <Button.Style>
-                                                    <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding CanEditSelectedTaskTicket}" Value="False">
-                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Button.Style>
-                                            </Button>
-                                        </Grid>
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding CanEditSelectedTaskTicket}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </Grid>
 
-                                        <ItemsControl Grid.Row="2"
+                                            <ItemsControl Grid.Row="2"
                                                       ItemsSource="{Binding SelectedTaskSiteNotes}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Margin="0,0,0,8"
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Margin="0,0,0,8"
                                                             Padding="10"
                                                             CornerRadius="10"
                                                             BorderBrush="{DynamicResource SurfaceBorder}"
                                                             BorderThickness="1"
                                                             Background="{DynamicResource SurfaceBg}">
-                                                        <Grid>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto"/>
-                                                                <RowDefinition Height="8"/>
-                                                                <RowDefinition Height="Auto"/>
-                                                                <RowDefinition Height="8"/>
-                                                                <RowDefinition Height="Auto"/>
-                                                            </Grid.RowDefinitions>
+                                                            <Grid>
+                                                                <Grid.RowDefinitions>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                    <RowDefinition Height="8"/>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                    <RowDefinition Height="8"/>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                </Grid.RowDefinitions>
 
-                                                            <TextBlock Grid.Row="0"
+                                                                <TextBlock Grid.Row="0"
                                                                        Text="{Binding NoteText}"
                                                                        TextWrapping="Wrap"
                                                                        Foreground="{DynamicResource TextPrimary}"/>
 
-                                                            <TextBlock Grid.Row="2"
+                                                                <TextBlock Grid.Row="2"
                                                                        FontSize="11"
                                                                        Foreground="{DynamicResource TextSecondary}">
                                                                 <Run Text="Created by "/>
                                                                 <Run Text="{Binding CreatedBy}"/>
                                                                 <Run Text=" on "/>
                                                                 <Run Text="{Binding CreatedAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"/>
-                                                            </TextBlock>
+                                                                </TextBlock>
 
-                                                            <StackPanel Grid.Row="4"
+                                                                <StackPanel Grid.Row="4"
                                                                         Orientation="Horizontal"
                                                                         HorizontalAlignment="Right">
-                                                                <StackPanel.Style>
-                                                                    <Style TargetType="StackPanel">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding DataContext.CanEditSelectedTaskTicket, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
-                                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </StackPanel.Style>
+                                                                    <StackPanel.Style>
+                                                                        <Style TargetType="StackPanel">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding DataContext.CanEditSelectedTaskTicket, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False">
+                                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </StackPanel.Style>
 
-                                                                <Button Content="Edit"
+                                                                    <Button Content="Edit"
                                                                         Height="24"
                                                                         Width="48"
                                                                         Padding="8,0"
@@ -597,51 +683,51 @@
                                                                         Style="{StaticResource SecondaryButtonStyle}"
                                                                         Click="EditSelectedTaskSiteNote_Click"/>
 
-                                                                <Button Content="Delete"
+                                                                    <Button Content="Delete"
                                                                         Height="24"
                                                                         Padding="8,0"
                                                                         Tag="{Binding}"
                                                                         Style="{StaticResource SecondaryButtonStyle}"
                                                                         Click="DeleteSelectedTaskSiteNote_Click"/>
-                                                            </StackPanel>
-                                                        </Grid>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </Grid>
-                                </Border>
-                            </Expander>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Grid>
+                                    </Border>
+                                </Expander>
 
-                            <!-- Dispatch Notes -->
-                            <Expander x:Name="TaskDispatchNotesExpander"
+                                <!-- Dispatch Notes -->
+                                <Expander x:Name="TaskDispatchNotesExpander"
                                       Header="Dispatch Notes"
                                       IsExpanded="False"
                                       Margin="0,10,0,0"
                                       Expanded="TaskDetailExpander_ExpandedChanged"
                                       Collapsed="TaskDetailExpander_ExpandedChanged">
-                                <Border Style="{StaticResource TaskDetailSectionCard}"
+                                    <Border Style="{StaticResource TaskDetailSectionCard}"
                                         Margin="0,8,0,0">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="8"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="8"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
 
-                                        <TextBlock Grid.Row="0"
+                                            <TextBlock Grid.Row="0"
                                                    Text="Visible to the assigned field technician."
                                                    FontSize="11"
                                                    TextWrapping="Wrap"
                                                    Foreground="{DynamicResource TextSecondary}"/>
 
-                                        <Border Grid.Row="2"
+                                            <Border Grid.Row="2"
                                                 CornerRadius="10"
                                                 BorderThickness="1"
                                                 BorderBrush="{DynamicResource SurfaceBorder}"
                                                 Background="{DynamicResource SurfaceBg}">
 
-                                            <TextBox x:Name="TaskDispatchNotesTextBox"
+                                                <TextBox x:Name="TaskDispatchNotesTextBox"
                                                     Style="{x:Null}"
                                                     Text="{Binding SelectedTaskTicket.DispatchNotes, UpdateSourceTrigger=PropertyChanged}"
                                                     AcceptsReturn="True"
@@ -657,45 +743,46 @@
                                                     VerticalScrollBarVisibility="Auto"
                                                     HorizontalScrollBarVisibility="Disabled"
                                                     TextChanged="TaskDispatchNotesTextBox_TextChanged"/>
-                                        </Border>
-                                    </Grid>
-                                </Border>
-                            </Expander>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </Expander>
 
-                            <!-- Tech Write-Ups -->
-                            <Expander x:Name="TaskTechWriteUpsExpander"
+                                <!-- Tech Write-Ups -->
+                                <Expander x:Name="TaskTechWriteUpsExpander"
                                       Header="Tech Write-Ups"
                                       IsExpanded="False"
                                       Margin="0,10,0,0"
                                       Expanded="TaskDetailExpander_ExpandedChanged"
                                       Collapsed="TaskDetailExpander_ExpandedChanged">
-                                <Border Style="{StaticResource TaskDetailSectionCard}"
+                                    <Border Style="{StaticResource TaskDetailSectionCard}"
                                         Margin="0,8,0,0">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="8"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="8"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
 
-                                        <TextBlock Grid.Row="0"
-                                                   Text="Technician write-up and ticket notes."
+                                            <TextBlock Grid.Row="0"
+                                                   Text="Submitted technician write-ups are shown for reference only."
                                                    FontSize="11"
                                                    TextWrapping="Wrap"
                                                    Foreground="{DynamicResource TextSecondary}"/>
 
-                                        <Border Grid.Row="2"
+                                            <Border Grid.Row="2"
                                                 CornerRadius="10"
                                                 BorderThickness="1"
                                                 BorderBrush="{DynamicResource SurfaceBorder}"
                                                 Background="{DynamicResource SurfaceBg}">
 
-                                            <TextBox x:Name="TaskTechWriteUpsTextBox"
+                                                <TextBox x:Name="TaskTechWriteUpsTextBox"
                                                      Style="{x:Null}"
-                                                     Text="{Binding SelectedTaskTicket.Notes, UpdateSourceTrigger=PropertyChanged}"
+                                                     Text="{Binding SelectedTaskTicket.Notes, Mode=OneWay}"
                                                      AcceptsReturn="True"
                                                      TextWrapping="Wrap"
-                                                     IsReadOnly="{Binding IsSelectedTaskTicketClosed}"
+                                                     IsReadOnly="True"
+                                                     IsReadOnlyCaretVisible="True"
                                                      MinHeight="220"
                                                      MaxHeight="342"
                                                      Padding="10"
@@ -704,31 +791,19 @@
                                                      Foreground="{DynamicResource TextPrimary}"
                                                      VerticalContentAlignment="Top"
                                                      VerticalScrollBarVisibility="Auto"
-                                                     HorizontalScrollBarVisibility="Disabled"
-                                                     TextChanged="TaskTechWriteUpsTextBox_TextChanged"/>
-                                        </Border>
-                                    </Grid>
-                                </Border>
-                            </Expander>
-                        </StackPanel>
-                    </ScrollViewer>
+                                                     HorizontalScrollBarVisibility="Disabled"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </Expander>
+                            </StackPanel>
+                        </ScrollViewer>
 
-                    <!-- Actions -->
-                    <Grid Grid.Row="6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-
-                        <TextBlock Grid.Column="0"
-                                   Text="{Binding SelectedTaskClosedLockText}"
-                                   Foreground="{DynamicResource TextSecondary}"
-                                   TextWrapping="Wrap"
-                                   VerticalAlignment="Center"/>
-
-                        <StackPanel Grid.Column="1"
+                        <!-- Actions -->
+                        <StackPanel Grid.Row="6"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right">
+
                             <Button Content="Copy Write-Up"
                                     Height="32"
                                     Padding="12,0"
@@ -751,16 +826,18 @@
                                     Style="{StaticResource PrimaryButtonStyle}"
                                     Click="SaveTaskNotes_Click"/>
 
-                            <Button Content="Mark Done"
+                            <Button x:Name="MarkDetailsClosedButton"
+                                    Content="Mark Closed"
                                     Height="32"
                                     Width="94"
                                     Padding="12,0"
+                                    IsEnabled="False"
                                     Style="{StaticResource PrimaryButtonStyle}"
-                                    Click="MarkDone_Click"/>
+                                    Click="MarkClosed_Click"/>
                         </StackPanel>
                     </Grid>
-                </Grid>
-            </Border>
-        </Grid>
+                </Border>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>
