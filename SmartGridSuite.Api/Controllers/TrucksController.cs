@@ -6,6 +6,7 @@ using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Contracts.Administration.Technicians;
 using SmartGridSuite.Contracts.Administration.Trucks;
+using SmartGridSuite.Api.Services;
 
 namespace SmartGridSuite.Api.Controllers;
 
@@ -14,9 +15,17 @@ namespace SmartGridSuite.Api.Controllers;
 public sealed class TrucksController : ControllerBase
 {
     private readonly SmartGridDbContext _db;
+    private readonly TruckBoardInitializationService _truckBoardInitialization;
+
     private const string TechnicianRoleCode = "TECHNICIAN";
 
-    public TrucksController(SmartGridDbContext db) => _db = db;
+    public TrucksController(
+        SmartGridDbContext db,
+        TruckBoardInitializationService truckBoardInitialization)
+    {
+        _db = db;
+        _truckBoardInitialization = truckBoardInitialization;
+    }
 
     [HttpGet]
     public async Task<ActionResult<List<TruckDto>>> GetAll()
@@ -145,8 +154,10 @@ public sealed class TrucksController : ControllerBase
     {
         var workDate = ParseDateOrToday(date);
 
+        await _truckBoardInitialization.EnsureBoardInitializedAsync(workDate);
+
         var trucks = await _db.Set<TruckEntity>()
-            .AsNoTracking()
+                .AsNoTracking()
             .Include(t => t.TruckStyle)
             .Where(t => t.IsActive)
             .OrderBy(t => t.TruckNumber)
@@ -349,46 +360,7 @@ public sealed class TrucksController : ControllerBase
     {
         var workDate = ParseDateOrToday(date);
 
-        var already = await _db.Set<TruckRosterEntity>()
-            .AsNoTracking()
-            .AnyAsync(r => r.WorkDate == workDate);
-
-        if (already)
-            return NoContent();
-
-        var priorDate = await _db.Set<TruckRosterEntity>()
-            .AsNoTracking()
-            .Where(r => r.WorkDate < workDate)
-            .OrderByDescending(r => r.WorkDate)
-            .Select(r => r.WorkDate)
-            .FirstOrDefaultAsync();
-
-        if (priorDate == default)
-            return NoContent();
-
-        var priorRows = await (
-            from roster in _db.Set<TruckRosterEntity>().AsNoTracking()
-            join tech in ActiveFieldTechniciansQuery()
-                on roster.TechnicianId equals tech.Id
-            where roster.WorkDate == priorDate
-            select roster)
-            .ToListAsync();
-
-        foreach (var r in priorRows)
-        {
-            _db.Set<TruckRosterEntity>().Add(new TruckRosterEntity
-            {
-                WorkDate = workDate,
-                TruckId = r.TruckId,
-                TechnicianId = r.TechnicianId
-            });
-        }
-
-        await _db.SaveChangesAsync();
-
-        var truckIds = priorRows.Select(x => x.TruckId).Distinct().ToList();
-        foreach (var tid in truckIds)
-            await SyncCrewForTruckAsync(workDate, tid);
+        await _truckBoardInitialization.EnsureBoardInitializedAsync(workDate);
 
         return NoContent();
     }
@@ -556,6 +528,8 @@ public sealed class TrucksController : ControllerBase
 
                 crew.LeadTechnicianId = technicianId;
             }
+
+            await _truckBoardInitialization.MarkExplicitSaveAsync(workDate);
 
             await _db.SaveChangesAsync();
             await tx.CommitAsync();

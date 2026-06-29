@@ -211,6 +211,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 WorkspaceView.RestoreEquipmentReplacementSessionEntries(session.EquipmentReplacementEntries);
 
+                /*
+                 * Check local pending submissions only after the selected dashboard session
+                 * has been fully rendered.
+                 */
+                QueuePendingWriteUpRecoveryForRenderedSession(session);
+
                 QueueLoadSiteNotesForRenderedSession(session);
             }
             finally

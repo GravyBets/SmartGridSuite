@@ -7,8 +7,6 @@
              mc:Ignorable="d">
 
     <UserControl.Resources>
-        <local:OneBasedIndexConverter x:Key="OneBasedIndexConverter"/>
-       
         <!-- Crew / Technician ComboBox Item -->
         <DataTemplate x:Key="AssignmentTargetComboTemplate">
             <Grid Margin="0,4">
@@ -160,16 +158,13 @@
 
                     <!-- Route order, no bubble -->
                     <TextBlock Grid.Column="0"
-                       Margin="0,0,8,0"
-                       FontSize="14"
-                       FontWeight="Bold"
-                       Foreground="{DynamicResource TextSecondary}"
-                       VerticalAlignment="Top"
-                       TextAlignment="Right"
-                       Text="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem},
-                                      Path=(ItemsControl.AlternationIndex),
-                                      Converter={StaticResource OneBasedIndexConverter},
-                                      StringFormat={}{0}.}"/>
+                               Margin="0,0,8,0"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextSecondary}"
+                               VerticalAlignment="Top"
+                               TextAlignment="Right"
+                               Text="{Binding SortOrder, StringFormat={}{0}.}"/>
 
                     <!-- Left: site / notification / problem -->
                     <Grid Grid.Column="1">
@@ -657,7 +652,6 @@
                                          ItemTemplate="{StaticResource AssignedTicketTemplate}"
                                          ItemContainerStyle="{StaticResource CleanListBoxItemStyle}"
                                          Style="{StaticResource CleanListBoxStyle}"
-                                         AlternationCount="999"
                                          SelectionMode="Single"
                                          AllowDrop="True"
                                          PreviewMouseLeftButtonDown="AssignedTicketsList_PreviewMouseLeftButtonDown"

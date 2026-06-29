@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
+using SmartGridSuite.Api.Services;
 using SmartGridSuite.Contracts.Dispatcher.DailyAssignments;
 
 namespace SmartGridSuite.Api.Controllers
@@ -12,13 +13,15 @@ namespace SmartGridSuite.Api.Controllers
     public sealed class DailyAssignmentsController : ControllerBase
     {
         private readonly SmartGridDbContext _db;
+        private readonly TruckBoardInitializationService _truckBoardInitialization;
 
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
         private const string TechnicianRoleCode = "TECHNICIAN";
 
-        public DailyAssignmentsController(SmartGridDbContext db)
+        public DailyAssignmentsController(SmartGridDbContext db, TruckBoardInitializationService truckBoardInitialization)
         {
             _db = db;
+            _truckBoardInitialization = truckBoardInitialization;
         }
 
         [HttpGet("board")]
@@ -26,6 +29,12 @@ namespace SmartGridSuite.Api.Controllers
         {
             var rosterDate = ParseDateOrToday(date);
             var assignmentDate = ActiveAssignmentDate;
+
+            /*
+             * Daily Assignments may be the first dispatch pane opened in the morning.
+             * Ensure today's truck roster and crews exist before building assignment targets.
+             */
+            await _truckBoardInitialization.EnsureBoardInitializedAsync(rosterDate, ct);
 
             var statusRows = await _db.TicketStatuses
                  .AsNoTracking()
@@ -59,8 +68,19 @@ namespace SmartGridSuite.Api.Controllers
                 .ThenBy(x => x.Id)
                 .ToListAsync(ct);
 
-            var assignmentByTicketId = assignments
+            /*
+             * Closed tickets remain stored in assignment history, but they are no longer
+             * active work and must not appear in Dispatcher Daily Assignment lists.
+             * Field-complete tickets remain visible because they are not closed.
+             */
+            var visibleAssignments = assignments
                 .Where(x => x.Ticket != null)
+                .Where(x =>
+                    !closedStatusNames.Contains(
+                        x.Ticket!.Status ?? string.Empty))
+                .ToList();
+
+            var assignmentByTicketId = visibleAssignments
                 .GroupBy(x => x.TicketId)
                 .ToDictionary(
                     g => g.Key,
@@ -148,14 +168,19 @@ namespace SmartGridSuite.Api.Controllers
                 .ThenBy(t => t.FirstName)
                 .ToListAsync(ct);
 
-            var technicianAssignmentsByTechId = assignments
-                .Where(x => IsTargetType(x.TargetType, "Technician") && x.TechnicianId.HasValue)
+            var technicianAssignmentsByTechId = visibleAssignments
+                .Where(x =>
+                    IsTargetType(x.TargetType, "Technician") &&
+                    x.TechnicianId.HasValue)
                 .GroupBy(x => x.TechnicianId!.Value)
                 .ToDictionary(
                     g => g.Key,
                     g => g.OrderBy(x => x.SortOrder)
                           .ThenBy(x => x.Id)
-                          .Select(x => MapAssignedTicket(x, closedStatusNames, fieldCompleteStatusNames))
+                          .Select(x => MapAssignedTicket(
+                              x,
+                              closedStatusNames,
+                              fieldCompleteStatusNames))
                           .ToList());
 
             var rosterTechEntitiesByTruckId = rosterRows
@@ -757,12 +782,28 @@ namespace SmartGridSuite.Api.Controllers
                 }
             }
 
-            var assignments = await _db.DailyTicketAssignments
+            /*
+             * Technician-owned routes are identified by the lead TechnicianId.
+             * TruckId is current display/crew context and must not split one lead
+             * technician's route into multiple assignment identities.
+             */
+            var targetAssignmentsQuery = _db.DailyTicketAssignments
                 .Where(x =>
                     x.AssignmentDate == workDate &&
-                    x.TargetType == cleanTargetType &&
-                    x.TruckId == truckId &&
-                    x.TechnicianId == technicianId)
+                    x.TargetType == cleanTargetType);
+
+            if (cleanTargetType == "Technician")
+            {
+                targetAssignmentsQuery = targetAssignmentsQuery
+                    .Where(x => x.TechnicianId == technicianId);
+            }
+            else
+            {
+                targetAssignmentsQuery = targetAssignmentsQuery
+                    .Where(x => x.TruckId == truckId);
+            }
+
+            var assignments = await targetAssignmentsQuery
                 .ToListAsync(ct);
 
             if (assignments.Count == 0)
@@ -798,6 +839,14 @@ namespace SmartGridSuite.Api.Controllers
                 var assignment = assignmentByTicketId[ticketId];
 
                 assignment.SortOrder = sortOrder;
+
+                /*
+                 * Keep the current truck only as crew display context. The technician
+                 * remains the stable owner of the route.
+                 */
+                if (cleanTargetType == "Technician")
+                    assignment.TruckId = truckId;
+
                 assignment.IsPublished = false;
                 assignment.UpdatedAt = now;
                 assignment.UpdatedBy = updatedBy;

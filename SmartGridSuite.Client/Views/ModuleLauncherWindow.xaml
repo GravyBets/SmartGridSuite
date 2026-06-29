@@ -7,37 +7,47 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="{DynamicResource AppBackground}">
-    
-    
+
     <Grid Margin="18">
         <Grid.RowDefinitions>
+            <!-- Header -->
             <RowDefinition Height="Auto"/>
+
+            <!-- Connectivity banner -->
+            <RowDefinition Height="Auto"/>
+
+            <!-- Module tiles -->
             <RowDefinition Height="*"/>
+
+            <!-- Footer -->
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Style="{StaticResource Card}">
+        <Border Grid.Row="0"
+                Style="{StaticResource Card}">
+
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Title/Sub -->
+                <!-- Title and subtitle -->
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Smart Grid Suite"
                                FontSize="22"
                                FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimary}"/>
+
                     <TextBlock Text="Choose how you want to use Smart Grid Suite."
                                Margin="0,4,0,0"
                                Foreground="{DynamicResource TextSecondary}"/>
                 </StackPanel>
 
-                <!-- Theme slider toggle -->
-                <ToggleButton Grid.Column="1"
-                              x:Name="ThemeToggle"
+                <!-- Theme toggle -->
+                <ToggleButton x:Name="ThemeToggle"
+                              Grid.Column="1"
                               Style="{StaticResource ThemeSliderToggleStyle}"
                               VerticalAlignment="Top"
                               Margin="12,9,0,0"
@@ -47,10 +57,55 @@
             </Grid>
         </Border>
 
-        <!-- Body -->
-        <Border Grid.Row="1"
+        <!-- Non-modal connectivity status -->
+        <Border x:Name="ConnectivityBanner"
+                Grid.Row="1"
+                Margin="0,10,0,0"
+                Padding="12,8"
+                CornerRadius="10"
+                BorderBrush="#D69E00"
+                BorderThickness="1"
+                Background="#22D69E00"
+                Visibility="Collapsed">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Ellipse Grid.Column="0"
+                         Width="9"
+                         Height="9"
+                         Margin="0,0,10,0"
+                         VerticalAlignment="Center"
+                         Fill="#D69E00"/>
+
+                <TextBlock x:Name="ConnectivityMessageText"
+                           Grid.Column="1"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}"/>
+
+                <Button x:Name="ConnectivityRetryButton"
+                        Grid.Column="2"
+                        Margin="14,0,0,0"
+                        Height="30"
+                        Padding="14,0"
+                        Content="Retry"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Click="RetryConnectivity_Click"/>
+            </Grid>
+        </Border>
+
+        <!-- Module selection body -->
+        <Border Grid.Row="2"
                 Style="{StaticResource Card}"
                 Margin="0,14,0,14">
+
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="2*"/>
@@ -70,8 +125,10 @@
                            Foreground="{DynamicResource TextSecondary}"
                            Margin="2,0,0,10"/>
 
-                <!-- Tiles grid -->
-                <Grid Grid.ColumnSpan="2" Margin="0,26,0,0">
+                <!-- Module tiles -->
+                <Grid Grid.ColumnSpan="2"
+                      Margin="0,26,0,0">
+
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*"/>
                         <ColumnDefinition Width="3*"/>
@@ -83,23 +140,25 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Primary: Field Technician (spans all 3 rows) -->
-                    <Button Grid.Column="0"
+                    <!-- Field Technician -->
+                    <Button x:Name="TechTile"
+                            Grid.Column="0"
                             Grid.Row="0"
                             Grid.RowSpan="3"
                             Style="{StaticResource PrimaryTileButton}"
                             Click="Tech_Click"
                             Margin="0,0,14,0">
+
                         <StackPanel>
                             <TextBlock Text="Field Technician"
                                        FontSize="22"
                                        FontWeight="SemiBold"
                                        Foreground="White"/>
+
                             <TextBlock Text="Site Dashboard • Diagnostics • History"
                                        FontSize="14"
                                        Foreground="#DCE7FF"
                                        Margin="0,8,0,0"/>
-                            
                         </StackPanel>
                     </Button>
 
@@ -110,12 +169,14 @@
                             Style="{StaticResource TileButton}"
                             Click="Dispatch_Click"
                             Margin="0,0,0,10">
+
                         <StackPanel>
                             <TextBlock Text="Dispatcher"
                                        FontSize="18"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimary}"
                                        HorizontalAlignment="Center"/>
+
                             <TextBlock Text="Tickets • Tasks • Routing"
                                        FontSize="13"
                                        Foreground="{DynamicResource TextSecondary}"
@@ -123,19 +184,21 @@
                                        HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    
+
                     <!-- RMA Testing -->
                     <Button Grid.Column="1"
                             Grid.Row="1"
                             Style="{StaticResource TileButton}"
                             Margin="0,0,0,10"
                             Click="Rma_Click">
+
                         <StackPanel>
                             <TextBlock Text="RMA Testing"
                                        FontSize="18"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimary}"
                                        HorizontalAlignment="Center"/>
+
                             <TextBlock Text="Testing Center"
                                        FontSize="13"
                                        Foreground="{DynamicResource TextSecondary}"
@@ -149,14 +212,15 @@
                             Grid.Column="1"
                             Grid.Row="2"
                             Style="{StaticResource TileButton}"
-                            Click="Admin_Click"
-                            Margin="0,0,0,0">
+                            Click="Admin_Click">
+
                         <StackPanel>
                             <TextBlock Text="Administration"
                                        FontSize="18"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimary}"
                                        HorizontalAlignment="Center"/>
+
                             <TextBlock Text="Users • Settings • Configuration"
                                        FontSize="13"
                                        Foreground="{DynamicResource TextSecondary}"
@@ -164,24 +228,23 @@
                                        HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-
-                    
                 </Grid>
             </Grid>
         </Border>
 
-        <!-- Footer: Display scale + buttons -->
-        <Grid Grid.Row="2">
+        <!-- Footer -->
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="18"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <!-- SmartGridSuite UI Scale -->
+            <!-- UI scale control -->
             <Border Grid.Column="0"
-            Style="{StaticResource Card}"
-            Padding="12">
+                    Style="{StaticResource Card}"
+                    Padding="12">
+
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -194,54 +257,56 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0"
-                        VerticalAlignment="Center">
+                                VerticalAlignment="Center">
+
                         <TextBlock Text="Display Scale"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextPrimary}"/>
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimary}"/>
 
                         <TextBlock Text="Recommendations: Laptop = 80%; Desk = 100%"
-                           FontSize="11"
-                           Margin="0,2,0,0"
-                           Foreground="{DynamicResource TextSecondary}"/>
+                                   FontSize="11"
+                                   Margin="0,2,0,0"
+                                   Foreground="{DynamicResource TextSecondary}"/>
                     </StackPanel>
 
                     <Slider x:Name="UiScaleSlider"
-                    Grid.Column="2"
-                    Minimum="80"
-                    Maximum="100"
-                    TickFrequency="5"
-                    IsSnapToTickEnabled="True"
-                    VerticalAlignment="Center"/>
+                            Grid.Column="2"
+                            Minimum="80"
+                            Maximum="100"
+                            TickFrequency="5"
+                            IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center"/>
 
                     <TextBlock x:Name="UiScaleValueTextBlock"
-                       Grid.Column="4"
-                       Width="48"
-                       TextAlignment="Right"
-                       VerticalAlignment="Center"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextPrimary}"/>
+                               Grid.Column="4"
+                               Width="48"
+                               TextAlignment="Right"
+                               VerticalAlignment="Center"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"/>
 
                     <Button Grid.Column="6"
-                    Style="{StaticResource SecondaryButtonStyle}"
-                    Content="Reset"
-                    Height="30"
-                    Padding="12,0"
-                    Click="ResetUiScaleButton_Click"/>
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Content="Reset"
+                            Height="30"
+                            Padding="12,0"
+                            Click="ResetUiScaleButton_Click"/>
                 </Grid>
             </Border>
 
             <!-- Footer buttons -->
             <StackPanel Grid.Column="2"
-                Orientation="Horizontal"
-                VerticalAlignment="Center">
-                <Button Style="{StaticResource FooterButton}"
-                Content="About App"
-                Click="About_Click"
-                Margin="0,0,18,0"/>
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center">
 
                 <Button Style="{StaticResource FooterButton}"
-                Content="Bug / Feature Request"
-                Click="BugFeature_Click"/>
+                        Content="About App"
+                        Click="About_Click"
+                        Margin="0,0,18,0"/>
+
+                <Button Style="{StaticResource FooterButton}"
+                        Content="Bug / Feature Request"
+                        Click="BugFeature_Click"/>
             </StackPanel>
         </Grid>
     </Grid>

@@ -72,11 +72,20 @@
                                 </Style>
                             </Button.Style>
 
-                            <Viewbox Width="18"
-                                     Height="18"
+                            <Viewbox Width="16"
+                                     Height="16"
                                      VerticalAlignment="Center"
                                      HorizontalAlignment="Center">
-                                <Path Style="{StaticResource TrashCanIconPathStyle}"/>
+                                <Path Stretch="Uniform"
+                                      Data="M12,2 L15.09,8.26 L22,9.27 L17,14.14 L18.18,21.02 L12,17.77 L5.82,21.02 L7,14.14 L2,9.27 L8.91,8.26 Z">
+                                    <Path.Fill>
+                                        <MultiBinding Converter="{StaticResource LeadStarBrushConverter}">
+                                            <Binding Path="Id"/>
+                                            <Binding Path="DataContext.LeadTechnicianId"
+                                                     RelativeSource="{RelativeSource AncestorType=ListBox}"/>
+                                        </MultiBinding>
+                                    </Path.Fill>
+                                </Path>
                             </Viewbox>
                         </Button>
 
@@ -85,8 +94,8 @@
                                 Tag="{Binding}"
                                 ToolTip="Remove from truck"
                                 Click="RemoveTechFromTruck_Click">
-                            <Viewbox Width="15"
-                                     Height="15"
+                            <Viewbox Width="16"
+                                     Height="16"
                                      VerticalAlignment="Center"
                                      HorizontalAlignment="Center">
                                 <Path Fill="{DynamicResource TextSecondary}"

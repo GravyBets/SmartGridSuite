@@ -4,150 +4,673 @@
              Background="Transparent">
 
     <UserControl.Resources>
-        <Style x:Key="FieldTechTaskCellTextStyle"
-               TargetType="TextBlock">
-            <Setter Property="FontSize" Value="15"/>
+        
+        <!-- Compact copy glyph used beside Notification and Work Order values. -->
+        <Style x:Key="CopyGlyph" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="Text" Value="&#xE8C8;"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-            <Setter Property="Padding" Value="2,4"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
+
+        <!-- Temporary confirmation glyph shown after an individual value is copied. -->
+        <Style x:Key="CheckGlyph" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="Text" Value="&#xE73E;"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Matches the compact Dispatch Tickets / Tasks grid text style. -->
+        <Style x:Key="FieldTechTrimCellText"
+               TargetType="{x:Type TextBlock}">
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="2,0,2,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsFieldComplete}"
+                             Value="True">
+                    <Setter Property="Foreground"
+                            Value="{DynamicResource TextSecondary}"/>
+                    <Setter Property="Opacity"
+                            Value="0.58"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Reused by both task grids for direct Notification copying. -->
+        <DataTemplate x:Key="FieldTechNotificationCopyCellTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="28"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding Notification}"
+                           Style="{StaticResource FieldTechTrimCellText}"/>
+
+                <Button Grid.Column="1"
+                        Width="24"
+                        Height="24"
+                        Margin="4,0,0,0"
+                        Tag="{Binding Notification}"
+                        ToolTip="Copy notification"
+                        Click="CopyGridValue_Click">
+
+                    <Button.Style>
+                        <Style TargetType="Button"
+                       BasedOn="{StaticResource FlatCopyIconButton}">
+                            <Setter Property="Visibility" Value="Visible"/>
+
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Notification}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+
+                                <DataTrigger Binding="{Binding Notification}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+
+                    <TextBlock Style="{StaticResource CopyGlyph}"/>
+                </Button>
+            </Grid>
+        </DataTemplate>
+
+        <!-- Reused by both task grids for direct current Work Order copying. -->
+        <DataTemplate x:Key="FieldTechWorkOrderCopyCellTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="28"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="{Binding WorkOrder}"
+                           Style="{StaticResource FieldTechTrimCellText}"/>
+
+                <Button Grid.Column="1"
+                        Width="24"
+                        Height="24"
+                        Margin="4,0,0,0"
+                        Tag="{Binding WorkOrder}"
+                        ToolTip="Copy work order"
+                        Click="CopyGridValue_Click">
+
+                    <Button.Style>
+                        <Style TargetType="Button"
+                               BasedOn="{StaticResource FlatCopyIconButton}">
+                            <Setter Property="Visibility" Value="Visible"/>
+
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding WorkOrder}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+
+                                <DataTrigger Binding="{Binding WorkOrder}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+
+                    <TextBlock Style="{StaticResource CopyGlyph}"/>
+                </Button>
+            </Grid>
+        </DataTemplate>
+
+        <!-- Small transparent control containing the circled expand/collapse chevron. -->
+        <Style x:Key="FieldTechExpandButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource FlatCopyIconButton}">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="ToolTip" Value="Show or hide ticket details"/>
+        </Style>
+
+        <!-- Circled expand/collapse chevron with a data-present indicator. -->
+        <DataTemplate x:Key="FieldTechExpandRowCellTemplate">
+            <Grid Width="28"
+                  Height="24"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center">
+
+                <Button Style="{StaticResource FieldTechExpandButtonStyle}"
+                        Click="ToggleTaskRowDetails_Click"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+
+                    <Grid Width="18"
+                          Height="18">
+
+                        <Ellipse x:Name="ChevronCircle"
+                         Width="18"
+                         Height="18"
+                         Fill="Transparent"
+                         Stroke="{DynamicResource TextPrimary}"
+                         StrokeThickness=".75"/>
+
+                        <Path x:Name="ChevronPath"
+                              Width="8"
+                              Height="6"
+                              Margin="0,0,0,-2"
+                              Data="M 0,0 L 4,4 L 8,0"
+                              Stroke="{DynamicResource TextPrimary}"
+                              StrokeThickness="1.1"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              RenderTransformOrigin=".45,.35">
+                            <Path.RenderTransform>
+                                <RotateTransform Angle="0"/>
+                            </Path.RenderTransform>
+                        </Path>
+                    </Grid>
+                </Button>
+
+                <!-- Blue dot indicates this row has Dispatch Notes and/or Site Notes. -->
+                <Border Width="8"
+                Height="8"
+                CornerRadius="4"
+                Background="{DynamicResource PrimaryBg}"
+                BorderBrush="{DynamicResource CardBackground}"
+                BorderThickness="1"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="0,-1,-1,0"
+                ToolTip="{Binding SiteNoteCount, StringFormat=Extra details available. Site notes: {0}}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasExpandableDetails}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                </Border>
+            </Grid>
+
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding DetailsVisibility, RelativeSource={RelativeSource AncestorType=DataGridRow}}"
+                             Value="Visible">
+                    <Setter TargetName="ChevronPath"
+                            Property="RenderTransform">
+                        <Setter.Value>
+                            <RotateTransform Angle="180"/>
+                        </Setter.Value>
+                    </Setter>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <Style x:Key="FieldTechExpandedLabelText"
+               TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="Margin" Value="0,0,0,5"/>
+        </Style>
+
+        <Style x:Key="FieldTechExpandedValueText"
+               TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="FieldTechExpandedSectionCard"
+               TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="12"/>
+        </Style>
+
+        <!-- Details shown beneath an expanded row after the on-demand API call completes. -->
+        <DataTemplate x:Key="FieldTechTaskRowDetailsTemplate">
+            <Grid Margin="44,4,10,10">
+                <!-- Loading state while expanded details are requested from the API. -->
+                <TextBlock Text="Loading ticket details..."
+                   Margin="0,2"
+                   FontSize="12"
+                   Foreground="{DynamicResource TextSecondary}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Tag,
+                                                       RelativeSource={RelativeSource AncestorType=DataGridRow}}"
+                                     Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- Loaded detail content. -->
+                <Grid>
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Visible"/>
+
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Tag,
+                                                       RelativeSource={RelativeSource AncestorType=DataGridRow}}"
+                                     Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
+
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="22"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Dispatch Notes -->
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Dispatch Notes"
+                                   Style="{StaticResource FieldTechExpandedLabelText}"/>
+
+                        <TextBlock Text="{Binding Tag.DispatchNotes,
+                                         RelativeSource={RelativeSource AncestorType=DataGridRow}}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock"
+                                       BasedOn="{StaticResource FieldTechExpandedValueText}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Tag.DispatchNotes,
+                                                               RelativeSource={RelativeSource AncestorType=DataGridRow}}"
+                                             Value="">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <TextBlock Text="No dispatch notes for this ticket."
+                                   FontSize="12"
+                                   FontStyle="Italic"
+                                   Foreground="{DynamicResource TextSecondary}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Tag.DispatchNotes,
+                                                               RelativeSource={RelativeSource AncestorType=DataGridRow}}"
+                                             Value="">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <!-- Site Notes -->
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Site Notes"
+                                   Style="{StaticResource FieldTechExpandedLabelText}"/>
+
+                        <ItemsControl ItemsSource="{Binding Tag.SiteNotes,
+                                                    RelativeSource={RelativeSource AncestorType=DataGridRow}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,0,10">
+                                        <TextBlock Text="{Binding NoteText}"
+                                           Style="{StaticResource FieldTechExpandedValueText}"/>
+
+                                        <TextBlock Margin="0,3,0,0"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextSecondary}">
+                                            <Run Text="{Binding NoteType}"/>
+                                            <Run Text="  •  "/>
+                                            <Run Text="{Binding CreatedBy}"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="No active site notes for this site."
+                                   FontSize="12"
+                                   FontStyle="Italic"
+                                   Foreground="{DynamicResource TextSecondary}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Tag.SiteNotes.Count,
+                                                               RelativeSource={RelativeSource AncestorType=DataGridRow}}"
+                                             Value="0">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </DataTemplate>
+
+        <!-- Route number emphasis while preserving completed-ticket grey-out. -->
+        <Style x:Key="FieldTechRouteOrderTextStyle"
+               TargetType="TextBlock"
+               BasedOn="{StaticResource FieldTechTrimCellText}">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Matches the compact Dispatch Tickets / Tasks column headers. -->
+        <Style x:Key="FieldTechTasksGridColumnHeaderStyle"
+               TargetType="DataGridColumnHeader"
+               BasedOn="{StaticResource ThemedDataGridColumnHeaderStyle}">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+
     </UserControl.Resources>
 
-    <Grid Margin="0">
-        <Border Style="{StaticResource Card}"
-                Padding="16">
+    <Grid Margin="0,8,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="3*"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="2*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Pane header -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel>
+                <TextBlock Text="My Tasks"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource TextPrimary}"/>
+
+                <TextBlock Text="Published route work first, followed by other active tickets assigned to you."
+                           Margin="0,4,0,0"
+                           Foreground="{DynamicResource TextSecondary}"/>
+            </StackPanel>
+
+            <Button Grid.Column="1"
+                    Content="Refresh"
+                    VerticalAlignment="Top"
+                    Click="Refresh_Click"/>
+        </Grid>
+
+        <!-- Daily Assignments card -->
+        <Border Grid.Row="2"
+                Style="{StaticResource Card}"
+                Padding="14">
+
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="10"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Header -->
-                <Grid Grid.Row="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                <!-- Daily Assignments toolbar -->
+                <DockPanel Grid.Row="0"
+                           LastChildFill="True">
 
-                    <StackPanel>
-                        <TextBlock Text="My Tasks"
-                                   FontSize="22"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource TextPrimary}"/>
-
-                        <TextBlock Text="Open tickets assigned to the signed-in technician."
-                                   Margin="0,4,0,0"
-                                   FontSize="13"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1"
+                    <StackPanel DockPanel.Dock="Right"
                                 Orientation="Horizontal"
-                                VerticalAlignment="Top">
+                                VerticalAlignment="Center">
 
-                        <Button Style="{StaticResource SecondaryButtonStyle}"
-                                Content="Open All"
-                                Height="34"
-                                Padding="16,0"
-                                Margin="0,0,10,0"
+                        <TextBlock Text="{Binding DailyAssignmentCount, StringFormat={}{0} ticket(s)}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,12,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+
+                        <Button Content="Open All"
+                                Height="30"
+                                Padding="12,0"
+                                Width="76"
+                                Style="{StaticResource PrimaryButtonStyle}"
                                 Click="OpenAll_Click"/>
-
-                        <Button Style="{StaticResource PrimaryButtonStyle}"
-                                Content="Refresh"
-                                Height="34"
-                                Padding="16,0"
-                                Click="Refresh_Click"/>
                     </StackPanel>
-                </Grid>
 
-                <!-- Grid -->
-                <DataGrid x:Name="TasksGrid"
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="Daily Assignments"
+                                   Margin="2,0,0,0"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   VerticalAlignment="Center"/>
+
+                        <TextBlock Text="Published route order from Dispatch"
+                                   Margin="12,0,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <!-- Published Daily Assignments grid -->
+                <DataGrid x:Name="DailyAssignmentsGrid"
                           Grid.Row="2"
                           Style="{StaticResource ThemedDataGridStyle}"
-                          ItemsSource="{Binding Tickets}"
-                          SelectedItem="{Binding SelectedTicket, Mode=TwoWay}"
+                          ItemsSource="{Binding DailyAssignments}"
                           AutoGenerateColumns="False"
+                          HeadersVisibility="Column"
+                          IsReadOnly="True"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          MinRowHeight="34"
                           CanUserAddRows="False"
                           CanUserDeleteRows="False"
-                          IsReadOnly="True"
-                          HeadersVisibility="Column"
-                          RowHeaderWidth="0"
-                          GridLinesVisibility="None"
-                          FontSize="15"
-                          RowHeight="44"
+                          CanUserResizeRows="False"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="{DynamicResource SurfaceBorder}"
+                          ColumnHeaderStyle="{StaticResource FieldTechTasksGridColumnHeaderStyle}"
+                          RowDetailsVisibilityMode="Collapsed"
+                          RowDetailsTemplate="{StaticResource FieldTechTaskRowDetailsTemplate}"
+                          LoadingRow="TasksGrid_LoadingRow"
                           MouseDoubleClick="TasksGrid_MouseDoubleClick">
 
-                    <DataGrid.Resources>
-                        <Style TargetType="TextBlock"
-                               x:Key="FieldTechGridTextBlockStyle">
-                            <Setter Property="FontSize" Value="15"/>
-                            <Setter Property="VerticalAlignment" Value="Center"/>
-                            <Setter Property="TextWrapping" Value="Wrap"/>
-                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-                        </Style>
-                    </DataGrid.Resources>
-
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Site"
-                            Binding="{Binding Site}"
-                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
-                            Width="95"/>
 
-                        <DataGridTextColumn Header="Status"
-                            Binding="{Binding Status}"
-                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
-                            Width="125"/>
+                        <DataGridTemplateColumn Header="Notes"
+                                                Width="64"
+                                                CanUserResize="False"
+                                                CanUserSort="False"
+                                                CellTemplate="{StaticResource FieldTechExpandRowCellTemplate}"/>
+
+                        <DataGridTextColumn Header="#"
+                                            Width="40"
+                                            Binding="{Binding RouteOrder}"
+                                            ElementStyle="{StaticResource FieldTechRouteOrderTextStyle}"/>
+
+                        <DataGridTextColumn Header="Site"
+                                            Width="80"
+                                            Binding="{Binding Site}"
+                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
 
                         <DataGridTextColumn Header="Notification Name"
-                            Binding="{Binding NotificationName}"
-                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
-                            Width="2*"/>
+                                            Width="3*"
+                                            Binding="{Binding NotificationName}"
+                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
 
                         <DataGridTextColumn Header="Problem / Issue"
-                            Binding="{Binding Problem}"
-                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
-                            Width="2*"/>
+                                            Width="3*"
+                                            Binding="{Binding Problem}"
+                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
 
-                        <DataGridTextColumn Header="Action Required"
-                            Binding="{Binding ActionRequired}"
-                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
-                            Width="2*"/>
+                        <DataGridTemplateColumn Header="Notification"
+                                                Width="126"
+                                                CellTemplate="{StaticResource FieldTechNotificationCopyCellTemplate}"/>
 
-                        <DataGridTextColumn Header="Notification"
-                            Binding="{Binding Notification}"
-                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
-                            Width="125"/>
+                        <DataGridTemplateColumn Header="Work Order"
+                                                Width="124"
+                                                CellTemplate="{StaticResource FieldTechWorkOrderCopyCellTemplate}"/>
 
-                        <DataGridTextColumn Header="Work Order"
-                            Binding="{Binding WorkOrder}"
-                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
-                            Width="115"/>
+                        <DataGridTextColumn Header="WO Type"
+                                            Width="105"
+                                            Binding="{Binding WorkOrderClass}"
+                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
 
-                        <DataGridTextColumn Header="Priority"
-                            Binding="{Binding PriorityDays}"
-                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
-                            Width="80"/>
+                        <DataGridTextColumn Header="Status"
+                                            Width="3*"
+                                            Binding="{Binding Status}"
+                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
 
-                        <DataGridTextColumn Header="Last Activity"
-                            Binding="{Binding LastActivityAt, StringFormat=MM-dd-yyyy HH:mm}"
-                            ElementStyle="{StaticResource FieldTechGridTextBlockStyle}"
-                            Width="150"/>
                     </DataGrid.Columns>
                 </DataGrid>
-
-                <!-- Footer status -->
-                <TextBlock Grid.Row="3"
-                           Text="{Binding StatusMessage}"
-                           Margin="4,10,0,0"
-                           FontSize="12"
-                           Foreground="{DynamicResource TextSecondary}"/>
-                
             </Grid>
         </Border>
+
+        <!-- Other Assigned Tickets card -->
+        <Border Grid.Row="4"
+                Style="{StaticResource Card}"
+                Padding="14">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Other Assigned Tickets toolbar -->
+                <DockPanel Grid.Row="0"
+                           LastChildFill="True">
+
+                    <TextBlock DockPanel.Dock="Right"
+                               Text="{Binding OtherAssignedTicketCount, StringFormat={}{0} ticket(s)}"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondary}"/>
+
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="Other Assigned Tickets"
+                                   Margin="2,0,0,0"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   VerticalAlignment="Center"/>
+
+                        <TextBlock Text="Not included in today's published route"
+                                   Margin="12,0,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <!-- Other Assigned Tickets grid -->
+                <DataGrid x:Name="OtherAssignedTicketsGrid"
+                          Grid.Row="2"
+                          Style="{StaticResource ThemedDataGridStyle}"
+                          ItemsSource="{Binding OtherAssignedTickets}"
+                          AutoGenerateColumns="False"
+                          HeadersVisibility="Column"
+                          IsReadOnly="True"
+                          SelectionMode="Single"
+                          SelectionUnit="FullRow"
+                          MinRowHeight="34"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          CanUserResizeRows="False"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="{DynamicResource SurfaceBorder}"
+                          ColumnHeaderStyle="{StaticResource FieldTechTasksGridColumnHeaderStyle}"
+                          RowDetailsVisibilityMode="Collapsed"
+                          RowDetailsTemplate="{StaticResource FieldTechTaskRowDetailsTemplate}"
+                          LoadingRow="TasksGrid_LoadingRow"
+                          MouseDoubleClick="TasksGrid_MouseDoubleClick">
+
+                    <DataGrid.Columns>
+
+                        <DataGridTemplateColumn Width="42"
+                                                CanUserResize="False"
+                                                CanUserSort="False"
+                                                CellTemplate="{StaticResource FieldTechExpandRowCellTemplate}"/>
+
+                        <DataGridTextColumn Header="Site"
+                                            Width="105"
+                                            Binding="{Binding Site}"
+                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
+
+                        <DataGridTextColumn Header="Notification Name"
+                                            Width="2*"
+                                            Binding="{Binding NotificationName}"
+                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
+
+                        <DataGridTextColumn Header="Problem / Issue"
+                                            Width="2*"
+                                            Binding="{Binding Problem}"
+                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
+
+                        <DataGridTemplateColumn Header="Notification"
+                                                Width="138"
+                                                CellTemplate="{StaticResource FieldTechNotificationCopyCellTemplate}"/>
+
+                        <DataGridTemplateColumn Header="Work Order"
+                                                Width="140"
+                                                CellTemplate="{StaticResource FieldTechWorkOrderCopyCellTemplate}"/>
+
+                        <DataGridTextColumn Header="WO Type"
+                                            Width="105"
+                                            Binding="{Binding WorkOrderClass}"
+                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
+
+                        <DataGridTextColumn Header="Status"
+                                            Width="150"
+                                            Binding="{Binding Status}"
+                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <!-- Footer status -->
+        <TextBlock Grid.Row="5"
+                   Text="{Binding StatusMessage}"
+                   Margin="4,10,0,0"
+                   FontSize="12"
+                   Foreground="{DynamicResource TextSecondary}"/>
+
     </Grid>
 </UserControl>

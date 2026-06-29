@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SmartGridSuite.Contracts.Tickets;
 using SmartGridSuite.Contracts.Dispatcher;
+using SmartGridSuite.Contracts.SiteDashboard;
 using System.Security;
 
 
@@ -209,19 +210,109 @@ namespace SmartGridSuite.Client.Services
             return await CreateTicketAsync(request, ct);
         }
 
-        //Add Write-Up to Ticket
-        public async Task SubmitWriteUpAsync(long ticketId, string finalWriteUpText, string siteHistoryWriteUpText, string submittedBy = "Unknown",
+        // Submits one confirmed write-up using a client-generated idempotency key so
+        // retrying an uncertain request cannot create duplicate History records.
+        public async Task SubmitWriteUpAsync(long ticketId, Guid clientSubmissionId, string finalWriteUpText,
+            string siteHistoryWriteUpText, string submittedBy = "Unknown", CancellationToken ct = default)
+        {
+            if (clientSubmissionId == Guid.Empty)
+            {
+                throw new ArgumentException(
+                    "A client submission ID is required.",
+                    nameof(clientSubmissionId));
+            }
+
+            await _api.PostAsync<
+                SubmitTicketWriteUpRequest,
+                UpdateTicketResponse>(
+                    $"api/tickets/{ticketId}/submit-writeup",
+                    new SubmitTicketWriteUpRequest
+                    {
+                        ClientSubmissionId = clientSubmissionId,
+                        FinalWriteUpText = finalWriteUpText ?? string.Empty,
+                        SiteHistoryWriteUpText = siteHistoryWriteUpText ?? string.Empty,
+                        SubmittedBy = submittedBy ?? "Unknown"
+                    },
+                    ct);
+        }
+
+        public async Task<List<SiteHistoryPreviewDto>> GetSiteHistoryAsync(string siteId, CancellationToken ct = default)
+        {
+            siteId = (siteId ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(siteId))
+                return new List<SiteHistoryPreviewDto>();
+
+            return await _api.GetAsync<List<SiteHistoryPreviewDto>>(
+                       $"api/tickets/site-history/{Uri.EscapeDataString(siteId)}",
+                       ct)
+                   ?? new List<SiteHistoryPreviewDto>();
+        }
+
+        public async Task<SubmittedWriteUpMutationResponse> UpdateSubmittedWriteUpAsync(long submissionId,
+            UpdateSubmittedWriteUpRequest request, CancellationToken ct = default)
+        {
+            return await _api.PostAsync<UpdateSubmittedWriteUpRequest, SubmittedWriteUpMutationResponse>(
+                       $"api/tickets/writeups/{submissionId}/update",
+                       request,
+                       ct)
+                   ?? new SubmittedWriteUpMutationResponse();
+        }
+
+        public async Task<SubmittedWriteUpMutationResponse> DeleteSubmittedWriteUpAsync(long submissionId,
+            DeleteSubmittedWriteUpRequest request, CancellationToken ct = default)
+        {
+            return await _api.PostAsync<DeleteSubmittedWriteUpRequest, SubmittedWriteUpMutationResponse>(
+                       $"api/tickets/writeups/{submissionId}/delete",
+                       request,
+                       ct)
+                   ?? new SubmittedWriteUpMutationResponse();
+        }
+
+        public async Task<BulkTicketUpdateResponse> BulkAssignTicketsAsync(BulkAssignTicketsRequest request, CancellationToken ct = default)
+        {
+            return await _api.PostAsync<BulkAssignTicketsRequest, BulkTicketUpdateResponse>(
+                       "api/tickets/bulk-assign",
+                       request,
+                       ct)
+                   ?? new BulkTicketUpdateResponse();
+        }
+
+        public async Task<BulkTicketUpdateResponse> BulkSetProblemAsync(BulkSetProblemRequest request, CancellationToken ct = default)
+        {
+            return await _api.PostAsync<BulkSetProblemRequest, BulkTicketUpdateResponse>(
+                       "api/tickets/bulk-set-problem",
+                       request,
+                       ct)
+                   ?? new BulkTicketUpdateResponse();
+        }
+
+        public async Task<BulkTicketUpdateResponse> BulkSetStatusAsync(BulkSetStatusRequest request, CancellationToken ct = default)
+        {
+            return await _api.PostAsync<BulkSetStatusRequest, BulkTicketUpdateResponse>(
+                       "api/tickets/bulk-set-status",
+                       request,
+                       ct)
+                   ?? new BulkTicketUpdateResponse();
+        }
+
+        public async Task<BulkTicketUpdateResponse> BulkSetWorkOrderTypeAsync(BulkSetWorkOrderTypeRequest request,
             CancellationToken ct = default)
         {
-            await _api.PostAsync<SubmitTicketWriteUpRequest, UpdateTicketResponse>(
-                $"api/tickets/{ticketId}/submit-writeup",
-                new SubmitTicketWriteUpRequest
-                {
-                    FinalWriteUpText = finalWriteUpText ?? string.Empty,
-                    SiteHistoryWriteUpText = siteHistoryWriteUpText ?? string.Empty,
-                    SubmittedBy = submittedBy ?? "Unknown"
-                },
-                ct);
+            return await _api.PostAsync<BulkSetWorkOrderTypeRequest, BulkTicketUpdateResponse>(
+                       "api/tickets/bulk-set-work-order-type",
+                       request,
+                       ct)
+                   ?? new BulkTicketUpdateResponse();
+        }
+
+        public async Task<SapQueueImportLastImportDto> GetLastSapQueueImportAsync(
+            CancellationToken ct = default)
+        {
+            return await _api.GetAsync<SapQueueImportLastImportDto>(
+                       "api/tickets/sap-import/last",
+                       ct)
+                   ?? new SapQueueImportLastImportDto();
         }
     }
 }

@@ -80,24 +80,39 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
                 cmd.CommandText = $"""
                     SELECT
-                        history_id,
-                        site_id,
-                        visit_date,
-                        primary_tech,
-                        secondary_tech,
-                        issue_text AS IssueText,
-                        narrative
-                    FROM site_history
-                    WHERE UPPER(
-                        REPLACE(
-                        REPLACE(
-                        REPLACE(
-                        REPLACE(TRIM(site_id), '_', ''),
-                                               '-', ''),
-                                               ' ', ''),
-                                               '.', '')
-                    ) IN ({string.Join(", ", parameterNames)})
-                    ORDER BY visit_date DESC, history_id DESC;
+                        sh.history_id,
+                        sh.site_id,
+                        sh.source_type,
+                        sh.visit_date,
+                        sh.primary_tech,
+                        sh.secondary_tech,
+                        sh.issue_text AS IssueText,
+                        sh.narrative,
+                        sh.edited_at,
+                        sh.edited_by,
+                        twus.submission_id
+                    FROM site_history sh
+                    LEFT JOIN (
+                        SELECT
+                            site_history_id,
+                            MIN(id) AS submission_id
+                        FROM ticket_writeup_submissions
+                        WHERE site_history_id IS NOT NULL
+                          AND is_deleted = 0
+                        GROUP BY site_history_id
+                    ) twus
+                        ON twus.site_history_id = sh.history_id
+                    WHERE sh.is_deleted = 0
+                      AND UPPER(
+                            REPLACE(
+                            REPLACE(
+                            REPLACE(
+                            REPLACE(TRIM(sh.site_id), '_', ''),
+                                                      '-', ''),
+                                                      ' ', ''),
+                                                      '.', '')
+                          ) IN ({string.Join(", ", parameterNames)})
+                    ORDER BY sh.visit_date DESC, sh.history_id DESC;
                     """;
 
                 var allRows = new List<SiteHistoryPreviewRow>();
@@ -109,12 +124,21 @@ namespace SmartGridSuite.Api.Services.ParentSync
                     allRows.Add(new SiteHistoryPreviewRow
                     {
                         HistoryId = GetInt64(reader, "history_id"),
+                        SubmissionId = GetNullableInt64(reader, "submission_id"),
+
                         SiteId = GetDbString(reader, "site_id") ?? "",
+                        SourceType = GetDbString(reader, "source_type") ?? "",
+
                         VisitDate = GetNullableDateTime(reader, "visit_date"),
                         PrimaryTech = GetDbString(reader, "primary_tech"),
                         SecondaryTech = GetDbString(reader, "secondary_tech"),
                         IssueText = GetDbString(reader, "IssueText"),
-                        Narrative = GetDbString(reader, "narrative")
+                        Narrative = GetDbString(reader, "narrative"),
+
+                        EditedAt = GetNullableDateTime(reader, "edited_at"),
+                        EditedBy = GetDbString(reader, "edited_by"),
+
+                        IsDeleted = false
                     });
                 }
 
@@ -243,6 +267,15 @@ namespace SmartGridSuite.Api.Services.ParentSync
             return reader.IsDBNull(ordinal)
                 ? null
                 : Convert.ToInt32(reader.GetValue(ordinal));
+        }
+
+        private static long? GetNullableInt64(DbDataReader reader, string columnName)
+        {
+            var ordinal = reader.GetOrdinal(columnName);
+
+            return reader.IsDBNull(ordinal)
+                ? null
+                : Convert.ToInt64(reader.GetValue(ordinal));
         }
     }
 }

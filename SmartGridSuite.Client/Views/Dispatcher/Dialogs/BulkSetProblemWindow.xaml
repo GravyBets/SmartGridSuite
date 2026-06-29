@@ -3,16 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Set Problem"
         Width="480"
-        Height="270"
+        Height="260"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
 
-    <Grid Margin="16">
+    <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="8"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="14"/>
+            <RowDefinition Height="8"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -30,7 +30,7 @@
 
         <TextBox Grid.Row="2"
                  x:Name="ProblemTextBox"
-                 MinHeight="120"
+                 MinHeight="100"
                  AcceptsReturn="True"
                  TextWrapping="Wrap"
                  VerticalScrollBarVisibility="Auto"
@@ -47,6 +47,7 @@
                     IsCancel="True"/>
 
             <Button Content="Apply"
+                    Style="{StaticResource PrimaryButtonStyle}"
                     Width="90"
                     Height="32"
                     IsDefault="True"

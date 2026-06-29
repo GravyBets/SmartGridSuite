@@ -64,15 +64,116 @@
                     <!-- Assigned To -->
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="Assigned To"
-                                   Margin="2,0,0,4"
-                                   FontWeight="SemiBold"/>
+               Margin="2,0,0,4"
+               FontWeight="SemiBold"/>
 
-                        <ComboBox x:Name="AssignedToBox"
-                                  Height="34"
-                                  Width="Auto"
-                                  HorizontalAlignment="Stretch"
-                                  IsTextSearchEnabled="True"
-                                  SelectedItem="{Binding AssignedTo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Grid>
+                            <Button x:Name="AssignedTechDropDownButton"
+                Height="34"
+                HorizontalContentAlignment="Stretch"
+                Click="AssignedTechDropDownButton_Click">
+
+                                <DockPanel LastChildFill="True">
+                                    <TextBlock DockPanel.Dock="Right"
+                           Text="▾"
+                           Margin="10,0,0,0"
+                           FontSize="14"
+                           VerticalAlignment="Center"/>
+
+                                    <TextBlock x:Name="AssignedTechDropDownTextBlock"
+                           Text="(Unassigned)"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center"/>
+                                </DockPanel>
+                            </Button>
+
+                            <Popup x:Name="AssignedTechDropDownPopup"
+               Placement="Bottom"
+               PlacementTarget="{Binding ElementName=AssignedTechDropDownButton}"
+               VerticalOffset="4"
+               StaysOpen="False"
+               AllowsTransparency="True"
+               PopupAnimation="Fade">
+
+                                <Border Width="{Binding ActualWidth, ElementName=AssignedTechDropDownButton}"
+                    MinWidth="430"
+                    MaxHeight="520"
+                    Padding="10"
+                    CornerRadius="10"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource SurfaceBorder}"
+                    Background="{DynamicResource CardBackground}">
+
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="8"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="8"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <CheckBox x:Name="AssignedToUnassignedCheckBox"
+                              Grid.Row="0"
+                              Content="(Unassigned)"
+                              FontWeight="SemiBold"
+                              Checked="AssignedToUnassignedCheckBox_Checked"
+                              Unchecked="AssignedToUnassignedCheckBox_Unchecked"/>
+
+                                        <Grid Grid.Row="2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Grid.Column="0"
+                                   Text="Technicians"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+
+                                            <Button Grid.Column="1"
+                                Content="Select All"
+                                Height="28"
+                                MinWidth="86"
+                                Padding="10,0"
+                                Click="SelectAllAssignedTechs_Click"/>
+
+                                            <Button Grid.Column="3"
+                                Content="Clear"
+                                Height="28"
+                                MinWidth="70"
+                                Padding="10,0"
+                                Click="ClearAssignedTechs_Click"/>
+                                        </Grid>
+
+                                        <ScrollViewer Grid.Row="4"
+                                  MaxHeight="390"
+                                  VerticalScrollBarVisibility="Auto">
+
+                                            <ItemsControl ItemsSource="{Binding AssignedTechOptions, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <CheckBox Content="{Binding Name}"
+                                              IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Margin="0,3"
+                                              Checked="AssignedTechOption_Changed"
+                                              Unchecked="AssignedTechOption_Changed"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <TextBlock x:Name="AssignedTechSummaryTextBlock"
+               Margin="2,4,0,0"
+               FontSize="11"
+               TextWrapping="Wrap"
+               Foreground="{DynamicResource TextSecondary}"/>
                     </StackPanel>
 
                     <!-- Status -->

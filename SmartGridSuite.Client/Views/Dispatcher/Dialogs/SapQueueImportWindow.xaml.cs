@@ -8,6 +8,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Security.Principal;
 using System.Windows;
+using System.Globalization;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 {
@@ -41,6 +42,21 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             {
                 if (_createdByDisplay == value) return;
                 _createdByDisplay = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _lastImportDisplay = "Never";
+
+        public string LastImportDisplay
+        {
+            get => _lastImportDisplay;
+            set
+            {
+                if (_lastImportDisplay == value)
+                    return;
+
+                _lastImportDisplay = value;
                 OnPropertyChanged();
             }
         }
@@ -173,6 +189,35 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
             CreatedByDisplay = TryGetDisplayName()
                                ?? (WindowsIdentity.GetCurrent()?.Name ?? Environment.UserName);
+
+            Loaded += async (_, _) =>
+            {
+                await LoadLastImportAsync();
+            };
+        }
+
+        private async Task LoadLastImportAsync()
+        {
+            try
+            {
+                var lastImport =
+                    await _ticketsApi.GetLastSapQueueImportAsync();
+
+                if (!lastImport.ImportedAt.HasValue)
+                {
+                    LastImportDisplay = "Never";
+                    return;
+                }
+
+                LastImportDisplay =
+                    $"{lastImport.ImportedAt.Value:MM/dd/yyyy HH:mm} by " +
+                    $"{lastImport.ImportedBy} " +
+                    $"({lastImport.ImportedCount} row(s))";
+            }
+            catch
+            {
+                LastImportDisplay = "Unavailable";
+            }
         }
 
         private static string? TryGetDisplayName()
@@ -423,16 +468,49 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             var headerRow = worksheet.FirstRowUsed()
                            ?? throw new InvalidOperationException("No header row was found in the Excel file.");
 
-            var headerMap = headerRow.CellsUsed()
-                .ToDictionary(
-                    c => (c.GetString() ?? "").Trim(),
-                    c => c.Address.ColumnNumber,
-                    StringComparer.OrdinalIgnoreCase);
+            var headerMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-            int notifCol = GetRequiredColumn(headerMap, "Notification");
-            int orderCol = GetRequiredColumn(headerMap, "Order");
-            int notifDateCol = GetRequiredColumn(headerMap, "Notif.date");
-            int descriptionCol = GetRequiredColumn(headerMap, "Description");
+            foreach (var cell in headerRow.CellsUsed())
+            {
+                var normalizedHeader =
+                    NormalizeSapHeader(ReadCellText(cell));
+
+                if (!string.IsNullOrWhiteSpace(normalizedHeader) &&
+                    !headerMap.ContainsKey(normalizedHeader))
+                {
+                    headerMap[normalizedHeader] =
+                        cell.Address.ColumnNumber;
+                }
+            }
+
+            int notifCol = GetRequiredColumn(
+                headerMap,
+                "Notification",
+                "Notif",
+                "Notification #",
+                "Notification Number");
+
+            int orderCol = GetRequiredColumn(
+                headerMap,
+                "Order",
+                "Work Order",
+                "WorkOrder",
+                "WO",
+                "WO #");
+
+            int notifDateCol = GetRequiredColumn(
+                headerMap,
+                "Notif.date",
+                "Notif. date",
+                "Notif Date",
+                "Notification Date",
+                "NotificationDate");
+
+            int descriptionCol = GetRequiredColumn(
+                headerMap,
+                "Description",
+                "Short Text",
+                "Notification Description");
 
             var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow.RowNumber();
             var result = new List<SapQueueImportPreviewRow>();
@@ -489,12 +567,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             }
         }
 
-        private static int GetRequiredColumn(Dictionary<string, int> headerMap, string header)
+        private static int GetRequiredColumn(Dictionary<string, int> headerMap, params string[] headers)
         {
-            if (headerMap.TryGetValue(header, out var col))
-                return col;
+            foreach (var header in headers)
+            {
+                var normalizedHeader =
+                    NormalizeSapHeader(header);
 
-            throw new InvalidOperationException($"Required SAP column '{header}' was not found.");
+                if (headerMap.TryGetValue(normalizedHeader, out var col))
+                    return col;
+            }
+
+            throw new InvalidOperationException(
+                $"Required SAP column '{headers.FirstOrDefault() ?? "Unknown"}' was not found.");
+        }
+
+        private static string NormalizeSapHeader(string? value)
+        {
+            var text = (value ?? string.Empty)
+                .Trim()
+                .Replace('\u00A0', ' ');
+
+            return new string(
+                text
+                    .Where(char.IsLetterOrDigit)
+                    .Select(char.ToLowerInvariant)
+                    .ToArray());
         }
 
         private static string ReadCellText(IXLCell cell)
@@ -517,15 +615,46 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             }
             catch
             {
-                // ignore and try fallbacks
+                // Ignore and try text/numeric fallbacks.
             }
 
             var text = ReadCellText(cell);
 
-            if (DateTime.TryParse(text, out var parsed))
-                return parsed;
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
 
-            if (double.TryParse(text, out var oa))
+            text = text.Trim();
+
+            var digitsOnly = new string(
+                text
+                    .Where(char.IsDigit)
+                    .ToArray());
+
+            if (digitsOnly.Length == 8 &&
+                DateTime.TryParseExact(
+                    digitsOnly,
+                    "yyyyMMdd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var sapCompactDate))
+            {
+                return sapCompactDate;
+            }
+
+            if (DateTime.TryParse(
+                    text,
+                    CultureInfo.CurrentCulture,
+                    DateTimeStyles.None,
+                    out var parsed))
+            {
+                return parsed;
+            }
+
+            if (double.TryParse(
+                    text,
+                    NumberStyles.Any,
+                    CultureInfo.CurrentCulture,
+                    out var oa))
             {
                 try
                 {

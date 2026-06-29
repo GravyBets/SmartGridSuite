@@ -39,12 +39,19 @@ namespace SmartGridSuite.Api.Mappings
             return new SiteHistoryPreviewDto
             {
                 HistoryId = source.HistoryId,
+                SubmissionId = source.SubmissionId,
+
                 SiteId = source.SiteId,
+                SourceType = source.SourceType ?? "",
+
                 VisitDate = source.VisitDate,
                 PrimaryTech = source.PrimaryTech,
                 SecondaryTech = source.SecondaryTech,
                 IssueText = source.IssueText,
-                Narrative = source.Narrative
+                Narrative = source.Narrative,
+
+                EditedAt = source.EditedAt,
+                EditedBy = source.EditedBy
             };
         }
 

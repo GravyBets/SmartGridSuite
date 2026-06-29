@@ -15,7 +15,16 @@ namespace SmartGridSuite.Client.Services
         {
             _http = new HttpClient
             {
-                BaseAddress = new Uri(baseUrl.EndsWith("/") ? baseUrl : baseUrl + "/")
+                BaseAddress = new Uri(
+                baseUrl.EndsWith("/")
+                    ? baseUrl
+                    : baseUrl + "/"),
+
+                /*
+                 * Prevent a weak or missing field connection from leaving the UI waiting
+                 * indefinitely for an API response.
+                 */
+                Timeout = TimeSpan.FromSeconds(15)
             };
         }
 
@@ -32,96 +41,100 @@ namespace SmartGridSuite.Client.Services
             }
         }
 
-        public Task<T?> GetAsync<T>(string path, CancellationToken ct = default)
-            => _http.GetFromJsonAsync<T>(path, ct);
-
-        public async Task<TResponse?> PostAsync<TRequest, TResponse>(string path, TRequest body,
-            CancellationToken ct = default)
+        // Represents a failure to contact the API, including network loss,
+        // connection refusal, DNS failure, and request timeout.
+        public sealed class ApiConnectionException : Exception
         {
-            using var resp = await _http.PostAsJsonAsync(path, body, ct);
+            public string RequestPath { get; }
 
-            if (!resp.IsSuccessStatusCode)
+            public bool IsTimeout { get; }
+
+            public ApiConnectionException(
+                string message,
+                string requestPath,
+                bool isTimeout,
+                Exception innerException)
+                : base(message, innerException)
             {
-                string? text = null;
-                try
-                {
-                    text = await resp.Content.ReadAsStringAsync(ct);
-                }
-                catch
-                {
-                }
-
-                throw new ApiException((int)resp.StatusCode, text);
-            }
-
-            return await ReadJsonOrDefaultAsync<TResponse>(resp, ct); 
-        }
-
-        public async Task PutAsync<TRequest>(string path, TRequest body,
-            CancellationToken ct = default)
-        {
-            using var resp = await _http.PutAsJsonAsync(path, body, ct);
-
-            if (!resp.IsSuccessStatusCode)
-            {
-                string? text = null;
-                try
-                {
-                    text = await resp.Content.ReadAsStringAsync(ct);
-                }
-                catch
-                {
-                }
-
-                throw new ApiException((int)resp.StatusCode, text);
+                RequestPath = requestPath;
+                IsTimeout = isTimeout;
             }
         }
 
-        public async Task<TResponse?> PutAsync<TRequest, TResponse>(string path, TRequest body,
-            CancellationToken ct = default)
+        // Sends a GET request through the shared connection/error handling path so
+        // callers receive a predictable exception when the network or API is unavailable.
+        public async Task<T?> GetAsync<T>(string path, CancellationToken ct = default)
         {
-            using var resp = await _http.PutAsJsonAsync(path, body, ct);
+            using var response = await SendAsync(
+                HttpMethod.Get,
+                path,
+                content: null,
+                ct);
 
-            if (!resp.IsSuccessStatusCode)
-            {
-                string? text = null;
-                try
-                {
-                    text = await resp.Content.ReadAsStringAsync(ct);
-                }
-                catch
-                {
-                }
-
-                throw new ApiException((int)resp.StatusCode, text);
-            }
-
-            return await ReadJsonOrDefaultAsync<TResponse>(resp, ct);
+            return await ReadJsonOrDefaultAsync<T>(response, ct);
         }
 
-        public async Task<SiteDashboardResponseDto?> GetSiteDashboardAsync(string siteId,
-            CancellationToken cancellationToken = default)
+        // Sends a JSON POST request while distinguishing API validation failures
+        // from connectivity and timeout failures.
+        public async Task<TResponse?> PostAsync<TRequest, TResponse>(string path, TRequest body, CancellationToken ct = default)
+        {
+            using var response = await SendAsync(
+                HttpMethod.Post,
+                path,
+                JsonContent.Create(body),
+                ct);
+
+            return await ReadJsonOrDefaultAsync<TResponse>(
+                response,
+                ct);
+        }
+
+        // Sends a JSON PUT request that does not require a response body.
+        public async Task PutAsync<TRequest>(string path, TRequest body, CancellationToken ct = default)
+        {
+            using var response = await SendAsync(
+                HttpMethod.Put,
+                path,
+                JsonContent.Create(body),
+                ct);
+        }
+
+        // Sends a JSON PUT request and deserializes the optional response body.
+        public async Task<TResponse?> PutAsync<TRequest, TResponse>(string path, TRequest body, CancellationToken ct = default)
+        {
+            using var response = await SendAsync(
+                HttpMethod.Put,
+                path,
+                JsonContent.Create(body),
+                ct);
+
+            return await ReadJsonOrDefaultAsync<TResponse>(
+                response,
+                ct);
+        }
+
+        // Loads one Site Dashboard through the centralized API connection handling.
+        public async Task<SiteDashboardResponseDto?> GetSiteDashboardAsync(string siteId, CancellationToken cancellationToken = default)
         {
             siteId = (siteId ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(siteId))
                 return null;
 
-            return await _http.GetFromJsonAsync<SiteDashboardResponseDto>(
+            return await GetAsync<SiteDashboardResponseDto>(
                 $"api/site-dashboard/{Uri.EscapeDataString(siteId)}",
                 cancellationToken);
         }
 
-        public async Task<SiteDashboardRouteInfoDto?> GetSiteDashboardRouteInfoAsync(
-            string siteId,
-            CancellationToken cancellationToken = default)
+        // Loads Site Dashboard routing information through the centralized API client.
+        public async Task<SiteDashboardRouteInfoDto?> GetSiteDashboardRouteInfoAsync(string siteId, CancellationToken cancellationToken = default)
         {
             siteId = (siteId ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(siteId))
                 return null;
 
-            return await _http.GetFromJsonAsync<SiteDashboardRouteInfoDto>(
+            return await GetAsync<SiteDashboardRouteInfoDto>(
                 $"api/site-dashboard/site-dashboard-route/{Uri.EscapeDataString(siteId)}",
                 cancellationToken);
         }
@@ -209,6 +222,88 @@ namespace SmartGridSuite.Client.Services
             return await GetAsync<SiteDashboardResponseDto>(
                 $"api/site-dashboard/tower-dashboard/{topNameId}",
                 ct);
+        }
+
+        // Executes every API request through one connection/error boundary so weak or
+        // missing field connectivity cannot surface as inconsistent raw HTTP exceptions.
+        private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, HttpContent? content,
+            CancellationToken ct)
+        {
+            using var request = new HttpRequestMessage(method, path)
+            {
+                Content = content
+            };
+
+            try
+            {
+                var response = await _http.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    ct);
+
+                /*
+                 * Any HTTP response proves that the API is reachable. Validation and server
+                 * errors are handled separately from actual loss of connectivity.
+                 */
+                ConnectivityService.ReportOnline();
+
+                if (response.IsSuccessStatusCode)
+                    return response;
+
+                var errorBody = await ReadErrorBodyAsync(
+                    response,
+                    ct);
+
+                var statusCode = (int)response.StatusCode;
+
+                response.Dispose();
+
+                throw new ApiException(
+                    statusCode,
+                    errorBody);
+            }
+            catch (TaskCanceledException ex)
+                when (!ct.IsCancellationRequested)
+            {
+                ConnectivityService.ReportOffline(
+                    "The Smart Grid Suite server did not respond before the request timed out.");
+
+                throw new ApiConnectionException(
+                    "The Smart Grid Suite server did not respond before the request timed out.",
+                    path,
+                    isTimeout: true,
+                    ex);
+            }
+            catch (HttpRequestException ex)
+            {
+                ConnectivityService.ReportOffline(
+                    "Offline — showing previously loaded data. Check the network connection and retry.");
+
+                throw new ApiConnectionException(
+                    "Unable to reach the Smart Grid Suite server. Check the network connection and try again.",
+                    path,
+                    isTimeout: false,
+                    ex);
+            }
+        }
+
+        // Safely reads a server-provided validation or error message without allowing
+        // a secondary content-read failure to hide the original HTTP status.
+        private static async Task<string?> ReadErrorBodyAsync(HttpResponseMessage response, CancellationToken ct)
+        {
+            try
+            {
+                var text = await response.Content
+                    .ReadAsStringAsync(ct);
+
+                return string.IsNullOrWhiteSpace(text)
+                    ? null
+                    : text.Trim().Trim('"');
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static async Task<TResponse?> ReadJsonOrDefaultAsync<TResponse>(HttpResponseMessage resp, CancellationToken ct)

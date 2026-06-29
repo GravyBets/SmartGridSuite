@@ -7,8 +7,6 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using System.Globalization;
-using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Runtime.InteropServices;
@@ -101,6 +99,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 OnPropertyChanged(nameof(HasSelectedTargetAssignedTickets));
                 OnPropertyChanged(nameof(SelectedTargetSubtitle));
                 OnPropertyChanged(nameof(SelectedTargetPublishStatusText));
+
+                /*
+                 * The selected route determines which tickets must be excluded from
+                 * the Ticket Pool. Refresh immediately when the dispatcher switches
+                 * crews or technicians.
+                 */
+                ApplyTicketPoolFilter();
             }
         }
 
@@ -248,12 +253,43 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void ApplyTicketPoolFilter()
         {
-            var q = (_ticketSearchText ?? string.Empty).Trim();
+            var q =
+                (_ticketSearchText ?? string.Empty).Trim();
 
-            IEnumerable<DailyAssignmentTicketDto> filtered = Board.TicketPool;
+            IEnumerable<DailyAssignmentTicketDto> filtered =
+                Board.TicketPool;
 
+            /*
+             * A ticket already present in the selected route must never remain in the
+             * pool for that same target. This prevents duplicate assignment attempts
+             * and makes drag/drop behavior clear.
+             */
+            var selectedTargetTicketIds =
+                SelectedTarget?.AssignedTickets
+                    .Select(x => x.TicketId)
+                    .Where(x => x > 0)
+                    .ToHashSet()
+                ?? new HashSet<long>();
+
+            if (selectedTargetTicketIds.Count > 0)
+            {
+                filtered = filtered.Where(
+                    ticket =>
+                        !selectedTargetTicketIds.Contains(
+                            ticket.TicketId));
+            }
+
+            /*
+             * By default, also hide tickets assigned to any other target. When
+             * "Include assigned tickets" is enabled, tickets assigned elsewhere may
+             * appear, but tickets already in the selected route remain excluded.
+             */
             if (!_includeAssignedTickets)
-                filtered = filtered.Where(t => t.CurrentAssignmentId == null);
+            {
+                filtered = filtered.Where(
+                    ticket =>
+                        ticket.CurrentAssignmentId == null);
+            }
 
             if (!string.IsNullOrWhiteSpace(q))
             {
@@ -1683,25 +1719,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 : $"+{AdditionalCount} more";
     }
 
-    public sealed class OneBasedIndexConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is int index)
-                return (index + 1).ToString(culture);
-
-            if (int.TryParse(value?.ToString(), out var parsed))
-                return (parsed + 1).ToString(culture);
-
-            return "";
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            throw new NotSupportedException();
-        }
-    }
-
     public sealed class AssignmentTargetVm
     {
         public string TargetKey { get; set; } = "";
@@ -1774,11 +1791,31 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 TechnicianId = dto.TechnicianId,
                 PrimaryText = primary,
                 SecondaryText = secondary,
-                AssignedTickets = new ObservableCollection<DailyAssignedTicketDto>(
-                    dto.AssignedTickets
-                        .OrderBy(x => x.SortOrder)
-                        .ThenBy(x => x.AssignmentId))
+                AssignedTickets = BuildOrderedAssignedTickets(dto.AssignedTickets)
             };
+        }
+
+        // Produces a stable one-based route for display. The API remains responsible
+        // for persistence; this only prevents stale or gapped sort values from
+        // appearing as route numbers in the current UI.
+        private static ObservableCollection<DailyAssignedTicketDto>
+            BuildOrderedAssignedTickets(IEnumerable<DailyAssignedTicketDto> tickets)
+        {
+            var orderedTickets = tickets
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.AssignmentId)
+                .ToList();
+
+            for (var index = 0;
+                 index < orderedTickets.Count;
+                 index++)
+            {
+                orderedTickets[index].SortOrder =
+                    index + 1;
+            }
+
+            return new ObservableCollection<DailyAssignedTicketDto>(
+                orderedTickets);
         }
 
         private static string FormatCrewNames(IReadOnlyList<string> names)

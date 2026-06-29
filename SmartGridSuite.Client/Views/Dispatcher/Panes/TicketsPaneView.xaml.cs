@@ -276,7 +276,51 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
+        private const int TicketPageSize = 500;
 
+        private int _currentTicketPageIndex;
+        private int _totalMatchingTicketCount;
+
+        public int CurrentTicketPageNumber =>
+            _currentTicketPageIndex + 1;
+
+        public int TotalTicketPageCount =>
+            Math.Max(
+                1,
+                (int)Math.Ceiling(
+                    _totalMatchingTicketCount /
+                    (double)TicketPageSize));
+
+        public bool CanGoToPreviousTicketPage =>
+            _currentTicketPageIndex > 0;
+
+        public bool CanGoToNextTicketPage =>
+            _currentTicketPageIndex + 1 <
+            TotalTicketPageCount;
+
+        public string TicketPageSummary
+        {
+            get
+            {
+                if (_totalMatchingTicketCount == 0)
+                    return "No tickets";
+
+                var first =
+                    _currentTicketPageIndex *
+                    TicketPageSize + 1;
+
+                var last =
+                    Math.Min(
+                        first + _tickets.Count - 1,
+                        _totalMatchingTicketCount);
+
+                return
+                    $"Showing {first:N0}–{last:N0} of " +
+                    $"{_totalMatchingTicketCount:N0} · " +
+                    $"Page {CurrentTicketPageNumber} of " +
+                    $"{TotalTicketPageCount}";
+            }
+        }
 
         public TicketsPaneView()
         {
@@ -291,9 +335,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
 
             TicketsView = CollectionViewSource.GetDefaultView(_tickets);
-            TicketsView.SortDescriptions.Clear();
-            TicketsView.SortDescriptions.Add(
-                new SortDescription(nameof(DispatchTicket.LastActivityAt), ListSortDirection.Descending));
+            
             _techniciansApi = new TechniciansApi(new ApiClient("https://localhost:7140"));
 
             TicketsGrid.ItemsSource = TicketsView;
@@ -342,6 +384,24 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             Loaded += TicketsPaneView_Loaded;
         }
 
+        private void RefreshTicketPagingBindings()
+        {
+            OnPropertyChanged(
+                nameof(CurrentTicketPageNumber));
+
+            OnPropertyChanged(
+                nameof(TotalTicketPageCount));
+
+            OnPropertyChanged(
+                nameof(CanGoToPreviousTicketPage));
+
+            OnPropertyChanged(
+                nameof(CanGoToNextTicketPage));
+
+            OnPropertyChanged(
+                nameof(TicketPageSummary));
+        }
+
         private async void QuickFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressFilterEvents || !_filtersInitialized)
@@ -358,7 +418,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 _ => TicketQuickFilter.None
             };
 
-            await LoadTicketsFromApiAsync();
+            await LoadTicketsFromApiAsync(resetPage: true);
         }
 
         private async void AddSelectedTicketSiteNote_Click(object sender, RoutedEventArgs e)
@@ -486,7 +546,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (!_filtersInitialized)
                 return;
 
-            await LoadTicketsFromApiAsync();
+            await LoadTicketsFromApiAsync(resetPage: true);
         }
 
         private async void TicketsPaneView_Loaded(object sender, RoutedEventArgs e)
@@ -582,10 +642,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private async Task LoadTicketsFromApiAsync(CancellationToken ct = default)
+        private async Task LoadTicketsFromApiAsync(bool resetPage = false, CancellationToken ct = default)
         {
             if (!_filtersInitialized)
                 return;
+
+            if (resetPage)
+                _currentTicketPageIndex = 0;
 
             _ticketQueryCts?.Cancel();
             _ticketQueryCts?.Dispose();
@@ -599,13 +662,51 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 var response = await _ticketsApi.QueryTicketsAsync(req, queryCt);
 
+                /*
+                 * A delete, status change, or filter change could leave the current page
+                 * beyond the new final page. Move back to the final valid page and reload.
+                 */
+                var maximumPageIndex =
+                    response.TotalCount <= 0
+                        ? 0
+                        : (response.TotalCount - 1) /
+                          TicketPageSize;
+
+                if (_currentTicketPageIndex >
+                    maximumPageIndex)
+                {
+                    _currentTicketPageIndex =
+                        maximumPageIndex;
+
+                    await LoadTicketsFromApiAsync(
+                        resetPage: false,
+                        ct: ct);
+
+                    return;
+                }
+
                 _tickets.Clear();
 
                 foreach (var dto in response.Items)
-                    _tickets.Add(Map(dto));
+                {
+                    _tickets.Add(
+                        Map(dto));
+                }
 
-                VisibleTicketCount = response.TotalCount;
-                TotalLoadedTicketCount = response.TotalCount;
+                /*
+                 * VisibleTicketCount is the number currently displayed on this page.
+                 * TotalLoadedTicketCount remains the total number matching the API query.
+                 */
+                VisibleTicketCount =
+                    response.Items.Count;
+
+                TotalLoadedTicketCount =
+                    response.TotalCount;
+
+                _totalMatchingTicketCount =
+                    response.TotalCount;
+
+                RefreshTicketPagingBindings();
 
                 TicketsView.Refresh();
                 UpdateTicketListUiState();
@@ -651,8 +752,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 QuickFilter = GetActiveQuickFilterApiValue(),
 
-                Skip = 0,
-                Take = 2000
+                Skip =
+                    _currentTicketPageIndex *
+                    TicketPageSize,
+
+                Take =
+                    TicketPageSize
             };
         }
 
@@ -885,6 +990,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (BulkSetProblemButton != null)
                 BulkSetProblemButton.IsEnabled = selectedCount > 0;
 
+            if (BulkSetWorkOrderTypeButton != null)
+                BulkSetWorkOrderTypeButton.IsEnabled = selectedCount > 0;
+
+            if (BulkSetStatusButton != null)
+                BulkSetStatusButton.IsEnabled = selectedCount > 0;
+
             if (AssignSelectedButton != null)
                 AssignSelectedButton.IsEnabled = selectedCount > 0;
 
@@ -961,7 +1072,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private async void SetSelectedStatuses(params string[] statusNames)
         {
             SetSelectedStatusesWithoutRefresh(statusNames);
-            await LoadTicketsFromApiAsync();
+            await LoadTicketsFromApiAsync(resetPage: true);
         }
 
         private void SetSelectedStatusesWithoutRefresh(params string[] statusNames)
@@ -1047,7 +1158,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             UpdateCustomDateVisibility();
 
             await Dispatcher.InvokeAsync(
-                async () => await LoadTicketsFromApiAsync(),
+                async () =>
+                    await LoadTicketsFromApiAsync(
+                        resetPage: true),
                 DispatcherPriority.Background);
         }
 
@@ -1059,7 +1172,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if ((DateRangeFilter?.SelectedItem as string) != "Custom")
                 return;
 
-            await LoadTicketsFromApiAsync();
+            await LoadTicketsFromApiAsync(resetPage: true);
         }
 
         private void StatusFilterButton_Click(object sender, RoutedEventArgs e)
@@ -1073,7 +1186,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
 
             OnPropertyChanged(nameof(SelectedStatusesSummary));
-            await LoadTicketsFromApiAsync();
+            await LoadTicketsFromApiAsync(resetPage: true);
         }
 
         private void SelectAllOpenStatuses_Click(object sender, RoutedEventArgs e)
@@ -1127,7 +1240,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             UpdateCustomDateVisibility();
             OnPropertyChanged(nameof(SelectedStatusesSummary));
 
-            await LoadTicketsFromApiAsync();
+            await LoadTicketsFromApiAsync(resetPage: true);
         }
 
         private async void CopyGridValue_Click(object sender, RoutedEventArgs e)
@@ -1540,47 +1653,27 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
 
             var problem = win.Problem;
-            var updated = 0;
-            var failed = 0;
-            var selectedIds = selected.Select(t => t.Id).ToHashSet();
+            var selectedIds = selected
+                .Select(t => t.Id)
+                .Where(x => x > 0)
+                .Distinct()
+                .ToHashSet();
 
             BulkSetProblemButton.IsEnabled = false;
             AssignSelectedButton.IsEnabled = false;
 
             try
             {
-                foreach (var ticket in selected)
+                var req = new BulkSetProblemRequest
                 {
-                    try
-                    {
-                        var req = new UpdateTicketRequest(
-                            Site: ticket.Site ?? "",
-                            NotificationName: ticket.NotificationName ?? "",
-                            Notification: ticket.Notification ?? "",
-                            WorkOrder: string.IsNullOrWhiteSpace(ticket.CurrentWorkOrder) ? null : ticket.CurrentWorkOrder,
-                            WorkOrderClass: ticket.WorkOrderType ?? "",
-                            GroupCode: ticket.GroupCode ?? "",
-                            PriorityDays: ticket.PriorityDays,
-                            Status: ticket.Status ?? "",
-                            TaskCategoryId: ticket.TaskCategoryId,
-                            ActionRequiredOverride: string.IsNullOrWhiteSpace(ticket.ActionRequiredOverride)
-                                ? null
-                                : ticket.ActionRequiredOverride,
-                            AssignedTech: ticket.AssignedTech ?? "(Unassigned)",
-                            Problem: problem,
-                            Notes: ticket.Notes ?? "",
-                            DispatchNotes: ticket.DispatchNotes ?? ""
-                        );
+                    TicketIds = selectedIds.ToList(),
+                    Problem = problem,
+                    UpdatedBy = GetCurrentUserDisplayName()
+                };
 
-                        await _ticketsApi.UpdateTicketAsync(ticket.Id, req);
-                        updated++;
-                    }
-                    catch
-                    {
-                        failed++;
-                    }
-                }
+                var result = await _ticketsApi.BulkSetProblemAsync(req);
 
+                await LoadSummaryFromApiAsync();
                 await LoadTicketsFromApiAsync();
 
                 if (_activeQuickFilter != TicketQuickFilter.MissingProblems)
@@ -1589,6 +1682,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                         TicketsGrid.SelectedItems.Add(ticket);
 
                     var first = _tickets.FirstOrDefault(t => selectedIds.Contains(t.Id));
+
                     if (first != null)
                     {
                         TicketsGrid.SelectedItem = first;
@@ -1602,17 +1696,285 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     UpdateDetailsVisibility();
                 }
 
-                var message = failed == 0
-                    ? _activeQuickFilter == TicketQuickFilter.MissingProblems
-                    ? $"Updated {updated} ticket(s). They were removed from the Missing Problems view."
-                        : $"Updated {updated} ticket(s)."
-                        : $"Updated {updated} ticket(s). Failed to update {failed}.";
+                var updatedCount = result?.UpdatedCount ?? 0;
+                var notFoundCount = result?.NotFoundCount ?? 0;
+
+                var message =
+                    _activeQuickFilter == TicketQuickFilter.MissingProblems
+                        ? $"Updated {updatedCount} ticket(s). They were removed from the Missing Problems view."
+                        : $"Updated {updatedCount} ticket(s).";
+
+                if (notFoundCount > 0)
+                {
+                    message +=
+                        $"{Environment.NewLine}{Environment.NewLine}" +
+                        $"{notFoundCount} ticket(s) were not found.";
+                }
 
                 MessageBox.Show(
                     message,
                     "Set Problem",
                     MessageBoxButton.OK,
-                    failed == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                    notFoundCount == 0
+                        ? MessageBoxImage.Information
+                        : MessageBoxImage.Warning);
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                MessageBox.Show(
+                    ex.Body ?? ex.Message,
+                    "Set Problem",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "Set Problem",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                UpdateTicketListUiState();
+            }
+        }
+
+        private async void BulkSetStatus_Click(object sender, RoutedEventArgs e)
+        {
+            var selected = GetSelectedTickets();
+
+            if (selected.Count == 0)
+            {
+                MessageBox.Show(
+                    "Select one or more tickets first.",
+                    "Set Status",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                return;
+            }
+
+            var statuses = StatusOptions
+                .Select(x => x.Name)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var win = new BulkSetStatusWindow(
+                selected.Count,
+                statuses)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (win.ShowDialog() != true)
+                return;
+
+            var selectedStatus =
+                win.SelectedStatus;
+
+            if (IsClosedBulkStatus(selectedStatus))
+            {
+                var confirm = MessageBox.Show(
+                    $"Close {selected.Count} selected ticket(s)?\n\n" +
+                    "Closed tickets are normally hidden from active dispatcher views. " +
+                    "This should only be used when the tickets are fully complete and ready to leave the active queue.",
+                    "Confirm Close Tickets",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (confirm != MessageBoxResult.Yes)
+                    return;
+            }
+
+            var selectedIds = selected
+                .Select(t => t.Id)
+                .Where(x => x > 0)
+                .Distinct()
+                .ToHashSet();
+
+            BulkSetProblemButton.IsEnabled = false;
+            BulkSetWorkOrderTypeButton.IsEnabled = false;
+            BulkSetStatusButton.IsEnabled = false;
+            AssignSelectedButton.IsEnabled = false;
+
+            try
+            {
+                var req = new BulkSetStatusRequest
+                {
+                    TicketIds = selectedIds.ToList(),
+                    Status = selectedStatus,
+                    UpdatedBy = GetCurrentUserDisplayName()
+                };
+
+                var result =
+                    await _ticketsApi.BulkSetStatusAsync(req);
+
+                await LoadSummaryFromApiAsync();
+                await LoadTicketsFromApiAsync();
+
+                foreach (var ticket in _tickets.Where(t => selectedIds.Contains(t.Id)))
+                    TicketsGrid.SelectedItems.Add(ticket);
+
+                var first = _tickets.FirstOrDefault(t => selectedIds.Contains(t.Id));
+
+                if (first != null)
+                {
+                    TicketsGrid.SelectedItem = first;
+                    TicketsGrid.ScrollIntoView(first);
+                }
+
+                var updatedCount = result?.UpdatedCount ?? 0;
+                var notFoundCount = result?.NotFoundCount ?? 0;
+
+                var message =
+                    IsClosedBulkStatus(selectedStatus)
+                        ? $"Closed {updatedCount} ticket(s)."
+                        : $"Updated status on {updatedCount} ticket(s).";
+
+                if (notFoundCount > 0)
+                {
+                    message +=
+                        $"{Environment.NewLine}{Environment.NewLine}" +
+                        $"{notFoundCount} ticket(s) were not found.";
+                }
+
+                MessageBox.Show(
+                    message,
+                    "Set Status",
+                    MessageBoxButton.OK,
+                    notFoundCount == 0
+                        ? MessageBoxImage.Information
+                        : MessageBoxImage.Warning);
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                MessageBox.Show(
+                    ex.Body ?? ex.Message,
+                    "Set Status",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "Set Status",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                UpdateTicketListUiState();
+            }
+        }
+
+        private async void BulkSetWorkOrderType_Click(object sender, RoutedEventArgs e)
+        {
+            var selected = GetSelectedTickets();
+
+            if (selected.Count == 0)
+            {
+                MessageBox.Show(
+                    "Select one or more tickets first.",
+                    "Set WO Type",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                return;
+            }
+
+            var win = new BulkSetWorkOrderTypeWindow(selected.Count)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (win.ShowDialog() != true)
+                return;
+
+            var selectedIds = selected
+                .Select(t => t.Id)
+                .Where(x => x > 0)
+                .Distinct()
+                .ToHashSet();
+
+            BulkSetProblemButton.IsEnabled = false;
+            BulkSetWorkOrderTypeButton.IsEnabled = false;
+            BulkSetStatusButton.IsEnabled = false;
+            AssignSelectedButton.IsEnabled = false;
+
+            try
+            {
+                var req = new BulkSetWorkOrderTypeRequest
+                {
+                    TicketIds = selectedIds.ToList(),
+                    WorkOrderType = win.WorkOrderType,
+                    UpdatedBy = GetCurrentUserDisplayName()
+                };
+
+                var result =
+                    await _ticketsApi.BulkSetWorkOrderTypeAsync(req);
+
+                await LoadSummaryFromApiAsync();
+                await LoadTicketsFromApiAsync();
+
+                foreach (var ticket in _tickets.Where(t => selectedIds.Contains(t.Id)))
+                    TicketsGrid.SelectedItems.Add(ticket);
+
+                var first = _tickets.FirstOrDefault(t => selectedIds.Contains(t.Id));
+
+                if (first != null)
+                {
+                    TicketsGrid.SelectedItem = first;
+                    TicketsGrid.ScrollIntoView(first);
+                }
+
+                var updatedCount = result?.UpdatedCount ?? 0;
+                var skippedCount = result?.SkippedCount ?? 0;
+                var notFoundCount = result?.NotFoundCount ?? 0;
+
+                var message =
+                    $"Updated WO Type on {updatedCount} ticket(s).";
+
+                if (skippedCount > 0)
+                {
+                    message +=
+                        $"{Environment.NewLine}{Environment.NewLine}" +
+                        $"{skippedCount} ticket(s) were skipped because they do not have a Work Order.";
+                }
+
+                if (notFoundCount > 0)
+                {
+                    message +=
+                        $"{Environment.NewLine}{Environment.NewLine}" +
+                        $"{notFoundCount} ticket(s) were not found.";
+                }
+
+                MessageBox.Show(
+                    message,
+                    "Set WO Type",
+                    MessageBoxButton.OK,
+                    skippedCount == 0 && notFoundCount == 0
+                        ? MessageBoxImage.Information
+                        : MessageBoxImage.Warning);
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                MessageBox.Show(
+                    ex.Body ?? ex.Message,
+                    "Set WO Type",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "Set WO Type",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
             finally
             {
@@ -1657,56 +2019,27 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             var isUnassigning = assignedTech.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase);
 
-            var newStatus = isUnassigning
-                ? "Open"
-                : "Assigned";
-
-            var updated = 0;
-            var failed = 0;
-            var selectedIds = selected.Select(t => t.Id).ToHashSet();
+            var selectedIds = selected
+                .Select(t => t.Id)
+                .Where(x => x > 0)
+                .Distinct()
+                .ToHashSet();
 
             BulkSetProblemButton.IsEnabled = false;
             AssignSelectedButton.IsEnabled = false;
 
             try
             {
-                foreach (var ticket in selected)
+                var req = new BulkAssignTicketsRequest
                 {
-                    try
-                    {
-                        var req = new UpdateTicketRequest(
-                            Site: ticket.Site ?? "",
-                            NotificationName: ticket.NotificationName ?? "",
-                            Notification: ticket.Notification ?? "",
-                            WorkOrder: string.IsNullOrWhiteSpace(ticket.CurrentWorkOrder) ? null : ticket.CurrentWorkOrder,
-                            WorkOrderClass: ticket.WorkOrderType ?? "",
-                            GroupCode: ticket.GroupCode ?? "",
-                            PriorityDays: ticket.PriorityDays,
+                    TicketIds = selectedIds.ToList(),
+                    AssignedTech = assignedTech,
+                    UpdatedBy = GetCurrentUserDisplayName()
+                };
 
-                            // Important:
-                            // Assigning to a real tech = Assigned
-                            // Assigning to (Unassigned) = Open
-                            Status: newStatus,
+                var result = await _ticketsApi.BulkAssignTicketsAsync(req);
 
-                            TaskCategoryId: ticket.TaskCategoryId,
-                            ActionRequiredOverride: string.IsNullOrWhiteSpace(ticket.ActionRequiredOverride)
-                                ? null
-                                : ticket.ActionRequiredOverride,
-                            AssignedTech: assignedTech,
-                            Problem: ticket.Problem ?? "",
-                            Notes: ticket.Notes ?? "",
-                            DispatchNotes: ticket.DispatchNotes ?? ""
-                        );
-
-                        await _ticketsApi.UpdateTicketAsync(ticket.Id, req);
-                        updated++;
-                    }
-                    catch
-                    {
-                        failed++;
-                    }
-                }
-
+                await LoadSummaryFromApiAsync();
                 await LoadTicketsFromApiAsync();
 
                 foreach (var ticket in _tickets.Where(t => selectedIds.Contains(t.Id)))
@@ -1720,19 +2053,44 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     TicketsGrid.ScrollIntoView(first);
                 }
 
-                var successMessage = isUnassigning
-                    ? $"Unassigned {updated} ticket(s)."
-                    : $"Assigned {updated} ticket(s) to {assignedTech}.";
+                var updatedCount = result?.UpdatedCount ?? 0;
+                var notFoundCount = result?.NotFoundCount ?? 0;
 
-                var failMessage = isUnassigning
-                    ? $"Unassigned {updated} ticket(s). Failed to update {failed}."
-                    : $"Assigned {updated} ticket(s) to {assignedTech}. Failed to update {failed}.";
+                var message =
+                    isUnassigning
+                        ? $"Unassigned {updatedCount} ticket(s)."
+                        : $"Assigned {updatedCount} ticket(s) to {assignedTech}.";
+
+                if (notFoundCount > 0)
+                {
+                    message +=
+                        $"{Environment.NewLine}{Environment.NewLine}" +
+                        $"{notFoundCount} ticket(s) were not found.";
+                }
 
                 MessageBox.Show(
-                    failed == 0 ? successMessage : failMessage,
+                    message,
                     "Assign Tickets",
                     MessageBoxButton.OK,
-                    failed == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                    notFoundCount == 0
+                        ? MessageBoxImage.Information
+                        : MessageBoxImage.Warning);
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                MessageBox.Show(
+                    ex.Body ?? ex.Message,
+                    "Assign Tickets",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "Assign Tickets",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
             finally
             {
@@ -1916,6 +2274,45 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 TechWriteUpsExpander?.IsExpanded == true
                     ? techHeight
                     : double.NaN;
+        }
+
+        private async void PreviousTicketPage_Click(object sender, RoutedEventArgs e)
+        {
+            if (!CanGoToPreviousTicketPage)
+                return;
+
+            _currentTicketPageIndex--;
+
+            await LoadTicketsFromApiAsync();
+        }
+
+        private async void NextTicketPage_Click(object sender, RoutedEventArgs e)
+        {
+            if (!CanGoToNextTicketPage)
+                return;
+
+            _currentTicketPageIndex++;
+
+            await LoadTicketsFromApiAsync();
+        }
+
+        private bool IsClosedBulkStatus(string statusName)
+        {
+            if (string.IsNullOrWhiteSpace(statusName))
+                return false;
+
+            var configuredStatus = StatusOptions
+                .FirstOrDefault(x =>
+                    x.Name.Equals(
+                        statusName,
+                        StringComparison.OrdinalIgnoreCase));
+
+            if (configuredStatus?.IsClosed == true)
+                return true;
+
+            return statusName.Equals(
+                "Closed",
+                StringComparison.OrdinalIgnoreCase);
         }
     }
 }

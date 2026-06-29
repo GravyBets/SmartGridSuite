@@ -2,10 +2,12 @@
 using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
-using SmartGridSuite.Contracts.Tickets;
+using SmartGridSuite.Api.Services;
 using SmartGridSuite.Contracts.Dispatcher;
-using System.Text.RegularExpressions;
 using SmartGridSuite.Contracts.FieldTechnician;
+using SmartGridSuite.Contracts.SiteDashboard;
+using SmartGridSuite.Contracts.Tickets;
+using System.Text.RegularExpressions;
 
 namespace SmartGridSuite.Api.Controllers
 {
@@ -14,10 +16,17 @@ namespace SmartGridSuite.Api.Controllers
     public class TicketsController : ControllerBase
     {
         private readonly SmartGridDbContext _db;
-        public TicketsController(SmartGridDbContext db) => _db = db;
+        private readonly TruckBoardInitializationService _truckBoardInitialization;
 
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
         private const string TechnicianRoleCode = "TECHNICIAN";
+
+        // Receives the shared roster initializer so field tasks can safely build today's crew route.
+        public TicketsController(SmartGridDbContext db, TruckBoardInitializationService truckBoardInitialization)
+        {
+            _db = db;
+            _truckBoardInitialization = truckBoardInitialization;
+        }
 
         [HttpGet]
         public async Task<ActionResult<List<TicketListItemDto>>> Get([FromQuery] string? status = null, [FromQuery] string? tech = null,
@@ -156,12 +165,25 @@ namespace SmartGridSuite.Api.Controllers
 
             if (req.From.HasValue)
             {
-                var from = req.From.Value.Date;
+                /*
+                 * Preserve the exact timestamp supplied by the client.
+                 * This keeps rolling ranges such as Last 24 Hours accurate.
+                 * Custom DatePicker values already arrive at midnight.
+                 */
+                var from = req.From.Value;
 
-                if (dateField.Equals("Created", StringComparison.OrdinalIgnoreCase))
-                    query = query.Where(t => t.CreatedAt >= from);
+                if (dateField.Equals(
+                        "Created",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(
+                        t => t.CreatedAt >= from);
+                }
                 else
-                    query = query.Where(t => t.LastActivityAt >= from);
+                {
+                    query = query.Where(
+                        t => t.LastActivityAt >= from);
+                }
             }
 
             if (req.To.HasValue)
@@ -531,16 +553,109 @@ namespace SmartGridSuite.Api.Controllers
             ));
         }
 
+        // Loads expandable field-row details on demand so Tasks and History stay
+        // lightweight while still displaying current Dispatch Notes and active Site Notes.
+        [HttpGet("field-tech/expanded-details/{ticketId:long}")]
+        public async Task<ActionResult<FieldTechExpandedTicketDetailsDto>> GetFieldTechExpandedDetails(
+            long ticketId, CancellationToken ct)
+        {
+            var ticket = await _db.Tickets
+                .AsNoTracking()
+                .Where(x => x.Id == ticketId)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Site,
+                    x.DispatchNotes
+                })
+                .FirstOrDefaultAsync(ct);
+
+            if (ticket == null)
+                return NotFound();
+
+            var normalizedSiteId = NormalizeSiteIdForFieldDetails(ticket.Site);
+
+            var siteNotes = new List<FieldTechSiteNoteDto>();
+
+            if (!string.IsNullOrWhiteSpace(normalizedSiteId))
+            {
+                /*
+                 * These filtering and ordering rules intentionally match
+                 * SiteNotesController.GetBySite(...) so field row details show the
+                 * same current active notes as the Site Dashboard.
+                 */
+                siteNotes = await _db.SiteNotes
+                    .AsNoTracking()
+                    .Where(x => x.IsActive && x.SiteId == normalizedSiteId)
+                    .OrderBy(x => x.NoteType)
+                    .ThenByDescending(x => x.UpdatedAt ?? x.CreatedAt)
+                    .Select(x => new FieldTechSiteNoteDto
+                    {
+                        Id = x.Id,
+                        NoteType = x.NoteType ?? "",
+                        NoteText = x.NoteText,
+                        CreatedBy = x.CreatedBy,
+                        CreatedAt = x.CreatedAt,
+                        UpdatedBy = x.UpdatedBy ?? "",
+                        UpdatedAt = x.UpdatedAt
+                    })
+                    .ToListAsync(ct);
+            }
+
+            return Ok(new FieldTechExpandedTicketDetailsDto
+            {
+                TicketId = ticket.Id,
+                Site = ticket.Site ?? "",
+                DispatchNotes = ticket.DispatchNotes ?? "",
+                SiteNotes = siteNotes
+            });
+        }
+
+        // Builds both Field Technician task sections in the API so the UI only displays
+        // published route work and deduplicated direct assignments already in business-rule order.
         [HttpGet("field-tech/tasks/{employeeId}")]
-        public async Task<ActionResult<List<FieldTechTicketListItemDto>>> GetFieldTechTasks(string employeeId, CancellationToken ct)
+        public async Task<ActionResult<FieldTechTasksResponseDto>> GetFieldTechTasks(string employeeId, CancellationToken ct)
         {
             var tech = await ResolveActiveTechnicianByEmployeeIdAsync(employeeId, ct);
 
             if (tech == null)
-                return Ok(new List<FieldTechTicketListItemDto>());
+                return Ok(new FieldTechTasksResponseDto());
 
             var rosterDate = DateTime.Today.Date;
             var assignmentDate = ActiveAssignmentDate;
+
+            /*
+             * Field Technician Tasks may be the first workflow opened in the morning.
+             * Ensure today's carried-forward truck/crew roster exists before resolving
+             * the technician's published crew route.
+             */
+            await _truckBoardInitialization.EnsureBoardInitializedAsync(rosterDate, ct);
+
+            var statusRows = await _db.TicketStatuses
+                .AsNoTracking()
+                .Where(x => x.IsActive)
+                .Select(x => new
+                {
+                    x.Name,
+                    x.IsClosed,
+                    x.IsFieldComplete
+                })
+                .ToListAsync(ct);
+
+            var closedStatusNames = statusRows
+                .Where(x => x.IsClosed)
+                .Select(x => x.Name)
+                .ToList();
+
+            var closedStatusSet = closedStatusNames
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var fieldCompleteStatusSet = statusRows
+                .Where(x => x.IsFieldComplete)
+                .Select(x => x.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var publishedAssignments = new List<DailyTicketAssignmentPublishedEntity>();
 
             var truckId = await _db.TruckRosters
                 .AsNoTracking()
@@ -548,8 +663,11 @@ namespace SmartGridSuite.Api.Controllers
                 .Select(x => (uint?)x.TruckId)
                 .FirstOrDefaultAsync(ct);
 
-            uint targetTechnicianId = tech.Id;
-
+            /*
+             * A technician assigned to a truck sees the latest published route owned by
+             * that truck's current lead anchor. TruckId is included so a lead technician's
+             * crew route cannot be confused with a directly assigned personal route.
+             */
             if (truckId.HasValue)
             {
                 var leadTech = await ResolveLeadTechnicianForTruckAsync(
@@ -558,73 +676,374 @@ namespace SmartGridSuite.Api.Controllers
                     ct);
 
                 if (leadTech != null)
-                    targetTechnicianId = leadTech.Id;
+                {
+                    publishedAssignments.AddRange(
+                        await LoadLatestPublishedTechnicianTargetAsync(
+                            assignmentDate,
+                            leadTech.Id,
+                            truckId.Value,
+                            ct));
+                }
             }
 
-            var latestTechnicianVersion = await _db.DailyTicketAssignmentPublished
+            /*
+             * Published work assigned directly to this technician is also Daily
+             * Assignment work, whether or not the technician currently belongs to a crew.
+             */
+            publishedAssignments.AddRange(
+                await LoadLatestPublishedTechnicianTargetAsync(
+                    assignmentDate,
+                    tech.Id,
+                    truckId: null,
+                    ct));
+
+            var orderedPublishedAssignments = publishedAssignments
+                .Where(x => x.Ticket != null)
+                .Where(x => !closedStatusSet.Contains(x.Ticket!.Status ?? string.Empty))
+                .GroupBy(x => x.TicketId)
+                .Select(x => x.First())
+                .ToList();
+
+            var dailyAssignmentTicketIds = orderedPublishedAssignments
+                .Select(x => x.TicketId)
+                .Distinct()
+                .ToList();
+
+            var assignedTechValues = BuildAssignedTechMatchValues(tech);
+
+            var technicianDisplayName =
+                FormatTechnicianName(
+                    tech.FirstName,
+                    tech.LastName,
+                    tech.EmployeeId);
+
+            var technicianEmployeeId =
+                (tech.EmployeeId ?? string.Empty).Trim();
+
+            /*
+             * This section intentionally contains only tickets directly assigned to the
+             * signed-in technician and excludes work already present in the published route.
+             *
+             * Direct dispatch assignment is stored as a display string. Support both the
+             * older single-tech exact value and the newer multi-tech formatted value such as
+             * "Alex Smith, Pat Jones & Lee Brown".
+             */
+            var otherAssignedQuery = _db.Tickets
+                .Include(t => t.TaskCategory)
+                .AsNoTracking()
+                .Where(t =>
+                    !closedStatusNames.Contains(t.Status) &&
+                    t.AssignedTech != null &&
+                    (
+                        assignedTechValues.Contains(t.AssignedTech) ||
+                        t.AssignedTech.Contains(technicianDisplayName) ||
+                        (
+                            technicianEmployeeId != "" &&
+                            t.AssignedTech.Contains(technicianEmployeeId)
+                        )
+                    ));
+
+            if (dailyAssignmentTicketIds.Count > 0)
+            {
+                otherAssignedQuery = otherAssignedQuery
+                    .Where(t => !dailyAssignmentTicketIds.Contains(t.Id));
+            }
+
+            var otherAssignedRows = await otherAssignedQuery
+                .OrderBy(t => t.PriorityDays == 0 ? 999 : t.PriorityDays)
+                .ThenByDescending(t => t.LastActivityAt)
+                .ThenByDescending(t => t.Id)
+                .ToListAsync(ct);
+
+            var allTaskSites = orderedPublishedAssignments
+                .Where(x => x.Ticket != null)
+                .Select(x => NormalizeSiteIdForFieldDetails(x.Ticket!.Site))
+                .Concat(otherAssignedRows.Select(x => NormalizeSiteIdForFieldDetails(x.Site)))
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var siteNoteCountsBySite = allTaskSites.Count == 0
+                ? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                : await _db.SiteNotes
+                    .AsNoTracking()
+                    .Where(x => x.IsActive && allTaskSites.Contains(x.SiteId))
+                    .GroupBy(x => x.SiteId)
+                    .Select(g => new
+                    {
+                        SiteId = g.Key,
+                        Count = g.Count()
+                    })
+                    .ToDictionaryAsync(
+                        x => x.SiteId,
+                        x => x.Count,
+                        StringComparer.OrdinalIgnoreCase,
+                        ct);
+
+            var dailyAssignments = new List<FieldTechTicketListItemDto>();
+            var routeOrder = 0;
+
+            foreach (var assignment in orderedPublishedAssignments)
+            {
+                routeOrder++;
+
+                dailyAssignments.Add(
+                    MapToFieldTechTicket(
+                        assignment.Ticket!,
+                        fieldCompleteStatusSet,
+                        routeOrder,
+                        siteNoteCountsBySite));
+            }
+
+            var otherAssignedTickets = otherAssignedRows
+                .Select(t => MapToFieldTechTicket(
+                    t,
+                    fieldCompleteStatusSet,
+                    routeOrder: null,
+                    siteNoteCountsBySite))
+                .ToList();
+
+            return Ok(new FieldTechTasksResponseDto
+            {
+                TechnicianName = FormatTechnicianName(
+                    tech.FirstName,
+                    tech.LastName,
+                    tech.EmployeeId),
+
+                DailyAssignments = dailyAssignments,
+                OtherAssignedTickets = otherAssignedTickets
+            });
+        }
+
+        // Loads the latest published snapshot for one exact technician route target.
+        // TruckId distinguishes a crew route anchored to a lead from direct personal work.
+        private async Task<List<DailyTicketAssignmentPublishedEntity>> LoadLatestPublishedTechnicianTargetAsync(DateTime assignmentDate,
+            uint technicianId, uint? truckId, CancellationToken ct)
+        {
+            var latestPublishedVersion = await _db.DailyTicketAssignmentPublished
                 .AsNoTracking()
                 .Where(x =>
                     x.AssignmentDate == assignmentDate &&
                     x.TargetType == "Technician" &&
-                    x.TechnicianId == targetTechnicianId)
+                    x.TechnicianId == technicianId &&
+                    x.TruckId == truckId)
                 .Select(x => (int?)x.PublishedVersion)
                 .MaxAsync(ct);
 
-            if (!latestTechnicianVersion.HasValue)
-                return Ok(new List<FieldTechTicketListItemDto>());
+            if (!latestPublishedVersion.HasValue)
+                return new List<DailyTicketAssignmentPublishedEntity>();
 
-            var publishedAssignments = await _db.DailyTicketAssignmentPublished
+            return await _db.DailyTicketAssignmentPublished
                 .AsNoTracking()
                 .Include(x => x.Ticket)
                     .ThenInclude(t => t!.TaskCategory)
                 .Where(x =>
                     x.AssignmentDate == assignmentDate &&
                     x.TargetType == "Technician" &&
-                    x.TechnicianId == targetTechnicianId &&
-                    x.PublishedVersion == latestTechnicianVersion.Value)
+                    x.TechnicianId == technicianId &&
+                    x.TruckId == truckId &&
+                    x.PublishedVersion == latestPublishedVersion.Value)
                 .OrderBy(x => x.SortOrder)
                 .ThenBy(x => x.Id)
                 .ToListAsync(ct);
-
-            var result = publishedAssignments
-                .Where(x => x.Ticket != null)
-                .Select(x => x.Ticket!)
-                .Where(t => !IsClosedTicketStatus(t.Status))
-                .Select(MapToFieldTechTicket)
-                .ToList();
-
-            return Ok(result);
         }
 
-        [HttpGet("field-tech/history/{employeeId}")]
-        public async Task<ActionResult<List<FieldTechTicketListItemDto>>> GetFieldTechHistory(string employeeId, [FromQuery] int days = 30,
-            CancellationToken ct = default)
+        // Returns completed work in which the signed-in technician participated.
+        // Completion date comes from the write-up submission, while current Work Order
+        // values continue to come from the live ticket for accurate time entry.
+        [HttpPost("field-tech/history/{employeeId}/query")]
+        public async Task<ActionResult<FieldTechHistoryQueryResponse>> QueryFieldTechHistory(string employeeId,
+            [FromBody] FieldTechHistoryQueryRequest? req, CancellationToken ct)
         {
-            var tech = await ResolveActiveTechnicianByEmployeeIdAsync(employeeId, ct);
+            req ??= new FieldTechHistoryQueryRequest();
 
-            if (tech == null)
-                return Ok(new List<FieldTechTicketListItemDto>());
+            var today = DateTime.Today.Date;
+            var oldestAllowedDate = today.AddDays(-364);
 
-            days = Math.Clamp(days, 1, 365);
+            var appliedTo = req.To?.Date ?? today;
 
-            var fromDate = DateTime.Today.AddDays(-days);
-            var assignedTechValues = BuildAssignedTechMatchValues(tech);
+            if (appliedTo > today)
+                appliedTo = today;
 
-            var rows = await _db.Tickets
-                .Include(t => t.TaskCategory)
-                .AsNoTracking()
-                .Where(t =>
-                    assignedTechValues.Contains(t.AssignedTech) &&
-                    t.LastActivityAt >= fromDate)
-                .OrderByDescending(t => t.LastActivityAt)
+            if (appliedTo < oldestAllowedDate)
+            {
+                return BadRequest(
+                    "History is available for the most recent 365 days only.");
+            }
+
+            var appliedFrom = req.From?.Date ?? appliedTo.AddDays(-29);
+
+            if (appliedFrom < oldestAllowedDate)
+                appliedFrom = oldestAllowedDate;
+
+            if (appliedFrom > appliedTo)
+                return BadRequest("The history start date cannot be after the end date.");
+
+            var technician = await ResolveActiveTechnicianByEmployeeIdAsync(
+                employeeId,
+                ct);
+
+            if (technician == null)
+            {
+                return Ok(new FieldTechHistoryQueryResponse
+                {
+                    AppliedFrom = appliedFrom,
+                    AppliedTo = appliedTo
+                });
+            }
+
+            var take = Math.Clamp(
+                req.Take <= 0 ? 500 : req.Take,
+                1,
+                2000);
+
+            var skip = Math.Max(0, req.Skip);
+
+            var toExclusive = appliedTo.AddDays(1);
+
+            var technicianEmployeeId = (technician.EmployeeId ?? string.Empty).Trim();
+
+            /*
+             * A submission belongs in this technician's History when the technician
+             * was snapshotted as a participant in the assigned work. The technician who
+             * pressed Submit is not the sole owner of the completed-work record.
+             *
+             * Current ticket assignment and closure status are intentionally ignored
+             * because those values may change after the field work was completed.
+             */
+            var query =
+                from submission in _db.TicketWriteUpSubmissions.AsNoTracking()
+                join ticket in _db.Tickets.AsNoTracking()
+                    on submission.TicketId equals ticket.Id
+                where !submission.IsDeleted
+                      && submission.SubmittedAt >= appliedFrom
+                      && submission.SubmittedAt < toExclusive
+                      && _db.TicketWriteUpSubmissionTechnicians
+                          .AsNoTracking()
+                          .Any(participant =>
+                              participant.SubmissionId == submission.Id &&
+                              (
+                                  participant.TechnicianId == technician.Id ||
+                                  participant.EmployeeId == technicianEmployeeId
+                              ))
+                select new
+                {
+                    Submission = submission,
+                    Ticket = ticket
+                };
+
+            var search = (req.Search ?? string.Empty).Trim();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(x =>
+                    (x.Ticket.Site != null &&
+                     x.Ticket.Site.Contains(search)) ||
+
+                    (x.Ticket.NotificationName != null &&
+                     x.Ticket.NotificationName.Contains(search)) ||
+
+                    (x.Ticket.Notification != null &&
+                     x.Ticket.Notification.Contains(search)) ||
+
+                    (x.Ticket.CurrentWorkOrder != null &&
+                     x.Ticket.CurrentWorkOrder.Contains(search)) ||
+
+                    (x.Ticket.WorkOrderClass != null &&
+                     x.Ticket.WorkOrderClass.Contains(search)) ||
+
+                    (x.Ticket.Status != null &&
+                     x.Ticket.Status.Contains(search)) ||
+
+                    (x.Ticket.Problem != null &&
+                     x.Ticket.Problem.Contains(search)) ||
+
+                    (x.Submission.SubmittedNarrative != null &&
+                     x.Submission.SubmittedNarrative.Contains(search)));
+            }
+
+            var totalCount = await query.CountAsync(ct);
+
+            /*
+             * Work-order counts are calculated by the API from the live ticket record.
+             * This ensures the copy workflow reports the current valid WO after any
+             * Maintenance-to-Capital conversion.
+             */
+            var itemsWithWorkOrderCount = await query.CountAsync(
+                x => x.Ticket.CurrentWorkOrder != null &&
+                     x.Ticket.CurrentWorkOrder != "",
+                ct);
+
+            var rows = await query
+                .OrderByDescending(x => x.Submission.SubmittedAt)
+                .ThenByDescending(x => x.Submission.Id)
+                .Skip(skip)
+                .Take(take)
+                .Select(x => new
+                {
+                    x.Submission.Id,
+                    x.Submission.TicketId,
+                    x.Submission.SiteHistoryId,
+                    x.Submission.SubmittedAt,
+                    x.Submission.SubmittedNarrative,
+                    x.Submission.SubmittedByName,
+
+                    x.Ticket.Site,
+                    x.Ticket.NotificationName,
+                    x.Ticket.Notification,
+                    x.Ticket.CurrentWorkOrder,
+                    x.Ticket.WorkOrderClass,
+                    x.Ticket.Status,
+                    x.Ticket.Problem
+                })
                 .ToListAsync(ct);
 
-            var result = rows
-                .Where(t => IsClosedTicketStatus(t.Status))
-                .Select(MapToFieldTechTicket)
+            var items = rows
+                .Select(x => new FieldTechHistoryItemDto
+                {
+                    SubmissionId = x.Id,
+                    TicketId = x.TicketId,
+                    SiteHistoryId = x.SiteHistoryId,
+
+                    CompletedAt = x.SubmittedAt,
+
+                    Site = x.Site ?? "",
+                    NotificationName = x.NotificationName ?? "",
+                    Notification = x.Notification ?? "",
+
+                    /*
+                     * These values intentionally come from the current ticket row,
+                     * not the write-up submission record.
+                     */
+                    CurrentWorkOrder = x.CurrentWorkOrder ?? "",
+                    CurrentWorkOrderType = NormalizeWorkOrderType(x.WorkOrderClass),
+
+                    CurrentStatus = string.IsNullOrWhiteSpace(x.Status)
+                        ? "Open"
+                        : x.Status,
+
+                    Problem = x.Problem ?? "",
+                    SubmittedNarrative = x.SubmittedNarrative ?? "",
+                    SubmittedByName = x.SubmittedByName ?? ""
+                })
                 .ToList();
 
-            return Ok(result);
+            return Ok(new FieldTechHistoryQueryResponse
+            {
+                TechnicianName = FormatTechnicianName(
+                    technician.FirstName,
+                    technician.LastName,
+                    technician.EmployeeId),
+
+                AppliedFrom = appliedFrom,
+                AppliedTo = appliedTo,
+
+                Items = items,
+                TotalCount = totalCount,
+
+                ItemsWithWorkOrderCount = itemsWithWorkOrderCount,
+                ItemsWithoutWorkOrderCount = totalCount - itemsWithWorkOrderCount
+            });
         }
 
         private async Task<TechnicianEntity?> ResolveActiveTechnicianByEmployeeIdAsync(string employeeId, CancellationToken ct)
@@ -745,17 +1164,10 @@ namespace SmartGridSuite.Api.Controllers
                 .ToList();
         }
 
-        private static bool IsClosedTicketStatus(string? status)
-        {
-            var cleanStatus = (status ?? string.Empty).Trim();
-
-            return cleanStatus.Equals("Closed", StringComparison.OrdinalIgnoreCase)
-                || cleanStatus.Equals("Completed", StringComparison.OrdinalIgnoreCase)
-                || cleanStatus.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
-                || cleanStatus.Equals("Canceled", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static FieldTechTicketListItemDto MapToFieldTechTicket(TicketEntity t)
+        // Maps a ticket row for Field Technician display and supplies API-calculated
+        // completion and route-order values rather than asking WPF to infer them.
+        private static FieldTechTicketListItemDto MapToFieldTechTicket(TicketEntity t, HashSet<string>? fieldCompleteStatusNames, int? routeOrder,
+            IReadOnlyDictionary<string, int>? siteNoteCountsBySite = null)
         {
             var hasActiveAssignedCategory =
                 t.TaskCategory != null &&
@@ -764,9 +1176,19 @@ namespace SmartGridSuite.Api.Controllers
 
             var actionRequired = !string.IsNullOrWhiteSpace(t.ActionRequiredOverride)
                 ? t.ActionRequiredOverride.Trim()
-                : hasActiveAssignedCategory && !string.IsNullOrWhiteSpace(t.TaskCategory!.DefaultActionRequired)
+                : hasActiveAssignedCategory &&
+                  !string.IsNullOrWhiteSpace(t.TaskCategory!.DefaultActionRequired)
                     ? t.TaskCategory.DefaultActionRequired
                     : "";
+
+            var normalizedSiteId = NormalizeSiteIdForFieldDetails(t.Site);
+
+            var siteNoteCount =
+                !string.IsNullOrWhiteSpace(normalizedSiteId) &&
+                siteNoteCountsBySite != null &&
+                siteNoteCountsBySite.TryGetValue(normalizedSiteId, out var count)
+                    ? count
+                    : 0;
 
             return new FieldTechTicketListItemDto
             {
@@ -792,7 +1214,15 @@ namespace SmartGridSuite.Api.Controllers
                 Notes = t.Notes ?? "",
 
                 Category = hasActiveAssignedCategory ? t.TaskCategory!.Name : "",
-                ActionRequired = actionRequired
+                ActionRequired = actionRequired,
+
+                IsFieldComplete =
+                    fieldCompleteStatusNames?.Contains(t.Status ?? string.Empty) == true,
+
+                RouteOrder = routeOrder,
+
+                HasDispatchNotes = !string.IsNullOrWhiteSpace(t.DispatchNotes),
+                SiteNoteCount = siteNoteCount
             };
         }
 
@@ -998,6 +1428,15 @@ namespace SmartGridSuite.Api.Controllers
                 // Legacy category administration is no longer used by the new Tasks query.
                 Category = ""
             };
+        }
+
+        // Normalizes ticket site IDs using the same rule as SiteNotesController so
+        // expandable field rows retrieve the same active notes as Site Dashboard.
+        private static string NormalizeSiteIdForFieldDetails(string? siteId)
+        {
+            return (siteId ?? string.Empty)
+                .Trim()
+                .ToUpperInvariant();
         }
 
         private static string NormalizeWorkOrderType(string? workOrderClass)
@@ -1298,6 +1737,233 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(new UpdateTicketResponse(entity.Id));
         }
 
+        [HttpPost("bulk-assign")]
+        public async Task<ActionResult<BulkTicketUpdateResponse>> BulkAssignTickets([FromBody] BulkAssignTicketsRequest req,
+            CancellationToken ct)
+        {
+            req ??= new BulkAssignTicketsRequest();
+
+            var ticketIds = (req.TicketIds ?? new List<long>())
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            if (ticketIds.Count == 0)
+                return BadRequest("At least one ticket is required.");
+
+            var assignedTech =
+                string.IsNullOrWhiteSpace(req.AssignedTech)
+                    ? "(Unassigned)"
+                    : req.AssignedTech.Trim();
+
+            var isUnassigning =
+                assignedTech.Equals(
+                    "(Unassigned)",
+                    StringComparison.OrdinalIgnoreCase);
+
+            var requestedStatus =
+                isUnassigning
+                    ? "Open"
+                    : "Assigned";
+
+            var requestedStatusLower =
+                requestedStatus.ToLower();
+
+            var statusEntity = await _db.TicketStatuses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x =>
+                        x.IsActive &&
+                        x.Name.ToLower() == requestedStatusLower,
+                    ct);
+
+            if (statusEntity == null)
+            {
+                return BadRequest(
+                    $"Status '{requestedStatus}' is missing or inactive.");
+            }
+
+            var now = DateTime.Now;
+
+            var tickets = await _db.Tickets
+                .Where(t => ticketIds.Contains(t.Id))
+                .ToListAsync(ct);
+
+            foreach (var ticket in tickets)
+            {
+                ticket.AssignedTech = assignedTech;
+                ticket.Status = statusEntity.Name;
+                ticket.LastActivityAt = now;
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(new BulkTicketUpdateResponse
+            {
+                RequestedCount = ticketIds.Count,
+                UpdatedCount = tickets.Count,
+                NotFoundCount = ticketIds.Count - tickets.Count
+            });
+        }
+
+        [HttpPost("bulk-set-problem")]
+        public async Task<ActionResult<BulkTicketUpdateResponse>> BulkSetProblem([FromBody] BulkSetProblemRequest req, CancellationToken ct)
+        {
+            req ??= new BulkSetProblemRequest();
+
+            var ticketIds = (req.TicketIds ?? new List<long>())
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            if (ticketIds.Count == 0)
+                return BadRequest("At least one ticket is required.");
+
+            var problem = (req.Problem ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(problem))
+                return BadRequest("Problem / Issue is required.");
+
+            var now = DateTime.Now;
+
+            var tickets = await _db.Tickets
+                .Where(t => ticketIds.Contains(t.Id))
+                .ToListAsync(ct);
+
+            foreach (var ticket in tickets)
+            {
+                ticket.Problem = problem;
+                ticket.Summary = FirstNonBlank(problem, ticket.NotificationName);
+                ticket.LastActivityAt = now;
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(new BulkTicketUpdateResponse
+            {
+                RequestedCount = ticketIds.Count,
+                UpdatedCount = tickets.Count,
+                NotFoundCount = ticketIds.Count - tickets.Count
+            });
+        }
+
+        [HttpPost("bulk-set-status")]
+        public async Task<ActionResult<BulkTicketUpdateResponse>> BulkSetStatus([FromBody] BulkSetStatusRequest req,
+            CancellationToken ct)
+        {
+            req ??= new BulkSetStatusRequest();
+
+            var ticketIds = (req.TicketIds ?? new List<long>())
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            if (ticketIds.Count == 0)
+                return BadRequest("At least one ticket is required.");
+
+            var requestedStatus = (req.Status ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(requestedStatus))
+                return BadRequest("Status is required.");
+
+            var requestedStatusLower = requestedStatus.ToLower();
+
+            var statusEntity = await _db.TicketStatuses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x =>
+                        x.IsActive &&
+                        x.Name.ToLower() == requestedStatusLower,
+                    ct);
+
+            if (statusEntity == null)
+                return BadRequest("Selected status is invalid or inactive.");
+
+            var now = DateTime.Now;
+
+            var tickets = await _db.Tickets
+                .Where(t => ticketIds.Contains(t.Id))
+                .ToListAsync(ct);
+
+            foreach (var ticket in tickets)
+            {
+                ticket.Status = statusEntity.Name;
+                ticket.LastActivityAt = now;
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(new BulkTicketUpdateResponse
+            {
+                RequestedCount = ticketIds.Count,
+                UpdatedCount = tickets.Count,
+                NotFoundCount = ticketIds.Count - tickets.Count
+            });
+        }
+
+        [HttpPost("bulk-set-work-order-type")]
+        public async Task<ActionResult<BulkTicketUpdateResponse>> BulkSetWorkOrderType([FromBody] BulkSetWorkOrderTypeRequest req,
+            CancellationToken ct)
+        {
+            req ??= new BulkSetWorkOrderTypeRequest();
+
+            var ticketIds = (req.TicketIds ?? new List<long>())
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            if (ticketIds.Count == 0)
+                return BadRequest("At least one ticket is required.");
+
+            var requestedType = (req.WorkOrderType ?? string.Empty).Trim();
+
+            string? storedType = null;
+
+            if (!string.IsNullOrWhiteSpace(requestedType))
+            {
+                storedType = NormalizeWorkOrderClassForStorage(requestedType);
+
+                if (string.IsNullOrWhiteSpace(storedType))
+                    return BadRequest("Work Order Type must be blank, Maintenance, Capital, or Distribution.");
+            }
+
+            var now = DateTime.Now;
+
+            var tickets = await _db.Tickets
+                .Where(t => ticketIds.Contains(t.Id))
+                .ToListAsync(ct);
+
+            var updated = 0;
+            var skipped = 0;
+
+            foreach (var ticket in tickets)
+            {
+                /*
+                 * Keep the existing data rule: WO Type only matters when a Work Order
+                 * exists. Tickets without a WO are skipped instead of creating dirty data.
+                 */
+                if (string.IsNullOrWhiteSpace(ticket.CurrentWorkOrder))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                ticket.WorkOrderClass = storedType;
+                ticket.LastActivityAt = now;
+                updated++;
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(new BulkTicketUpdateResponse
+            {
+                RequestedCount = ticketIds.Count,
+                UpdatedCount = updated,
+                NotFoundCount = ticketIds.Count - tickets.Count,
+                SkippedCount = skipped
+            });
+        }
+
         [HttpPost("sap-import/preview")]
         public async Task<ActionResult<List<SapQueueImportPreviewResultRow>>> PreviewSapImport([FromBody] SapQueueImportPreviewRequest req)
         {
@@ -1386,7 +2052,7 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPost("sap-import/commit")]
-        public async Task<ActionResult<SapQueueImportCommitResponse>> CommitSapImport([FromBody] SapQueueImportCommitRequest req)
+        public async Task<ActionResult<SapQueueImportCommitResponse>> CommitSapImport([FromBody] SapQueueImportCommitRequest req, CancellationToken ct)
         {
             var rows = req.Rows ?? new List<SapQueueImportCommitRow>();
             var createdBy = string.IsNullOrWhiteSpace(req.CreatedBy) ? "Unknown" : req.CreatedBy.Trim();
@@ -1530,7 +2196,7 @@ namespace SmartGridSuite.Api.Controllers
                 try
                 {
                     _db.Tickets.Add(entity);
-                    await _db.SaveChangesAsync();
+                    await _db.SaveChangesAsync(ct);
 
                     existingNotifications.Add(notif);
                     imported++;
@@ -1575,12 +2241,56 @@ namespace SmartGridSuite.Api.Controllers
                 }
             }
 
+            await RecordSapImportRunAsync(
+                importTime,
+                createdBy,
+                imported,
+                alreadyExists,
+                invalid,
+                ct);
+
             return Ok(new SapQueueImportCommitResponse(
                 ImportedCount: imported,
                 AlreadyExistsCount: alreadyExists,
                 InvalidCount: invalid,
                 Rows: results));
         }
+
+        [HttpGet("sap-import/last")]
+        public async Task<ActionResult<SapQueueImportLastImportDto>> GetLastSapImport(
+            CancellationToken ct)
+        {
+            var rows = await _db.Database
+                .SqlQueryRaw<SapQueueImportLastImportDto>(
+                    """
+                    SELECT
+                        imported_at AS ImportedAt,
+                        imported_by AS ImportedBy,
+                        imported_count AS ImportedCount
+                    FROM sap_queue_import_runs
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """)
+                .ToListAsync(ct);
+
+            return Ok(
+                rows.FirstOrDefault()
+                ?? new SapQueueImportLastImportDto());
+        }
+
+        private async Task RecordSapImportRunAsync(DateTime importedAt, string importedBy, int importedCount, int alreadyExistsCount,
+            int invalidCount, CancellationToken ct)
+        {
+            await _db.Database.ExecuteSqlInterpolatedAsync(
+                        $"""
+                INSERT INTO sap_queue_import_runs
+                    (imported_at, imported_by, imported_count, already_exists_count, invalid_count)
+                VALUES
+                    ({importedAt}, {importedBy}, {importedCount}, {alreadyExistsCount}, {invalidCount})
+                """,
+                ct);
+        }
+
 
         private static string? NormalizeNotification(string? raw)
         {
@@ -1644,10 +2354,52 @@ namespace SmartGridSuite.Api.Controllers
             }
         }
 
+        // Submits a technician write-up as one atomic operation so ticket state,
+        // Site History, and technician completion History can never drift apart.
         [HttpPost("{id:long}/submit-writeup")]
-        public async Task<ActionResult<UpdateTicketResponse>> SubmitWriteUp(long id, [FromBody] SubmitTicketWriteUpRequest req, CancellationToken ct)
+        public async Task<ActionResult<UpdateTicketResponse>> SubmitWriteUp(long id, [FromBody] SubmitTicketWriteUpRequest req,
+            CancellationToken ct)
         {
-            var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+            if (req.ClientSubmissionId == Guid.Empty)
+            {
+                return BadRequest(
+                    "ClientSubmissionId is required.");
+            }
+
+            var clientSubmissionId =
+                req.ClientSubmissionId;
+
+            /*
+             * A repeated request with the same client ID represents the same confirmed
+             * write-up. Return success without modifying the ticket or Site History again.
+             */
+            var existingSubmission =
+                await _db.TicketWriteUpSubmissions
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.ClientSubmissionId ==
+                        clientSubmissionId)
+                    .Select(x => new
+                    {
+                        x.TicketId
+                    })
+                    .FirstOrDefaultAsync(ct);
+
+            if (existingSubmission != null)
+            {
+                if (existingSubmission.TicketId != id)
+                {
+                    return Conflict(
+                        "This client submission ID is already associated with another ticket.");
+                }
+
+                return Ok(
+                    new UpdateTicketResponse(id));
+            }
+
+
+            var entity = await _db.Tickets
+                .FirstOrDefaultAsync(t => t.Id == id, ct);
 
             if (entity == null)
                 return NotFound();
@@ -1661,24 +2413,11 @@ namespace SmartGridSuite.Api.Controllers
                 ? finalWriteUp
                 : req.SiteHistoryWriteUpText.Trim();
 
-            entity.Notes = AppendTicketNote(
-                entity.Notes,
-                "Write-up submitted",
-                finalWriteUp,
-                req.SubmittedBy);
-
-            await InsertSubmittedWriteUpIntoSiteHistoryAsync(
-                entity,
-                siteHistoryWriteUp,
-                req.SubmittedBy,
-                ct);
-
-            entity.ActionRequiredOverride = "Review submitted site write-up";
-            entity.LastActivityAt = DateTime.Now;
-
             var writeUpSubmitStatus = await _db.TicketStatuses
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.IsActive && x.IsWriteUpSubmitTarget, ct);
+                .FirstOrDefaultAsync(
+                    x => x.IsActive && x.IsWriteUpSubmitTarget,
+                    ct);
 
             if (writeUpSubmitStatus == null)
             {
@@ -1687,147 +2426,810 @@ namespace SmartGridSuite.Api.Controllers
                     "Go to Administration > Tickets and select one status as the write-up submitted target.");
             }
 
-            entity.Status = writeUpSubmitStatus.Name;
+            var submittedAt = DateTime.Now;
 
-            await _db.SaveChangesAsync(ct);
+            await using var transaction = await _db.Database
+                .BeginTransactionAsync(ct);
 
-            return Ok(new UpdateTicketResponse(entity.Id));
-        }
-
-        private async Task InsertSubmittedWriteUpIntoSiteHistoryAsync(TicketEntity ticket, string siteHistoryWriteUp, string? submittedByEmployeeId,
-            CancellationToken ct)
-        {
-            var siteId = (ticket.Site ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(siteId))
-                return;
-
-            var crew = await ResolveSubmittedCrewAsync(submittedByEmployeeId, ct);
-
-            var sourceType = "SmartGridSuite";
-            var sourceFile = $"Ticket {ticket.Id}";
-            var visitDate = DateTime.Today;
-
-            var primaryTech = TrimForColumn(crew.PrimaryTech, 100);
-            var secondaryTech = TrimForColumn(crew.SecondaryTech, 100);
-            var issueText = ticket.Problem ?? string.Empty;
-
-            await _db.Database.ExecuteSqlInterpolatedAsync($@"
-            INSERT INTO site_history
-            (
-                legacy_source_id,
-                source_type,
-                source_file,
-                site_id,
-                visit_date,
-                primary_tech,
-                secondary_tech,
-                narrative,
-                issue_text
-            )
-            VALUES
-            (
-                NULL,
-                {sourceType},
-                {sourceFile},
-                {siteId},
-                {visitDate},
-                {primaryTech},
-                {secondaryTech},
-                {siteHistoryWriteUp},
-                {issueText}
-            );", ct);
-        }
-
-        private async Task<SubmittedCrewInfo> ResolveSubmittedCrewAsync( string? submittedByEmployeeId, CancellationToken ct)
-        {
-            var employeeId = (submittedByEmployeeId ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(employeeId))
+            try
             {
-                return new SubmittedCrewInfo
-                {
-                    PrimaryTech = "Unknown",
-                    SecondaryTech = null
-                };
-            }
+                entity.Notes = AppendTicketNote(
+                    entity.Notes,
+                    "Write-up submitted",
+                    finalWriteUp,
+                    req.SubmittedBy);
 
-            var workDate = DateTime.Today;
+                entity.ActionRequiredOverride = "Review submitted site write-up";
+                entity.LastActivityAt = submittedAt;
+                entity.Status = writeUpSubmitStatus.Name;
 
-            var submitter = await _db.Technicians
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.EmployeeId == employeeId && x.IsActive, ct);
-
-            if (submitter is null)
-            {
-                return new SubmittedCrewInfo
-                {
-                    PrimaryTech = employeeId,
-                    SecondaryTech = null
-                };
-            }
-
-            var primaryName = FormatTechnicianName(
-                submitter.FirstName,
-                submitter.LastName,
-                submitter.EmployeeId);
-
-            var submitterRoster = await _db.TruckRosters
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x =>
-                    x.WorkDate == workDate &&
-                    x.TechnicianId == submitter.Id,
+                await CreateSubmittedWriteUpRecordsAsync(
+                    entity,
+                    siteHistoryWriteUp,
+                    req.SubmittedBy,
+                    clientSubmissionId,
+                    submittedAt,
                     ct);
 
-            if (submitterRoster is null)
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+
+                return Ok(new UpdateTicketResponse(entity.Id));
+            }
+            catch (DbUpdateException ex)
+                when (IsDuplicateClientSubmissionIdException(ex))
             {
-                return new SubmittedCrewInfo
+                await transaction.RollbackAsync(ct);
+
+                /*
+                 * Remove rolled-back tracked entities before checking the record created
+                 * by the competing or earlier request.
+                 */
+                _db.ChangeTracker.Clear();
+
+                var completedSubmission =
+                    await _db.TicketWriteUpSubmissions
+                        .AsNoTracking()
+                        .Where(x =>
+                            x.ClientSubmissionId ==
+                            clientSubmissionId)
+                        .Select(x => new
+                        {
+                            x.TicketId
+                        })
+                        .FirstOrDefaultAsync(ct);
+
+                if (completedSubmission?.TicketId == id)
                 {
-                    PrimaryTech = primaryName,
-                    SecondaryTech = null
+                    return Ok(
+                        new UpdateTicketResponse(id));
+                }
+
+                throw;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
+        }
+
+        // Creates Site History, the structured write-up submission, and permanent
+        // participant rows using the client idempotency key for duplicate protection.
+        private async Task CreateSubmittedWriteUpRecordsAsync(TicketEntity ticket, string siteHistoryWriteUp,
+            string? submittedByEmployeeId, Guid clientSubmissionId, DateTime submittedAt, CancellationToken ct)
+        {
+            var submittedWork = await ResolveSubmittedWorkAsync(
+                ticket,
+                submittedByEmployeeId,
+                submittedAt.Date,
+                ct);
+
+            long? siteHistoryId = null;
+
+            var siteId = (ticket.Site ?? string.Empty).Trim();
+
+            /*
+             * Site History requires a site ID. If an unusual ticket has no site,
+             * still record the structured submission and its participants.
+             */
+            if (!string.IsNullOrWhiteSpace(siteId))
+            {
+                var siteHistory = new SiteHistoryEntity
+                {
+                    LegacySourceId = null,
+                    SourceType = "SmartGridSuite",
+                    SourceFile = $"Ticket {ticket.Id}",
+                    SiteId = siteId,
+                    VisitDate = submittedAt.Date,
+
+                    PrimaryTech = TrimForColumn(
+                        submittedWork.PrimaryTech,
+                        100),
+
+                    SecondaryTech = TrimForColumn(
+                        submittedWork.SecondaryTech,
+                        100),
+
+                    Narrative = siteHistoryWriteUp,
+                    IssueText = ticket.Problem ?? string.Empty
                 };
+
+                _db.SiteHistory.Add(siteHistory);
+
+                /*
+                 * Save inside the transaction so MySQL generates HistoryId before
+                 * the linked structured submission is created.
+                 */
+                await _db.SaveChangesAsync(ct);
+
+                siteHistoryId = siteHistory.HistoryId;
             }
 
-            var crewTechs = await (
-                from roster in _db.TruckRosters.AsNoTracking()
-                join tech in _db.Technicians.AsNoTracking()
-                    on roster.TechnicianId equals tech.Id
-                where roster.WorkDate == workDate
-                      && roster.TruckId == submitterRoster.TruckId
-                      && tech.IsActive
-                select new
-                {
-                    tech.Id,
-                    tech.EmployeeId,
-                    tech.FirstName,
-                    tech.LastName
-                })
-                .ToListAsync(ct);
+            var submission = new TicketWriteUpSubmissionEntity
+            {
+                TicketId = ticket.Id,
+                SiteHistoryId = siteHistoryId,
+                ClientSubmissionId = clientSubmissionId,
 
-            var secondaryNames = crewTechs
-                .Where(x => x.Id != submitter.Id)
-                .Select(x => FormatTechnicianName(
-                    x.FirstName,
-                    x.LastName,
-                    x.EmployeeId))
+                SubmittedByTechnicianId =
+                    submittedWork.SubmittedByTechnicianId,
+
+                SubmittedByEmployeeId =
+                    TrimForColumn(
+                        submittedWork.SubmittedByEmployeeId,
+                        100)
+                    ?? "Unknown",
+
+                SubmittedByName =
+                    TrimForColumn(
+                        submittedWork.SubmittedByName,
+                        150)
+                    ?? "Unknown",
+
+                SubmittedAt = submittedAt,
+                SubmittedNarrative = siteHistoryWriteUp,
+
+                IsDeleted = false,
+                DeletedAt = null,
+                DeletedBy = null
+            };
+
+            _db.TicketWriteUpSubmissions.Add(submission);
+
+            /*
+             * Generate SubmissionId before creating participant rows. This save remains
+             * inside SubmitWriteUp's transaction, so a later failure still rolls back.
+             */
+            await _db.SaveChangesAsync(ct);
+
+            var participantRows = submittedWork.Participants
+                .Select(participant =>
+                    new TicketWriteUpSubmissionTechnicianEntity
+                    {
+                        SubmissionId = submission.Id,
+
+                        TechnicianId = participant.TechnicianId,
+
+                        EmployeeId =
+                            TrimForColumn(participant.EmployeeId, 100)
+                            ?? "Unknown",
+
+                        TechnicianName =
+                            TrimForColumn(participant.TechnicianName, 150)
+                            ?? "Unknown",
+
+                        IsSubmitter = participant.IsSubmitter,
+                        CreatedAt = submittedAt
+                    })
+                .ToList();
+
+            _db.TicketWriteUpSubmissionTechnicians.AddRange(
+                participantRows);
+        }
+
+        // Resolves everyone assigned to the ticket at submission time. Published
+        // assignment ownership is preferred over mutable display text such as AssignedTech.
+        private async Task<SubmittedWorkInfo> ResolveSubmittedWorkAsync(TicketEntity ticket, string? submittedByEmployeeId,
+            DateTime submittedDate, CancellationToken ct)
+        {
+            var submittedEmployeeId =
+                (submittedByEmployeeId ?? string.Empty).Trim();
+
+            var participants =
+                new Dictionary<string, SubmittedParticipantInfo>(
+                    StringComparer.OrdinalIgnoreCase);
+
+            var submitter = string.IsNullOrWhiteSpace(submittedEmployeeId)
+                ? null
+                : await _db.Technicians
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        x => x.EmployeeId == submittedEmployeeId,
+                        ct);
+
+            /*
+             * Prefer the newest published assignment because that represents the route
+             * the field technicians actually received, even if Dispatch has since begun
+             * making unpublished draft changes.
+             */
+            var publishedTarget = await _db.DailyTicketAssignmentPublished
+                .AsNoTracking()
+                .Where(x => x.TicketId == ticket.Id)
+                .OrderByDescending(x => x.PublishedAt)
+                .ThenByDescending(x => x.PublishedVersion)
+                .ThenByDescending(x => x.Id)
+                .Select(x => new WriteUpAssignmentTargetInfo
+                {
+                    TargetType = x.TargetType,
+                    TruckId = x.TruckId,
+                    TechnicianId = x.TechnicianId
+                })
+                .FirstOrDefaultAsync(ct);
+
+            /*
+             * A directly assigned ticket may not have a published snapshot. Fall back
+             * to the current active assignment record when necessary.
+             */
+            if (publishedTarget == null)
+            {
+                publishedTarget = await _db.DailyTicketAssignments
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.AssignmentDate == ActiveAssignmentDate &&
+                        x.TicketId == ticket.Id)
+                    .OrderByDescending(x => x.IsPublished)
+                    .ThenByDescending(x => x.UpdatedAt)
+                    .ThenByDescending(x => x.Id)
+                    .Select(x => new WriteUpAssignmentTargetInfo
+                    {
+                        TargetType = x.TargetType,
+                        TruckId = x.TruckId,
+                        TechnicianId = x.TechnicianId
+                    })
+                    .FirstOrDefaultAsync(ct);
+            }
+
+            /*
+             * A technician-owned assignment carrying TruckId represents a crew route.
+             * Snapshot everybody rostered to that truck on the submission date.
+             */
+            if (publishedTarget?.TruckId is uint assignedTruckId)
+            {
+                var assignedCrew = await (
+                    from roster in _db.TruckRosters.AsNoTracking()
+                    join tech in _db.Technicians.AsNoTracking()
+                        on roster.TechnicianId equals tech.Id
+                    where roster.WorkDate == submittedDate.Date
+                          && roster.TruckId == assignedTruckId
+                          && tech.IsActive
+                          && tech.TechnicianRoles.Any(
+                              role => role.Role.Code == TechnicianRoleCode)
+                    select tech)
+                    .ToListAsync(ct);
+
+                foreach (var technician in assignedCrew)
+                {
+                    AddSubmittedParticipant(
+                        participants,
+                        technician,
+                        isSubmitter: false);
+                }
+            }
+
+            /*
+             * A Technician target without truck context is personal work. Add that
+             * assigned technician directly.
+             */
+            if (participants.Count == 0 &&
+                publishedTarget?.TechnicianId is uint assignedTechnicianId)
+            {
+                var assignedTechnician = await _db.Technicians
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        x => x.Id == assignedTechnicianId &&
+                             x.IsActive,
+                        ct);
+
+                if (assignedTechnician != null)
+                {
+                    AddSubmittedParticipant(
+                        participants,
+                        assignedTechnician,
+                        isSubmitter: false);
+                }
+            }
+
+            /*
+             * Legacy/direct AssignedTech values are a final fallback for tickets that
+             * were assigned without a Daily Assignments record.
+             */
+            if (participants.Count == 0)
+            {
+                var assignedTechNames =
+                    ParseAssignedTechnicianDisplayNames(
+                        ticket.AssignedTech);
+
+                if (assignedTechNames.Count > 0)
+                {
+                    var activeTechnicians = await ActiveFieldTechniciansQuery()
+                        .ToListAsync(ct);
+
+                    foreach (var technician in activeTechnicians)
+                    {
+                        var technicianName = FormatTechnicianName(
+                            technician.FirstName,
+                            technician.LastName,
+                            technician.EmployeeId);
+
+                        if (!assignedTechNames.Contains(technicianName) &&
+                            !assignedTechNames.Contains(
+                                technician.EmployeeId ?? string.Empty))
+                        {
+                            continue;
+                        }
+
+                        AddSubmittedParticipant(
+                            participants,
+                            technician,
+                            isSubmitter: false);
+                    }
+                }
+            }
+
+            /*
+             * The submitter is always included even if assignment data is incomplete.
+             * If already present as a crew member, the existing participant is marked
+             * as the submitter rather than inserted twice.
+             */
+            if (submitter != null)
+            {
+                AddSubmittedParticipant(
+                    participants,
+                    submitter,
+                    isSubmitter: true);
+            }
+            else
+            {
+                var fallbackEmployeeId =
+                    string.IsNullOrWhiteSpace(submittedEmployeeId)
+                        ? "Unknown"
+                        : submittedEmployeeId;
+
+                AddSubmittedParticipant(
+                    participants,
+                    technicianId: null,
+                    employeeId: fallbackEmployeeId,
+                    technicianName: fallbackEmployeeId,
+                    isSubmitter: true);
+            }
+
+            var submitterParticipant = participants.Values
+                .FirstOrDefault(x => x.IsSubmitter);
+
+            var submittedByName =
+                submitterParticipant?.TechnicianName
+                ?? "Unknown";
+
+            var secondaryNames = participants.Values
+                .Where(x => !x.IsSubmitter)
+                .Select(x => x.TechnicianName)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(x => x)
                 .ToList();
 
-            return new SubmittedCrewInfo
+            return new SubmittedWorkInfo
             {
-                PrimaryTech = primaryName,
+                SubmittedByTechnicianId =
+                    submitterParticipant?.TechnicianId,
+
+                SubmittedByEmployeeId =
+                    submitterParticipant?.EmployeeId
+                    ?? "Unknown",
+
+                SubmittedByName = submittedByName,
+
+                PrimaryTech = submittedByName,
+
                 SecondaryTech = secondaryNames.Count == 0
                     ? null
-                    : FormatCrewDisplayText(secondaryNames)
+                    : FormatCrewDisplayText(secondaryNames),
+
+                Participants = participants.Values
+                    .OrderByDescending(x => x.IsSubmitter)
+                    .ThenBy(x => x.TechnicianName)
+                    .ToList()
             };
         }
 
-        private sealed class SubmittedCrewInfo
+        // Adds a technician to the participant snapshot while preventing duplicate
+        // employee entries and preserving the submitter flag.
+        private static void AddSubmittedParticipant(IDictionary<string, SubmittedParticipantInfo> participants,
+            TechnicianEntity technician, bool isSubmitter)
         {
+            var employeeId =
+                string.IsNullOrWhiteSpace(technician.EmployeeId)
+                    ? $"TECH-{technician.Id}"
+                    : technician.EmployeeId.Trim();
+
+            var technicianName = FormatTechnicianName(
+                technician.FirstName,
+                technician.LastName,
+                employeeId);
+
+            AddSubmittedParticipant(
+                participants,
+                technician.Id,
+                employeeId,
+                technicianName,
+                isSubmitter);
+        }
+
+        // Adds or updates one participant using employee ID as the stable snapshot key.
+        private static void AddSubmittedParticipant(IDictionary<string, SubmittedParticipantInfo> participants,
+            uint? technicianId, string employeeId, string technicianName, bool isSubmitter)
+        {
+            var cleanEmployeeId =
+                string.IsNullOrWhiteSpace(employeeId)
+                    ? "Unknown"
+                    : employeeId.Trim();
+
+            var cleanTechnicianName =
+                string.IsNullOrWhiteSpace(technicianName)
+                    ? cleanEmployeeId
+                    : technicianName.Trim();
+
+            if (participants.TryGetValue(
+                    cleanEmployeeId,
+                    out var existing))
+            {
+                if (!existing.TechnicianId.HasValue &&
+                    technicianId.HasValue)
+                {
+                    existing.TechnicianId = technicianId;
+                }
+
+                if (isSubmitter)
+                    existing.IsSubmitter = true;
+
+                return;
+            }
+
+            participants[cleanEmployeeId] =
+                new SubmittedParticipantInfo
+                {
+                    TechnicianId = technicianId,
+                    EmployeeId = cleanEmployeeId,
+                    TechnicianName = cleanTechnicianName,
+                    IsSubmitter = isSubmitter
+                };
+        }
+
+        // Splits the AssignedTech display value used for direct or older assignments.
+        // Crew strings such as "Alex Smith, Pat Jones & Lee Brown" become exact names.
+        private static HashSet<string> ParseAssignedTechnicianDisplayNames(
+            string? assignedTech)
+        {
+            var value = (assignedTech ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(value) ||
+                value.Equals(
+                    "(Unassigned)",
+                    StringComparison.OrdinalIgnoreCase) ||
+                value.StartsWith(
+                    "Truck ",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase);
+            }
+
+            return Regex
+                .Split(value, @"\s*(?:,|&)\s*")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        [HttpGet("site-history/{siteId}")]
+        public async Task<ActionResult<List<SiteHistoryPreviewDto>>> GetSiteHistoryForSite(
+            string siteId, CancellationToken ct)
+        {
+            siteId = (siteId ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(siteId))
+                return Ok(new List<SiteHistoryPreviewDto>());
+
+            var matchKeys = BuildTicketSiteHistoryMatchKeys(siteId);
+
+            if (matchKeys.Count == 0)
+                return Ok(new List<SiteHistoryPreviewDto>());
+
+            var historyRows = await _db.SiteHistory
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted)
+                .ToListAsync(ct);
+
+            var matchingHistoryRows = historyRows
+                .Where(x => matchKeys.Contains(NormalizeTicketSiteHistoryKey(x.SiteId)))
+                .OrderByDescending(x => x.VisitDate ?? DateTime.MinValue)
+                .ThenByDescending(x => x.HistoryId)
+                .ToList();
+
+            if (matchingHistoryRows.Count == 0)
+                return Ok(new List<SiteHistoryPreviewDto>());
+
+            var historyIds = matchingHistoryRows
+                .Select(x => x.HistoryId)
+                .Distinct()
+                .ToList();
+
+            var submissionsByHistoryId = await _db.TicketWriteUpSubmissions
+                .AsNoTracking()
+                .Where(x =>
+                    !x.IsDeleted &&
+                    x.SiteHistoryId.HasValue &&
+                    historyIds.Contains(x.SiteHistoryId.Value))
+                .GroupBy(x => x.SiteHistoryId!.Value)
+                .Select(g => new
+                {
+                    SiteHistoryId = g.Key,
+                    SubmissionId = g.Min(x => x.Id),
+                    SubmittedAt = g.Min(x => x.SubmittedAt)
+                })
+                .ToDictionaryAsync(
+                    x => x.SiteHistoryId,
+                    x => new
+                    {
+                        x.SubmissionId,
+                        x.SubmittedAt
+                    },
+                    ct);
+
+            var result = matchingHistoryRows
+                .Select(x =>
+                {
+                    var submissionInfo = submissionsByHistoryId.TryGetValue(
+                        x.HistoryId,
+                        out var foundSubmission)
+                            ? foundSubmission
+                            : null;
+
+                    return new SiteHistoryPreviewDto
+                    {
+                        HistoryId = x.HistoryId,
+                        SubmissionId = submissionInfo?.SubmissionId,
+
+                        SiteId = x.SiteId ?? "",
+                        SourceType = x.SourceType ?? "",
+
+                        VisitDate = x.VisitDate,
+                        SubmittedAt = submissionInfo?.SubmittedAt,
+
+                        PrimaryTech = x.PrimaryTech,
+                        SecondaryTech = x.SecondaryTech,
+                        IssueText = x.IssueText,
+                        Narrative = x.Narrative,
+
+                        EditedAt = x.EditedAt,
+                        EditedBy = x.EditedBy
+                    };
+                })
+                .ToList();
+
+            return Ok(result);
+        }
+
+        private static List<string> BuildTicketSiteHistoryMatchKeys(params string?[] values)
+        {
+            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var value in values)
+            {
+                var key = NormalizeTicketSiteHistoryKey(value);
+
+                if (string.IsNullOrWhiteSpace(key))
+                    continue;
+
+                keys.Add(key);
+
+                if (key.EndsWith("MR", StringComparison.OrdinalIgnoreCase) &&
+                    key.Length > 2)
+                {
+                    keys.Add(key[..^2]);
+                }
+            }
+
+            return keys.ToList();
+        }
+
+        private static string NormalizeTicketSiteHistoryKey(string? value)
+        {
+            var text = (value ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            return text
+                .Replace("_", "")
+                .Replace("-", "")
+                .Replace(" ", "")
+                .Replace(".", "")
+                .ToUpperInvariant();
+        }
+
+        [HttpPost("writeups/{submissionId:long}/update")]
+        public async Task<ActionResult<SubmittedWriteUpMutationResponse>> UpdateSubmittedWriteUp(long submissionId,
+            [FromBody] UpdateSubmittedWriteUpRequest req, CancellationToken ct)
+        {
+            req ??= new UpdateSubmittedWriteUpRequest();
+
+            var narrative = (req.Narrative ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(narrative))
+                return BadRequest("Write-up text is required.");
+
+            var updatedBy =
+                string.IsNullOrWhiteSpace(req.UpdatedBy)
+                    ? "Unknown"
+                    : req.UpdatedBy.Trim();
+
+            var now = DateTime.Now;
+
+            await using var transaction =
+                await _db.Database.BeginTransactionAsync(ct);
+
+            var submission = await _db.TicketWriteUpSubmissions
+                .FirstOrDefaultAsync(x => x.Id == submissionId, ct);
+
+            if (submission == null)
+                return NotFound();
+
+            if (submission.IsDeleted)
+                return BadRequest("This write-up has been deleted and cannot be edited.");
+
+            submission.SubmittedNarrative = narrative;
+            submission.EditedAt = now;
+            submission.EditedBy = TrimForColumn(updatedBy, 100);
+
+            if (submission.SiteHistoryId.HasValue)
+            {
+                var siteHistory = await _db.SiteHistory
+                    .FirstOrDefaultAsync(
+                        x => x.HistoryId == submission.SiteHistoryId.Value,
+                        ct);
+
+                if (siteHistory != null)
+                {
+                    siteHistory.Narrative = narrative;
+
+                    if (req.IssueText != null)
+                    {
+                        siteHistory.IssueText =
+                            string.IsNullOrWhiteSpace(req.IssueText)
+                                ? null
+                                : req.IssueText.Trim();
+                    }
+
+                    siteHistory.EditedAt = now;
+                    siteHistory.EditedBy = TrimForColumn(updatedBy, 100);
+                }
+            }
+
+            var ticket = await _db.Tickets
+                .FirstOrDefaultAsync(x => x.Id == submission.TicketId, ct);
+
+            if (ticket != null)
+            {
+                ticket.LastActivityAt = now;
+
+                ticket.DispatchNotes = AppendTicketNote(
+                    ticket.DispatchNotes,
+                    "Write-up edited",
+                    $"Site History write-up #{submission.Id} was edited by Dispatch.",
+                    updatedBy);
+            }
+
+            await _db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            return Ok(new SubmittedWriteUpMutationResponse
+            {
+                SubmissionId = submission.Id,
+                SiteHistoryId = submission.SiteHistoryId,
+                TicketId = submission.TicketId,
+                ChangedAt = now
+            });
+        }
+
+        [HttpPost("writeups/{submissionId:long}/delete")]
+        public async Task<ActionResult<SubmittedWriteUpMutationResponse>> DeleteSubmittedWriteUp(long submissionId,
+            [FromBody] DeleteSubmittedWriteUpRequest req, CancellationToken ct)
+        {
+            req ??= new DeleteSubmittedWriteUpRequest();
+
+            var deletedBy =
+                string.IsNullOrWhiteSpace(req.DeletedBy)
+                    ? "Unknown"
+                    : req.DeletedBy.Trim();
+
+            var now = DateTime.Now;
+
+            await using var transaction =
+                await _db.Database.BeginTransactionAsync(ct);
+
+            var submission = await _db.TicketWriteUpSubmissions
+                .FirstOrDefaultAsync(x => x.Id == submissionId, ct);
+
+            if (submission == null)
+                return NotFound();
+
+            if (!submission.IsDeleted)
+            {
+                submission.IsDeleted = true;
+                submission.DeletedAt = now;
+                submission.DeletedBy = TrimForColumn(deletedBy, 100);
+            }
+
+            if (submission.SiteHistoryId.HasValue)
+            {
+                var siteHistory = await _db.SiteHistory
+                    .FirstOrDefaultAsync(
+                        x => x.HistoryId == submission.SiteHistoryId.Value,
+                        ct);
+
+                if (siteHistory != null && !siteHistory.IsDeleted)
+                {
+                    siteHistory.IsDeleted = true;
+                    siteHistory.DeletedAt = now;
+                    siteHistory.DeletedBy = TrimForColumn(deletedBy, 100);
+                }
+            }
+
+            var ticket = await _db.Tickets
+                .FirstOrDefaultAsync(x => x.Id == submission.TicketId, ct);
+
+            if (ticket != null)
+            {
+                ticket.LastActivityAt = now;
+
+                ticket.DispatchNotes = AppendTicketNote(
+                    ticket.DispatchNotes,
+                    "Write-up deleted",
+                    $"Site History write-up #{submission.Id} was deleted by Dispatch.",
+                    deletedBy);
+            }
+
+            await _db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            return Ok(new SubmittedWriteUpMutationResponse
+            {
+                SubmissionId = submission.Id,
+                SiteHistoryId = submission.SiteHistoryId,
+                TicketId = submission.TicketId,
+                ChangedAt = now
+            });
+        }
+
+        // Carries submission identity, Site History display names, and every technician
+        // who should receive this completed work in personal History.
+        private sealed class SubmittedWorkInfo
+        {
+            public uint? SubmittedByTechnicianId { get; set; }
+
+            public string SubmittedByEmployeeId { get; set; } = "";
+
+            public string SubmittedByName { get; set; } = "";
+
             public string PrimaryTech { get; set; } = "";
+
             public string? SecondaryTech { get; set; }
+
+            public List<SubmittedParticipantInfo> Participants { get; set; } = new();
+        }
+
+        // Represents one permanent technician participant snapshot for a submission.
+        private sealed class SubmittedParticipantInfo
+        {
+            public uint? TechnicianId { get; set; }
+
+            public string EmployeeId { get; set; } = "";
+
+            public string TechnicianName { get; set; } = "";
+
+            public bool IsSubmitter { get; set; }
+        }
+
+        // Carries only the assignment ownership needed to resolve write-up participants.
+        private sealed class WriteUpAssignmentTargetInfo
+        {
+            public string TargetType { get; set; } = "";
+
+            public uint? TruckId { get; set; }
+
+            public uint? TechnicianId { get; set; }
         }
 
         private static string FormatTechnicianName(string? firstName, string? lastName, string? fallbackEmployeeId)
@@ -1872,6 +3274,28 @@ namespace SmartGridSuite.Api.Controllers
             return text.Length <= maxLength
                 ? text
                 : text[..maxLength];
+        }
+
+        // Identifies the unique client-submission constraint used to resolve a rare
+        // simultaneous retry as an already completed write-up rather than an error.
+        private static bool IsDuplicateClientSubmissionIdException(
+            DbUpdateException ex)
+        {
+            var message =
+                ex.InnerException?.Message ??
+                ex.Message;
+
+            return message.Contains(
+                       "ux_ticket_writeup_submissions_client_submission_id",
+                       StringComparison.OrdinalIgnoreCase) ||
+                   (
+                       message.Contains(
+                           "Duplicate",
+                           StringComparison.OrdinalIgnoreCase) &&
+                       message.Contains(
+                           "client_submission_id",
+                           StringComparison.OrdinalIgnoreCase)
+                   );
         }
     }
 }

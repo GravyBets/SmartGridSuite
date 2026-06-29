@@ -8,9 +8,58 @@
                      Background="{DynamicResource AppBackground}">
 
     <Grid x:Name="ShellRoot"
-          Margin="10,0,10,22">
+      Margin="10,0,10,22">
 
-        <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Persistent connection warning shown without interrupting field work. -->
+        <Border x:Name="ConnectivityBanner"
+            Grid.Row="0"
+            Margin="0,8,0,8"
+            Padding="12,8"
+            CornerRadius="10"
+            BorderBrush="#D69E00"
+            BorderThickness="1"
+            Background="#22D69E00"
+            Visibility="Collapsed">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Ellipse Grid.Column="0"
+                     Width="9"
+                     Height="9"
+                     Margin="0,0,10,0"
+                     VerticalAlignment="Center"
+                     Fill="#D69E00"/>
+
+                <TextBlock x:Name="ConnectivityMessageText"
+                       Grid.Column="1"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"/>
+
+                <Button x:Name="ConnectivityRetryButton"
+                    Grid.Column="2"
+                    Margin="14,0,0,0"
+                    Height="30"
+                    Padding="14,0"
+                    Content="Retry"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    Click="RetryConnectivity_Click"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="NavCol" Width="280"/>
                 <ColumnDefinition Width="8"/>

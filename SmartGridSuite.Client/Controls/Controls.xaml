@@ -647,7 +647,7 @@
         </Setter>
     </Style>
 
-    <!-- Control the DataGrid ROWS (border outline without triggering horizontal scroll) -->
+    <!-- Control DataGrid rows while preserving support for expandable row details. -->
     <Style x:Key="ThemedDataGridRowStyle" TargetType="DataGridRow">
         <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
@@ -655,27 +655,37 @@
         <Setter Property="SnapsToDevicePixels" Value="True"/>
         <Setter Property="UseLayoutRounding" Value="True"/>
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-        <Setter Property="ClipToBounds" Value="True"/>
-
-        <!-- IMPORTANT: remove BorderThickness setter entirely -->
-        <!-- <Setter Property="BorderThickness" Value="1"/>  -->
 
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="DataGridRow">
-                    <Grid SnapsToDevicePixels="True" ClipToBounds="True">
-                        <!-- Fill/background -->
-                        <Border x:Name="RowFill"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="8">
-                            <DataGridCellsPresenter/>
-                        </Border>
+                    <Grid SnapsToDevicePixels="True">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
-                        <!-- Outline overlay (does not affect row width measurement) -->
-                        <Border BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            IsHitTestVisible="False"/>
+                        <!-- Normal compact row content and selection outline. -->
+                        <Grid Grid.Row="0"
+                              SnapsToDevicePixels="True"
+                              ClipToBounds="True">
+
+                            <Border x:Name="RowFill"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="8">
+                                <DataGridCellsPresenter/>
+                            </Border>
+
+                            <Border BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    IsHitTestVisible="False"/>
+                        </Grid>
+
+                        <!-- Required for expandable row content. -->
+                        <DataGridDetailsPresenter Grid.Row="1"
+                                                  Visibility="{TemplateBinding DetailsVisibility}"
+                                                  SelectiveScrollingGrid.SelectiveScrollingOrientation="Horizontal"/>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
@@ -1846,7 +1856,7 @@
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="12,0,8,0"/>
+        <Setter Property="Padding" Value="8,0,0,0"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template">
             <Setter.Value>

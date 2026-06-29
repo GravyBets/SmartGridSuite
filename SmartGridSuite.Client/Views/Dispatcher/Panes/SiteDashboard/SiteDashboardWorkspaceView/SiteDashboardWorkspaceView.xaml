@@ -480,22 +480,6 @@
                                                                         </Style.Triggers>
                                                                     </Style>
                                                                 </StackPanel.Style>
-
-                                                                <Button Content="Edit"
-                                                                        Height="24"
-                                                                        Width="48"
-                                                                        Padding="8,0"
-                                                                        Margin="0,0,6,0"
-                                                                        Tag="{Binding}"
-                                                                        Style="{StaticResource SecondaryButtonStyle}"
-                                                                        Click="EditSiteNoteButton_Click"/>
-
-                                                                <Button Content="Delete"
-                                                                        Height="24"
-                                                                        Padding="8,0"
-                                                                        Tag="{Binding}"
-                                                                        Style="{StaticResource SecondaryButtonStyle}"
-                                                                        Click="DeleteSiteNoteButton_Click"/>
                                                             </StackPanel>
                                                         </Grid>
                                                     </Border>
@@ -1312,13 +1296,62 @@
                                 </Style>
                             </DataGrid.Resources>
 
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Date" Width="110" Binding="{Binding DateText}" />
-                                <DataGridTextColumn Header="Tech 1" Width="145" Binding="{Binding Tech1Text}" />
-                                <DataGridTextColumn Header="Tech 2" Width="145" Binding="{Binding Tech2Text}" />
-                                <DataGridTextColumn Header="Site Issue" Width="*" Binding="{Binding IssueText}" />
-                            </DataGrid.Columns>
-                        </DataGrid>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Date"
+                                                Width="110"
+                                                Binding="{Binding DateText}" />
+
+                            <DataGridTextColumn Header="Tech 1"
+                                                Width="145"
+                                                Binding="{Binding Tech1Text}" />
+
+                            <DataGridTextColumn Header="Tech 2"
+                                                Width="145"
+                                                Binding="{Binding Tech2Text}" />
+
+                            <DataGridTextColumn Header="Site Issue"
+                                                Width="*"
+                                                Binding="{Binding IssueText}" />
+
+                            <DataGridTemplateColumn Header=""
+                                                    Width="125">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal"
+                                                    HorizontalAlignment="Right">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding CanEditWriteUp}" Value="False">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
+
+                                            <Button Content="Edit"
+                                                    Width="48"
+                                                    Height="24"
+                                                    Padding="6,0"
+                                                    Margin="0,0,6,0"
+                                                    Tag="{Binding}"
+                                                    Style="{StaticResource SecondaryButtonStyle}"
+                                                    Click="EditHistoryWriteUpButton_Click"/>
+
+                                            <Button Content="Delete"
+                                                    Width="58"
+                                                    Height="24"
+                                                    Padding="6,0"
+                                                    Tag="{Binding}"
+                                                    Style="{StaticResource SecondaryButtonStyle}"
+                                                    Click="DeleteHistoryWriteUpButton_Click"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
 
                         <Grid Grid.Row="2">
                             <Grid.RowDefinitions>
@@ -1327,10 +1360,23 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
                             <TextBlock Text="Site History Write-Up"
                                        Style="{StaticResource WorkspaceSectionHeaderStyle}" />
 
-                            <Border Grid.Row="2"
+                            <TextBlock x:Name="HistoryEditedTextBlock"
+                                       Grid.Column="1"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <Border Grid.Row="2"
                                     BorderBrush="{DynamicResource SurfaceBorder}"
                                     BorderThickness="1"
                                     CornerRadius="0,0,0,12"

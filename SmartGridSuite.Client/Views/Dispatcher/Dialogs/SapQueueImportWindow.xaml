@@ -7,14 +7,14 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize">
 
-    <Grid Margin="16">
+    <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="8"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="8"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="8"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -43,16 +43,32 @@
                                    Margin="0,4,0,0"
                                    Foreground="{DynamicResource TextSecondary}"/>
 
-                        <TextBlock Text="Expected headers: Notification, Order, Notif.date, Description"
+                        <TextBlock Text="Expected headers: Notification, Order, Notif.date, Description."
                                    Margin="0,6,0,0"
                                    Foreground="{DynamicResource TextSecondary}"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1"
                                 HorizontalAlignment="Right">
+
+                        <TextBlock Text="Last Import"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   HorizontalAlignment="Right"/>
+
+                        <TextBlock Text="{Binding LastImportDisplay}"
+                                   Margin="0,4,0,0"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   HorizontalAlignment="Right"/>
+
+                        <Border Height="1"
+                                Margin="0,10,0,10"
+                                Background="{DynamicResource SurfaceBorder}"/>
+
                         <TextBlock Text="Importing As"
                                    Foreground="{DynamicResource TextSecondary}"
                                    HorizontalAlignment="Right"/>
+
                         <TextBlock Text="{Binding CreatedByDisplay}"
                                    Margin="0,4,0,0"
                                    FontWeight="SemiBold"
@@ -326,19 +342,33 @@
                           ItemsSource="{Binding PreviewRows}">
 
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Status" Width="120" Binding="{Binding ImportStatus}"/>
-                        <DataGridTextColumn Header="Will Become" Width="130" Binding="{Binding WillBecome}"/>
-                        <DataGridTextColumn Header="Site Check" Width="120" Binding="{Binding SiteCheck}"/>
-                        <DataGridTextColumn Header="WO Check" Width="90" Binding="{Binding WorkOrderCheck}"/>
-                        <DataGridTextColumn Header="Row" Width="70" Binding="{Binding RowNumber}"/>
-                        <DataGridTextColumn Header="Notification" Width="130" Binding="{Binding Notification}"/>
-                        <DataGridTextColumn Header="Work Order" Width="120" Binding="{Binding WorkOrder}"/>
-                        <DataGridTextColumn Header="Notif.date"
-                                            Width="110"
-                                            Binding="{Binding NotificationDate, StringFormat={}{0:MM/dd/yyyy}}"/>
-                        <DataGridTextColumn Header="Parsed Site" Width="120" Binding="{Binding ParsedSite}"/>
-                        <DataGridTextColumn Header="Description" Width="*" Binding="{Binding Description}"/>
-                        <DataGridTextColumn Header="Message" Width="Auto" Binding="{Binding Message}"/>
+                        <DataGridTextColumn Header="Site"
+                        Width="120"
+                        Binding="{Binding ParsedSite}"/>
+
+                        <DataGridTextColumn Header="Notification"
+                        Width="140"
+                        Binding="{Binding Notification}"/>
+
+                        <DataGridTextColumn Header="Work Order"
+                        Width="130"
+                        Binding="{Binding WorkOrder}"/>
+
+                        <DataGridTextColumn Header="Description"
+                        Width="*"
+                        Binding="{Binding Description}"/>
+
+                        <DataGridTextColumn Header="Notif. Date"
+                        Width="120"
+                        Binding="{Binding NotificationDate, StringFormat={}{0:MM/dd/yyyy}}"/>
+
+                        <DataGridTextColumn Header="Status"
+                        Width="130"
+                        Binding="{Binding ImportStatus}"/>
+
+                        <DataGridTextColumn Header="Message"
+                        Width="2*"
+                        Binding="{Binding Message}"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
@@ -363,20 +393,20 @@
                     Click="ImportReady_Click"/>
         </StackPanel>
         <Border x:Name="BusyOverlay"
-        Grid.RowSpan="7"
-        Background="#66000000"
-        CornerRadius="16"
-        Visibility="Collapsed"
-        Panel.ZIndex="100">
+                Grid.RowSpan="7"
+                Background="#66000000"
+                CornerRadius="16"
+                Visibility="Collapsed"
+                Panel.ZIndex="100">
 
             <Border Width="260"
-            Padding="18"
-            CornerRadius="16"
-            Background="{DynamicResource CardBackground}"
-            BorderBrush="{DynamicResource CardBorder}"
-            BorderThickness="1"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center">
+                    Padding="18"
+                    CornerRadius="16"
+                    Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource CardBorder}"
+                    BorderThickness="1"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
 
                 <StackPanel HorizontalAlignment="Center">
                     <TextBlock Text="↻"

@@ -44,12 +44,27 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     GetFirstNonEmptyText(item, "SecondaryTech", "Tech2", "Technician2")
                     ?? "—";
 
+                var sourceType =
+                    GetFirstNonEmptyText(item, "SourceType", "sourceType", "source_type")
+                    ?? "";
+
+                var editedBy =
+                    GetFirstNonEmptyText(item, "EditedBy", "editedBy", "edited_by")
+                    ?? "";
+
                 result.Add(new SiteDashboardHistoryRowViewModel(
                     FormatHistoryDate(rawDateText),
                     tech1,
                     tech2,
                     issue,
-                    narrative));
+                    narrative)
+                {
+                    SiteHistoryId = GetOptionalLong(item, "HistoryId", "SiteHistoryId", "historyId", "siteHistoryId", "history_id"),
+                    SubmissionId = GetOptionalLong(item, "SubmissionId", "WriteUpSubmissionId", "TicketWriteUpSubmissionId", "submissionId", "writeUpSubmissionId"),
+                    SourceType = sourceType,
+                    EditedBy = editedBy,
+                    EditedAt = GetOptionalDateTime(item, "EditedAt", "editedAt", "edited_at")
+                });
             }
 
             return result;
@@ -312,6 +327,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return FirstNonEmptyJsonProperty(json, propertyNames);
 
             return FirstNonEmptyObjectProperty(source, propertyNames);
+        }
+
+        private static long? GetOptionalLong(object source, params string[] propertyNames)
+        {
+            var text = GetFirstNonEmptyText(source, propertyNames);
+
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            if (long.TryParse(text.Trim(), out var value) && value > 0)
+                return value;
+
+            return null;
+        }
+
+        private static DateTime? GetOptionalDateTime(object source, params string[] propertyNames)
+        {
+            var text = GetFirstNonEmptyText(source, propertyNames);
+
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            if (DateTime.TryParse(text.Trim(), out var value))
+                return value;
+
+            return null;
         }
 
         private static string? FirstNonEmptyObjectProperty(object source, params string[] propertyNames)

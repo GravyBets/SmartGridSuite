@@ -16,7 +16,8 @@ namespace SmartGridSuite.Api.Data
         public virtual DbSet<TechnicianRoleEntity> TechnicianRoles { get; set; }
         public virtual DbSet<TechnicianWorkdayOverrideEntity> TechnicianWorkdayOverrides { get; set; }
         public virtual DbSet<TruckEntity> Trucks { get; set; }
-        public virtual DbSet<TruckRosterEntity> TruckRosters { get; set; }        
+        public virtual DbSet<TruckRosterEntity> TruckRosters { get; set; }
+        public virtual DbSet<TruckBoardDayEntity> TruckBoardDays { get; set; }
         public virtual DbSet<TruckStyleEntity> TruckStyles { get; set; }
 
         public virtual DbSet<SnmpProfileEntity> SnmpProfiles { get; set; } = null!;
@@ -30,12 +31,19 @@ namespace SmartGridSuite.Api.Data
 
         public DbSet<SiteNoteEntity> SiteNotes => Set<SiteNoteEntity>();
 
+        public DbSet<SiteHistoryEntity> SiteHistory => Set<SiteHistoryEntity>();
+
+        public DbSet<TicketWriteUpSubmissionEntity> TicketWriteUpSubmissions => Set<TicketWriteUpSubmissionEntity>();
+
+        public DbSet<TicketWriteUpSubmissionTechnicianEntity> TicketWriteUpSubmissionTechnicians
+        => Set<TicketWriteUpSubmissionTechnicianEntity>();
+
         public virtual DbSet<CommunicationDeviceTypeEntity> CommunicationDeviceTypes { get; set; }
 
         public DbSet<DailyTicketAssignmentEntity> DailyTicketAssignments => Set<DailyTicketAssignmentEntity>();
 
         public DbSet<DailyTicketAssignmentPublishedEntity> DailyTicketAssignmentPublished => Set<DailyTicketAssignmentPublishedEntity>();
-
+        
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<TicketEntity>(e =>
@@ -202,6 +210,35 @@ namespace SmartGridSuite.Api.Data
                  .WithMany() // keep simple for now
                  .HasForeignKey(x => x.TechnicianId)
                  .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<TruckBoardDayEntity>(e =>
+            {
+                e.ToTable("truck_board_days");
+
+                e.HasKey(x => x.WorkDate);
+
+                e.Property(x => x.WorkDate)
+                    .HasColumnName("work_date")
+                    .HasColumnType("date");
+
+                e.Property(x => x.InitializationSource)
+                    .HasColumnName("initialization_source")
+                    .HasMaxLength(32)
+                    .IsRequired();
+
+                e.Property(x => x.CarriedFromWorkDate)
+                    .HasColumnName("carried_from_work_date")
+                    .HasColumnType("date");
+
+                e.Property(x => x.InitializedAt)
+                    .HasColumnName("initialized_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.CarriedFromWorkDate)
+                    .HasDatabaseName("ix_truck_board_days_carried_from_date");
             });
 
             modelBuilder.Entity<TruckStyleEntity>(e =>
@@ -451,6 +488,277 @@ namespace SmartGridSuite.Api.Data
 
                 e.HasIndex(x => new { x.SiteId, x.IsActive })
                     .HasDatabaseName("ix_site_notes_site_active");
+
+                e.Property(x => x.DeletedAt)
+                    .HasColumnName("deleted_at");
+
+                e.Property(x => x.DeletedBy)
+                    .HasColumnName("deleted_by")
+                    .HasMaxLength(100);
+            });
+
+            // Maps the existing site-history table so submitted write-ups can be inserted
+            // through EF and their generated history IDs can be linked to completion records.
+            modelBuilder.Entity<SiteHistoryEntity>(e =>
+            {
+                e.ToTable("site_history");
+
+                e.HasKey(x => x.HistoryId);
+
+                e.Property(x => x.HistoryId)
+                    .HasColumnName("history_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.LegacySourceId)
+                    .HasColumnName("legacy_source_id");
+
+                e.Property(x => x.SourceType)
+                    .HasColumnName("source_type")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.SourceFile)
+                    .HasColumnName("source_file")
+                    .HasMaxLength(255);
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.VisitDate)
+                    .HasColumnName("visit_date")
+                    .HasColumnType("date");
+
+                e.Property(x => x.PrimaryTech)
+                    .HasColumnName("primary_tech")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SecondaryTech)
+                    .HasColumnName("secondary_tech")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.Narrative)
+                    .HasColumnName("narrative");
+
+                e.Property(x => x.IssueText)
+                    .HasColumnName("issue_text");
+
+                e.Property(x => x.ImportedAt)
+                    .HasColumnName("imported_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                    .ValueGeneratedOnAdd();
+
+                e.HasIndex(x => x.SiteId)
+                    .HasDatabaseName("ix_site_history_site_id");
+
+                e.HasIndex(x => x.VisitDate)
+                    .HasDatabaseName("ix_site_history_visit_date");
+
+                e.HasIndex(x => x.LegacySourceId)
+                    .HasDatabaseName("ix_site_history_legacy_source_id");
+
+                e.Property(x => x.IsDeleted)
+                    .HasColumnName("is_deleted");
+
+                e.Property(x => x.EditedAt)
+                    .HasColumnName("edited_at");
+
+                e.Property(x => x.EditedBy)
+                    .HasColumnName("edited_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.DeletedAt)
+                    .HasColumnName("deleted_at");
+
+                e.Property(x => x.DeletedBy)
+                    .HasColumnName("deleted_by")
+                    .HasMaxLength(100);
+            });
+
+            // Stores technician write-up completion events for History date searches.
+            // Work Orders intentionally remain sourced from the live TicketEntity record
+            // so time entry always uses the latest valid maintenance/capital work order.
+            modelBuilder.Entity<TicketWriteUpSubmissionEntity>(e =>
+            {
+                e.ToTable("ticket_writeup_submissions");
+
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.Id)
+                    .HasColumnName("id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.TicketId)
+                    .HasColumnName("ticket_id");
+
+                e.Property(x => x.SiteHistoryId)
+                    .HasColumnName("site_history_id");
+
+                /*
+                 * The client submission ID is a nullable Guid because older submission rows
+                 * predate idempotency. Pomelo stores it in the existing CHAR(36) column.
+                 */
+                e.Property(x => x.ClientSubmissionId)
+                    .HasColumnName("client_submission_id")
+                    .HasColumnType("char(36)");
+
+                e.HasIndex(x => x.ClientSubmissionId)
+                    .IsUnique()
+                    .HasDatabaseName(
+                        "ux_ticket_writeup_submissions_client_submission_id");
+
+                e.Property(x => x.SubmittedByTechnicianId)
+                    .HasColumnName("submitted_by_technician_id");
+
+                e.Property(x => x.SubmittedByEmployeeId)
+                    .HasColumnName("submitted_by_employee_id")
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                e.Property(x => x.SubmittedByName)
+                    .HasColumnName("submitted_by_name")
+                    .HasMaxLength(150)
+                    .IsRequired();
+
+                e.Property(x => x.SubmittedAt)
+                    .HasColumnName("submitted_at");
+
+                e.Property(x => x.SubmittedNarrative)
+                    .HasColumnName("submitted_narrative")
+                    .IsRequired();
+
+                e.Property(x => x.IsDeleted)
+                    .HasColumnName("is_deleted")
+                    .HasColumnType("tinyint(1)");
+
+                e.Property(x => x.DeletedAt)
+                    .HasColumnName("deleted_at");
+
+                e.Property(x => x.DeletedBy)
+                    .HasColumnName("deleted_by")
+                    .HasMaxLength(100);
+
+                e.HasIndex(x => x.SiteHistoryId)
+                    .IsUnique()
+                    .HasDatabaseName("ux_ticket_writeup_submissions_site_history_id");
+
+                e.HasIndex(x => x.TicketId)
+                    .HasDatabaseName("ix_ticket_writeup_submissions_ticket_id");
+
+                e.HasIndex(x => new
+                {
+                    x.SubmittedByTechnicianId,
+                    x.SubmittedAt
+                })
+                    .HasDatabaseName("ix_ticket_writeup_submissions_technician_date");
+
+                e.HasIndex(x => new
+                {
+                    x.SubmittedByEmployeeId,
+                    x.SubmittedAt
+                })
+                    .HasDatabaseName("ix_ticket_writeup_submissions_employee_date");
+
+                e.HasOne(x => x.Ticket)
+                    .WithMany()
+                    .HasForeignKey(x => x.TicketId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(x => x.SubmittedByTechnician)
+                    .WithMany()
+                    .HasForeignKey(x => x.SubmittedByTechnicianId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.Property(x => x.EditedAt)
+                    .HasColumnName("edited_at");
+
+                e.Property(x => x.EditedBy)
+                    .HasColumnName("edited_by")
+                    .HasMaxLength(100);
+            });
+
+            // Maps the technicians who participated in a submitted write-up so every
+            // assigned crew member receives the completed ticket in personal History.
+            modelBuilder.Entity<TicketWriteUpSubmissionTechnicianEntity>(e =>
+            {
+                e.ToTable("ticket_writeup_submission_technicians");
+
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.Id)
+                    .HasColumnName("id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SubmissionId)
+                    .HasColumnName("submission_id");
+
+                e.Property(x => x.TechnicianId)
+                    .HasColumnName("technician_id")
+                    .HasColumnType("int unsigned");
+
+                e.Property(x => x.EmployeeId)
+                    .HasColumnName("employee_id")
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                e.Property(x => x.TechnicianName)
+                    .HasColumnName("technician_name")
+                    .HasMaxLength(150)
+                    .IsRequired();
+
+                e.Property(x => x.IsSubmitter)
+                    .HasColumnName("is_submitter")
+                    .HasColumnType("tinyint(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                    .ValueGeneratedOnAdd();
+
+                e.HasIndex(x => new
+                {
+                    x.SubmissionId,
+                    x.EmployeeId
+                })
+                    .IsUnique()
+                    .HasDatabaseName("ux_writeup_submission_technician_employee");
+
+                e.HasIndex(x => x.SubmissionId)
+                    .HasDatabaseName("ix_writeup_submission_participant_submission");
+
+                e.HasIndex(x => new
+                {
+                    x.TechnicianId,
+                    x.SubmissionId
+                })
+                    .HasDatabaseName("ix_writeup_submission_participant_technician");
+
+                e.HasIndex(x => new
+                {
+                    x.EmployeeId,
+                    x.SubmissionId
+                })
+                    .HasDatabaseName("ix_writeup_submission_participant_employee");
+
+                /*
+                 * Participant rows belong to one write-up submission. The principal-side
+                 * collection is intentionally omitted because current workflows query the
+                 * participant DbSet directly.
+                 */
+                e.HasOne(x => x.Submission)
+                    .WithMany()
+                    .HasForeignKey(x => x.SubmissionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                /*
+                 * A technician may later be deleted while the stored employee ID and
+                 * display name remain available on the completed-work participant row.
+                 */
+                e.HasOne(x => x.Technician)
+                    .WithMany()
+                    .HasForeignKey(x => x.TechnicianId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<DailyTicketAssignmentEntity>(e =>

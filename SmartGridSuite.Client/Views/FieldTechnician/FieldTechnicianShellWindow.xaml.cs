@@ -14,6 +14,9 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
 {
     public partial class FieldTechnicianShellWindow
     {
+        private readonly ApiClient _connectivityApi =
+            new("https://localhost:7140/");
+
         private bool _navCollapsed;
         private bool _syncingNav;
 
@@ -28,6 +31,13 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
             InitializeComponent();
 
             UiScaleService.ApplyToWindow(this);
+
+            ConnectivityService.StateChanged += ConnectivityService_StateChanged;
+
+            Closed += FieldTechnicianShellWindow_Closed;
+
+            ApplyConnectivityState(ConnectivityService.CurrentState,
+                ConnectivityService.CurrentMessage);
 
             // Default selection = Site Dashboard
             SelectNavIndex(0);
@@ -189,6 +199,113 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
             };
 
             return _siteDashboardPaneView;
+        }
+
+        // Receives application-wide connection changes and safely updates this window
+        // even when the originating API request completed on another thread.
+        private void ConnectivityService_StateChanged(
+            object? sender,
+            ConnectivityChangedEventArgs e)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(() =>
+                    ApplyConnectivityState(
+                        e.State,
+                        e.Message));
+
+                return;
+            }
+
+            ApplyConnectivityState(
+                e.State,
+                e.Message);
+        }
+
+        // Shows connection problems persistently without blocking the technician with
+        // repeated modal windows.
+        private void ApplyConnectivityState(
+            ConnectivityState state,
+            string message)
+        {
+            var shouldShow =
+                state == ConnectivityState.Offline ||
+                state == ConnectivityState.Degraded ||
+                state == ConnectivityState.Checking;
+
+            ConnectivityBanner.Visibility =
+                shouldShow
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+
+            ConnectivityMessageText.Text =
+                string.IsNullOrWhiteSpace(message)
+                    ? "Unable to determine server availability."
+                    : message;
+
+            ConnectivityRetryButton.IsEnabled =
+                state != ConnectivityState.Checking;
+
+            ConnectivityRetryButton.Content =
+                state == ConnectivityState.Checking
+                    ? "Checking..."
+                    : "Retry";
+        }
+
+        // Calls the lightweight health endpoint and restores normal UI state once both
+        // the API and database are available again.
+        private async void RetryConnectivity_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            ConnectivityService.BeginCheck();
+
+            try
+            {
+                var result =
+                    await _connectivityApi.GetAsync<ApiHealthResponse>(
+                        "api/health");
+
+                if (result?.ApiAvailable == true &&
+                    result.DatabaseAvailable)
+                {
+                    ConnectivityService.ReportOnline();
+                    return;
+                }
+
+                ConnectivityService.ReportDegraded(
+                    "The API is reachable, but the Smart Grid database is unavailable.");
+            }
+            catch (ApiClient.ApiConnectionException)
+            {
+                /*
+                 * ApiClient already reported the offline state. No modal window is
+                 * needed because the persistent banner displays the result.
+                 */
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                ConnectivityService.ReportDegraded(
+                    $"The health check returned server error {ex.StatusCode}.");
+            }
+        }
+
+        // Removes the shared event subscription when this shell closes.
+        private void FieldTechnicianShellWindow_Closed(
+            object? sender,
+            EventArgs e)
+        {
+            ConnectivityService.StateChanged -=
+                ConnectivityService_StateChanged;
+        }
+
+        private sealed class ApiHealthResponse
+        {
+            public bool ApiAvailable { get; set; }
+
+            public bool DatabaseAvailable { get; set; }
+
+            public DateTimeOffset CheckedAtUtc { get; set; }
         }
     }
 }

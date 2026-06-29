@@ -215,7 +215,35 @@
                             </Grid>
                         </ListBoxItem>
 
+                        <ListBoxItem Tag="Site History">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
+                                <Border Style="{StaticResource NavBadgeStyle}">
+                                    <TextBlock Text="H"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="14"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource TextPrimary}"/>
+                                </Border>
+
+                                <StackPanel Grid.Column="1"
+                                            Margin="10,0,0,0">
+                                    <TextBlock Text="Modify Site History"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}"/>
+                                    <TextBlock Text="Review and correct write-ups"
+                                               Margin="0,2,0,0"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondary}"/>
+                                </StackPanel>
+                            </Grid>
+                        </ListBoxItem>
                     </ListBox>
 
                     <!-- Collapsed nav -->
@@ -266,6 +294,17 @@
                         <ListBoxItem Tag="Daily Assignments" ToolTip="Daily Assignments">
                             <Border Style="{StaticResource NavBadgeStyle}">
                                 <TextBlock Text="A"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="14"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                            </Border>
+                        </ListBoxItem>
+
+                        <ListBoxItem Tag="Site History" ToolTip="Site History">
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <TextBlock Text="H"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
                                            FontSize="14"

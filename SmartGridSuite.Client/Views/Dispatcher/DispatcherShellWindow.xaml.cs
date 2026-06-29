@@ -16,6 +16,7 @@ namespace SmartGridSuite.Client.Views
         private int _currentNavIndex;
         private bool _allowCloseWithoutPrompt;
         private bool _closePromptRunning;
+        private SiteHistoryPaneView? _siteHistoryPaneView;
 
         private readonly ApiClient _api = new("https://localhost:7140");
 
@@ -126,6 +127,11 @@ namespace SmartGridSuite.Client.Views
                 case "Daily Assignments":
                     _dailyAssignmentsPaneView ??= new DailyAssignmentsPaneView();
                     MainPaneHost.Content = _dailyAssignmentsPaneView;
+                    break;
+
+                case "Site History":
+                    _siteHistoryPaneView ??= new SiteHistoryPaneView();
+                    MainPaneHost.Content = _siteHistoryPaneView;
                     break;
 
                 default:
