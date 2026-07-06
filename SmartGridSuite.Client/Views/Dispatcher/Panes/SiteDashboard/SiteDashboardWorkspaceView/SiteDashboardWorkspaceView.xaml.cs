@@ -482,5 +482,34 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     MessageBoxImage.Error);
             }
         }
+
+        public SiteDashboardSubmitOptionsSessionState GetSubmitOptionsSessionState()
+        {
+            return new SiteDashboardSubmitOptionsSessionState
+            {
+                IncludePingStats = IncludePingStatsCheckBox.IsChecked == true,
+
+                IncludeSnmpStats = IncludeSnmpStatsCheckBox.IsChecked == true,
+                IncludeSnmpAdmin = IncludeSnmpAdminCheckBox.IsChecked == true,
+                IncludeSnmpConfig = IncludeSnmpConfigCheckBox.IsChecked == true,
+                IncludeSnmpStatsCategory = IncludeSnmpStatsCategoryCheckBox.IsChecked == true
+            };
+        }
+
+        public void RestoreSubmitOptionsSessionState(SiteDashboardSubmitOptionsSessionState? state)
+        {
+            state ??= new SiteDashboardSubmitOptionsSessionState();
+
+            IncludePingStatsCheckBox.IsChecked = state.IncludePingStats;
+
+            IncludeSnmpStatsCheckBox.IsChecked = state.IncludeSnmpStats;
+            IncludeSnmpAdminCheckBox.IsChecked = state.IncludeSnmpAdmin;
+            IncludeSnmpConfigCheckBox.IsChecked = state.IncludeSnmpConfig;
+            IncludeSnmpStatsCategoryCheckBox.IsChecked = state.IncludeSnmpStatsCategory;
+
+            SnmpCategoryOptionsPanel.Visibility = state.IncludeSnmpStats
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
     }
 }

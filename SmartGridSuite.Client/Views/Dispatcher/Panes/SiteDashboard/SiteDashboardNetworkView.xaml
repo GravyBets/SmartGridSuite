@@ -337,8 +337,8 @@
         <!-- Secondary Ping Card -->
         <Border Grid.Row="6"
                 Style="{StaticResource Card}"
-                Padding="10,10,10,10"
-                Margin="0,0,0,-8">
+                Padding="10"
+                Margin="0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -377,10 +377,10 @@
                 </Grid>
 
                 <Border Grid.Row="2"
-                    CornerRadius="8"
-                    BorderBrush="{DynamicResource SurfaceBorder}"
-                    BorderThickness="1"
-                    Background="{DynamicResource SurfaceBg}">
+                        CornerRadius="8"
+                        BorderBrush="{DynamicResource SurfaceBorder}"
+                        BorderThickness="1"
+                        Background="{DynamicResource SurfaceBg}">
                     <TextBox x:Name="SecondaryResultsTextBox"
                          Style="{StaticResource NetworkOutputTextBoxStyle}" />
                 </Border>
@@ -396,7 +396,7 @@
         <Border x:Name="SecondaryReferenceSectionBorder"
                 Grid.Row="8"
                 Style="{StaticResource Card}"
-                Padding="10,10,10,60"
+                Padding="10"
                 Visibility="Collapsed">
             <Grid>
                 <Grid.RowDefinitions>

@@ -720,19 +720,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private static bool TryAddPingWriteUpBlock(List<string> lines, string label, string? ip, string? summary)
         {
             var cleanIp = (ip ?? string.Empty).Trim();
-            var cleanSummary = CleanPingSummaryForWriteUp(summary);
 
-            if (string.IsNullOrWhiteSpace(cleanIp) ||
-                cleanIp == "—" ||
-                string.IsNullOrWhiteSpace(cleanSummary))
-            {
+            if (string.IsNullOrWhiteSpace(cleanIp) || cleanIp == "—")
                 return false;
-            }
+
+            var cleanSummary = CleanPingSummaryForWriteUp(summary);
 
             if (lines.Count > 1)
                 lines.Add(string.Empty);
 
-            lines.Add($"{label} ({cleanIp}) - {cleanSummary}");
+            if (string.IsNullOrWhiteSpace(cleanSummary))
+                lines.Add($"{label} ({cleanIp})");
+            else
+                lines.Add($"{label} ({cleanIp}) - {cleanSummary}");
+
             return true;
         }
 
@@ -781,6 +782,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         {
             await RunQuickReachabilityTestForAllAsync();
         }
+
 
 
     }

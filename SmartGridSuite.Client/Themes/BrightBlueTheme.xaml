@@ -1,0 +1,128 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- =========================
+         BRIGHT BLUE THEME
+         - legacy-style blue app background
+         - gray cards
+         - white/near-white inputs through SurfaceBg
+         - stronger secondary buttons through TileFill
+         ========================= -->
+
+    <!-- App + cards -->
+    <SolidColorBrush x:Key="AppBackground" Color="#78A9CC"/>
+    <SolidColorBrush x:Key="CardBackground" Color="#E3E7EB"/>
+    <SolidColorBrush x:Key="CardBorder" Color="#5F7890"/>
+
+    <DropShadowEffect x:Key="CardShadow"
+                      Color="#000000"
+                      BlurRadius="16"
+                      ShadowDepth="2"
+                      Opacity="0.16"/>
+
+    <!-- Surfaces: current TextBoxes/ComboBoxes use these -->
+    <SolidColorBrush x:Key="SurfaceBg" Color="#FBFCFE"/>
+    <SolidColorBrush x:Key="SurfaceBorder" Color="#6E8498"/>
+
+    <!-- Semantic control colors for Bright Blue -->
+
+    <!-- Control semantic keys -->
+    <SolidColorBrush x:Key="ControlInputBg" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ControlInputText" Color="#0F172A"/>
+    <SolidColorBrush x:Key="ControlInputCaret" Color="#0F172A"/>
+    <SolidColorBrush x:Key="ControlInputBorder" Color="#6E8498"/>
+    <SolidColorBrush x:Key="ControlInputHoverBg" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ControlInputHoverBorder" Color="#4F6E89"/>
+    <SolidColorBrush x:Key="ControlInputFocusBorder" Color="#1688E8"/>
+
+    <SolidColorBrush x:Key="ControlSecondaryBg" Color="#E9EEF3"/>
+    <SolidColorBrush x:Key="ControlSecondaryText" Color="#102331"/>
+    <SolidColorBrush x:Key="ControlSecondaryBorder" Color="#5F7890"/>
+    <SolidColorBrush x:Key="ControlSecondaryHoverBg" Color="#F7FAFC"/>
+    <SolidColorBrush x:Key="ControlSecondaryHoverBorder" Color="#4F6E89"/>
+    <SolidColorBrush x:Key="ControlSecondaryPressedBg" Color="#D5E0EA"/>
+
+    <!-- Lists -->
+    <SolidColorBrush x:Key="ListBg" Color="#E6EAEE"/>
+    <SolidColorBrush x:Key="ListBorder" Color="#6E8498"/>
+    <SolidColorBrush x:Key="ListHoverBg" Color="#F2F5F8"/>
+    <SolidColorBrush x:Key="ListSelectedBg" Color="#D3DEE8"/>
+    <SolidColorBrush x:Key="ListItemSelectedBorder" Color="#55748C"/>
+    <SolidColorBrush x:Key="ListItemHoverBg" Color="#F2F5F8"/>
+
+    <!-- Primary buttons -->
+    <SolidColorBrush x:Key="PrimaryBg" Color="#1688E8"/>
+    <SolidColorBrush x:Key="PrimaryBorder" Color="#0D62AA"/>
+    <SolidColorBrush x:Key="PrimaryBgHover" Color="#2A96F0"/>
+    <SolidColorBrush x:Key="PrimaryBgPressed" Color="#0B72C8"/>
+
+    <!-- Secondary buttons / tiles: current SecondaryButtonStyle uses these -->
+    <SolidColorBrush x:Key="TileFill" Color="#E9EEF3"/>
+    <SolidColorBrush x:Key="TileFillHover" Color="#F7FAFC"/>
+    <SolidColorBrush x:Key="TileFillPressed" Color="#D5E0EA"/>
+
+    <SolidColorBrush x:Key="TileHoverBg" Color="#F7FAFC"/>
+    <SolidColorBrush x:Key="TilePressedBg" Color="#D5E0EA"/>
+
+    <!-- Optional keys for later if Controls.xaml ever uses them -->
+    <SolidColorBrush x:Key="SecondaryBg" Color="#E4EBF1"/>
+    <SolidColorBrush x:Key="SecondaryBorder" Color="#647D94"/>
+    <SolidColorBrush x:Key="SecondaryText" Color="#102331"/>
+    <SolidColorBrush x:Key="SecondaryBgHover" Color="#F1F5F9"/>
+    <SolidColorBrush x:Key="SecondaryBgPressed" Color="#D0DCE7"/>
+
+    <!-- DataGrid -->
+    <SolidColorBrush x:Key="DataGridHeaderBg" Color="#D6DEE6"/>
+    <SolidColorBrush x:Key="DataGridHeaderBorder" Color="#788C9E"/>
+    <SolidColorBrush x:Key="DataGridRowHoverBg" Color="#10000000"/>
+    <SolidColorBrush x:Key="DataGridRowSelectedBg" Color="#220066CC"/>
+
+    <!-- Tabs: selected should feel attached to card, not pure white -->
+    <SolidColorBrush x:Key="TabBg" Color="#CDD8E2"/>
+    <SolidColorBrush x:Key="TabBgSelected" Color="#E3E7EB"/>
+    <SolidColorBrush x:Key="TabBgHover" Color="#DDE6EE"/>
+
+    <SolidColorBrush x:Key="InnerTabBg" Color="#D5DEE7"/>
+    <SolidColorBrush x:Key="InnerTabSelectedBg" Color="#E3E7EB"/>
+    <SolidColorBrush x:Key="InnerTabHoverBg" Color="#E7EDF3"/>
+
+    <SolidColorBrush x:Key="TabPillSelectedBg" Color="#E9EEF3"/>
+
+    <!-- Text -->
+    <SolidColorBrush x:Key="TextPrimary" Color="#102331"/>
+    <SolidColorBrush x:Key="TextSecondary" Color="#3E5668"/>
+    <SolidColorBrush x:Key="WatermarkText" Color="#708596"/>
+
+    <!-- Inputs: only hover/focus are currently used by Controls.xaml -->
+    <SolidColorBrush x:Key="InputBackground" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="InputForeground" Color="#0F172A"/>
+    <SolidColorBrush x:Key="InputBorder" Color="#8196A9"/>
+    <SolidColorBrush x:Key="InputBorderHover" Color="#4F6E89"/>
+    <SolidColorBrush x:Key="InputBorderFocus" Color="#1688E8"/>
+    <SolidColorBrush x:Key="InputDisabledBackground" Color="#E5E9EE"/>
+    <SolidColorBrush x:Key="InputDisabledForeground" Color="#64748B"/>
+
+    <!-- Validation / danger -->
+    <SolidColorBrush x:Key="MissingRefBg" Color="#FAD6D6"/>
+    <SolidColorBrush x:Key="MissingRefBgHover" Color="#F4C0C0"/>
+    <SolidColorBrush x:Key="MissingRefBorder" Color="#D9534F"/>
+
+    <SolidColorBrush x:Key="DangerText" Color="#7B1F1F"/>
+    <SolidColorBrush x:Key="DangerBorder" Color="#D9534F"/>
+    <SolidColorBrush x:Key="DangerBg" Color="#FAD6D6"/>
+    <SolidColorBrush x:Key="DangerBgHover" Color="#F4C0C0"/>
+
+    <SolidColorBrush x:Key="ReturnText" Color="#102331"/>
+
+    <!-- Misc -->
+    <SolidColorBrush x:Key="BorderHover" Color="#4F6E89"/>
+    <SolidColorBrush x:Key="HoverOverlay" Color="#10000000"/>
+    <SolidColorBrush x:Key="PressedOverlay" Color="#18000000"/>
+
+    <!-- Fluent Ribbon -->
+    <SolidColorBrush x:Key="Fluent.Ribbon.Brushes.RibbonBackgroundBrush" Color="#78A9CC"/>
+    <SolidColorBrush x:Key="Fluent.Ribbon.Brushes.RibbonBorderBrush" Color="#5F7890"/>
+    <SolidColorBrush x:Key="Fluent.Ribbon.Brushes.RibbonTabItemForegroundBrush" Color="#102331"/>
+    <SolidColorBrush x:Key="Fluent.Ribbon.Brushes.RibbonTabItemSelectedForegroundBrush" Color="#102331"/>
+
+</ResourceDictionary>

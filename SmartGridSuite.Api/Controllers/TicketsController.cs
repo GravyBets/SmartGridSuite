@@ -3082,18 +3082,58 @@ namespace SmartGridSuite.Api.Controllers
 
                 if (siteHistory != null)
                 {
+                    var originalPrimaryTech = siteHistory.PrimaryTech;
+                    var originalSecondaryTech = siteHistory.SecondaryTech;
+
                     siteHistory.Narrative = narrative;
 
                     if (req.IssueText != null)
                     {
                         siteHistory.IssueText =
-                            string.IsNullOrWhiteSpace(req.IssueText)
-                                ? null
-                                : req.IssueText.Trim();
+                            NormalizeEditableSiteHistoryText(req.IssueText);
+                    }
+
+                    if (req.PrimaryTech != null)
+                    {
+                        siteHistory.PrimaryTech = TrimForColumn(
+                            NormalizeEditableSiteHistoryText(req.PrimaryTech),
+                            100);
+                    }
+
+                    if (req.SecondaryTech != null)
+                    {
+                        siteHistory.SecondaryTech = TrimForColumn(
+                            NormalizeEditableSiteHistoryText(req.SecondaryTech),
+                            100);
                     }
 
                     siteHistory.EditedAt = now;
                     siteHistory.EditedBy = TrimForColumn(updatedBy, 100);
+
+                    var technicianOwnershipChanged =
+                        !string.Equals(
+                            NormalizeComparableSiteHistoryText(originalPrimaryTech),
+                            NormalizeComparableSiteHistoryText(siteHistory.PrimaryTech),
+                            StringComparison.OrdinalIgnoreCase) ||
+
+                        !string.Equals(
+                            NormalizeComparableSiteHistoryText(originalSecondaryTech),
+                            NormalizeComparableSiteHistoryText(siteHistory.SecondaryTech),
+                            StringComparison.OrdinalIgnoreCase);
+
+                    if (technicianOwnershipChanged)
+                    {
+                        var participantRewriteError =
+                            await RewriteSubmittedWriteUpParticipantsAsync(
+                                submission,
+                                siteHistory.PrimaryTech,
+                                siteHistory.SecondaryTech,
+                                now,
+                                ct);
+
+                        if (!string.IsNullOrWhiteSpace(participantRewriteError))
+                            return BadRequest(participantRewriteError);
+                    }
                 }
             }
 
@@ -3274,6 +3314,140 @@ namespace SmartGridSuite.Api.Controllers
             return text.Length <= maxLength
                 ? text
                 : text[..maxLength];
+        }
+
+        private async Task<string?> RewriteSubmittedWriteUpParticipantsAsync(
+            TicketWriteUpSubmissionEntity submission, string? primaryTechText, string? secondaryTechText,
+            DateTime changedAt, CancellationToken ct)
+        {
+            var activeTechnicians = await ActiveFieldTechniciansQuery()
+                .ToListAsync(ct);
+
+            var primaryText = NormalizeEditableSiteHistoryText(primaryTechText);
+            var secondaryText = NormalizeEditableSiteHistoryText(secondaryTechText);
+
+            var primaryTech = ResolveTechnicianForHistoryEdit(
+                primaryText,
+                activeTechnicians);
+
+            var secondaryTech = ResolveTechnicianForHistoryEdit(
+                secondaryText,
+                activeTechnicians);
+
+            if (!string.IsNullOrWhiteSpace(primaryText) && primaryTech == null)
+            {
+                return $"Primary Tech '{primaryText}' could not be matched to an active technician.";
+            }
+
+            if (!string.IsNullOrWhiteSpace(secondaryText) && secondaryTech == null)
+            {
+                return $"Secondary Tech '{secondaryText}' could not be matched to an active technician.";
+            }
+
+            if (primaryTech == null && secondaryTech == null)
+            {
+                return "At least one technician is required when changing write-up technician ownership.";
+            }
+
+            var existingParticipantRows = await _db.TicketWriteUpSubmissionTechnicians
+                .Where(x => x.SubmissionId == submission.Id)
+                .ToListAsync(ct);
+
+            _db.TicketWriteUpSubmissionTechnicians.RemoveRange(existingParticipantRows);
+
+            var participantRows =
+                new List<TicketWriteUpSubmissionTechnicianEntity>();
+
+            if (primaryTech != null)
+            {
+                var primaryName = FormatTechnicianName(
+                    primaryTech.FirstName,
+                    primaryTech.LastName,
+                    primaryTech.EmployeeId);
+
+                participantRows.Add(new TicketWriteUpSubmissionTechnicianEntity
+                {
+                    SubmissionId = submission.Id,
+                    TechnicianId = primaryTech.Id,
+                    EmployeeId = TrimForColumn(primaryTech.EmployeeId, 100) ?? "Unknown",
+                    TechnicianName = TrimForColumn(primaryName, 150) ?? "Unknown",
+                    IsSubmitter = true,
+                    CreatedAt = changedAt
+                });
+
+                submission.SubmittedByTechnicianId = primaryTech.Id;
+                submission.SubmittedByEmployeeId = TrimForColumn(primaryTech.EmployeeId, 100) ?? "Unknown";
+                submission.SubmittedByName = TrimForColumn(primaryName, 150) ?? "Unknown";
+            }
+
+            if (secondaryTech != null &&
+                secondaryTech.Id != primaryTech?.Id)
+            {
+                var secondaryName = FormatTechnicianName(
+                    secondaryTech.FirstName,
+                    secondaryTech.LastName,
+                    secondaryTech.EmployeeId);
+
+                participantRows.Add(new TicketWriteUpSubmissionTechnicianEntity
+                {
+                    SubmissionId = submission.Id,
+                    TechnicianId = secondaryTech.Id,
+                    EmployeeId = TrimForColumn(secondaryTech.EmployeeId, 100) ?? "Unknown",
+                    TechnicianName = TrimForColumn(secondaryName, 150) ?? "Unknown",
+                    IsSubmitter = primaryTech == null,
+                    CreatedAt = changedAt
+                });
+
+                if (primaryTech == null)
+                {
+                    submission.SubmittedByTechnicianId = secondaryTech.Id;
+                    submission.SubmittedByEmployeeId = TrimForColumn(secondaryTech.EmployeeId, 100) ?? "Unknown";
+                    submission.SubmittedByName = TrimForColumn(secondaryName, 150) ?? "Unknown";
+                }
+            }
+
+            _db.TicketWriteUpSubmissionTechnicians.AddRange(participantRows);
+
+            return null;
+        }
+
+        private static TechnicianEntity? ResolveTechnicianForHistoryEdit(
+            string? selectedText,
+            IReadOnlyList<TechnicianEntity> technicians)
+        {
+            var text = NormalizeEditableSiteHistoryText(selectedText);
+
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            return technicians.FirstOrDefault(t =>
+                string.Equals(
+                    t.EmployeeId?.Trim(),
+                    text,
+                    StringComparison.OrdinalIgnoreCase) ||
+
+                string.Equals(
+                    FormatTechnicianName(t.FirstName, t.LastName, t.EmployeeId),
+                    text,
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string NormalizeComparableSiteHistoryText(string? value)
+        {
+            return NormalizeEditableSiteHistoryText(value) ?? "";
+        }
+
+        private static string? NormalizeEditableSiteHistoryText(string? value)
+        {
+            var text = (value ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            if (text == "—")
+                return null;
+
+            return text;
         }
 
         // Identifies the unique client-submission constraint used to resolve a rare

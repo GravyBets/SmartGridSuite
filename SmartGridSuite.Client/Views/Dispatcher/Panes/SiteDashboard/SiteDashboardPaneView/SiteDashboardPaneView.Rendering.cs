@@ -164,6 +164,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 WorkspaceView.CurrentTicketId = session.CurrentTicketId;
                 WorkspaceView.TicketInfoText = session.TicketInfoText;
                 WorkspaceView.WriteUpText = session.WriteUpText;
+                WorkspaceView.RestoreSubmitOptionsSessionState(session.SubmitOptions);
 
                 WorkspaceView.ShowPortalTab = session.ShowIgsdPortalTab;
                 WorkspaceView.PortalUrl = session.IgsdPortalUrl;

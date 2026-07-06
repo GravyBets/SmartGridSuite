@@ -15,23 +15,37 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
     public partial class SiteHistoryPaneView : UserControl, INotifyPropertyChanged
     {
-        private readonly TicketsApi _ticketsApi =
-            new(new ApiClient("https://localhost:7140"));
+        private readonly ApiClient _api;
+        private readonly TicketsApi _ticketsApi;
 
         private DispatcherSiteHistoryRowViewModel? _selectedHistoryRow;
+
         private string _currentSiteId = "";
-        private string _originalNarrative = "";
+        private string _originalPrimaryTech = "";
+        private string _originalSecondaryTech = "";
         private string _originalIssue = "";
+        private string _originalNarrative = "";
+
         private bool _isEditing;
         private bool _isLoading;
 
         public SiteHistoryPaneView()
         {
             InitializeComponent();
+
+            _api = new ApiClient("https://localhost:7140");
+            _ticketsApi = new TicketsApi(_api);
+
             DataContext = this;
+
+            TechnicianOptions.Add("—");
+
+            _ = LoadTechnicianOptionsAsync();
         }
 
         public ObservableCollection<DispatcherSiteHistoryRowViewModel> HistoryRows { get; } = new();
+
+        public ObservableCollection<string> TechnicianOptions { get; } = new();
 
         public DispatcherSiteHistoryRowViewModel? SelectedHistoryRow
         {
@@ -64,12 +78,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             await LoadHistoryAsync();
         }
 
-        private async Task LoadHistoryAsync()
+        private async Task LoadHistoryAsync(bool skipUnsavedCheck = false)
         {
             if (_isLoading)
                 return;
 
-            if (_isEditing && HasUnsavedChanges())
+            if (!skipUnsavedCheck && _isEditing && HasUnsavedChanges())
             {
                 var confirm = MessageBox.Show(
                     Window.GetWindow(this),
@@ -155,6 +169,40 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
+        private async Task LoadTechnicianOptionsAsync()
+        {
+            try
+            {
+                var currentPrimary = GetSelectedComboText(Tech1ComboBox);
+                var currentSecondary = GetSelectedComboText(Tech2ComboBox);
+
+                var techs = await _api.GetAsync<List<TechnicianLookupDto>>(
+                    "api/technicians");
+
+                var names = (techs ?? new List<TechnicianLookupDto>())
+                    .Where(x => x.IsActive)
+                    .Select(GetTechnicianDisplayName)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x)
+                    .ToList();
+
+                TechnicianOptions.Clear();
+                TechnicianOptions.Add("—");
+
+                foreach (var name in names)
+                    TechnicianOptions.Add(name);
+
+                RestoreComboSelection(Tech1ComboBox, currentPrimary);
+                RestoreComboSelection(Tech2ComboBox, currentSecondary);
+            }
+            catch
+            {
+                if (TechnicianOptions.Count == 0)
+                    TechnicianOptions.Add("—");
+            }
+        }
+
         private static DispatcherSiteHistoryRowViewModel MapHistoryRow(SiteHistoryPreviewDto dto)
         {
             var effectiveDateTime =
@@ -218,8 +266,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             if (SelectedHistoryRow == null)
             {
-                _originalNarrative = "";
+                _originalPrimaryTech = "";
+                _originalSecondaryTech = "";
                 _originalIssue = "";
+                _originalNarrative = "";
 
                 ClearDetails();
 
@@ -228,17 +278,21 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
             }
 
-            _originalNarrative = CleanNarrativeText(SelectedHistoryRow.NarrativeText);
+            _originalPrimaryTech = NormalizeTechSelection(SelectedHistoryRow.Tech1Text);
+            _originalSecondaryTech = NormalizeTechSelection(SelectedHistoryRow.Tech2Text);
             _originalIssue = (SelectedHistoryRow.IssueText ?? string.Empty).Trim();
+            _originalNarrative = CleanNarrativeText(SelectedHistoryRow.NarrativeText);
 
             DateTimeTextBox.Text = SelectedHistoryRow.DateTimeText;
-            Tech1TextBox.Text = SelectedHistoryRow.Tech1Text;
-            Tech2TextBox.Text = SelectedHistoryRow.Tech2Text;
+
+            RestoreComboSelection(Tech1ComboBox, _originalPrimaryTech);
+            RestoreComboSelection(Tech2ComboBox, _originalSecondaryTech);
+
             IssueTextBox.Text = _originalIssue;
             NarrativeTextBox.Text = _originalNarrative;
 
             SelectedHintTextBlock.Text = SelectedHistoryRow.CanEditWriteUp
-                ? "SmartGridSuite write-up selected. Dispatch may edit the issue/body or soft-delete this entry."
+                ? "SmartGridSuite write-up selected. Dispatch may edit the techs, issue/body, or soft-delete this entry."
                 : "Legacy or imported history selected. This entry is read-only.";
 
             EditAuditTextBlock.Text = SelectedHistoryRow.EditedText;
@@ -249,8 +303,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private void ClearDetails()
         {
             DateTimeTextBox.Text = "";
-            Tech1TextBox.Text = "";
-            Tech2TextBox.Text = "";
+            Tech1ComboBox.SelectedItem = null;
+            Tech2ComboBox.SelectedItem = null;
             IssueTextBox.Text = "";
             NarrativeTextBox.Text = "";
             EditAuditTextBlock.Text = "";
@@ -262,8 +316,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
 
             SetEditMode(true);
-            IssueTextBox.Focus();
-            IssueTextBox.CaretIndex = IssueTextBox.Text.Length;
+
+            Tech1ComboBox.Focus();
         }
 
         private async void Save_Click(object sender, RoutedEventArgs e)
@@ -274,6 +328,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
             }
 
+            var primaryTech = GetSelectedComboText(Tech1ComboBox);
+            var secondaryTech = GetSelectedComboText(Tech2ComboBox);
             var issueText = (IssueTextBox.Text ?? string.Empty).Trim();
             var narrative = (NarrativeTextBox.Text ?? string.Empty).Trim();
 
@@ -300,10 +356,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     {
                         Narrative = narrative,
                         IssueText = issueText,
+                        PrimaryTech = primaryTech,
+                        SecondaryTech = secondaryTech,
                         UpdatedBy = GetWindowsEmployeeId()
                     });
 
-                await LoadHistoryAsync();
+                _originalPrimaryTech = primaryTech;
+                _originalSecondaryTech = secondaryTech;
+                _originalIssue = issueText;
+                _originalNarrative = narrative;
+
+                SetEditMode(false);
+
+                await LoadHistoryAsync(skipUnsavedCheck: true);
 
                 MessageBox.Show(
                     Window.GetWindow(this),
@@ -338,8 +403,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
+            RestoreComboSelection(Tech1ComboBox, _originalPrimaryTech);
+            RestoreComboSelection(Tech2ComboBox, _originalSecondaryTech);
+
             IssueTextBox.Text = _originalIssue;
             NarrativeTextBox.Text = _originalNarrative;
+
             SetEditMode(false);
         }
 
@@ -373,7 +442,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                         DeletedBy = GetWindowsEmployeeId()
                     });
 
-                await LoadHistoryAsync();
+                SetEditMode(false);
+
+                await LoadHistoryAsync(skipUnsavedCheck: true);
 
                 MessageBox.Show(
                     Window.GetWindow(this),
@@ -411,9 +482,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             UpdateButtons();
         }
 
+        private void DetailComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateButtons();
+        }
+
         private void SetEditMode(bool isEditing)
         {
             _isEditing = isEditing;
+
+            Tech1ComboBox.IsHitTestVisible = _isEditing;
+            Tech1ComboBox.Focusable = _isEditing;
+
+            Tech2ComboBox.IsHitTestVisible = _isEditing;
+            Tech2ComboBox.Focusable = _isEditing;
 
             IssueTextBox.IsReadOnly = !_isEditing;
             NarrativeTextBox.IsReadOnly = !_isEditing;
@@ -423,6 +505,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private bool HasUnsavedChanges()
         {
+            var currentPrimaryTech = GetSelectedComboText(Tech1ComboBox);
+            var currentSecondaryTech = GetSelectedComboText(Tech2ComboBox);
+
             var currentIssue =
                 (IssueTextBox.Text ?? string.Empty).Trim();
 
@@ -430,6 +515,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 (NarrativeTextBox.Text ?? string.Empty).Trim();
 
             return
+                !string.Equals(
+                    currentPrimaryTech,
+                    NormalizeTechSelection(_originalPrimaryTech),
+                    StringComparison.Ordinal) ||
+
+                !string.Equals(
+                    currentSecondaryTech,
+                    NormalizeTechSelection(_originalSecondaryTech),
+                    StringComparison.Ordinal) ||
+
                 !string.Equals(
                     currentIssue,
                     (_originalIssue ?? string.Empty).Trim(),
@@ -475,6 +570,37 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 !_isLoading;
         }
 
+        private static string NormalizeTechSelection(string? value)
+        {
+            var text = (value ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(text))
+                return "—";
+
+            return text;
+        }
+
+        private string GetSelectedComboText(ComboBox comboBox)
+        {
+            return comboBox.SelectedItem?.ToString()?.Trim() ?? "—";
+        }
+
+        private void RestoreComboSelection(ComboBox comboBox, string? value)
+        {
+            var text = NormalizeTechSelection(value);
+
+            if (!TechnicianOptions.Any(x =>
+                    string.Equals(x, text, StringComparison.OrdinalIgnoreCase)))
+            {
+                TechnicianOptions.Add(text);
+            }
+
+            var match = TechnicianOptions.FirstOrDefault(x =>
+                string.Equals(x, text, StringComparison.OrdinalIgnoreCase));
+
+            comboBox.SelectedItem = match ?? "—";
+        }
+
         private static string CleanNarrativeText(string? text)
         {
             if (string.IsNullOrWhiteSpace(text))
@@ -488,6 +614,28 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 normalized = normalized.Replace("\n\n\n", "\n\n");
 
             return normalized.Trim();
+        }
+
+        private static string GetTechnicianDisplayName(TechnicianLookupDto tech)
+        {
+            var name = FirstNonBlank(
+                tech.Name,
+                tech.FullName,
+                $"{tech.FirstName} {tech.LastName}",
+                tech.EmployeeId);
+
+            return name.Trim();
+        }
+
+        private static string FirstNonBlank(params string?[] values)
+        {
+            foreach (var value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value.Trim();
+            }
+
+            return "";
         }
 
         private static string GetWindowsEmployeeId()
@@ -512,6 +660,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             PropertyChanged?.Invoke(
                 this,
                 new PropertyChangedEventArgs(name));
+        }
+
+        private sealed class TechnicianLookupDto
+        {
+            public uint Id { get; set; }
+
+            public string EmployeeId { get; set; } = "";
+
+            public string Name { get; set; } = "";
+
+            public string FullName { get; set; } = "";
+
+            public string FirstName { get; set; } = "";
+
+            public string LastName { get; set; } = "";
+
+            public bool IsActive { get; set; } = true;
         }
     }
 }

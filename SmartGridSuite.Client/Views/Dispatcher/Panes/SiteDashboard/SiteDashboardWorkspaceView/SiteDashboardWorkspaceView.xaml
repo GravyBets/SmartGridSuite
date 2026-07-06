@@ -32,8 +32,8 @@
 
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceBg}"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource CardBackground}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
                                 <Setter Property="Panel.ZIndex" Value="20"/>
                                 <Setter Property="Margin" Value="-4,0,0,-1"/>
                             </Trigger>
@@ -170,26 +170,22 @@
                 <TabItem x:Name="SnmpTabItem" Header="SNMP Tool" Tag="SNMPTool" Height="33" Margin="-4,0,0,0" VerticalAlignment="Top"/>
             </TabControl>
 
-            <Border Grid.Row="1"
-                    Margin="0,-2,0,0"
-                    CornerRadius="16,16,16,16"
-                    Background="{DynamicResource CardBackground}"
-                    BorderBrush="{DynamicResource SurfaceBorder}"
-                    BorderThickness="1">
-                <Grid x:Name="WorkspaceContentRoot">
+        <Grid Grid.Row="1"
+              x:Name="WorkspaceContentRoot"
+              Margin="0">
 
-                    <!-- TOP / Write Up -->
+            <!-- TOP / Write Up -->
                     <Grid x:Name="TopWriteUpPanel" Margin="0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="4"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
                         <Grid Grid.Row="0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="320"/>
-                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="4"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
@@ -360,12 +356,12 @@
                             </Border>
                             
                             <!-- Site Notes -->
-                            <Border x:Name="SiteNotesCard" Margin="0,8,0,0"
+                            <Border x:Name="SiteNotesCard" Margin="0,4,0,0"
                                     Style="{StaticResource Card}">
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="2"/>
+                                        <RowDefinition Height="8"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="8"/>
                                         <RowDefinition Height="*"/>
@@ -1816,7 +1812,6 @@
                         </Border>
                     </Grid>
                 </Grid>
-            </Border>
         </Grid>
     
 </UserControl>

@@ -25,6 +25,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public string SiteStatusText { get; set; } = string.Empty;
         public string TopAccessTitleText { get; set; } = "TOP Access";
 
+        // Submit options
+        public SiteDashboardSubmitOptionsSessionState SubmitOptions { get; set; } = new();
+
         // Range Extender
         public string RangeExtenderLinkUrl { get; set; } = "";
 
@@ -67,6 +70,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
     }
 
+    public sealed class SiteDashboardSubmitOptionsSessionState
+    {
+        public bool IncludePingStats { get; set; } = true;
+
+        public bool IncludeSnmpStats { get; set; } = false;
+        public bool IncludeSnmpAdmin { get; set; } = true;
+        public bool IncludeSnmpConfig { get; set; } = true;
+        public bool IncludeSnmpStatsCategory { get; set; } = true;
+    }
     public sealed class EquipmentReplacementSessionEntry
     {
         public string SlotLabel { get; set; } = "";

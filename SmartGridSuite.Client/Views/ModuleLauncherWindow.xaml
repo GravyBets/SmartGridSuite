@@ -45,15 +45,23 @@
                                Foreground="{DynamicResource TextSecondary}"/>
                 </StackPanel>
 
-                <!-- Theme toggle -->
-                <ToggleButton x:Name="ThemeToggle"
-                              Grid.Column="1"
-                              Style="{StaticResource ThemeSliderToggleStyle}"
-                              VerticalAlignment="Top"
-                              Margin="12,9,0,0"
-                              ToolTip="Toggle Light / Dark mode"
-                              Checked="ThemeToggle_Checked"
-                              Unchecked="ThemeToggle_Unchecked"/>
+                <!-- Theme picker -->
+                <StackPanel Grid.Column="1"
+                            VerticalAlignment="Top"
+                            Margin="12,3,0,0">
+
+                    <TextBlock Text="Theme"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondary}"
+                               Margin="2,0,0,4"/>
+
+                    <ComboBox x:Name="ThemeComboBox"
+                              Width="180"
+                              Height="34"
+                              Style="{StaticResource ModernComboBox}"
+                              SelectionChanged="ThemeComboBox_SelectionChanged"/>
+                </StackPanel>
             </Grid>
         </Border>
 

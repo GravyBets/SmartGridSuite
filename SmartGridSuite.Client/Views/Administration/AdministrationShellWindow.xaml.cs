@@ -5,6 +5,7 @@ using SmartGridSuite.Client.Views.Administration.Tickets;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using SmartGridSuite.Client.Views.Administration.DesignTest;
 
 namespace SmartGridSuite.Client.Views.Administration
 {
@@ -18,7 +19,11 @@ namespace SmartGridSuite.Client.Views.Administration
         private readonly GeneralSettingsAdminView _generalSettingsView;
         private readonly SnmpAdminView _snmpView;
 
-        private bool _suppressNavSelectionChanged;
+        private readonly DesignTestPaneView _designTestView;
+
+        private bool _navCollapsed;
+        private bool _syncingNav;
+        private int _currentNavIndex;
         private string? _currentNavTag;
 
         public AdministrationShellWindow()
@@ -35,18 +40,51 @@ namespace SmartGridSuite.Client.Views.Administration
             _generalSettingsView = new GeneralSettingsAdminView(_api);
             _snmpView = new SnmpAdminView(_api);
 
-            NavigationListBox.SelectedIndex = 0;
+            _designTestView = new DesignTestPaneView();
+
+            SelectNavIndex(0);
         }
 
-        private async void NavigationListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void SelectNavIndex(int index)
         {
-            if (_suppressNavSelectionChanged)
+            _syncingNav = true;
+
+            NavListExpanded.SelectedIndex = index;
+            NavListCollapsed.SelectedIndex = index;
+
+            _syncingNav = false;
+
+            if (index >= 0 &&
+                index < NavListExpanded.Items.Count &&
+                NavListExpanded.Items[index] is ListBoxItem item)
+            {
+                ShowPane(item);
+                _currentNavIndex = index;
+                _currentNavTag = GetNavKey(item);
+            }
+        }
+
+        private static string? GetNavKey(ListBoxItem item)
+        {
+            return item.Tag?.ToString()
+                   ?? item.ToolTip?.ToString()
+                   ?? item.Content?.ToString();
+        }
+
+        private async void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_syncingNav)
                 return;
 
-            if (NavigationListBox.SelectedItem is not ListBoxItem item)
+            if (sender is not ListBox lb)
                 return;
 
-            var requestedTag = item.Tag as string;
+            if (lb.SelectedItem is not ListBoxItem item)
+                return;
+
+            var requestedIndex = lb.SelectedIndex;
+            var requestedTag = GetNavKey(item);
+
             if (string.IsNullOrWhiteSpace(requestedTag))
                 return;
 
@@ -59,33 +97,18 @@ namespace SmartGridSuite.Client.Views.Administration
                 return;
             }
 
-            switch (requestedTag)
-            {
-                case "Technicians":
-                    ShowTechnicians();
-                    break;
+            _syncingNav = true;
 
-                case "Trucks":
-                    ShowTrucks();
-                    break;
+            if (lb == NavListExpanded)
+                NavListCollapsed.SelectedIndex = requestedIndex;
+            else
+                NavListExpanded.SelectedIndex = requestedIndex;
 
-                case "Tickets":
-                    ShowTickets();
-                    break;
+            _syncingNav = false;
 
-                case "GeneralSettings":
-                    ShowGeneralSettings();
-                    break;
+            ShowPane(item);
 
-                case "SNMP":
-                    ShowSNMP();
-                    break;
-
-                default:
-                    RestoreCurrentSelection();
-                    return;
-            }
-
+            _currentNavIndex = requestedIndex;
             _currentNavTag = requestedTag;
         }
 
@@ -99,54 +122,85 @@ namespace SmartGridSuite.Client.Views.Administration
 
         private void RestoreCurrentSelection()
         {
-            _suppressNavSelectionChanged = true;
+            _syncingNav = true;
 
             try
             {
-                if (string.IsNullOrWhiteSpace(_currentNavTag))
-                    return;
-
-                var match = NavigationListBox.Items
-                    .OfType<ListBoxItem>()
-                    .FirstOrDefault(x => string.Equals(x.Tag as string, _currentNavTag, StringComparison.Ordinal));
-
-                if (match is not null)
-                    NavigationListBox.SelectedItem = match;
+                NavListExpanded.SelectedIndex = _currentNavIndex;
+                NavListCollapsed.SelectedIndex = _currentNavIndex;
             }
             finally
             {
-                _suppressNavSelectionChanged = false;
+                _syncingNav = false;
             }
         }
 
-        private void ShowTechnicians()
+        private void ShowPane(ListBoxItem item)
         {
-            ShowView(_techniciansView);
-        }
+            switch (GetNavKey(item))
+            {
+                case "Technicians":
+                    ShowView(_techniciansView);
+                    break;
 
-        private void ShowTrucks()
-        {
-            ShowView(_trucksView);
-        }
+                case "Trucks":
+                    ShowView(_trucksView);
+                    break;
 
-        private void ShowTickets()
-        {
-            ShowView(_ticketsView);
-        }
+                case "Tickets":
+                    ShowView(_ticketsView);
+                    break;
 
-        private void ShowGeneralSettings()
-        {
-            ShowView(_generalSettingsView);
-        }
+                case "GeneralSettings":
+                    ShowView(_generalSettingsView);
+                    break;
 
-        private void ShowSNMP()
-        {
-            ShowView(_snmpView);
+                case "SNMP":
+                    ShowView(_snmpView);
+                    break;
+
+                case "DesignTest":
+                    ShowView(_designTestView);
+                    break;
+
+                default:
+                    ShowView(_techniciansView);
+                    break;
+            }
         }
 
         private void ShowView(UserControl view)
         {
             AdminContentHost.Content = view;
+        }
+
+        private void ToggleNav_Click(object sender, RoutedEventArgs e)
+        {
+            _navCollapsed = !_navCollapsed;
+
+            NavCol.Width = _navCollapsed
+                ? new GridLength(88)
+                : new GridLength(280);
+
+            NavListExpanded.Visibility = _navCollapsed
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+            NavListCollapsed.Visibility = _navCollapsed
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            NavSectionLabel.Visibility = _navCollapsed
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+            HomeButtonExpanded.Visibility = _navCollapsed
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+            HomeButtonCollapsed.Visibility = _navCollapsed
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         private async void HomeButton_Click(object sender, RoutedEventArgs e)
@@ -156,6 +210,7 @@ namespace SmartGridSuite.Client.Views.Administration
 
             var home = new ModuleLauncherWindow();
             home.Show();
+
             Close();
         }
     }

@@ -26,10 +26,10 @@
         <Setter Property="FocusVisualStyle" Value= "{x:Null}"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-        <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}"/>
-        <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ControlInputText}"/>
+        <Setter Property="CaretBrush" Value="{DynamicResource ControlInputCaret}"/>
+        <Setter Property="Background" Value="{DynamicResource ControlInputBg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlInputBorder}"/>
         <Setter Property="BorderThickness" Value="1.5"/>
         <Setter Property="SelectionBrush" Value="{DynamicResource PrimaryBg}"/>
 
@@ -48,14 +48,14 @@
                     <ControlTemplate.Triggers>
                         <!-- Hover: thicker + clearer -->
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderHover}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlInputHoverBorder}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlInputHoverBg}"/>
                             <Setter TargetName="Bd" Property="BorderThickness" Value="1.5"/>
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillHover}"/>
                         </Trigger>
 
                         <!-- Focus: thickest (wins over hover) -->
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlInputFocusBorder}"/>
                             <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
                         </Trigger>
 
@@ -108,8 +108,8 @@
 
     <!-- Modern TextBox WITH watermark (uses Tag for watermark text) -->
     <Style x:Key="ModernWatermarkTextBox"
-       TargetType="TextBox"
-       BasedOn="{StaticResource ModernTextBox}">
+           TargetType="TextBox"
+           BasedOn="{StaticResource ModernTextBox}">
 
         <Setter Property="Template">
             <Setter.Value>
@@ -153,14 +153,14 @@
 
                         <!-- Hover -->
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderHover}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlInputHoverBorder}"/>
                             <Setter TargetName="Bd" Property="BorderThickness" Value="1.5"/>
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillHover}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlInputHoverBg}"/>
                         </Trigger>
 
                         <!-- Focus -->
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlInputFocusBorder}"/>
                             <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
                         </Trigger>
 
@@ -175,8 +175,8 @@
     </Style>
 
     <!-- Clearable Search TextBox WITH watermark.
-  Uses Tag for watermark text.
-  Uses TextBoxCommands.ClearText for the X button. -->
+          Uses Tag for watermark text.
+          Uses TextBoxCommands.ClearText for the X button. -->
     <Style x:Key="ClearableSearchTextBox"
             TargetType="TextBox"
             BasedOn="{StaticResource ModernTextBox}">
@@ -250,13 +250,13 @@
                         </MultiTrigger>
 
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderHover}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlInputHoverBorder}"/>
                             <Setter TargetName="Bd" Property="BorderThickness" Value="1.5"/>
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillHover}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlInputHoverBg}"/>
                         </Trigger>
 
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlInputFocusBorder}"/>
                             <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
                         </Trigger>
 
@@ -902,9 +902,9 @@
         <Setter Property="Padding" Value="12,10"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="MaxLength" Value="600"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-        <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ControlInputText}"/>
+        <Setter Property="Background" Value="{DynamicResource ControlInputBg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlInputBorder}"/>
         <Setter Property="BorderThickness" Value="1.5"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
         <Setter Property="AcceptsReturn" Value="True"/>
@@ -947,13 +947,13 @@
 
                         <!-- Hover: thicker, more noticeable border -->
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="#6B7280"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlInputHoverBorder}"/>
                             <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
                         </Trigger>
 
                         <!-- Focus: primary border -->
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBg}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlInputFocusBorder}"/>
                             <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
                         </Trigger>
 
@@ -1848,8 +1848,148 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
-    </Style>   
-    
+    </Style>
+
+    <!-- Little badge used in nav items -->
+    <Style x:Key="NavBadgeStyle" TargetType="Border">
+        <Setter Property="Width" Value="34"/>
+        <Setter Property="Height" Value="34"/>
+        <Setter Property="CornerRadius" Value="11"/>
+        <Setter Property="Background" Value="{DynamicResource TileFill}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+        <Setter Property="BorderThickness" Value="1.5"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Small section label -->
+    <Style x:Key="NavRailSectionTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="Opacity" Value="0.88"/>
+        <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+    </Style>
+
+    <!-- Expanded nav item -->
+    <Style x:Key="NavRailItemStyle" TargetType="ListBoxItem">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,3"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Outer"
+                        Background="Transparent"
+                        CornerRadius="14"
+                        Padding="0">
+                        <Grid>
+                            <Border x:Name="Accent"
+                                Width="4"
+                                HorizontalAlignment="Left"
+                                Margin="0,8,0,8"
+                                CornerRadius="99"
+                                Background="Transparent"/>
+
+                            <Border x:Name="Bd"
+                                Margin="8,0,0,0"
+                                Padding="10,9"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="1.5"
+                                CornerRadius="14"
+                                SnapsToDevicePixels="True">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillHover}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderHover}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillPressed}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
+                            <Setter TargetName="Accent" Property="Background" Value="{DynamicResource InputBorderFocus}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Collapsed nav item -->
+    <Style x:Key="NavRailCollapsedItemStyle" TargetType="ListBoxItem">
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,4"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Bd"
+                        Padding="10"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="1.5"
+                        CornerRadius="14"
+                        SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillHover}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderHover}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillPressed}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Expanded home button -->
+    <Style x:Key="NavRailFooterButtonStyle"
+       TargetType="Button"
+       BasedOn="{StaticResource SecondaryButtonStyle}">
+        <Setter Property="Height" Value="56"/>
+        <Setter Property="Padding" Value="10,0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+
+    <!-- Collapsed home button -->
+    <Style x:Key="NavRailCollapsedFooterButtonStyle"
+       TargetType="Button"
+       BasedOn="{StaticResource SecondaryButtonStyle}">
+        <Setter Property="Width" Value="56"/>
+        <Setter Property="MinWidth" Value="56"/>
+        <Setter Property="Height" Value="56"/>
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+
 
     <!-- Modern DatePicker -->
     <Style x:Key="ModernDatePickerTextBoxStyle" TargetType="{x:Type DatePickerTextBox}">
@@ -1981,25 +2121,6 @@
         <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
     </Style>
 
-    <!-- Small section label -->
-    <Style x:Key="NavRailSectionTextStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="11"/>
-        <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-        <Setter Property="Opacity" Value="0.85"/>
-    </Style>
-
-    <!-- Little badge used in nav items -->
-    <Style x:Key="NavBadgeStyle" TargetType="Border">
-        <Setter Property="Width" Value="30"/>
-        <Setter Property="Height" Value="30"/>
-        <Setter Property="CornerRadius" Value="10"/>
-        <Setter Property="Background" Value="{DynamicResource TileFill}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-    </Style>
-
     <!-- Toggle button in nav header -->
     <Style x:Key="NavRailToggleButtonStyle"
            TargetType="Button"
@@ -2012,101 +2133,9 @@
         <Setter Property="FontWeight" Value="Bold"/>
     </Style>
 
-    <!-- Expanded nav item -->
-    <Style x:Key="NavRailItemStyle" TargetType="ListBoxItem">
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ListBoxItem">
-                    <Border x:Name="Bd"
-                        Margin="0,4"
-                        Padding="12,10"
-                        Background="Transparent"
-                        BorderBrush="Transparent"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
-                    </Border>
+    
 
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillHover}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderHover}"/>
-                        </Trigger>
-
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillPressed}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
-                        </Trigger>
-
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.55"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- Collapsed nav item -->
-    <Style x:Key="NavRailCollapsedItemStyle" TargetType="ListBoxItem">
-        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ListBoxItem">
-                    <Border x:Name="Bd"
-                        Margin="0,4"
-                        Padding="10"
-                        Background="Transparent"
-                        BorderBrush="Transparent"
-                        BorderThickness="1"
-                        CornerRadius="12"
-                        SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                    </Border>
-
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillHover}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderHover}"/>
-                        </Trigger>
-
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillPressed}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
-                        </Trigger>
-
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.55"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- Expanded home button -->
-    <Style x:Key="NavRailFooterButtonStyle"
-       TargetType="Button"
-       BasedOn="{StaticResource SecondaryButtonStyle}">
-        <Setter Property="Height" Value="52"/>
-        <Setter Property="Padding" Value="12,0"/>
-        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-    </Style>
-
-    <!-- Collapsed home button -->
-    <Style x:Key="NavRailCollapsedFooterButtonStyle"
-           TargetType="Button"
-           BasedOn="{StaticResource SecondaryButtonStyle}">
-        <Setter Property="Width" Value="52"/>
-        <Setter Property="MinWidth" Value="52"/>
-        <Setter Property="Height" Value="52"/>
-        <Setter Property="Padding" Value="0"/>
-    </Style>
+    
     
     <!--Mini Copy Button-->
     <Style x:Key="MiniIconButton" TargetType="Button">

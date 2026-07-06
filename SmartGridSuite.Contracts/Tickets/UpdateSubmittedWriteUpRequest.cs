@@ -6,5 +6,9 @@ public sealed class UpdateSubmittedWriteUpRequest
 
     public string? IssueText { get; set; }
 
+    public string? PrimaryTech { get; set; }
+
+    public string? SecondaryTech { get; set; }
+
     public string UpdatedBy { get; set; } = "";
 }

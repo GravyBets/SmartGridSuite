@@ -30,10 +30,9 @@
 
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceBg}"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource CardBackground}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
                                 <Setter Property="Panel.ZIndex" Value="20"/>
-                                
                             </Trigger>
 
                             <Trigger Property="IsEnabled" Value="False">
@@ -121,7 +120,7 @@
             <Setter Property="CornerRadius" Value="12"/>
             <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Background" Value="{DynamicResource ControlSecondaryBg}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
@@ -139,8 +138,6 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
             <Setter Property="FontSize" Value="14"/>
         </Style>      
-        
-        
     </UserControl.Resources>
 
     <Grid>
@@ -176,8 +173,8 @@
         <Border Grid.Row="1"
                 Padding="12"
                 CornerRadius="12"
-                Background="{DynamicResource SurfaceBg}"
-                BorderBrush="{DynamicResource SurfaceBorder}"
+                Background="{DynamicResource CardBackground}"
+                BorderBrush="{DynamicResource CardBorder}"
                 BorderThickness="1">
             <Grid>
                 <Grid.ColumnDefinitions>

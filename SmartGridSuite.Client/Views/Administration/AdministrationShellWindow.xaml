@@ -6,94 +6,322 @@
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource AppBackground}">
 
-    <Grid Margin="12">
+    <Grid Margin="10,0,10,22">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="240"/>
-            <ColumnDefinition Width="12"/>
+            <ColumnDefinition x:Name="NavCol" Width="280"/>
+            <ColumnDefinition Width="8"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Left nav -->
+        <!-- LEFT NAV -->
         <Border Grid.Column="0"
                 Style="{StaticResource Card}"
-                Padding="0">
+                Padding="12">
             <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- Header -->
-                <StackPanel Margin="14,14,14,8">
-                    <TextBlock Text="Administration"
-                               FontSize="22"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource TextPrimary}"/>
+                <!-- Nav header -->
+                <Grid Grid.Row="0"
+                      Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Setup and maintenance"
-                               Margin="0,4,0,0"
-                               Foreground="{DynamicResource TextSecondary}"/>
-                </StackPanel>
+                    <StackPanel>
+                        <TextBlock Text="Administration"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimary}"/>
 
-                <!-- Navigation -->
-                <ListBox Grid.Row="1"
-                         x:Name="NavigationListBox"
-                         Margin="6,0,6,10"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         SelectionChanged="NavigationListBox_SelectionChanged"
-                         ItemContainerStyle="{StaticResource NavItemCleanStyle}">
+                        <TextBlock Text="Setup and maintenance"
+                                   Margin="0,3,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                    </StackPanel>
+
+                    <Button x:Name="NavHeaderBtn"
+                            Grid.Column="1"
+                            Style="{StaticResource NavRailToggleButtonStyle}"
+                            Content="☰"
+                            ToolTip="Collapse / Expand"
+                            Click="ToggleNav_Click"/>
+                </Grid>
+
+                <!-- Section label -->
+                <TextBlock x:Name="NavSectionLabel"
+                           Grid.Row="1"
+                           Text="Administration Panes"
+                           Style="{StaticResource NavRailSectionTextStyle}"
+                           Margin="4,0,0,8"/>
+
+                <!-- Expanded nav -->
+                <ListBox x:Name="NavListExpanded"
+                         Grid.Row="2"
+                         Style="{StaticResource NavRailListStyle}"
+                         ItemContainerStyle="{StaticResource NavRailItemStyle}"
+                         SelectionChanged="NavList_SelectionChanged">
 
                     <ListBoxItem Tag="Technicians">
-                        <TextBlock Text="Technicians"
-                                   Padding="8,0,0,2"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="38"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <TextBlock Text="👷"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="15"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1"
+                                        Margin="10,0,0,0">
+                                <TextBlock Text="Technicians"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Text="Roster, roles, and profiles"
+                                           Margin="0,2,0,0"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+                        </Grid>
                     </ListBoxItem>
 
                     <ListBoxItem Tag="Tickets">
-                        <TextBlock Text="Tickets"
-                                   Padding="8,0,0,2"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="38"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <TextBlock Text="🎫"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="15"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1"
+                                        Margin="10,0,0,0">
+                                <TextBlock Text="Tickets"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Text="Statuses, categories, and rules"
+                                           Margin="0,2,0,0"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+                        </Grid>
                     </ListBoxItem>
 
                     <ListBoxItem Tag="Trucks">
-                        <TextBlock Text="Trucks"
-                                   Padding="8,0,0,2"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="38"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <TextBlock Text="🚚"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="15"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1"
+                                        Margin="10,0,0,0">
+                                <TextBlock Text="Trucks"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Text="Fleet, styles, and service state"
+                                           Margin="0,2,0,0"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+                        </Grid>
                     </ListBoxItem>
 
                     <ListBoxItem Tag="SNMP">
-                        <TextBlock Text="SNMP"
-                                   Padding="8,0,0,2"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="38"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <TextBlock Text="S"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="15"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1"
+                                        Margin="10,0,0,0">
+                                <TextBlock Text="SNMP"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Text="Profiles, OIDs, and polling"
+                                           Margin="0,2,0,0"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+                        </Grid>
                     </ListBoxItem>
 
                     <ListBoxItem Tag="GeneralSettings">
-                        <TextBlock Text="General Settings"
-                                   Padding="8,0,0,2"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="38"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <TextBlock Text="⚙"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="15"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1"
+                                        Margin="10,0,0,0">
+                                <TextBlock Text="General Settings"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Text="Application-level configuration"
+                                           Margin="0,2,0,0"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <ListBoxItem Tag="DesignTest">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="38"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <TextBlock Text="D"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="15"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1"
+                                        Margin="10,0,0,0">
+                                <TextBlock Text="Design Test"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Text="Experimental visual direction"
+                                           Margin="0,2,0,0"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+                        </Grid>
+                    </ListBoxItem>
+                </ListBox>
+
+                <!-- Collapsed nav -->
+                <ListBox x:Name="NavListCollapsed"
+                         Grid.Row="2"
+                         Style="{StaticResource NavRailListStyle}"
+                         ItemContainerStyle="{StaticResource NavRailCollapsedItemStyle}"
+                         SelectionChanged="NavList_SelectionChanged"
+                         Visibility="Collapsed">
+
+                    <ListBoxItem Tag="Technicians" ToolTip="Technicians">
+                        <Border Style="{StaticResource NavBadgeStyle}">
+                            <TextBlock Text="👷"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="15"/>
+                        </Border>
+                    </ListBoxItem>
+
+                    <ListBoxItem Tag="Tickets" ToolTip="Tickets">
+                        <Border Style="{StaticResource NavBadgeStyle}">
+                            <TextBlock Text="🎫"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="15"/>
+                        </Border>
+                    </ListBoxItem>
+
+                    <ListBoxItem Tag="Trucks" ToolTip="Trucks">
+                        <Border Style="{StaticResource NavBadgeStyle}">
+                            <TextBlock Text="🚚"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="15"/>
+                        </Border>
+                    </ListBoxItem>
+
+                    <ListBoxItem Tag="SNMP" ToolTip="SNMP">
+                        <Border Style="{StaticResource NavBadgeStyle}">
+                            <TextBlock Text="S"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="15"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </Border>
+                    </ListBoxItem>
+
+                    <ListBoxItem Tag="GeneralSettings" ToolTip="General Settings">
+                        <Border Style="{StaticResource NavBadgeStyle}">
+                            <TextBlock Text="⚙"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="15"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </Border>
+                    </ListBoxItem>
+
+                    <ListBoxItem Tag="DesignTest" ToolTip="Design Test">
+                        <Border Style="{StaticResource NavBadgeStyle}">
+                            <TextBlock Text="D"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="15"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </Border>
                     </ListBoxItem>
                 </ListBox>
 
                 <!-- Home button -->
-                <StackPanel Grid.Row="2"
-                            Margin="6,0,6,10">
+                <StackPanel Grid.Row="3"
+                            Margin="0,12,0,0">
                     <Border Height="1"
                             Margin="4,0,4,12"
                             Background="{DynamicResource CardBorder}"/>
 
-                    <Button x:Name="HomeButton"
+                    <Button x:Name="HomeButtonExpanded"
                             Style="{StaticResource NavRailFooterButtonStyle}"
                             Click="HomeButton_Click">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="36"/>
+                                <ColumnDefinition Width="38"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
@@ -119,13 +347,34 @@
                             </StackPanel>
                         </Grid>
                     </Button>
+
+                    <Button x:Name="HomeButtonCollapsed"
+                            Style="{StaticResource NavRailCollapsedFooterButtonStyle}"
+                            Click="HomeButton_Click"
+                            ToolTip="Home"
+                            Visibility="Collapsed">
+                        <Border Style="{StaticResource NavBadgeStyle}">
+                            <TextBlock Text="⌂"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                        </Border>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Right content -->
-        <Border Grid.Column="2">
-            <ContentControl x:Name="AdminContentHost"/>
-        </Border>
+        <!-- Splitter -->
+        <GridSplitter Grid.Column="1"
+                      Width="14"
+                      Background="Transparent"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch"
+                      ShowsPreview="True"/>
+
+        <!-- Main content -->
+        <ContentControl x:Name="AdminContentHost"
+                        Grid.Column="2"/>
     </Grid>
 </Window>

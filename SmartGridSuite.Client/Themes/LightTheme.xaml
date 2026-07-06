@@ -28,6 +28,26 @@
     <SolidColorBrush x:Key="SurfaceBg" Color="#FAFBFC"/>
     <SolidColorBrush x:Key="SurfaceBorder" Color="#D7DCE3"/>
 
+    <!-- Semantic control colors.
+     These match the current Light theme values so Light does not visually change. -->
+
+    <!-- Inputs: TextBox / ComboBox / DatePicker -->
+    <SolidColorBrush x:Key="ControlInputBg" Color="#FAFBFC"/>
+    <SolidColorBrush x:Key="ControlInputText" Color="#0F172A"/>
+    <SolidColorBrush x:Key="ControlInputCaret" Color="#0F172A"/>
+    <SolidColorBrush x:Key="ControlInputBorder" Color="#D7DCE3"/>
+    <SolidColorBrush x:Key="ControlInputHoverBg" Color="#E4EAF3"/>
+    <SolidColorBrush x:Key="ControlInputHoverBorder" Color="#94A3B8"/>
+    <SolidColorBrush x:Key="ControlInputFocusBorder" Color="#2563EB"/>
+
+    <!-- Secondary buttons -->
+    <SolidColorBrush x:Key="ControlSecondaryBg" Color="#EEF2F7"/>
+    <SolidColorBrush x:Key="ControlSecondaryText" Color="#0F172A"/>
+    <SolidColorBrush x:Key="ControlSecondaryBorder" Color="#D7DCE3"/>
+    <SolidColorBrush x:Key="ControlSecondaryHoverBg" Color="#E4EAF3"/>
+    <SolidColorBrush x:Key="ControlSecondaryHoverBorder" Color="#94A3B8"/>
+    <SolidColorBrush x:Key="ControlSecondaryPressedBg" Color="#D8E1EE"/>
+
     <!-- Text -->
     <SolidColorBrush x:Key="TextPrimary" Color="#0F172A"/>
     <SolidColorBrush x:Key="TextSecondary" Color="#475569"/>

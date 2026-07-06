@@ -82,7 +82,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void CreateBlankTab(bool selectNewTab)
         {
-            var header = _blankTabCounter == 1 ? "Blank" : $"Blank ({_blankTabCounter})";
+            var blankNumber = GetNextBlankTabNumber();
+            var header = blankNumber == 1 ? "Blank" : $"Blank ({blankNumber})";
 
             var session = new SiteDashboardTabSession
             {
@@ -91,11 +92,47 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 SearchText = string.Empty
             };
 
-            _blankTabCounter++;
             _sessions.Add(session);
 
             if (selectNewTab)
                 _selectedSessionKey = session.SessionKey;
+        }
+
+        private int GetNextBlankTabNumber()
+        {
+            var usedNumbers = _sessions
+                .Select(x => GetBlankTabNumber(x.HeaderText))
+                .Where(x => x > 0)
+                .ToHashSet();
+
+            var number = 1;
+
+            while (usedNumbers.Contains(number))
+                number++;
+
+            return number;
+        }
+
+        private static int GetBlankTabNumber(string? headerText)
+        {
+            var text = (headerText ?? string.Empty).Trim();
+
+            if (text.Equals("Blank", StringComparison.OrdinalIgnoreCase))
+                return 1;
+
+            const string prefix = "Blank (";
+
+            if (!text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ||
+                !text.EndsWith(")", StringComparison.OrdinalIgnoreCase))
+            {
+                return 0;
+            }
+
+            var numberText = text.Substring(prefix.Length, text.Length - prefix.Length - 1);
+
+            return int.TryParse(numberText, out var number) && number > 1
+                ? number
+                : 0;
         }
 
         private SiteDashboardTabSession? GetSelectedSession()
@@ -118,6 +155,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             session.WriteUpText = WorkspaceView.WriteUpText;
             session.SelectedWorkspaceTabKey = WorkspaceView.SelectedWorkspaceTabKey;
+            session.SubmitOptions = WorkspaceView.GetSubmitOptionsSessionState();
 
             session.EquipmentReplacementEntries =
                 WorkspaceView.GetEquipmentReplacementSessionEntries();
@@ -167,6 +205,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.WriteUpText = string.Empty;
             session.EquipmentText = string.Empty;
             session.EquipmentReplacementEntries = new List<EquipmentReplacementSessionEntry>();
+            session.SubmitOptions = new SiteDashboardSubmitOptionsSessionState();
             session.SelectedWorkspaceTabKey = "TopWriteUp";
 
             session.SiteStatusText = string.Empty;
@@ -218,6 +257,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             // Workspace selection gets set after reload.
             session.SelectedWorkspaceTabKey = "SiteHistory";
+            session.SubmitOptions = new SiteDashboardSubmitOptionsSessionState();
         }
 
         private void TopBarView_PopOutRequested(object? sender, EventArgs e)

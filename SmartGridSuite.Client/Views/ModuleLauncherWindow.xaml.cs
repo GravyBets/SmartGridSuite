@@ -13,6 +13,8 @@ namespace SmartGridSuite.Client.Views
     {
         public ModuleLauncherWindow()
         {
+            ThemeService.ApplySavedTheme();
+
             InitializeComponent();
 
             ConnectivityService.StateChanged += ConnectivityService_StateChanged;
@@ -23,9 +25,10 @@ namespace SmartGridSuite.Client.Views
                 ConnectivityService.CurrentState,
                 ConnectivityService.CurrentMessage);
 
+            LoadThemeControl();
+
             LoadUiScaleControl();
             UiScaleSlider.ValueChanged += UiScaleSlider_ValueChanged;
-            ThemeToggle.IsChecked = ThemeService.Current == AppTheme.Dark;
         }
 
         private readonly ApiClient _connectivityApi =
@@ -33,12 +36,28 @@ namespace SmartGridSuite.Client.Views
 
         private bool _loadingUiScale;
         private bool _isOpeningModule;
+        private bool _loadingThemeControl;
 
-        private void ThemeToggle_Checked(object sender, RoutedEventArgs e)
-            => ThemeService.Apply(AppTheme.Dark);
+        private void LoadThemeControl()
+        {
+            _loadingThemeControl = true;
 
-        private void ThemeToggle_Unchecked(object sender, RoutedEventArgs e)
-            => ThemeService.Apply(AppTheme.Light);
+            ThemeComboBox.ItemsSource = ThemeService.ThemeOptions;
+            ThemeComboBox.DisplayMemberPath = nameof(AppThemeOption.DisplayName);
+            ThemeComboBox.SelectedValuePath = nameof(AppThemeOption.Theme);
+            ThemeComboBox.SelectedValue = ThemeService.Current;
+
+            _loadingThemeControl = false;
+        }
+
+        private void ThemeComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (_loadingThemeControl)
+                return;
+
+            if (ThemeComboBox.SelectedValue is AppTheme theme)
+                ThemeService.Apply(theme);
+        }
 
         private async void Tech_Click(object sender, RoutedEventArgs e)
         {
