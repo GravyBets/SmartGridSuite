@@ -80,7 +80,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 TopBarView.StatusText = $"Setting {selectedOid.Label}...";
 
-                var result = await _api.PostAsync<SnmpSetSelectedRequestDto, SnmpSetResultDto>(
+                var setResult = await _api.PostAsync<SnmpSetSelectedRequestDto, SnmpSetResultDto>(
                     "api/snmp-profiles/set-selected",
                     new SnmpSetSelectedRequestDto
                     {
@@ -91,15 +91,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     });
 
                 session.SnmpTargetIp = targetIp;
-                WorkspaceView.ShowSnmpSetResult(result);
+                WorkspaceView.ShowSnmpSetResult(setResult);
 
-                TopBarView.StatusText = result?.Success == true
-                    ? $"SNMP set returned {result.DisplayValue}."
-                    : $"SNMP set failed: {result?.ErrorMessage}";
+                if (setResult?.Success != true)
+                {
+                    TopBarView.StatusText = $"SNMP set failed: {setResult?.ErrorMessage}";
+                    return;
+                }
+
+                TopBarView.StatusText = $"Set {selectedOid.Label}. Refreshing selected field...";
+
+                var refreshResult = await RefreshSelectedSnmpOidAfterSetAsync(
+                    session,
+                    selectedOid,
+                    targetIp,
+                    CancellationToken.None);
+
+                WorkspaceView.ShowSnmpSetAndRefreshResult(setResult, refreshResult);
+
+                TopBarView.StatusText = refreshResult?.Success == true
+                    ? $"{selectedOid.Label} set and refreshed: {refreshResult.DisplayValue}."
+                    : $"SNMP set succeeded, but refresh failed: {refreshResult?.ErrorMessage}";
             }
             catch (Exception ex)
             {
                 TopBarView.StatusText = $"SNMP set failed: {ex.Message}";
+
                 WorkspaceView.ShowSnmpSetResult(new SnmpSetResultDto
                 {
                     Success = false,
@@ -110,6 +127,59 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     DecodeMode = selectedOid.DecodeMode,
                     ErrorMessage = ex.Message
                 });
+            }
+        }
+
+        private async Task<SnmpRunResultDto> RefreshSelectedSnmpOidAfterSetAsync(SiteDashboardTabSession session,
+            SnmpOidConfigDto selectedOid, string targetIp, CancellationToken ct)
+        {
+            if (!session.SnmpProfileId.HasValue || session.SnmpProfileId.Value == 0)
+            {
+                return new SnmpRunResultDto
+                {
+                    Success = false,
+                    ErrorMessage = "No active SNMP profile is loaded for this site."
+                };
+            }
+
+            try
+            {
+                WorkspaceView.SetSnmpOidResult(selectedOid.Id, "Refreshing...");
+
+                var refreshResult = await _api.PostAsync<SnmpRunSelectedRequestDto, SnmpRunResultDto>(
+                    "api/snmp-profiles/run-selected",
+                    new SnmpRunSelectedRequestDto
+                    {
+                        ProfileId = session.SnmpProfileId.Value,
+                        OidId = selectedOid.Id,
+                        TargetIp = targetIp
+                    });
+
+                var display = refreshResult?.Success == true
+                    ? refreshResult.DisplayValue
+                    : $"ERROR: {refreshResult?.ErrorMessage}";
+
+                session.SnmpOidResults[selectedOid.Id] = display ?? string.Empty;
+                WorkspaceView.SetSnmpOidResult(selectedOid.Id, display ?? string.Empty);
+
+                return refreshResult ?? new SnmpRunResultDto
+                {
+                    Success = false,
+                    ErrorMessage = "No SNMP refresh result returned."
+                };
+            }
+            catch (Exception ex)
+            {
+                var error = $"ERROR: {ex.Message}";
+
+                session.SnmpOidResults[selectedOid.Id] = error;
+                WorkspaceView.SetSnmpOidResult(selectedOid.Id, error);
+
+                return new SnmpRunResultDto
+                {
+                    Success = false,
+                    ErrorMessage = ex.Message
+                };
             }
         }
 

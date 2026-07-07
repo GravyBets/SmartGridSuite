@@ -35,7 +35,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             NetworkColumn.Width = hideNetwork
                 ? new GridLength(0)
-                : new GridLength(340);
+                : new GridLength(295);
 
             NetworkGapColumn.Width = hideNetwork
                 ? new GridLength(0)

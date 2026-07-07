@@ -420,6 +420,35 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 : $"Set failed for {result.Label}:{Environment.NewLine}{result.ErrorMessage}";
         }
 
+        public void ShowSnmpSetAndRefreshResult(SnmpSetResultDto? setResult, SnmpRunResultDto? refreshResult)
+        {
+            if (setResult is null)
+            {
+                SnmpDecoderValuesTextBox.Text = "No SNMP set result.";
+                return;
+            }
+
+            var setText = setResult.Success
+                ? $"Set succeeded for {setResult.Label}:{Environment.NewLine}{setResult.DisplayValue}"
+                : $"Set failed for {setResult.Label}:{Environment.NewLine}{setResult.ErrorMessage}";
+
+            if (setResult.Success != true)
+            {
+                SnmpDecoderValuesTextBox.Text = setText;
+                return;
+            }
+
+            var refreshText = refreshResult?.Success == true
+                ? $"Refreshed selected value:{Environment.NewLine}{refreshResult.DisplayValue}"
+                : $"Refresh failed:{Environment.NewLine}{refreshResult?.ErrorMessage ?? "No SNMP refresh result returned."}";
+
+            SnmpDecoderValuesTextBox.Text =
+                setText +
+                Environment.NewLine +
+                Environment.NewLine +
+                refreshText;
+        }
+
         private static bool IsUsefulSnmpResultText(string? rawValue)
         {
             var value = (rawValue ?? string.Empty).Trim();

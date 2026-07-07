@@ -1230,6 +1230,7 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<UpdateTicketResponse>> RequestCapital(long id, [FromBody] TicketActionReasonRequest req, CancellationToken ct)
         {
             var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+
             if (entity == null)
                 return NotFound();
 
@@ -1249,9 +1250,10 @@ namespace SmartGridSuite.Api.Controllers
 
             entity.Status = awaitingCapitalStatus.Name;
             entity.ActionRequiredOverride = "Review Capital request";
-            entity.Notes = AppendTicketNote(
-                entity.Notes,
-                "Capital requested",
+
+            entity.DispatchNotes = AppendDispatchRequestNote(
+                entity.DispatchNotes,
+                "Capital",
                 reason,
                 req.RequestedBy);
 
@@ -1266,6 +1268,7 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<UpdateTicketResponse>> RequestMaintenance(long id, [FromBody] TicketActionReasonRequest req, CancellationToken ct)
         {
             var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+
             if (entity == null)
                 return NotFound();
 
@@ -1285,9 +1288,10 @@ namespace SmartGridSuite.Api.Controllers
 
             entity.Status = needsReviewStatus.Name;
             entity.ActionRequiredOverride = "Review Maintenance request";
-            entity.Notes = AppendTicketNote(
-                entity.Notes,
-                "Maintenance requested",
+
+            entity.DispatchNotes = AppendDispatchRequestNote(
+                entity.DispatchNotes,
+                "Maintenance",
                 reason,
                 req.RequestedBy);
 
@@ -1519,6 +1523,29 @@ namespace SmartGridSuite.Api.Controllers
             return cleanExisting + Environment.NewLine + Environment.NewLine + entry;
         }
 
+        private static string AppendDispatchRequestNote(string? existingNotes, string requestType, string reason, string? requestedBy)
+        {
+            var cleanExisting = (existingNotes ?? string.Empty).Trim();
+
+            var cleanRequestType = string.IsNullOrWhiteSpace(requestType)
+                ? "Ticket"
+                : requestType.Trim();
+
+            var cleanReason = (reason ?? string.Empty).Trim();
+
+            var cleanRequestedBy = string.IsNullOrWhiteSpace(requestedBy)
+                ? "Unknown"
+                : requestedBy.Trim();
+
+            var entry =
+                $"{cleanRequestType} requested by {cleanRequestedBy} Reason: '{cleanReason}'";
+
+            if (string.IsNullOrWhiteSpace(cleanExisting))
+                return entry;
+
+            return cleanExisting + Environment.NewLine + entry;
+        }
+
         [HttpPost]
         public async Task<ActionResult<CreateTicketResponse>> Create([FromBody] CreateTicketRequest req)
         {
@@ -1595,6 +1622,13 @@ namespace SmartGridSuite.Api.Controllers
 
             var now = DateTime.Now;
 
+            var isSiteDashboardTicketRequest = incomingNotificationName.Equals("Ticket requested from Site Dashboard", StringComparison.OrdinalIgnoreCase);
+
+            var requestDispatchNotes = isSiteDashboardTicketRequest
+                ? AppendDispatchRequestNote(req.DispatchNotes, "Ticket", FirstNonBlank(req.Notes, req.Problem, "Ticket requested from Site Dashboard."),
+                    createdBy)
+                : req.DispatchNotes;
+
             var entity = new TicketEntity
             {
                 Site = req.Site.Trim(),
@@ -1618,8 +1652,13 @@ namespace SmartGridSuite.Api.Controllers
                 ActionRequiredOverride = actionRequiredOverride,
 
                 Problem = (req.Problem ?? "").Trim(),
-                Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim(),
-                DispatchNotes = string.IsNullOrWhiteSpace(req.DispatchNotes) ? null : req.DispatchNotes.Trim(),
+                Notes = isSiteDashboardTicketRequest
+                    ? null
+                    : string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim(),
+
+                DispatchNotes = string.IsNullOrWhiteSpace(requestDispatchNotes)
+                    ? null
+                    : requestDispatchNotes.Trim(),
                 CreatedBy = createdBy,
                 Summary = FirstNonBlank(req.Problem, req.NotificationName)
             };

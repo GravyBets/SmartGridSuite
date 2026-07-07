@@ -11,6 +11,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             TicketNotificationNameTextBlock.Text = GetTicketFieldValue(rawText, "Notification Name");
             TicketNotificationNumberTextBlock.Text = GetTicketFieldValue(rawText, "Notification #");
             TicketProblemIssueTextBlock.Text = GetTicketFieldValue(rawText, "Problem/Issue");
+            TicketDispatchNotesTextBlock.Text = GetTicketFieldValue(rawText, "Dispatch Notes");
             TicketWorkOrderTextBlock.Text = GetTicketFieldValue(rawText, "Work Order");
             TicketWorkOrderTypeTextBlock.Text = GetTicketFieldValue(rawText, "Work Order Type");
             TicketAssignedToTextBlock.Text = GetTicketFieldValue(rawText, "Assigned To");
@@ -25,6 +26,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             if (string.IsNullOrWhiteSpace(TicketProblemIssueTextBlock.Text))
                 TicketProblemIssueTextBlock.Text = "—";
+
+            if (string.IsNullOrWhiteSpace(TicketDispatchNotesTextBlock.Text))
+                TicketDispatchNotesTextBlock.Text = "No dispatch notes.";
 
             if (string.IsNullOrWhiteSpace(TicketWorkOrderTextBlock.Text))
                 TicketWorkOrderTextBlock.Text = "—";
@@ -45,26 +49,71 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             ApplyTicketStatusDisplay();
         }
 
+        private static readonly string[] TicketInfoLabels =
+        {
+            "Notification Name",
+            "Notification #",
+            "Problem/Issue",
+            "Dispatch Notes",
+            "Work Order",
+            "Work Order Type",
+            "Assigned To",
+            "Date Created",
+            "Current Status"
+        };
+
         private static string GetTicketFieldValue(string rawText, string label)
         {
             if (string.IsNullOrWhiteSpace(rawText))
                 return string.Empty;
 
-            var lines = rawText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            var lines = rawText.Split(
+                new[] { "\r\n", "\n", "\r" },
+                StringSplitOptions.None);
 
-            foreach (var line in lines)
+            var prefix = label + ":";
+            var capturing = false;
+            var values = new List<string>();
+
+            foreach (var rawLine in lines)
             {
-                if (!line.StartsWith(label + ":", StringComparison.OrdinalIgnoreCase))
-                    continue;
+                var line = rawLine ?? string.Empty;
+                var trimmed = line.Trim();
 
-                var idx = line.IndexOf(':');
-                if (idx < 0)
-                    continue;
+                if (!capturing)
+                {
+                    if (!trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                        continue;
 
-                return line[(idx + 1)..].Trim();
+                    var idx = trimmed.IndexOf(':');
+                    if (idx >= 0)
+                    {
+                        var firstValue = trimmed[(idx + 1)..].Trim();
+                        if (!string.IsNullOrWhiteSpace(firstValue))
+                            values.Add(firstValue);
+                    }
+
+                    capturing = true;
+                    continue;
+                }
+
+                if (IsTicketInfoLabelLine(trimmed))
+                    break;
+
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                    values.Add(trimmed);
             }
 
-            return string.Empty;
+            return string.Join(Environment.NewLine, values).Trim();
+        }
+
+        private static bool IsTicketInfoLabelLine(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                return false;
+
+            return TicketInfoLabels.Any(label =>
+                line.StartsWith(label + ":", StringComparison.OrdinalIgnoreCase));
         }
 
         private void RefreshTicketButton_Click(object sender, RoutedEventArgs e)
@@ -72,22 +121,56 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             RefreshTicketRequested?.Invoke(this, EventArgs.Empty);
         }
 
-        private void CopyTicketNotificationButton_Click(object sender, RoutedEventArgs e)
+        private async void CopyTicketNotificationButton_Click(object sender, RoutedEventArgs e)
         {
-            CopyTicketValue(TicketNotificationNumberTextBlock.Text);
+            await CopyButtonValueWithFeedbackAsync(
+                sender,
+                TicketNotificationNumberTextBlock.Text,
+                "Copy notification");
         }
 
-        private void CopyTicketWorkOrderButton_Click(object sender, RoutedEventArgs e)
+        private async void CopyTicketWorkOrderButton_Click(object sender, RoutedEventArgs e)
         {
-            CopyTicketValue(TicketWorkOrderTextBlock.Text);
+            await CopyButtonValueWithFeedbackAsync(
+                sender,
+                TicketWorkOrderTextBlock.Text,
+                "Copy work order");
         }
 
-        private static void CopyTicketValue(string? value)
+        private async Task CopyButtonValueWithFeedbackAsync(object sender, string? value, string defaultToolTip)
         {
-            if (string.IsNullOrWhiteSpace(value) || value == "—")
+            var cleanValue = (value ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(cleanValue) || cleanValue == "—")
                 return;
 
-            Clipboard.SetText(value);
+            if (sender is not Button button)
+                return;
+
+            var copied = await TryCopyToClipboardAsync(cleanValue);
+
+            if (!copied)
+            {
+                button.ToolTip = "Could not copy. Try again.";
+                return;
+            }
+
+            if (button.Content is not TextBlock glyphBlock)
+                return;
+
+            var originalText = glyphBlock.Text;
+            var originalToolTip = button.ToolTip;
+
+            glyphBlock.Text = CheckGlyph;
+            button.ToolTip = "Copied!";
+
+            await Task.Delay(TimeSpan.FromSeconds(3));
+
+            glyphBlock.Text = string.IsNullOrWhiteSpace(originalText)
+                ? CopyGlyph
+                : originalText;
+
+            button.ToolTip = originalToolTip ?? defaultToolTip;
         }
 
         private void ApplyTicketActionButtons()
@@ -96,6 +179,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             RequestCapitalButton.Visibility = Visibility.Collapsed;
             RequestMaintenanceButton.Visibility = Visibility.Collapsed;
 
+            RequestTicketButton.IsEnabled = false;
+            RequestCapitalButton.IsEnabled = false;
+            RequestMaintenanceButton.IsEnabled = false;
+
             var hasTicket = CurrentTicketId > 0 &&
                             !TicketNotificationNameTextBlock.Text.Equals(
                                 "No ticket data returned yet.",
@@ -103,33 +190,43 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             var workOrderType = (TicketWorkOrderTypeTextBlock.Text ?? string.Empty).Trim();
 
-            // No ticket populated: allow user to request a ticket.
             if (!hasTicket)
             {
                 RequestTicketButton.Visibility = Visibility.Visible;
-                TicketActionHintTextBlock.Text = "No ticket is associated with this site.";
+                RequestTicketButton.IsEnabled = true;
+
+                TicketRequestsDescriptionTextBlock.Text =
+                    "No ticket is associated with this site. You can create a ticket request.";
+
                 return;
             }
 
-            // Maintenance ticket/order: allow request to Capital.
             if (workOrderType.Equals("Maintenance", StringComparison.OrdinalIgnoreCase) ||
                 workOrderType.Equals("Maint", StringComparison.OrdinalIgnoreCase))
             {
                 RequestCapitalButton.Visibility = Visibility.Visible;
-                TicketActionHintTextBlock.Text = "Maintenance order loaded.";
+                RequestCapitalButton.IsEnabled = true;
+
+                TicketRequestsDescriptionTextBlock.Text =
+                    "This maintenance order can be requested as capital.";
+
                 return;
             }
 
-            // Capital ticket/order: allow request to Maintenance.
             if (workOrderType.Equals("Capital", StringComparison.OrdinalIgnoreCase) ||
                 workOrderType.Equals("Cap", StringComparison.OrdinalIgnoreCase))
             {
                 RequestMaintenanceButton.Visibility = Visibility.Visible;
-                TicketActionHintTextBlock.Text = "Capital order loaded.";
+                RequestMaintenanceButton.IsEnabled = true;
+
+                TicketRequestsDescriptionTextBlock.Text =
+                    "This capital order can be requested as maintenance.";
+
                 return;
             }
 
-            TicketActionHintTextBlock.Text = "Ticket actions require a reason.";
+            TicketRequestsDescriptionTextBlock.Text =
+                "No request actions are available for the current ticket.";
         }
 
         private void ApplyTicketStatusDisplay()

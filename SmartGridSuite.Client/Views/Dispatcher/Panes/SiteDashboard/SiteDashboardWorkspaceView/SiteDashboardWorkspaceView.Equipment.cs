@@ -442,12 +442,31 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             var removeButton = new Button
             {
                 Content = CreateTrashButtonContent(),
-                Style = (Style)FindResource("SecondaryButtonStyle"),
                 Height = 30,
-                Width = 36,
+                Width = 30,
                 Padding = new Thickness(0),
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
                 VerticalAlignment = VerticalAlignment.Center,
-                ToolTip = "Remove entry"
+                ToolTip = "Remove entry",
+                Cursor = Cursors.Hand
+            };
+
+            removeButton.MouseEnter += (_, _) =>
+            {
+                removeButton.Background = new SolidColorBrush(Color.FromArgb(24, 220, 80, 80));
+
+                if (removeButton.Content is TextBlock icon)
+                    icon.Foreground = new SolidColorBrush(Color.FromRgb(220, 80, 80));
+            };
+
+            removeButton.MouseLeave += (_, _) =>
+            {
+                removeButton.Background = Brushes.Transparent;
+
+                if (removeButton.Content is TextBlock icon)
+                    icon.Foreground = TryFindResource("TextSecondary") as Brush;
             };
 
             removeButton.Click += (_, _) =>
@@ -602,6 +621,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             button.IsEnabled = false;
             button.ToolTip = "A replacement entry already exists for this device.";
+            button.Content = CreateAddedReplacementButtonContent();
 
             AddReplacementEntryRow(
                 label: info.Label,
@@ -722,15 +742,43 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             return panel;
         }
 
+        private object CreateAddedReplacementButtonContent()
+        {
+            var panel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal
+            };
+
+            panel.Children.Add(new TextBlock
+            {
+                Text = "\uE73E",
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 6, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            panel.Children.Add(new TextBlock
+            {
+                Text = "Added",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            return panel;
+        }
+
         private object CreateTrashButtonContent()
         {
             return new TextBlock
             {
-                Text = "\uE74D",
+                Text = "\uE107",
                 FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 14,
+                FontSize = 15,
+                Foreground = TryFindResource("TextSecondary") as Brush,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center
             };
         }
 

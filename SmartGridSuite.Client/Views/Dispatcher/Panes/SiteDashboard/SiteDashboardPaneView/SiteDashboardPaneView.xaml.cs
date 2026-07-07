@@ -25,7 +25,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private readonly List<SiteDashboardTabSession> _sessions = new();
         private string? _selectedSessionKey;
-        private int _blankTabCounter = 1;
         private bool _renderingSession;
         private bool _ticketActionInProgress;
         private bool _writeUpSubmitInProgress;

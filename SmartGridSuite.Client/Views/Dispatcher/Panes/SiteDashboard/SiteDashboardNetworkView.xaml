@@ -26,8 +26,8 @@
                TargetType="Button"
                BasedOn="{StaticResource SecondaryButtonStyle}">
             <Setter Property="Height" Value="28"/>
-            <Setter Property="MinWidth" Value="68"/>
-            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="MinWidth" Value="58"/>
+            <Setter Property="Padding" Value="8,0"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
@@ -36,8 +36,8 @@
                TargetType="Button"
                BasedOn="{StaticResource PrimaryButtonStyle}">
             <Setter Property="Height" Value="28"/>
-            <Setter Property="MinWidth" Value="74"/>
-            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="MinWidth" Value="66"/>
+            <Setter Property="Padding" Value="8,0"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
@@ -63,6 +63,87 @@
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="VerticalAlignment" Value="Stretch"/>
         </Style>
+
+        <Style x:Key="NetworkDangerMiniButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="MinWidth" Value="58"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#D92D20"/>
+            <Setter Property="BorderBrush" Value="#B42318"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#B42318"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#912018"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#912018"/>
+                                <Setter Property="Opacity" Value="0.9"/>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="NetworkIpTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                  Margin="{TemplateBinding Padding}"
+                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
 
@@ -85,7 +166,7 @@
 
         <!-- Header / action card -->
         <Border Grid.Row="0"
-            Style="{StaticResource Card}">
+                Style="{StaticResource Card}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -109,45 +190,32 @@
                 </Grid>
 
                 <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
                     <TextBox x:Name="PingCountTextBox"
-                         Grid.Column="0"
-                         Style="{StaticResource ModernWatermarkTextBox}"
-                         Height="30"
-                         Padding="8,0"
-                         VerticalContentAlignment="Center"
-                         HorizontalContentAlignment="Left"
-                         ToolTip="Blank = continuous"
-                         Tag="Ping Count"                         
-                         PreviewTextInput="PingCountTextBox_PreviewTextInput"/>
-
-                    <Button x:Name="PingAllButton"
-                        Grid.Column="2"
-                        Style="{StaticResource NetworkPrimaryMiniButtonStyle}"
-                        Content="Ping All"
-                        Click="PingAllButton_Click" />
+                             Style="{StaticResource ModernWatermarkTextBox}"
+                             Height="30"
+                             Padding="8,0"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Blank = continuous"
+                             Tag="Ping Count"
+                             PreviewTextInput="PingCountTextBox_PreviewTextInput"/>
                 </Grid>
 
                 <Grid Grid.Row="4">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="2*"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="4"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="4"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="2*"/>
                     </Grid.ColumnDefinitions>
 
-                    <Button x:Name="StopAllButton"
+                    <Button x:Name="PingAllButton"
                             Grid.Column="1"
-                            Style="{StaticResource NetworkMiniButtonStyle}"
-                            Content="Stop"
-                            Click="StopAllButton_Click" />
+                            Style="{StaticResource NetworkPrimaryMiniButtonStyle}"
+                            Content="Ping All"
+                            Click="PingAllButton_Click" />
 
                     <Button x:Name="ClearAllButton"
                             Grid.Column="3"
@@ -179,10 +247,10 @@
 
                 <Grid Grid.Row="0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="72"/>
+                        <ColumnDefinition Width="60"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="70"/>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="58"/>
                     </Grid.ColumnDefinitions>
 
                     <TextBlock x:Name="PrimaryPingLabelTextBlock"
@@ -191,18 +259,20 @@
                                Style="{StaticResource NetworkHeaderLabelStyle}" />
 
                     <TextBox x:Name="PrimaryIpTextBox"
-                         Grid.Column="1"
-                         Style="{StaticResource ModernWatermarkTextBox}"
-                         Height="30"
-                         Padding="10,0"
-                         VerticalContentAlignment="Center"
-                         FontSize="13"
-                         FontWeight="SemiBold" />
+                             Grid.Column="1"
+                             Style="{StaticResource NetworkIpTextBoxStyle}"
+                             Height="30"
+                             Padding="2,0"
+                             VerticalContentAlignment="Center"
+                             HorizontalContentAlignment="Left"
+                             FontSize="13"
+                             FontWeight="SemiBold" />
 
-                    <Button Grid.Column="3"
-                        Style="{StaticResource NetworkMiniButtonStyle}"
-                        Content="Ping"
-                        Click="PingPrimaryButton_Click" />
+                    <Button x:Name="PrimaryPingButton"
+                            Grid.Column="3"
+                            Style="{StaticResource NetworkMiniButtonStyle}"
+                            Content="Ping"
+                            Click="PingPrimaryButton_Click" />
                 </Grid>
 
                 <Border Grid.Row="2"
@@ -237,10 +307,10 @@
 
                 <Grid Grid.Row="0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="72"/>
+                        <ColumnDefinition Width="60"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="70"/>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="58"/>
                     </Grid.ColumnDefinitions>
 
                     <TextBlock x:Name="LanPingLabelTextBlock"
@@ -249,18 +319,20 @@
                                Style="{StaticResource NetworkHeaderLabelStyle}" />
 
                     <TextBox x:Name="LanIpTextBox"
-                         Grid.Column="1"
-                         Style="{StaticResource ModernWatermarkTextBox}"
-                         Height="30"
-                         Padding="10,0"
-                         VerticalContentAlignment="Center"
-                         FontSize="13"
-                         FontWeight="SemiBold" />
+                             Grid.Column="1"
+                             Style="{StaticResource NetworkIpTextBoxStyle}"
+                             Height="30"
+                             Padding="2,0"
+                             VerticalContentAlignment="Center"
+                             HorizontalContentAlignment="Left"
+                             FontSize="13"
+                             FontWeight="SemiBold" />
 
-                    <Button Grid.Column="3"
-                        Style="{StaticResource NetworkMiniButtonStyle}"
-                        Content="Ping"
-                        Click="PingLanButton_Click" />
+                    <Button x:Name="LanPingButton"
+                            Grid.Column="3"
+                            Style="{StaticResource NetworkMiniButtonStyle}"
+                            Content="Ping"
+                            Click="PingLanButton_Click" />
                 </Grid>
 
                 <Border Grid.Row="2"
@@ -303,7 +375,7 @@
                              Grid.Column="2"
                              Style="{StaticResource ModernWatermarkTextBox}"
                              Height="30"
-                             Padding="10,0"
+                             Padding="2,0"
                              VerticalContentAlignment="Center"
                              FontSize="13"
                              FontWeight="SemiBold"
@@ -350,10 +422,10 @@
 
                 <Grid Grid.Row="0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="72"/>
+                        <ColumnDefinition Width="60"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="70"/>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="58"/>
                     </Grid.ColumnDefinitions>
 
                     <TextBlock x:Name="SecondaryPingLabelTextBlock"
@@ -362,18 +434,20 @@
                                Style="{StaticResource NetworkHeaderLabelStyle}" />
 
                     <TextBox x:Name="SecondaryIpTextBox"
-                         Grid.Column="1"
-                         Style="{StaticResource ModernWatermarkTextBox}"
-                         Height="30"
-                         Padding="10,0"
-                         VerticalContentAlignment="Center"
-                         FontSize="13"
-                         FontWeight="SemiBold" />
+                             Grid.Column="1"
+                             Style="{StaticResource NetworkIpTextBoxStyle}"
+                             Height="30"
+                             Padding="2,0"
+                             VerticalContentAlignment="Center"
+                             HorizontalContentAlignment="Left"
+                             FontSize="13"
+                             FontWeight="SemiBold" />
 
-                    <Button Grid.Column="3"
-                        Style="{StaticResource NetworkMiniButtonStyle}"
-                        Content="Ping"
-                        Click="PingSecondaryButton_Click" />
+                    <Button x:Name="SecondaryPingButton"
+                            Grid.Column="3"
+                            Style="{StaticResource NetworkMiniButtonStyle}"
+                            Content="Ping"
+                            Click="PingSecondaryButton_Click" />
                 </Grid>
 
                 <Border Grid.Row="2"

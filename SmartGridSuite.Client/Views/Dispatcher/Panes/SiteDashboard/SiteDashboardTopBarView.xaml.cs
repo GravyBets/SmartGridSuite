@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Threading.Tasks;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 {
@@ -226,24 +227,58 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 : Visibility.Collapsed;
         }
 
-        //Copy Buttons
-        private void CopyAddressButton_Click(object sender, RoutedEventArgs e)
+        // Copy Buttons
+        private const string TopBarCopyGlyph = "\uE8C8";   // Copy
+        private const string TopBarCheckGlyph = "\uE73E";  // Check
+
+        private async void CopyAddressButton_Click(object sender, RoutedEventArgs e)
         {
-            CopyTextToClipboard(AddressTextBlock?.Text, "Address copied.");
+            await CopyTopBarValueWithFeedbackAsync(
+                sender,
+                AddressTextBlock?.Text,
+                "Copy address");
         }
 
-        private void CopyCoordinatesButton_Click(object sender, RoutedEventArgs e)
+        private async void CopyCoordinatesButton_Click(object sender, RoutedEventArgs e)
         {
-            CopyTextToClipboard(CoordinatesTextBlock?.Text, "Coordinates copied.");
+            await CopyTopBarValueWithFeedbackAsync(
+                sender,
+                CoordinatesTextBlock?.Text,
+                "Copy coordinates");
         }
 
-        private static void CopyTextToClipboard(string? text, string successMessage)
+        private async Task CopyTopBarValueWithFeedbackAsync(object sender, string? value, string defaultToolTip)
         {
-            if (string.IsNullOrWhiteSpace(text) || text == "—")
+            var cleanValue = (value ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(cleanValue) || cleanValue == "—")
                 return;
 
-            Clipboard.SetText(text);
-            MessageBox.Show(successMessage, "Copied", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (sender is not Button button)
+                return;
+
+            try
+            {
+                Clipboard.SetText(cleanValue);
+            }
+            catch
+            {
+                button.ToolTip = "Could not copy. Try again.";
+                return;
+            }
+
+            if (button.Content is not TextBlock glyphBlock)
+                return;
+
+            var originalToolTip = button.ToolTip;
+
+            glyphBlock.Text = TopBarCheckGlyph;
+            button.ToolTip = "Copied!";
+
+            await Task.Delay(TimeSpan.FromSeconds(3));
+
+            glyphBlock.Text = TopBarCopyGlyph;
+            button.ToolTip = originalToolTip ?? defaultToolTip;
         }
     }
 }

@@ -265,79 +265,152 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private async void PingPrimaryButton_Click(object sender, RoutedEventArgs e)
         {
-            CancelAndDispose(ref _primaryPingCts);
-            _primaryPingCts = new CancellationTokenSource();
+            if (_primaryPingCts is not null)
+            {
+                CancelAndDispose(ref _primaryPingCts);
+                RefreshPingButtonStates();
+                return;
+            }
 
-            await PingTargetAsync(
-                PrimaryIp,
+            await RunSinglePingAsync(
+                () => PrimaryIp,
                 PrimarySummaryTextBlock,
                 PrimaryResultsTextBox,
-                _primaryPingCts.Token);
+                cts => _primaryPingCts = cts,
+                () => _primaryPingCts,
+                () => CancelAndDispose(ref _primaryPingCts));
         }
 
         private async void PingLanButton_Click(object sender, RoutedEventArgs e)
         {
-            CancelAndDispose(ref _lanPingCts);
-            _lanPingCts = new CancellationTokenSource();
+            if (_lanPingCts is not null)
+            {
+                CancelAndDispose(ref _lanPingCts);
+                RefreshPingButtonStates();
+                return;
+            }
 
-            await PingTargetAsync(
-                LanIp,
+            await RunSinglePingAsync(
+                () => LanIp,
                 LanSummaryTextBlock,
                 LanResultsTextBox,
-                _lanPingCts.Token);
+                cts => _lanPingCts = cts,
+                () => _lanPingCts,
+                () => CancelAndDispose(ref _lanPingCts));
         }
 
         private async void PingSecondaryButton_Click(object sender, RoutedEventArgs e)
         {
-            CancelAndDispose(ref _secondaryPingCts);
-            _secondaryPingCts = new CancellationTokenSource();
+            if (_secondaryPingCts is not null)
+            {
+                CancelAndDispose(ref _secondaryPingCts);
+                RefreshPingButtonStates();
+                return;
+            }
 
-            await PingTargetAsync(
-                SecondaryIp,
+            await RunSinglePingAsync(
+                () => SecondaryIp,
                 SecondarySummaryTextBlock,
                 SecondaryResultsTextBox,
-                _secondaryPingCts.Token);
+                cts => _secondaryPingCts = cts,
+                () => _secondaryPingCts,
+                () => CancelAndDispose(ref _secondaryPingCts));
+        }
+
+        private async Task RunSinglePingAsync(
+            Func<string> ipProvider,
+            TextBlock summaryTextBlock,
+            TextBox resultsTextBox,
+            Action<CancellationTokenSource> setCts,
+            Func<CancellationTokenSource?> getCurrentCts,
+            Action clearCurrentCts)
+        {
+            var cts = new CancellationTokenSource();
+
+            setCts(cts);
+            RefreshPingButtonStates();
+
+            try
+            {
+                await PingTargetAsync(
+                    ipProvider(),
+                    summaryTextBlock,
+                    resultsTextBox,
+                    cts.Token);
+            }
+            finally
+            {
+                if (ReferenceEquals(getCurrentCts(), cts))
+                    clearCurrentCts();
+
+                RefreshPingButtonStates();
+            }
         }
 
         private async void PingAllButton_Click(object sender, RoutedEventArgs e)
         {
+            if (IsAnyPingRunning())
+            {
+                StopAllPings();
+                return;
+            }
+
             StopAllPings();
 
-            _primaryPingCts = new CancellationTokenSource();
-            _secondaryPingCts = new CancellationTokenSource();
+            var primaryCts = new CancellationTokenSource();
+            var secondaryCts = new CancellationTokenSource();
+
+            _primaryPingCts = primaryCts;
+            _secondaryPingCts = secondaryCts;
+
+            CancellationTokenSource? lanCts = null;
 
             var tasks = new List<Task>
-            {
-                PingTargetAsync(
-                    PrimaryIp,
-                    PrimarySummaryTextBlock,
-                    PrimaryResultsTextBox,
-                    _primaryPingCts.Token),
+    {
+        PingTargetAsync(
+            PrimaryIp,
+            PrimarySummaryTextBlock,
+            PrimaryResultsTextBox,
+            primaryCts.Token),
 
-                PingTargetAsync(
-                    SecondaryIp,
-                    SecondarySummaryTextBlock,
-                    SecondaryResultsTextBox,
-                    _secondaryPingCts.Token)
-            };
+        PingTargetAsync(
+            SecondaryIp,
+            SecondarySummaryTextBlock,
+            SecondaryResultsTextBox,
+            secondaryCts.Token)
+    };
 
             if (!IsIgsdMode)
             {
-                _lanPingCts = new CancellationTokenSource();
+                lanCts = new CancellationTokenSource();
+                _lanPingCts = lanCts;
 
                 tasks.Insert(1, PingTargetAsync(
                     LanIp,
                     LanSummaryTextBlock,
                     LanResultsTextBox,
-                    _lanPingCts.Token));
+                    lanCts.Token));
             }
 
-            await Task.WhenAll(tasks);
-        }
+            RefreshPingButtonStates();
 
-        private void StopAllButton_Click(object sender, RoutedEventArgs e)
-        {
-            StopAllPings();
+            try
+            {
+                await Task.WhenAll(tasks);
+            }
+            finally
+            {
+                if (ReferenceEquals(_primaryPingCts, primaryCts))
+                    CancelAndDispose(ref _primaryPingCts);
+
+                if (ReferenceEquals(_lanPingCts, lanCts))
+                    CancelAndDispose(ref _lanPingCts);
+
+                if (ReferenceEquals(_secondaryPingCts, secondaryCts))
+                    CancelAndDispose(ref _secondaryPingCts);
+
+                RefreshPingButtonStates();
+            }
         }
 
         private void ClearAllButton_Click(object sender, RoutedEventArgs e)
@@ -534,6 +607,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             CancelAndDispose(ref _primaryPingCts);
             CancelAndDispose(ref _lanPingCts);
             CancelAndDispose(ref _secondaryPingCts);
+
+            RefreshPingButtonStates();
         }
 
         private static void CancelAndDispose(ref CancellationTokenSource? cts)
@@ -566,6 +641,49 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 textBox.AppendText(Environment.NewLine + line);
 
             textBox.ScrollToEnd();
+        }
+
+        private bool IsAnyPingRunning()
+        {
+            return _primaryPingCts is not null ||
+                   _lanPingCts is not null ||
+                   _secondaryPingCts is not null;
+        }
+
+        private void RefreshPingButtonStates()
+        {
+            SetPingButtonState(
+                PrimaryPingButton,
+                _primaryPingCts is not null,
+                normalText: "Ping",
+                normalStyleKey: "NetworkMiniButtonStyle");
+
+            SetPingButtonState(
+                LanPingButton,
+                _lanPingCts is not null,
+                normalText: "Ping",
+                normalStyleKey: "NetworkMiniButtonStyle");
+
+            SetPingButtonState(
+                SecondaryPingButton,
+                _secondaryPingCts is not null,
+                normalText: "Ping",
+                normalStyleKey: "NetworkMiniButtonStyle");
+
+            SetPingButtonState(
+                PingAllButton,
+                IsAnyPingRunning(),
+                normalText: "Ping All",
+                normalStyleKey: "NetworkPrimaryMiniButtonStyle");
+        }
+
+        private void SetPingButtonState(Button button, bool isRunning, string normalText, string normalStyleKey)
+        {
+            button.Content = isRunning ? "Stop" : normalText;
+
+            button.Style = isRunning
+                ? (Style)FindResource("NetworkDangerMiniButtonStyle")
+                : (Style)FindResource(normalStyleKey);
         }
 
 
@@ -782,8 +900,5 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         {
             await RunQuickReachabilityTestForAllAsync();
         }
-
-
-
     }
 }

@@ -39,6 +39,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             WriteUpTextBox.TextChanged += WriteUpTextBox_TextChanged;
 
             SiteNotesItemsControl.ItemsSource = _siteNotes;
+            RxAssociatedSitesItemsControl.ItemsSource = _rxAssociatedSiteResults;
 
             Reset();
         }
@@ -215,6 +216,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             _snmpCategoryOptionsInitialized = false;
 
+            IncludePingStatsCheckBox.IsChecked = true;
             IncludeSnmpStatsCheckBox.IsChecked = false;
             IncludeSnmpAdminCheckBox.IsChecked = true;
             IncludeSnmpConfigCheckBox.IsChecked = true;

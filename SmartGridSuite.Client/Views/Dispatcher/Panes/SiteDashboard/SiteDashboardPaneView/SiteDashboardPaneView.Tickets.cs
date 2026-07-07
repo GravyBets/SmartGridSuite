@@ -49,6 +49,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 "Problem",
                 "Issue"));
 
+            AddLine(lines, "Dispatch Notes", GetObjectPropertyText(
+                ticket,
+                "DispatchNotes",
+                "DispatcherNotes",
+                "DispatchNote",
+                "DispatcherNote"));
+
             AddLine(lines, "Work Order", GetObjectPropertyText(
                 ticket,
                 "CurrentWorkOrder",
@@ -83,10 +90,25 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private TicketListItemDto? SelectBestTicket(IEnumerable<TicketListItemDto>? tickets)
         {
             return tickets?
+                .Where(IsVisibleSiteDashboardTicket)
                 .OrderByDescending(GetTicketStatusRank)
                 .ThenByDescending(t => GetTicketDate(t, "LastActivityAt", "LastActivity"))
                 .ThenByDescending(t => GetTicketDate(t, "CreatedAt", "Created"))
                 .FirstOrDefault();
+        }
+
+        private static bool IsVisibleSiteDashboardTicket(TicketListItemDto ticket)
+        {
+            var status = (GetObjectPropertyText(ticket, "Status", "TicketStatus") ?? string.Empty).Trim();
+
+            if (status.Equals("Closed", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                status.Equals("Canceled", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return true;
         }
 
         private static int GetTicketStatusRank(TicketListItemDto ticket)
@@ -100,10 +122,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 status.Equals("In Progress", StringComparison.OrdinalIgnoreCase) ||
                 status.Equals("Open", StringComparison.OrdinalIgnoreCase) ||
                 status.Equals("Needs Review", StringComparison.OrdinalIgnoreCase))
+                return 3;
+
+            if (status.Equals("Completed, Awaiting Closure", StringComparison.OrdinalIgnoreCase) ||
+                status.Equals("Completed Awaiting Closure", StringComparison.OrdinalIgnoreCase) ||
+                status.Equals("Completed", StringComparison.OrdinalIgnoreCase))
                 return 2;
 
             if (status.Equals("Closed", StringComparison.OrdinalIgnoreCase) ||
-                status.Equals("Completed", StringComparison.OrdinalIgnoreCase) ||
                 status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) ||
                 status.Equals("Canceled", StringComparison.OrdinalIgnoreCase))
                 return 0;
