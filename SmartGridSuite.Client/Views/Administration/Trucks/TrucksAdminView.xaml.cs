@@ -54,6 +54,9 @@ namespace SmartGridSuite.Client.Views.Administration
                 var trucks = await _trucksApi.GetTrucksAsync();
 
                 _items.Clear();
+                TrucksGrid.SelectedItem = null;
+                UpdateSelectionButtons();
+
                 foreach (var truck in trucks.OrderBy(t => t.TruckNumber))
                 {
                     _items.Add(truck);
@@ -110,11 +113,13 @@ namespace SmartGridSuite.Client.Views.Administration
                 var req = window.BuildCreateRequest();
                 var created = await _trucksApi.CreateTruckAsync(req);
 
+                _busy = false;
                 await RefreshAsync();
-                SetStatus("Truck created.");
 
                 if (created != null)
                     SelectTruckById(created.Id);
+
+                SetStatus("Truck created.");
             }
             catch (ApiClient.ApiException ex)
             {
@@ -165,7 +170,9 @@ namespace SmartGridSuite.Client.Views.Administration
                 var req = window.BuildUpdateRequest();
                 await _trucksApi.UpdateTruckAsync(truck.Id, req);
 
+                _busy = false;
                 await RefreshAsync();
+
                 SelectTruckById(truck.Id);
                 SetStatus("Truck updated.");
             }
@@ -222,6 +229,88 @@ namespace SmartGridSuite.Client.Views.Administration
 
             await OpenEditWindowAsync(truck);
         }
-        
+
+        private async void DeleteSelected_Click(object sender, RoutedEventArgs e)
+        {
+            if (TrucksGrid.SelectedItem is not TruckDto truck)
+            {
+                SetStatus("Select a truck first.");
+                return;
+            }
+
+            await DeleteTruckAsync(truck);
+        }
+
+        private async Task DeleteTruckAsync(TruckDto truck)
+        {
+            if (_busy) return;
+
+            var truckNumber = string.IsNullOrWhiteSpace(truck.TruckNumber)
+                ? $"Truck ID {truck.Id}"
+                : $"Truck {truck.TruckNumber}";
+
+            var confirm = new DangerConfirmWindow(
+                "Delete truck?",
+                $"Are you sure you want to permanently delete {truckNumber}?\n\nYou could just take this truck out of service instead. Delete should only be used for duplicate or mistaken truck entries.\n\nIf this truck has assignments, crews, or history tied to it, the API may block the delete.",
+                "Delete")
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (confirm.ShowDialog() != true)
+            {
+                SetStatus("Delete canceled.");
+                return;
+            }
+
+            try
+            {
+                _busy = true;
+                SetStatus($"Deleting {truckNumber}...");
+
+                await _trucksApi.DeleteTruckAsync(truck.Id);
+
+                _busy = false;
+                await RefreshAsync();
+
+                SetStatus($"{truckNumber} deleted.");
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                MessageBox.Show(ex.Body ?? ex.Message, "Truck Delete Failed",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+
+                SetStatus("Delete failed.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Truck Delete Failed",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+
+                SetStatus("Delete failed.");
+            }
+            finally
+            {
+                _busy = false;
+            }
+        }
+
+        private void TrucksGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateSelectionButtons();
+        }
+
+        private void UpdateSelectionButtons()
+        {
+            var hasSelection = TrucksGrid.SelectedItem is TruckDto;
+
+            EditSelectedButton.Visibility = hasSelection
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            DeleteSelectedButton.Visibility = hasSelection
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
     }
 }

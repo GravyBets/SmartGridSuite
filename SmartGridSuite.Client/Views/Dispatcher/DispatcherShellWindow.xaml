@@ -5,6 +5,7 @@
                      Title="Smart Grid Suite - Dispatcher"
                      WindowState="Maximized"
                      WindowStartupLocation="CenterScreen"
+                     Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
                      Background="{DynamicResource AppBackground}">
 
     <Grid x:Name="ShellRoot" 
@@ -13,15 +14,15 @@
         <!-- BODY -->
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="NavCol" Width="280"/>
-                <ColumnDefinition Width="8"/>
+                <ColumnDefinition x:Name="NavCol" Width="58"/>
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <!-- LEFT NAV -->
-            <Border Grid.Column="0"
-                    Style="{StaticResource Card}"
-                    Padding="12">
+            <Border x:Name="NavShellBorder"
+                    Grid.Column="0"
+                    Style="{StaticResource ShellNavCardStyle}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -32,30 +33,46 @@
 
                     <!-- Nav header -->
                     <Grid Grid.Row="0"
-                          Margin="0,0,0,10">
+                          Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel>
+                        <StackPanel x:Name="NavHeaderTextPanel">
                             <TextBlock Text="Dispatcher"
-                                       FontSize="18"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource TextPrimary}"/>
+                                       Style="{StaticResource NavRailHeaderTitleTextStyle}"/>
 
                             <TextBlock Text="Workspace"
-                                       Margin="0,3,0,0"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextSecondary}"/>
+                                       Style="{StaticResource NavRailHeaderSubtitleTextStyle}"/>
                         </StackPanel>
 
                         <Button x:Name="NavHeaderBtn"
                                 Grid.Column="1"
                                 Style="{StaticResource NavRailToggleButtonStyle}"
-                                Content="☰"
                                 ToolTip="Collapse / Expand"
-                                Click="ToggleNav_Click"/>
+                                Click="ToggleNav_Click">
+                            <Viewbox Width="12"
+                                     Height="12"
+                                     Stretch="Uniform"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center">
+                                <Path x:Name="NavHeaderArrowPath"
+                                      Data="M 4 2 L 8 6 L 4 10"
+                                      Stroke="{DynamicResource TextSecondary}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform>
+                                        <RotateTransform Angle="0"/>
+                                    </Path.RenderTransform>
+                                </Path>
+                            </Viewbox>
+                        </Button>
                     </Grid>
 
                     <!-- Section label -->
@@ -80,22 +97,17 @@
                                 </Grid.ColumnDefinitions>
 
                                 <Border Style="{StaticResource NavBadgeStyle}">
-                                    <TextBlock Text="S"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontSize="14"/>
+                                    <Path Style="{StaticResource NavRailPathIconStyle}"
+                                          Data="M3 5C3 3.9 3.9 3 5 3H19C20.1 3 21 3.9 21 5V19C21 20.1 20.1 21 19 21H5C3.9 21 3 20.1 3 19V5ZM5 5V10H11V5H5ZM13 5V10H19V5H13ZM5 12V19H11V12H5ZM13 12V19H19V12H13Z"/>
                                 </Border>
 
                                 <StackPanel Grid.Column="1"
-                                            Margin="10,0,0,0">
+                                            Margin="10,0,0,0"
+                                            VerticalAlignment="Center">
                                     <TextBlock Text="Site Dashboard"
-                                               FontSize="14"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimary}"/>
+                                               Style="{StaticResource NavRailItemTitleTextStyle}"/>
                                     <TextBlock Text="Lookup, diagnostics, write-ups"
-                                               Margin="0,2,0,0"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource TextSecondary}"/>
+                                               Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
                                 </StackPanel>
                             </Grid>
                         </ListBoxItem>
@@ -108,23 +120,17 @@
                                 </Grid.ColumnDefinitions>
 
                                 <Border Style="{StaticResource NavBadgeStyle}">
-                                    <TextBlock Text="T"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontWeight="Bold"
-                                               Foreground="{DynamicResource TextPrimary}"/>
+                                    <Path Style="{StaticResource NavRailPathIconStyle}"
+                                          Data="M9 6H20V8H9V6ZM9 11H20V13H9V11ZM9 16H20V18H9V16ZM4.8 8.2L2.8 6.2L4.2 4.8L4.8 5.4L6.8 3.4L8.2 4.8L4.8 8.2ZM4.8 13.2L2.8 11.2L4.2 9.8L4.8 10.4L6.8 8.4L8.2 9.8L4.8 13.2ZM4.8 18.2L2.8 16.2L4.2 14.8L4.8 15.4L6.8 13.4L8.2 14.8L4.8 18.2Z"/>
                                 </Border>
 
                                 <StackPanel Grid.Column="1"
-                                            Margin="10,0,0,0">
+                                            Margin="10,0,0,0"
+                                            VerticalAlignment="Center">
                                     <TextBlock Text="Tasks"
-                                               FontSize="14"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimary}"/>
+                                               Style="{StaticResource NavRailItemTitleTextStyle}"/>
                                     <TextBlock Text="Dispatcher follow-up items"
-                                               Margin="0,2,0,0"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource TextSecondary}"/>
+                                               Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
                                 </StackPanel>
                             </Grid>
                         </ListBoxItem>
@@ -137,27 +143,22 @@
                                 </Grid.ColumnDefinitions>
 
                                 <Border Style="{StaticResource NavBadgeStyle}">
-                                    <TextBlock Text="🎫"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontSize="14"/>
+                                    <Path Style="{StaticResource NavRailPathIconStyle}"
+                                          Data="M4 6C4 4.9 4.9 4 6 4H18C19.1 4 20 4.9 20 6V9C18.9 9 18 9.9 18 11S18.9 13 20 13V16C20 17.1 19.1 18 18 18H6C4.9 18 4 17.1 4 16V13C5.1 13 6 12.1 6 11S5.1 9 4 9V6ZM6 6V7.4C7.2 8.1 8 9.4 8 11S7.2 13.9 6 14.6V16H18V14.6C16.8 13.9 16 12.6 16 11S16.8 8.1 18 7.4V6H6ZM10 8H14V10H10V8ZM10 12H14V14H10V12Z"/>
                                 </Border>
 
                                 <StackPanel Grid.Column="1"
-                                            Margin="10,0,0,0">
+                                            Margin="10,0,0,0"
+                                            VerticalAlignment="Center">
                                     <TextBlock Text="Tickets"
-                                               FontSize="14"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimary}"/>
+                                               Style="{StaticResource NavRailItemTitleTextStyle}"/>
                                     <TextBlock Text="Queue, filters, and details"
-                                               Margin="0,2,0,0"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource TextSecondary}"/>
+                                               Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
                                 </StackPanel>
                             </Grid>
                         </ListBoxItem>
 
-                        <ListBoxItem Tag="Technicians">
+                        <ListBoxItem Tag="Truck Assignments">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="36"/>
@@ -165,22 +166,69 @@
                                 </Grid.ColumnDefinitions>
 
                                 <Border Style="{StaticResource NavBadgeStyle}">
-                                    <TextBlock Text="👷"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontSize="14"/>
+                                    <Viewbox Width="24"
+                                             Height="24"
+                                             Stretch="Uniform">
+                                        <Canvas Width="48"
+                                                Height="48">
+
+                                            <!-- truck body -->
+                                            <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M6 33H28V24H35V33H43V39H6V33Z"/>
+
+                                            <!-- cab (shifted right a bit) -->
+                                            <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M35 25H40L43 30V39H35V25Z"/>
+
+                                            <!-- cab window -->
+                                            <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M37 28H39.5L41 32H37V28Z"/>
+
+                                            <!-- wheels -->
+                                            <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M14 39
+                        A4 4 0 1 0 14 47
+                        A4 4 0 1 0 14 39"/>
+
+                                            <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M35 39
+                        A4 4 0 1 0 35 47
+                        A4 4 0 1 0 35 39"/>
+
+                                            <!-- bucket -->
+                                            <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M4 6H15V15H5L4 6Z"/>
+
+                                            <!-- upper boom -->
+                                            <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M15 8L36 16"/>
+
+                                            <!-- lower boom -->
+                                            <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M15 14L30 22"/>
+
+                                            <!-- boom tip (kept left of cab for more separation) -->
+                                            <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M36 16H40V21H31"/>
+
+                                            <!-- lift post -->
+                                            <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M14 33V25C14 22 16 20 19 20H26"/>
+
+                                            <!-- knuckle -->
+                                            <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M26 24L22 26L24 30"/>
+                                        </Canvas>
+                                    </Viewbox>
                                 </Border>
 
                                 <StackPanel Grid.Column="1"
-                                            Margin="10,0,0,0">
+                                            Margin="10,0,0,0"
+                                            VerticalAlignment="Center">
                                     <TextBlock Text="Truck Assignments"
-                                               FontSize="14"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimary}"/>
+                                               Style="{StaticResource NavRailItemTitleTextStyle}"/>
                                     <TextBlock Text="Crews, pairings, and trucks"
-                                               Margin="0,2,0,0"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource TextSecondary}"/>
+                                               Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
                                 </StackPanel>
                             </Grid>
                         </ListBoxItem>
@@ -193,24 +241,17 @@
                                 </Grid.ColumnDefinitions>
 
                                 <Border Style="{StaticResource NavBadgeStyle}">
-                                    <TextBlock Text="A"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontSize="14"
-                                               FontWeight="Bold"
-                                               Foreground="{DynamicResource TextPrimary}"/>
+                                    <Path Style="{StaticResource NavRailPathIconStyle}"
+                                          Data="M7 2V4H17V2H19V4H21C22.1 4 23 4.9 23 6V21C23 22.1 22.1 23 21 23H3C1.9 23 1 22.1 1 21V6C1 4.9 1.9 4 3 4H5V2H7ZM3 10V21H21V10H3ZM3 6V8H21V6H3ZM6 13H10V15H6V13ZM12 13H18V15H12V13ZM6 17H10V19H6V17ZM12 17H18V19H12V17Z"/>
                                 </Border>
 
                                 <StackPanel Grid.Column="1"
-                                            Margin="10,0,0,0">
+                                            Margin="10,0,0,0"
+                                            VerticalAlignment="Center">
                                     <TextBlock Text="Daily Assignments"
-                                               FontSize="14"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimary}"/>
+                                               Style="{StaticResource NavRailItemTitleTextStyle}"/>
                                     <TextBlock Text="Crew routes and ticket order"
-                                               Margin="0,2,0,0"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource TextSecondary}"/>
+                                               Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
                                 </StackPanel>
                             </Grid>
                         </ListBoxItem>
@@ -223,24 +264,17 @@
                                 </Grid.ColumnDefinitions>
 
                                 <Border Style="{StaticResource NavBadgeStyle}">
-                                    <TextBlock Text="H"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontSize="14"
-                                               FontWeight="Bold"
-                                               Foreground="{DynamicResource TextPrimary}"/>
+                                    <Path Style="{StaticResource NavRailPathIconStyle}"
+                                          Data="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.58 20 4 16.42 4 12S7.58 4 12 4 20 7.58 20 12 16.42 20 12 20ZM13 7H11V13L16 16L17 14.3L13 12V7Z"/>
                                 </Border>
 
                                 <StackPanel Grid.Column="1"
-                                            Margin="10,0,0,0">
+                                            Margin="10,0,0,0"
+                                            VerticalAlignment="Center">
                                     <TextBlock Text="Modify Site History"
-                                               FontSize="14"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimary}"/>
+                                               Style="{StaticResource NavRailItemTitleTextStyle}"/>
                                     <TextBlock Text="Review and correct write-ups"
-                                               Margin="0,2,0,0"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource TextSecondary}"/>
+                                               Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
                                 </StackPanel>
                             </Grid>
                         </ListBoxItem>
@@ -256,60 +290,95 @@
 
                         <ListBoxItem Tag="Site Dashboard" ToolTip="Site Dashboard">
                             <Border Style="{StaticResource NavBadgeStyle}">
-                                <TextBlock Text="S"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontSize="14"/>
+                                <Path Style="{StaticResource NavRailPathIconStyle}"
+                                      Data="M3 5C3 3.9 3.9 3 5 3H19C20.1 3 21 3.9 21 5V19C21 20.1 20.1 21 19 21H5C3.9 21 3 20.1 3 19V5ZM5 5V10H11V5H5ZM13 5V10H19V5H13ZM5 12V19H11V12H5ZM13 12V19H19V12H13Z"/>
                             </Border>
                         </ListBoxItem>
 
                         <ListBoxItem Tag="Tasks" ToolTip="Tasks">
                             <Border Style="{StaticResource NavBadgeStyle}">
-                                <TextBlock Text="T"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <Path Style="{StaticResource NavRailPathIconStyle}"
+                                      Data="M9 6H20V8H9V6ZM9 11H20V13H9V11ZM9 16H20V18H9V16ZM4.8 8.2L2.8 6.2L4.2 4.8L4.8 5.4L6.8 3.4L8.2 4.8L4.8 8.2ZM4.8 13.2L2.8 11.2L4.2 9.8L4.8 10.4L6.8 8.4L8.2 9.8L4.8 13.2ZM4.8 18.2L2.8 16.2L4.2 14.8L4.8 15.4L6.8 13.4L8.2 14.8L4.8 18.2Z"/>
                             </Border>
                         </ListBoxItem>
 
                         <ListBoxItem Tag="Tickets" ToolTip="Tickets">
                             <Border Style="{StaticResource NavBadgeStyle}">
-                                <TextBlock Text="🎫"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontSize="14"/>
+                                <Path Style="{StaticResource NavRailPathIconStyle}"
+                                      Data="M4 6C4 4.9 4.9 4 6 4H18C19.1 4 20 4.9 20 6V9C18.9 9 18 9.9 18 11S18.9 13 20 13V16C20 17.1 19.1 18 18 18H6C4.9 18 4 17.1 4 16V13C5.1 13 6 12.1 6 11S5.1 9 4 9V6ZM6 6V7.4C7.2 8.1 8 9.4 8 11S7.2 13.9 6 14.6V16H18V14.6C16.8 13.9 16 12.6 16 11S16.8 8.1 18 7.4V6H6ZM10 8H14V10H10V8ZM10 12H14V14H10V12Z"/>
                             </Border>
                         </ListBoxItem>
 
-                        <ListBoxItem Tag="Technicians" ToolTip="Truck Assignments">
+                        <ListBoxItem Tag="Truck Assignments" ToolTip="Truck Assignments">
                             <Border Style="{StaticResource NavBadgeStyle}">
-                                <TextBlock Text="👷"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontSize="14"/>
+                                <Viewbox Width="24"
+             Height="24"
+             Stretch="Uniform">
+                                    <Canvas Width="48"
+                Height="48">
+
+                                        <!-- truck body -->
+                                        <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M6 33H28V24H35V33H43V39H6V33Z"/>
+
+                                        <!-- cab (shifted right a bit) -->
+                                        <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M35 25H40L43 30V39H35V25Z"/>
+
+                                        <!-- cab window -->
+                                        <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M37 28H39.5L41 32H37V28Z"/>
+
+                                        <!-- wheels -->
+                                        <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M14 39
+                        A4 4 0 1 0 14 47
+                        A4 4 0 1 0 14 39"/>
+
+                                        <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M35 39
+                        A4 4 0 1 0 35 47
+                        A4 4 0 1 0 35 39"/>
+
+                                        <!-- bucket -->
+                                        <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M4 6H15V15H5L4 6Z"/>
+
+                                        <!-- upper boom -->
+                                        <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M15 8L36 16"/>
+
+                                        <!-- lower boom -->
+                                        <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M15 14L30 22"/>
+
+                                        <!-- boom tip (kept left of cab for more separation) -->
+                                        <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M36 16H40V21H31"/>
+
+                                        <!-- lift post -->
+                                        <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M14 33V25C14 22 16 20 19 20H26"/>
+
+                                        <!-- knuckle -->
+                                        <Path Style="{StaticResource NavRailCanvasStrokeIconStyle}"
+                  Data="M26 24L22 26L24 30"/>
+                                    </Canvas>
+                                </Viewbox>
                             </Border>
                         </ListBoxItem>
 
                         <ListBoxItem Tag="Daily Assignments" ToolTip="Daily Assignments">
                             <Border Style="{StaticResource NavBadgeStyle}">
-                                <TextBlock Text="A"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontSize="14"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <Path Style="{StaticResource NavRailPathIconStyle}"
+                                      Data="M7 2V4H17V2H19V4H21C22.1 4 23 4.9 23 6V21C23 22.1 22.1 23 21 23H3C1.9 23 1 22.1 1 21V6C1 4.9 1.9 4 3 4H5V2H7ZM3 10V21H21V10H3ZM3 6V8H21V6H3ZM6 13H10V15H6V13ZM12 13H18V15H12V13ZM6 17H10V19H6V17ZM12 17H18V19H12V17Z"/>
                             </Border>
                         </ListBoxItem>
 
-                        <ListBoxItem Tag="Site History" ToolTip="Site History">
+                        <ListBoxItem Tag="Site History" ToolTip="Modify Site History">
                             <Border Style="{StaticResource NavBadgeStyle}">
-                                <TextBlock Text="H"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontSize="14"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <Path Style="{StaticResource NavRailPathIconStyle}"
+                                      Data="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.58 20 4 16.42 4 12S7.58 4 12 4 20 7.58 20 12 16.42 20 12 20ZM13 7H11V13L16 16L17 14.3L13 12V7Z"/>
                             </Border>
                         </ListBoxItem>
                     </ListBox>
@@ -331,24 +400,17 @@
                                 </Grid.ColumnDefinitions>
 
                                 <Border Style="{StaticResource NavBadgeStyle}">
-                                    <TextBlock Text="⌂"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontWeight="Bold"
-                                               Foreground="{DynamicResource TextPrimary}"/>
+                                    <Path Style="{StaticResource NavRailPathIconStyle}"
+                                          Data="M12 3L3 10.2V21H9V15H15V21H21V10.2L12 3ZM19 19H17V13H7V19H5V11.2L12 5.6L19 11.2V19Z"/>
                                 </Border>
 
                                 <StackPanel Grid.Column="1"
                                             Margin="10,0,0,0"
                                             VerticalAlignment="Center">
                                     <TextBlock Text="Home"
-                                               FontSize="14"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimary}"/>
+                                               Style="{StaticResource NavRailItemTitleTextStyle}"/>
                                     <TextBlock Text="Back to start screen"
-                                               Margin="0,2,0,0"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource TextSecondary}"/>
+                                               Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
                                 </StackPanel>
                             </Grid>
                         </Button>
@@ -359,25 +421,15 @@
                                 ToolTip="Home"
                                 Visibility="Collapsed">
                             <Border Style="{StaticResource NavBadgeStyle}">
-                                <TextBlock Text="⌂"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource TextPrimary}"/>
+                                <Path Style="{StaticResource NavRailPathIconStyle}"
+                                      Data="M12 3L3 10.2V21H9V15H15V21H21V10.2L12 3ZM19 19H17V13H7V19H5V11.2L12 5.6L19 11.2V19Z"/>
                             </Border>
                         </Button>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- Splitter -->
-            <GridSplitter Grid.Column="1"
-                          Width="14"
-                          Background="Transparent"
-                          HorizontalAlignment="Stretch"
-                          VerticalAlignment="Stretch"
-                          ShowsPreview="True"/>
-
+            
             <!-- Main pane host -->
             <ContentControl x:Name="MainPaneHost"
                             Grid.Column="2"/>

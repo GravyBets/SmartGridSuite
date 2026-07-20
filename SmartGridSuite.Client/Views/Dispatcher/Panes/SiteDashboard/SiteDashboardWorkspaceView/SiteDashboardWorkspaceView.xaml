@@ -233,10 +233,8 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-
     </UserControl.Resources>
-
-
+    
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -262,8 +260,8 @@
         </TabControl>
 
         <Grid Grid.Row="1"
-                x:Name="WorkspaceContentRoot"
-                Margin="0">
+              x:Name="WorkspaceContentRoot"
+              Margin="0">
 
             <!-- TOP / Write Up -->
             <Grid x:Name="TopWriteUpPanel" Margin="0">
@@ -1016,7 +1014,7 @@
                     Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="4"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -1034,9 +1032,10 @@
                                     Style="{StaticResource WorkspaceSectionHeaderStyle}"
                                     VerticalAlignment="Center"/>
 
-                        <Button Grid.Column="1"
+                        <Button x:Name="TestAllTowerSectorsButton"
+                                Grid.Column="1"
                                 Style="{StaticResource PrimaryButtonStyle}"
-                                Content="Test All"
+                                Content="Test"
                                 Height="28"
                                 MinWidth="88"
                                 Padding="12,0"
@@ -1064,7 +1063,7 @@
                     Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="4"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -1084,7 +1083,7 @@
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="320"/>
-                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="4"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
@@ -1371,212 +1370,309 @@
             <Grid x:Name="PortalPanel" Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="0"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Grid Grid.Row="0" Margin="0,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                <Border Grid.Row="0"
+                        Style="{StaticResource Card}"
+                        CornerRadius="12,12,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="PingScreen"
-                                Margin="10,4,0,0"
-                                Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+                        <TextBlock Text="PingScreen"
+                                   Margin="10,4,0,0"
+                                   Style="{StaticResource WorkspaceSectionHeaderStyle}"
+                                   FontSize="16"/>
 
-                    <Button Grid.Column="2"
-                            x:Name="ReloadPortalButton"
-                            Style="{StaticResource SecondaryButtonStyle}"
-                            Content="Reload"
-                            Height="28"
-                            Padding="12,0"
-                            Click="ReloadPortalButton_Click" />
+                        <Button Grid.Column="2"
+                                x:Name="ReloadPortalButton"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Content="Reload"
+                                Height="28"
+                                Width="96"
+                                Padding="12,0"
+                                Click="ReloadPortalButton_Click" />
 
-                    <Button Grid.Column="4"
-                            x:Name="OpenPortalInBrowserButton"
-                            Style="{StaticResource SecondaryButtonStyle}"
-                            Content="Open in Browser"
-                            Height="28"
-                            Padding="12,0"
-                            Click="OpenPortalInBrowserButton_Click" />
-                </Grid>
+                        <Button Grid.Column="4"
+                                x:Name="OpenPortalInBrowserButton"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Content="Open in Browser"
+                                Height="28"
+                                Padding="12,0"
+                                Click="OpenPortalInBrowserButton_Click" />
+                    </Grid>
+                </Border>
 
                 <Border Grid.Row="2"
                         CornerRadius="10"
                         BorderBrush="{DynamicResource SurfaceBorder}"
-                        BorderThickness="1"
+                        BorderThickness="0.5"
                         Background="{DynamicResource SurfaceBg}">
                     <wv2:WebView2 x:Name="PortalWebView" />
                 </Border>
+
             </Grid>
 
             <!-- Site History -->
-            <Grid x:Name="SiteHistoryPanel" Margin="10" Visibility="Collapsed">
+            <Grid x:Name="SiteHistoryPanel"
+                  Margin="0"
+                  Visibility="Collapsed">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="190"/>
-                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="240"/>
+                    <RowDefinition Height="4"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <DataGrid x:Name="HistoryDataGrid"
-                                Grid.Row="0"
-                                AutoGenerateColumns="False"
-                                CanUserAddRows="False"
-                                CanUserDeleteRows="False"
-                                CanUserReorderColumns="False"
-                                CanUserResizeRows="False"
-                                BorderThickness="0"
-                                Background="Transparent"
-                                GridLinesVisibility="None"
-                                HeadersVisibility="Column"
-                                IsReadOnly="True"
-                                RowHeaderWidth="0"
-                                SelectionMode="Single"
-                                SelectionUnit="FullRow"
-                                ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                SelectionChanged="HistoryDataGrid_SelectionChanged">
+                <!-- History list -->
+                <Border Grid.Row="0"
+                        Style="{StaticResource Card}"
+                        CornerRadius="0,0,10,10"
+                        Padding="0,0,0,24"
+                        ClipToBounds="True">
 
-                    <DataGrid.Resources>
-                        <Style TargetType="DataGridColumnHeader">
-                            <Setter Property="Background" Value="{DynamicResource SurfaceBg}" />
-                            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
-                            <Setter Property="FontWeight" Value="SemiBold" />
-                            <Setter Property="FontSize" Value="14" />
-                            <Setter Property="Padding" Value="10,8" />
-                            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}" />
-                            <Setter Property="BorderThickness" Value="0,0,0,1" />
-                        </Style>
+                    <Border CornerRadius="10"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="0"
+                            Background="{DynamicResource CardBackground}"
+                            ClipToBounds="True">
 
-                        <Style TargetType="DataGridRow">
-                            <Setter Property="Background" Value="Transparent" />
-                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
-                            <Setter Property="BorderThickness" Value="0" />
-                            <Setter Property="SnapsToDevicePixels" Value="True" />
-                            <Setter Property="FontSize" Value="14" />
-                            <Style.Triggers>
-                                <Trigger Property="IsSelected" Value="True">
-                                    <Setter Property="Background" Value="{DynamicResource TabBgHover}" />
-                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
+                        <DataGrid x:Name="HistoryDataGrid"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  CanUserResizeRows="False"
+                                  IsReadOnly="True"
+                                  RowHeaderWidth="0"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  BorderThickness="0"
+                                  Background="{DynamicResource CardBackground}"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="None"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  SelectionChanged="HistoryDataGrid_SelectionChanged">
 
-                        <Style TargetType="DataGridCell">
-                            <Setter Property="Padding" Value="10,8" />
-                            <Setter Property="BorderThickness" Value="0,0,0,1" />
-                            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}" />
-                            <Setter Property="Background" Value="Transparent" />
-                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
-                            <Setter Property="VerticalContentAlignment" Value="Center" />
-                            <Style.Triggers>
-                                <Trigger Property="IsSelected" Value="True">
-                                    <Setter Property="Background" Value="Transparent" />
-                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </DataGrid.Resources>
+                            <DataGrid.Resources>
+                                <!-- HEADER: stronger, larger, no vertical separators -->
+                                <Style TargetType="{x:Type DataGridColumnHeader}">
+                                    <Setter Property="Background" Value="{DynamicResource TabBgHover}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                    <Setter Property="FontSize" Value="14"/>
+                                    <Setter Property="Height" Value="32"/>
+                                    <Setter Property="Padding" Value="12,0"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource DataGridHeaderBorder}"/>
+                                    <Setter Property="BorderThickness" Value="0,0,0,1.25"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="{x:Type DataGridColumnHeader}">
+                                                <Border Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        Padding="{TemplateBinding Padding}"
+                                        SnapsToDevicePixels="True">
+                                                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                      SnapsToDevicePixels="True"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
 
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Date"
-                                            Width="110"
-                                            Binding="{Binding DateText}" />
+                                <!-- ROW -->
+                                <Style TargetType="{x:Type DataGridRow}">
+                                    <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                    <Setter Property="MinHeight" Value="34"/>
+                                    <Setter Property="BorderThickness" Value="0"/>
+                                    <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
 
-                        <DataGridTextColumn Header="Tech 1"
-                                            Width="145"
-                                            Binding="{Binding Tech1Text}" />
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource TileFillHover}"/>
+                                        </Trigger>
 
-                        <DataGridTextColumn Header="Tech 2"
-                                            Width="145"
-                                            Binding="{Binding Tech2Text}" />
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource TileFillPressed}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
 
-                        <DataGridTextColumn Header="Site Issue"
-                                            Width="*"
-                                            Binding="{Binding IssueText}" />
+                                <!-- CELL: horizontal separator only -->
+                                <Style TargetType="{x:Type DataGridCell}">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                    <Setter Property="Padding" Value="12,6"/>
+                                    <Setter Property="FontSize" Value="13.25"/>
+                                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                    <Setter Property="IsTabStop" Value="False"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="{x:Type DataGridCell}">
+                                                <Border Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        Padding="{TemplateBinding Padding}"
+                                        SnapsToDevicePixels="True">
+                                                    <ContentPresenter VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                      HorizontalAlignment="Left"
+                                                      SnapsToDevicePixels="True"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
 
-                        <DataGridTemplateColumn Header=""
-                                                Width="125">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal"
-                                                HorizontalAlignment="Right">
-                                        <StackPanel.Style>
-                                            <Style TargetType="StackPanel">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding CanEditWriteUp}" Value="False">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </StackPanel.Style>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
 
-                                        <Button Content="Edit"
-                                                Width="48"
-                                                Height="24"
-                                                Padding="6,0"
-                                                Margin="0,0,6,0"
-                                                Tag="{Binding}"
-                                                Style="{StaticResource SecondaryButtonStyle}"
-                                                Click="EditHistoryWriteUpButton_Click"/>
+                                <Style x:Key="HistoryGridTextStyle"
+                       TargetType="{x:Type TextBlock}">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize" Value="13.25"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                                </Style>
 
-                                        <Button Content="Delete"
-                                                Width="58"
-                                                Height="24"
-                                                Padding="6,0"
-                                                Tag="{Binding}"
-                                                Style="{StaticResource SecondaryButtonStyle}"
-                                                Click="DeleteHistoryWriteUpButton_Click"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                    </DataGrid.Columns>
-                </DataGrid>
+                                <Style x:Key="HistoryGridIssueTextStyle"
+                       TargetType="{x:Type TextBlock}"
+                       BasedOn="{StaticResource HistoryGridTextStyle}">
+                                    <Setter Property="TextWrapping" Value="Wrap"/>
+                                    <Setter Property="MaxHeight" Value="38"/>
+                                </Style>
+                            </DataGrid.Resources>
 
-                <Grid Grid.Row="2">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Date"
+                                    Width="110"
+                                    Binding="{Binding DateText}"
+                                    ElementStyle="{StaticResource HistoryGridTextStyle}" />
 
+                                <DataGridTextColumn Header="Tech 1"
+                                    Width="145"
+                                    Binding="{Binding Tech1Text}"
+                                    ElementStyle="{StaticResource HistoryGridTextStyle}" />
+
+                                <DataGridTextColumn Header="Tech 2"
+                                    Width="145"
+                                    Binding="{Binding Tech2Text}"
+                                    ElementStyle="{StaticResource HistoryGridTextStyle}" />
+
+                                <DataGridTextColumn Header="Site Issue"
+                                    Width="*"
+                                    Binding="{Binding IssueText}"
+                                    ElementStyle="{StaticResource HistoryGridIssueTextStyle}" />
+
+                                <DataGridTemplateColumn Header=""
+                                        Width="125">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding CanEditWriteUp}" Value="False">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
+
+                                                <Button Content="Edit"
+                                                    Width="48"
+                                                    Height="24"
+                                                    Padding="6,0"
+                                                    Margin="0,0,6,0"
+                                                    Tag="{Binding}"
+                                                    Style="{StaticResource SecondaryButtonStyle}"
+                                                    Click="EditHistoryWriteUpButton_Click"/>
+
+                                                <Button Content="Delete"
+                                                    Width="58"
+                                                    Height="24"
+                                                    Padding="6,0"
+                                                    Tag="{Binding}"
+                                                    Style="{StaticResource SecondaryButtonStyle}"
+                                                    Click="DeleteHistoryWriteUpButton_Click"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </Border>
+
+                <!-- History narrative card -->
+                <Border Grid.Row="2"
+                        Style="{StaticResource Card}"
+                        Padding="12">
                     <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
 
-                        <TextBlock Text="Site History Write-Up"
-                                    Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
 
-                        <TextBlock x:Name="HistoryEditedTextBlock"
-                                    Grid.Column="1"
-                                    Foreground="{DynamicResource TextSecondary}"
-                                    FontSize="12"
-                                    VerticalAlignment="Center"/>
-                    </Grid>
+                            <TextBlock Text="Site History Write-Up"
+                                       Margin="4,0,0,0"
+                                       Style="{StaticResource WorkspaceSectionHeaderStyle}"/>
 
-                    <Border Grid.Row="2"
+                            <TextBlock x:Name="HistoryEditedTextBlock"
+                                       Grid.Column="1"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <Border Grid.Row="2"
                                 BorderBrush="{DynamicResource SurfaceBorder}"
                                 BorderThickness="1"
-                                CornerRadius="0,0,0,12"
+                                CornerRadius="10"
                                 Background="{DynamicResource SurfaceBg}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                            HorizontalScrollBarVisibility="Disabled">
-                            <TextBlock x:Name="NarrativeTextBlock"
-                                            Padding="12"
-                                            TextWrapping="Wrap"
-                                            Foreground="{DynamicResource TextPrimary}"
-                                            FontSize="14"/>
-                        </ScrollViewer>
-                    </Border>
-                </Grid>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                                <TextBlock x:Name="NarrativeTextBlock"
+                               Padding="12"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextPrimary}"
+                               FontSize="14"/>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </Border>
             </Grid>
 
             <!-- Equipment -->
@@ -1586,13 +1682,13 @@
 
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="300"/>
-                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="4"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- LEFT SIDE -->
                 <StackPanel Grid.Column="0"
-                                VerticalAlignment="Top">
+                            VerticalAlignment="Top">
 
                     <!-- Serialized Devices -->
                     <Border Style="{StaticResource Card}"
@@ -1689,109 +1785,109 @@
             <Grid x:Name="SnmpPanel" Margin="0" Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="4"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="4"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- Header -->
                 <Border Grid.Row="0"
-                            Style="{StaticResource Card}"
-                            Margin="0,0,0,0">
+                        Style="{StaticResource Card}"
+                        Margin="0,0,0,0">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="10"/>
+                            <RowDefinition Height="4"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <Grid Grid.Row="0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="12"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Column="0"
-                                            Text="SNMP Tool"
-                                            Style="{StaticResource WorkspaceSectionHeaderStyle}"
-                                            VerticalAlignment="Center" />
+                                       Text="SNMP Tool"
+                                       Style="{StaticResource WorkspaceSectionHeaderStyle}"
+                                       VerticalAlignment="Center" />
 
                             <TextBlock x:Name="SnmpSupportInlineTextBlock"
-                                            Grid.Column="2"
-                                            VerticalAlignment="Center"
-                                            Foreground="{DynamicResource TextSecondary}"
-                                            Text="No site loaded." />
+                                       Grid.Column="2"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Text="No site loaded." />
                         </Grid>
                         <Grid Grid.Row="2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="4"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="4"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="4"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="4"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Column="0"
-                                            Text="Profile"
-                                            Style="{StaticResource WorkspaceMiniLabelStyle}"
-                                            VerticalAlignment="Center" />
+                                       Text="Profile"
+                                       Style="{StaticResource WorkspaceMiniLabelStyle}"
+                                       VerticalAlignment="Center" />
 
                             <ComboBox x:Name="SnmpProfileComboBox"
-                                            Grid.Column="2"
-                                            Height="28"
-                                            MinWidth="220"
-                                            IsEditable="False"
-                                            DisplayMemberPath="DisplayLabel"
-                                            SelectedValuePath="Id"
-                                            TextSearch.TextPath="DisplayLabel"
-                                            SelectionChanged="SnmpProfileComboBox_SelectionChanged" />
+                                     Grid.Column="2"
+                                     Height="28"
+                                     MinWidth="220"
+                                     IsEditable="False"
+                                     DisplayMemberPath="DisplayLabel"
+                                     SelectedValuePath="Id"
+                                     TextSearch.TextPath="DisplayLabel"
+                                     SelectionChanged="SnmpProfileComboBox_SelectionChanged" />
 
                             <Button x:Name="RefreshSnmpButton"
-                                        Grid.Column="4"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Content="Refresh SNMP Config"
-                                        Height="28"
-                                        Padding="12,0"
-                                        Click="RefreshSnmpButton_Click" />
+                                    Grid.Column="4"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Refresh SNMP Config"
+                                    Height="28"
+                                    Padding="12,0"
+                                    Click="RefreshSnmpButton_Click" />
 
                             <TextBlock Grid.Column="6"
-                                            Text="Target"
-                                            Style="{StaticResource WorkspaceMiniLabelStyle}"
-                                            VerticalAlignment="Center" />
+                                       Text="Target"
+                                       Style="{StaticResource WorkspaceMiniLabelStyle}"
+                                       VerticalAlignment="Center" />
 
                             <ComboBox x:Name="SnmpTargetComboBox"
-                                            Grid.Column="8"
-                                            Height="30"
-                                            VerticalContentAlignment="Center"
-                                            SelectionChanged="SnmpTargetComboBox_SelectionChanged"/>
+                                     Grid.Column="8"
+                                     Height="30"
+                                     VerticalContentAlignment="Center"
+                                     SelectionChanged="SnmpTargetComboBox_SelectionChanged"/>
 
                             <TextBox x:Name="SnmpTargetTextBox"
-                                            Grid.Column="10"
-                                            Style="{StaticResource WorkspaceEditorBoxStyle}"
-                                            Height="28"
-                                            MinWidth="104"
-                                            Padding="10,0,14,0"
-                                            VerticalContentAlignment="Center"
-                                            LostFocus="SnmpTargetTextBox_LostFocus" />
+                                     Grid.Column="10"
+                                     Style="{StaticResource WorkspaceEditorBoxStyle}"
+                                     Height="28"
+                                     MinWidth="104"
+                                     Padding="10,0,14,0"
+                                     VerticalContentAlignment="Center"
+                                     LostFocus="SnmpTargetTextBox_LostFocus" />
 
                             <Button x:Name="PollAllSnmpButton"
-                                        Grid.Column="12"
-                                        Style="{StaticResource PrimaryButtonStyle}"
-                                        Content="Poll All"
-                                        Height="28"
-                                        Width="66"
-                                        Padding="12,0"
-                                        Click="PollAllSnmpButton_Click" />
+                                    Grid.Column="12"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Content="Poll All"
+                                    Height="28"
+                                    Width="66"
+                                    Padding="12,0"
+                                    Click="PollAllSnmpButton_Click" />
                         </Grid>
                     </Grid>
                 </Border>
@@ -1799,7 +1895,7 @@
                 <!-- Category cards -->
                 <Grid Grid.Row="2">
                     <ItemsControl x:Name="SnmpCategoryItemsControl"
-                                        Margin="0,0,-8,0">
+                                  Margin="0,0,-6,0">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <UniformGrid Columns="3"/>
@@ -1808,19 +1904,19 @@
 
                         <ItemsControl.ItemContainerStyle>
                             <Style TargetType="ContentPresenter">
-                                <Setter Property="Margin" Value="0,0,8,0"/>
+                                <Setter Property="Margin" Value="0,0,6,0"/>
                             </Style>
                         </ItemsControl.ItemContainerStyle>
 
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border Style="{StaticResource Card}"
-                                            Padding="12,10"
-                                            MinHeight="0">
+                                        Padding="10,8"
+                                        MinHeight="0">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="8"/>
+                                            <RowDefinition Height="2"/>
                                             <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
 
@@ -1831,65 +1927,85 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
 
-                                            <TextBlock Text="{Binding Category}"
-                                                            Style="{StaticResource WorkspaceSectionHeaderStyle}"
-                                                            VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding Category}"
+                                                       Style="{StaticResource WorkspaceSectionHeaderStyle}"
+                                                       VerticalAlignment="Center"/>
+
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Rows.Count, StringFormat={}{0} OIDs}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondary}"
+                                                       VerticalAlignment="Center"/>
                                         </Grid>
 
                                         <!-- Category contents -->
-                                        <Grid Grid.Row="2" MinHeight="0">
+                                        <Grid Grid.Row="2"
+                                              MinHeight="0">
                                             <TextBlock Text="{Binding EmptyMessage}"
-                                                            Visibility="{Binding EmptyMessageVisibility}"
-                                                            Foreground="{DynamicResource TextSecondary}" />
+                                                       Visibility="{Binding EmptyMessageVisibility}"
+                                                       Foreground="{DynamicResource TextSecondary}"/>
 
                                             <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                                                HorizontalScrollBarVisibility="Disabled"
-                                                                CanContentScroll="True">
+                                                          HorizontalScrollBarVisibility="Disabled"
+                                                          CanContentScroll="True">
                                                 <ItemsControl ItemsSource="{Binding Rows}">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Border Margin="0,0,0,6"
-                                                                        Padding="0,0,0,6"
-                                                                        BorderBrush="{DynamicResource SurfaceBorder}"
-                                                                        BorderThickness="0,0,0,1">
+                                                            <Border Margin="0,0,0,4"
+                                                                    Padding="0,0,0,4"
+                                                                    BorderBrush="{DynamicResource SurfaceBorder}"
+                                                                    BorderThickness="0,0,0,1">
                                                                 <Grid>
                                                                     <Grid.RowDefinitions>
                                                                         <RowDefinition Height="Auto"/>
-                                                                        <RowDefinition Height="4"/>
+                                                                        <RowDefinition Height="2"/>
                                                                         <RowDefinition Height="Auto"/>
                                                                     </Grid.RowDefinitions>
+
                                                                     <Grid.ColumnDefinitions>
                                                                         <ColumnDefinition Width="*"/>
                                                                         <ColumnDefinition Width="Auto"/>
                                                                     </Grid.ColumnDefinitions>
 
+                                                                    <!-- Row 1: OID label + run button -->
                                                                     <TextBlock Grid.Row="0"
-                                                                                    Grid.Column="0"
-                                                                                    Text="{Binding Label}"
-                                                                                    TextWrapping="Wrap"
-                                                                                    Margin="0,1,8,0"
-                                                                                    Foreground="{DynamicResource TextPrimary}"
-                                                                                    FontWeight="SemiBold"
-                                                                                    VerticalAlignment="Center" />
+                                                                               Grid.Column="0"
+                                                                               Text="{Binding Label}"
+                                                                               TextWrapping="Wrap"
+                                                                               TextTrimming="CharacterEllipsis"
+                                                                               MaxHeight="34"
+                                                                               Margin="4,0,8,0"
+                                                                               Foreground="{DynamicResource TextPrimary}"
+                                                                               FontWeight="SemiBold"
+                                                                               FontSize="12"
+                                                                               VerticalAlignment="Center"/>
 
                                                                     <Button Grid.Row="0"
-                                                                                Grid.Column="1"
-                                                                                Style="{StaticResource SecondaryButtonStyle}"
-                                                                                FontFamily="Segoe MDL2 Assets"
-                                                                                Content="&#xE72C;"
-                                                                                Height="24"
-                                                                                MinWidth="28"
-                                                                                Padding="0,0"
-                                                                                Tag="{Binding}"
-                                                                                Click="RunSnmpOidButton_Click" />
+                                                                            Grid.Column="1"
+                                                                            Style="{StaticResource MiniIconButton}"
+                                                                            FontFamily="Segoe MDL2 Assets"
+                                                                            Content="&#xE72C;"
+                                                                            Height="22"
+                                                                            MinWidth="26"
+                                                                            FontSize="12"
+                                                                            FontWeight="SemiBold"
+                                                                            Padding="0"
+                                                                            Tag="{Binding}"
+                                                                            VerticalAlignment="Center"
+                                                                            Click="RunSnmpOidButton_Click"/>
 
+                                                                    <!-- Row 2: Result -->
                                                                     <TextBox Grid.Row="2"
-                                                                            Grid.Column="0"
-                                                                            Grid.ColumnSpan="2"
-                                                                            VerticalScrollBarVisibility="Disabled"
-                                                                            Text="{Binding ResultText}"
-                                                                            Style="{StaticResource SnmpResultBoxStyle}"
-                                                                            MinHeight="32" />
+                                                                             Grid.Column="0"
+                                                                             Grid.ColumnSpan="2"
+                                                                             Text="{Binding ResultText}"
+                                                                             Style="{StaticResource SnmpResultBoxStyle}"
+                                                                             MinHeight="28"
+                                                                             MaxHeight="52"
+                                                                             Padding="6,4"
+                                                                             FontSize="12"
+                                                                             VerticalScrollBarVisibility="Auto"/>
                                                                 </Grid>
                                                             </Border>
                                                         </DataTemplate>
@@ -1906,80 +2022,87 @@
 
                 <!-- SNMP Set Tool -->
                 <Border Grid.Row="4"
-                            Style="{StaticResource Card}"
-                            Margin="0">
-                    <Grid MinHeight="100">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
+                        Style="{StaticResource Card}"
+                        Margin="0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="14"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                        <TextBlock Text="SNMP Set Tool"
-                                        Style="{StaticResource WorkspaceSectionHeaderStyle}" />
+                        <!-- Left: Set controls -->
+                        <Grid Grid.Column="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
 
+                            <TextBlock Grid.Row="0"
+                                       Text="SNMP Set Tool"
+                                       Style="{StaticResource WorkspaceSectionHeaderStyle}" />
 
-                        <!-- Row 2: OID + Value + Set -->
-                        <Grid Grid.Row="4">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="280"/>                                    
+                                </Grid.ColumnDefinitions>
 
-                            <TextBlock Grid.Column="0"
-                                            Text="Choose OID"
-                                            Style="{StaticResource WorkspaceMiniLabelStyle}" />
+                                <TextBlock Grid.Column="0"
+                                           Text="Choose OID"
+                                           Style="{StaticResource WorkspaceMiniLabelStyle}" />
 
-                            <ComboBox x:Name="SnmpWritableOidComboBox"
-                                            Grid.Column="2"
-                                            Height="28"
-                                            MinWidth="260"
-                                            HorizontalAlignment="Stretch"
-                                            IsEditable="False"
-                                            DisplayMemberPath="DisplayLabel"
-                                            TextSearch.TextPath="DisplayLabel"
-                                            SelectionChanged="SnmpWritableOidComboBox_SelectionChanged" />
-
-                            <TextBlock Grid.Column="4"
-                                            Text="Set Value"
-                                            Style="{StaticResource WorkspaceMiniLabelStyle}" />
-
-                            <Grid Grid.Column="6">
-                                <TextBox x:Name="SnmpSetValueTextBox"
-                                                Style="{StaticResource WorkspaceEditorBoxStyle}"
-                                                Height="28"
-                                                MinWidth="220"
-                                                Padding="10,0"
-                                                VerticalContentAlignment="Center"
-                                                HorizontalAlignment="Stretch"
-                                                IsEnabled="False" />
-
-                                <ComboBox x:Name="SnmpSetValueComboBox"
-                                                Height="28"
-                                                MinWidth="220"
-                                                HorizontalAlignment="Stretch"
-                                                IsEditable="False"
-                                                DisplayMemberPath="DisplayLabel"
-                                                SelectedValuePath="RawValue"
-                                                TextSearch.TextPath="DisplayLabel"
-                                                Visibility="Collapsed"
-                                                IsEnabled="False" />
+                                <ComboBox x:Name="SnmpWritableOidComboBox"
+                                          Grid.Column="2"
+                                          Height="28"
+                                          Width="280"
+                                          HorizontalAlignment="Stretch"
+                                          IsEditable="False"
+                                          DisplayMemberPath="DisplayLabel"
+                                          TextSearch.TextPath="DisplayLabel"
+                                          SelectionChanged="SnmpWritableOidComboBox_SelectionChanged" />
                             </Grid>
+                            
+                            <Grid Grid.Row="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="280"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="Auto"/>                                    
+                                </Grid.ColumnDefinitions>
 
-                            <Button x:Name="SetSelectedSnmpButton"
-                                        Grid.Column="8"
+                                <TextBlock Grid.Column="0"
+                                           Text="Set Value"
+                                           Style="{StaticResource WorkspaceMiniLabelStyle}" />
+
+                                <Grid Grid.Column="2">
+                                    <TextBox x:Name="SnmpSetValueTextBox"
+                                             Style="{StaticResource WorkspaceEditorBoxStyle}"
+                                             Height="28"
+                                             Padding="10,0"
+                                             VerticalContentAlignment="Center"
+                                             HorizontalAlignment="Stretch"
+                                             IsEnabled="False" />
+
+                                    <ComboBox x:Name="SnmpSetValueComboBox"
+                                              Height="28"
+                                              Width="280"
+                                              HorizontalAlignment="Stretch"
+                                              IsEditable="False"
+                                              DisplayMemberPath="DisplayLabel"
+                                              SelectedValuePath="RawValue"
+                                              TextSearch.TextPath="DisplayLabel"
+                                              Visibility="Collapsed"
+                                              IsEnabled="False" />
+                                </Grid>
+
+                                <Button x:Name="SetSelectedSnmpButton"
+                                        Grid.Column="4"
                                         Style="{StaticResource PrimaryButtonStyle}"
                                         Content="Set Selected"
                                         Height="28"
@@ -1987,21 +2110,39 @@
                                         Padding="12,0"
                                         IsEnabled="False"
                                         Click="SetSelectedSnmpButton_Click" />
+                            </Grid>
                         </Grid>
 
-                        <!-- Decoder / help area -->
-                        <TextBox x:Name="SnmpDecoderValuesTextBox"
-                                        Grid.Row="6"
-                                        Style="{StaticResource WorkspaceReadOnlyBoxStyle}"
-                                        AcceptsReturn="True"
-                                        TextWrapping="Wrap"
-                                        VerticalScrollBarVisibility="Auto"
-                                        IsReadOnly="True"
-                                        MinHeight="56" />
+                        <!-- Right: Decoder help -->
+                        <Grid Grid.Column="2"
+                              VerticalAlignment="Stretch">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="4"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0"
+                                       Text="Decoder"
+                                       Style="{StaticResource WorkspaceMiniLabelStyle}" />
+
+                            <TextBox x:Name="SnmpDecoderValuesTextBox"
+                                     Grid.Row="2"
+                                     Style="{StaticResource WorkspaceReadOnlyBoxStyle}"
+                                     MinHeight="56"
+                                     MinWidth="220"
+                                     Padding="10,7"
+                                     VerticalContentAlignment="Top"
+                                     HorizontalAlignment="Stretch"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Auto"
+                                     HorizontalScrollBarVisibility="Disabled"
+                                     IsReadOnly="True" />
+                        </Grid>
                     </Grid>
                 </Border>
             </Grid>
         </Grid>
     </Grid>
-
 </UserControl>

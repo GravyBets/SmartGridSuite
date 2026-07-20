@@ -10,6 +10,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\Branding\CenterPoint Logo Black Transparent bkgrnd.png" />
+    <None Remove="Assets\Branding\CenterPoint Logo Color Transparent bkgrnd.png" />
+    <None Remove="Assets\Branding\CenterPoint Logo Color White text Transparent bkgrnd.png" />
+    <None Remove="Assets\Branding\CenterPoint Logo White Transparent bkgrnd.png" />
+  </ItemGroup>
+	
+  <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Fluent.Ribbon" Version="11.0.2" />
@@ -18,6 +25,27 @@
 
   <ItemGroup>   
     <ProjectReference Include="..\..\SmartGridSuite\SmartGridSuite.Contracts\SmartGridSuite.Contracts.csproj" />	
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Branding\CenterPoint Logo Black Transparent bkgrnd.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Assets\Branding\CenterPoint Logo Color Transparent bkgrnd.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Assets\Branding\CenterPoint Logo Color White text Transparent bkgrnd.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Assets\Branding\CenterPoint Logo White Transparent bkgrnd.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Assets\Branding\SmartGridSuite_Icon.ico">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Assets\Branding\SmartGridSuite_Logo.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
   </ItemGroup>
 
 </Project>

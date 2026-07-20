@@ -5,7 +5,9 @@
         Width="420"
         Height="210"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
+        Background="{StaticResource AppBackground}">
 
     <Grid Margin="16">
         <Grid.RowDefinitions>

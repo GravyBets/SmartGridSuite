@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using SmartGridSuite.Client.Views.Dispatcher.Panes;
 using System.ComponentModel;
 using SmartGridSuite.Client.Services;
@@ -18,6 +19,9 @@ namespace SmartGridSuite.Client.Views
         private bool _closePromptRunning;
         private SiteHistoryPaneView? _siteHistoryPaneView;
 
+        private const double NavExpandedWidth = 260;
+        private const double NavCollapsedWidth = 58;
+
         private readonly ApiClient _api = new("https://localhost:7140");
 
         public DispatcherShellWindow()
@@ -28,8 +32,10 @@ namespace SmartGridSuite.Client.Views
 
             Closing += DispatcherShellWindow_Closing;
 
-            // Default selection = Site Dashboard
-            SelectNavIndex(0);
+            _navCollapsed = true;
+            ApplyNavState();
+
+            SelectNavIndex(1);
         }
 
         private void SelectNavIndex(int index)
@@ -120,7 +126,7 @@ namespace SmartGridSuite.Client.Views
                     MainPaneHost.Content = new TicketsPaneView();
                     break;
 
-                case "Technicians":
+                case "Truck Assignments":
                     MainPaneHost.Content = new TechniciansPaneView();
                     break;
 
@@ -144,10 +150,18 @@ namespace SmartGridSuite.Client.Views
         private void ToggleNav_Click(object sender, RoutedEventArgs e)
         {
             _navCollapsed = !_navCollapsed;
+            ApplyNavState();
+        }
 
+        private void ApplyNavState()
+        {
             NavCol.Width = _navCollapsed
-                ? new GridLength(88)
-                : new GridLength(280);
+                ? new GridLength(NavCollapsedWidth)
+                : new GridLength(NavExpandedWidth);
+
+            NavShellBorder.Padding = _navCollapsed
+                ? new Thickness(5)
+                : new Thickness(12);
 
             NavListExpanded.Visibility = _navCollapsed
                 ? Visibility.Collapsed
@@ -156,6 +170,17 @@ namespace SmartGridSuite.Client.Views
             NavListCollapsed.Visibility = _navCollapsed
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+
+            NavHeaderTextPanel.Visibility = _navCollapsed
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+            Grid.SetColumn(NavHeaderBtn, _navCollapsed ? 0 : 1);
+            Grid.SetColumnSpan(NavHeaderBtn, _navCollapsed ? 2 : 1);
+
+            NavHeaderBtn.HorizontalAlignment = _navCollapsed
+                ? HorizontalAlignment.Center
+                : HorizontalAlignment.Right;
 
             NavSectionLabel.Visibility = _navCollapsed
                 ? Visibility.Collapsed
@@ -168,6 +193,15 @@ namespace SmartGridSuite.Client.Views
             HomeButtonCollapsed.Visibility = _navCollapsed
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+
+            if (NavHeaderArrowPath.RenderTransform is RotateTransform rotate)
+            {
+                rotate.Angle = _navCollapsed ? 0 : 180;
+            }
+
+            NavHeaderBtn.ToolTip = _navCollapsed
+                ? "Expand navigation"
+                : "Collapse navigation";
         }
 
         private async void HomeButton_Click(object sender, RoutedEventArgs e)

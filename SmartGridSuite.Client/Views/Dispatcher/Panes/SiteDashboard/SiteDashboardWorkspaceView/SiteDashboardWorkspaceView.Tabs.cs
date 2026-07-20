@@ -175,7 +175,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private void WriteUpTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            WriteUpTextChanged?.Invoke(this, WriteUpTextBox.Text);
+            if (_suppressWriteUpTextChanged)
+                return;
+
+            _pendingWriteUpText = WriteUpTextBox.Text ?? string.Empty;
+
+            _writeUpTextChangedDebounceTimer.Stop();
+            _writeUpTextChangedDebounceTimer.Start();
+        }
+
+        private void FlushWriteUpTextChangedDebounce()
+        {
+            if (_suppressWriteUpTextChanged)
+                return;
+
+            _writeUpTextChangedDebounceTimer.Stop();
+
+            _pendingWriteUpText = WriteUpTextBox.Text ?? string.Empty;
+
+            WriteUpTextChanged?.Invoke(this, _pendingWriteUpText);
+        }
+
+        private void WriteUpTextChangedDebounceTimer_Tick(object? sender, EventArgs e)
+        {
+            _writeUpTextChangedDebounceTimer.Stop();
+
+            WriteUpTextChanged?.Invoke(this, _pendingWriteUpText);
         }
     }
 }

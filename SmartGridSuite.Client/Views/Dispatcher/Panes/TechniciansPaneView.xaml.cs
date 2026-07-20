@@ -40,6 +40,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private bool _syncingTechnicianSelection;
 
+        private int _busyOverlayDepth;
+
         public TruckBoardVm Board { get; private set; } = new();
 
         public int OnDutyCount => Board.AllTechnicians.Count(t => t.IsOnShift);
@@ -134,8 +136,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private async Task LoadBoardAsync()
+        private async Task LoadBoardAsync(string busyMessage = "Loading truck board...")
         {
+            ShowBusyOverlay(busyMessage);
+
             try
             {
                 SetStatus("Loading board...");
@@ -155,6 +159,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             catch (Exception ex)
             {
                 SetStatus("Error: " + ex.Message);
+            }
+            finally
+            {
+                HideBusyOverlay();
             }
         }
 
@@ -218,7 +226,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             try
             {
-                await LoadBoardAsync();
+                await LoadBoardAsync("Refreshing truck board...");
             }
             finally
             {
@@ -445,6 +453,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             try
             {
                 IsCommitting = true;
+                ShowBusyOverlay("Committing truck board changes...");
                 SetStatus("Committing truck board changes...");
 
                 var req = new CommitTruckBoardRequest
@@ -471,7 +480,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     return false;
                 }
 
-                await LoadBoardAsync();
+                await LoadBoardAsync("Refreshing saved truck board...");
 
                 SetStatus("Truck board changes committed.");
                 return true;
@@ -491,6 +500,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             finally
             {
                 IsCommitting = false;
+                HideBusyOverlay();
             }
         }
 
@@ -561,7 +571,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (confirm != MessageBoxResult.Yes)
                 return;
 
-            await LoadBoardAsync();
+            await LoadBoardAsync("Discarding changes and reloading truck board...");
         }
 
         private void MoveTechnicianToTruck(int technicianId, int? toTruckId)
@@ -706,6 +716,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void RootGrid_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
+            if (BusyOverlay?.Visibility == Visibility.Visible)
+            {
+                e.Handled = true;
+                return;
+            }
+
             var source = e.OriginalSource as DependencyObject;
 
             // Do not clear when clicking inside the technician drawer list.
@@ -983,6 +999,61 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 e.Handled = true;
         }
 
+        private void ShowBusyOverlay(string message)
+        {
+            _busyOverlayDepth++;
+
+            if (BusyOverlay is null ||
+                BusyOverlayMessageTextBlock is null)
+            {
+                return;
+            }
+
+            BusyOverlayMessageTextBlock.Text = string.IsNullOrWhiteSpace(message)
+                ? "Loading..."
+                : message;
+
+            BusyOverlay.Visibility = Visibility.Visible;
+            SetTruckBoardControlsEnabled(false);
+
+            Cursor = Cursors.Wait;
+        }
+
+        private void HideBusyOverlay()
+        {
+            if (_busyOverlayDepth > 0)
+                _busyOverlayDepth--;
+
+            if (_busyOverlayDepth > 0)
+                return;
+
+            if (BusyOverlay is null)
+                return;
+
+            BusyOverlay.Visibility = Visibility.Collapsed;
+            SetTruckBoardControlsEnabled(true);
+
+            Cursor = null;
+
+            RefreshBoardMetrics();
+            NotifyDraftStateChanged();
+        }
+
+        private void SetTruckBoardControlsEnabled(bool enabled)
+        {
+            if (RefreshBoardButton != null)
+                RefreshBoardButton.IsEnabled = enabled && CanEditBoard;
+
+            if (TechnicianDrawerCard != null)
+                TechnicianDrawerCard.IsEnabled = enabled && CanEditBoard;
+
+            if (TruckBoardCard != null)
+                TruckBoardCard.IsEnabled = enabled && CanEditBoard;
+
+            if (!enabled)
+                _dragTechnicianIdsSnapshot.Clear();
+        }
+
 
         //Drag and Drop
         private void TechCardList_PreviewMouseMove(object sender, MouseEventArgs e)
@@ -1251,13 +1322,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        public string? LeadTechnicianName =>
-            LeadTechnicianId.HasValue
+        public string? LeadTechnicianName => LeadTechnicianId.HasValue
                 ? Technicians.FirstOrDefault(t => t.Id == LeadTechnicianId.Value)?.Name
                 : null;
 
-        public string LeadText =>
-            string.IsNullOrWhiteSpace(LeadTechnicianName)
+        public string LeadText => string.IsNullOrWhiteSpace(LeadTechnicianName)
                 ? "Lead: Not set"
                 : $"Lead: {LeadTechnicianName}";
     }

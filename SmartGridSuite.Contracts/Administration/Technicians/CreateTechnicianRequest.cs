@@ -13,6 +13,8 @@ public sealed class CreateTechnicianRequest
     public string LastName { get; set; } = "";
     public string Title { get; set; } = "";
 
+    public string? EmailAddress { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public int? HomeTruckId { get; set; }

@@ -27,11 +27,16 @@ namespace SmartGridSuite.Api
             builder.Services.Configure<ParentDatabaseOptions>(
                 builder.Configuration.GetSection(ParentDatabaseOptions.SectionName));
 
+            builder.Services.Configure<EmailOptions>(
+                builder.Configuration.GetSection(EmailOptions.SectionName));
+
             builder.Services.AddScoped<ParentSyncService>();
 
             builder.Services.AddScoped<SnmpPollingService>();
 
             builder.Services.AddScoped<TruckBoardInitializationService>();
+
+            builder.Services.AddScoped<EmailService>();
 
             var app = builder.Build();
 

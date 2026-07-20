@@ -105,8 +105,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 _writeUpSubmitInProgress = true;
 
+                ShowSiteLoadOverlay("Submitting write-up...");
                 TopBarView.StatusText =
                     "Submitting write-up...";
+
+                await Task.Yield();
 
                 /*
                  * First check the draft already restored into this dashboard tab.
@@ -178,6 +181,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                             pendingDraft.TicketId;
                     }
 
+                    UpdateSiteLoadOverlayMessage("Retrying pending write-up...");
                     TopBarView.StatusText =
                         "Retrying pending write-up...";
                 }
@@ -197,6 +201,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     isPendingRetry && pendingTicketId > 0
                         ? pendingTicketId
                         : session.CurrentTicketId;
+
+                UpdateSiteLoadOverlayMessage("Finding or creating ticket for write-up...");
 
                 if (targetTicketId <= 0)
                 {
@@ -219,6 +225,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     return;
                 }
 
+                UpdateSiteLoadOverlayMessage("Submitting write-up to server...");
+
                 await _ticketsApi.SubmitWriteUpAsync(
                     targetTicketId,
                     clientSubmissionId,
@@ -229,6 +237,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 submittedTicketId =
                     targetTicketId;
+
+                UpdateSiteLoadOverlayMessage("Cleaning up local pending write-up backup...");
 
                 /*
                  * Only remove the JSON after the API positively confirms success.
@@ -246,6 +256,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 ResetPendingWriteUpRecoveryCheck(
                     session);
 
+                UpdateSiteLoadOverlayMessage("Refreshing site history after submit...");
+
                 TopBarView.StatusText =
                     "Refreshing site after write-up submit...";
 
@@ -260,6 +272,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
             catch (ApiClient.ApiConnectionException)
             {
+                UpdateSiteLoadOverlayMessage("Connection failed. Saving write-up locally...");
+
                 bool savedLocally;
 
                 if (isPendingRetry &&
@@ -358,6 +372,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             finally
             {
                 _writeUpSubmitInProgress = false;
+                HideSiteLoadOverlay();
             }
         }
 

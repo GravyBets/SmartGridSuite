@@ -8,6 +8,8 @@ using SmartGridSuite.Contracts.FieldTechnician;
 using SmartGridSuite.Contracts.SiteDashboard;
 using SmartGridSuite.Contracts.Tickets;
 using System.Text.RegularExpressions;
+using System.Net;
+using System.Text;
 
 namespace SmartGridSuite.Api.Controllers
 {
@@ -17,15 +19,20 @@ namespace SmartGridSuite.Api.Controllers
     {
         private readonly SmartGridDbContext _db;
         private readonly TruckBoardInitializationService _truckBoardInitialization;
+        private readonly EmailService _emailService;
+        private readonly ILogger<TicketsController> _logger;
 
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
         private const string TechnicianRoleCode = "TECHNICIAN";
 
         // Receives the shared roster initializer so field tasks can safely build today's crew route.
-        public TicketsController(SmartGridDbContext db, TruckBoardInitializationService truckBoardInitialization)
+        public TicketsController(SmartGridDbContext db, TruckBoardInitializationService truckBoardInitialization,
+        EmailService emailService, ILogger<TicketsController> logger)
         {
             _db = db;
             _truckBoardInitialization = truckBoardInitialization;
+            _emailService = emailService;
+            _logger = logger;
         }
 
         [HttpGet]
@@ -663,11 +670,8 @@ namespace SmartGridSuite.Api.Controllers
                 .Select(x => (uint?)x.TruckId)
                 .FirstOrDefaultAsync(ct);
 
-            /*
-             * A technician assigned to a truck sees the latest published route owned by
-             * that truck's current lead anchor. TruckId is included so a lead technician's
-             * crew route cannot be confused with a directly assigned personal route.
-             */
+            bool signedInTechIsCrewLead = false;
+
             if (truckId.HasValue)
             {
                 var leadTech = await ResolveLeadTechnicianForTruckAsync(
@@ -677,6 +681,13 @@ namespace SmartGridSuite.Api.Controllers
 
                 if (leadTech != null)
                 {
+                    signedInTechIsCrewLead = leadTech.Id == tech.Id;
+
+                    /*
+                     * A technician in a truck sees the route owned by that truck's lead.
+                     * If the signed-in tech is not the lead, do not also load their old
+                     * individual route.
+                     */
                     publishedAssignments.AddRange(
                         await LoadLatestPublishedTechnicianTargetAsync(
                             assignmentDate,
@@ -685,17 +696,25 @@ namespace SmartGridSuite.Api.Controllers
                             ct));
                 }
             }
+            else
+            {
+                /*
+                 * A technician not currently assigned to a truck sees their individual route.
+                 */
+                publishedAssignments.AddRange(
+                    await LoadLatestPublishedTechnicianTargetAsync(
+                        assignmentDate,
+                        tech.Id,
+                        truckId: null,
+                        ct));
+            }
 
             /*
-             * Published work assigned directly to this technician is also Daily
-             * Assignment work, whether or not the technician currently belongs to a crew.
+             * If the signed-in tech is the lead, their lead route was already loaded above.
+             * If they are not in a truck, their individual route was loaded above.
+             * If they are in a truck under another lead, they should not see their old
+             * individual route.
              */
-            publishedAssignments.AddRange(
-                await LoadLatestPublishedTechnicianTargetAsync(
-                    assignmentDate,
-                    tech.Id,
-                    truckId: null,
-                    ct));
 
             var orderedPublishedAssignments = publishedAssignments
                 .Where(x => x.Ticket != null)
@@ -815,18 +834,21 @@ namespace SmartGridSuite.Api.Controllers
             });
         }
 
-        // Loads the latest published snapshot for one exact technician route target.
-        // TruckId distinguishes a crew route anchored to a lead from direct personal work.
-        private async Task<List<DailyTicketAssignmentPublishedEntity>> LoadLatestPublishedTechnicianTargetAsync(DateTime assignmentDate,
-            uint technicianId, uint? truckId, CancellationToken ct)
+        // Loads the latest published snapshot for one technician-owned route.
+        // TechnicianId is the route owner. TruckId is display/crew context only and must
+        // not split the route identity.
+        private async Task<List<DailyTicketAssignmentPublishedEntity>> LoadLatestPublishedTechnicianTargetAsync(
+            DateTime assignmentDate,
+            uint technicianId,
+            uint? truckId,
+            CancellationToken ct)
         {
             var latestPublishedVersion = await _db.DailyTicketAssignmentPublished
                 .AsNoTracking()
                 .Where(x =>
                     x.AssignmentDate == assignmentDate &&
                     x.TargetType == "Technician" &&
-                    x.TechnicianId == technicianId &&
-                    x.TruckId == truckId)
+                    x.TechnicianId == technicianId)
                 .Select(x => (int?)x.PublishedVersion)
                 .MaxAsync(ct);
 
@@ -841,7 +863,6 @@ namespace SmartGridSuite.Api.Controllers
                     x.AssignmentDate == assignmentDate &&
                     x.TargetType == "Technician" &&
                     x.TechnicianId == technicianId &&
-                    x.TruckId == truckId &&
                     x.PublishedVersion == latestPublishedVersion.Value)
                 .OrderBy(x => x.SortOrder)
                 .ThenBy(x => x.Id)
@@ -1549,7 +1570,10 @@ namespace SmartGridSuite.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<CreateTicketResponse>> Create([FromBody] CreateTicketRequest req)
         {
-            if (string.IsNullOrWhiteSpace(req.Site)) return BadRequest("Site required");
+            var createValidationError = ValidateCreateTicketRequest(req);
+
+            if (!string.IsNullOrWhiteSpace(createValidationError))
+                return BadRequest(createValidationError);
 
             var incomingNotificationName = (req.NotificationName ?? string.Empty).Trim();
 
@@ -1671,24 +1695,33 @@ namespace SmartGridSuite.Api.Controllers
             catch (DbUpdateException ex)
             {
                 var msg = ex.InnerException?.Message ?? ex.Message;
+
                 if (msg.Contains("Duplicate", StringComparison.OrdinalIgnoreCase))
                     return Conflict($"A ticket already exists with Notification {notif}.");
 
-                throw;
+                if (IsColumnTooLongException(ex, "current_work_order"))
+                    return BadRequest("Work Order is too long. Work Order is limited to 10 characters.");
+
+                return BadRequest("Ticket could not be saved because one or more fields are too long for the database.");
             }
 
             return Ok(new CreateTicketResponse(entity.Id));
         }
 
         [HttpPost("{id:long}/update")]
-        public async Task<ActionResult<UpdateTicketResponse>> Update(long id, [FromBody] UpdateTicketRequest req)
+        public async Task<ActionResult<UpdateTicketResponse>> Update(long id, [FromBody] UpdateTicketRequest req, CancellationToken ct)
         {
             var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id);
             if (entity == null)
                 return NotFound();
 
-            if (string.IsNullOrWhiteSpace(req.Site))
-                return BadRequest("Site required");            
+            var originalWorkOrder = entity.CurrentWorkOrder;
+            var originalWorkOrderClass = entity.WorkOrderClass;
+
+            var updateValidationError = ValidateUpdateTicketRequest(req);
+
+            if (!string.IsNullOrWhiteSpace(updateValidationError))
+                return BadRequest(updateValidationError);
 
             string? notif = string.IsNullOrWhiteSpace(req.Notification) ? null : req.Notification.Trim();
                         
@@ -1771,7 +1804,49 @@ namespace SmartGridSuite.Api.Controllers
             entity.Summary = FirstNonBlank(req.Problem, req.NotificationName);
             entity.LastActivityAt = DateTime.Now;
 
-            await _db.SaveChangesAsync();
+            var workOrderChanged =
+                !string.Equals(
+                    originalWorkOrder ?? "",
+                    entity.CurrentWorkOrder ?? "",
+                    StringComparison.OrdinalIgnoreCase);
+
+            var workOrderTypeChanged =
+                !string.Equals(
+                    NormalizeWorkOrderType(originalWorkOrderClass),
+                    NormalizeWorkOrderType(entity.WorkOrderClass),
+                    StringComparison.OrdinalIgnoreCase);
+
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                if (IsColumnTooLongException(ex, "current_work_order"))
+                    return BadRequest("Work Order is too long. Work Order is limited to 10 characters.");
+
+                return BadRequest("Ticket could not be saved because one or more fields are too long for the database.");
+            }
+
+            if (workOrderChanged || workOrderTypeChanged)
+            {
+                await TrySendPublishedAssignmentTicketModifiedEmailAsync(
+                    entity.Id,
+                    "Work Order / WO Type changed",
+                    new List<string>
+                    {
+                        workOrderChanged
+                            ? $"Work Order: {BlankForDisplay(originalWorkOrder)} → {BlankForDisplay(entity.CurrentWorkOrder)}"
+                            : "",
+
+                        workOrderTypeChanged
+                            ? $"WO Type: {BlankForDisplay(NormalizeWorkOrderType(originalWorkOrderClass))} → {BlankForDisplay(NormalizeWorkOrderType(entity.WorkOrderClass))}"
+                            : ""
+                    }
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToList(),
+                    ct);
+            }
 
             return Ok(new UpdateTicketResponse(entity.Id));
         }
@@ -2330,6 +2405,14 @@ namespace SmartGridSuite.Api.Controllers
                 ct);
         }
 
+        private static string BlankForDisplay(string? value)
+        {
+            var clean = (value ?? string.Empty).Trim();
+
+            return string.IsNullOrWhiteSpace(clean)
+                ? "—"
+                : clean;
+        }
 
         private static string? NormalizeNotification(string? raw)
         {
@@ -2378,6 +2461,73 @@ namespace SmartGridSuite.Api.Controllers
             return candidates.Count == 1
                 ? candidates.First().ToUpperInvariant()
                 : "";
+        }
+
+        private static string? ValidateCreateTicketRequest(CreateTicketRequest req)
+        {
+            if (string.IsNullOrWhiteSpace(req.Site))
+            {
+                return
+                    "Site is required before this ticket can be saved. " +
+                    "Enter the site number first, then set the problem/issue, work order, and dispatch notes. " +
+                    "For TOP sites, use the TOP site only, like XX-MWB. Do not include the sector.";
+            }
+
+            return
+                ValidateTicketTextLength("Site", req.Site, TicketTextLimits.Site) ??
+                ValidateTicketTextLength("Notification Name", req.NotificationName, TicketTextLimits.NotificationName) ??
+                ValidateTicketTextLength("Notification #", req.Notification, TicketTextLimits.Notification) ??
+                ValidateTicketTextLength("Work Order", req.WorkOrder, TicketTextLimits.WorkOrder) ??
+                ValidateTicketTextLength("Work Order Type", req.WorkOrderClass, TicketTextLimits.WorkOrderClass) ??
+                ValidateTicketTextLength("Work Order Code", req.GroupCode, TicketTextLimits.GroupCode) ??
+                ValidateTicketTextLength("Status", req.Status, TicketTextLimits.Status) ??
+                ValidateTicketTextLength("Assigned Tech", req.AssignedTech, TicketTextLimits.AssignedTech) ??
+                ValidateTicketTextLength("Problem", req.Problem, TicketTextLimits.Problem) ??
+                ValidateTicketTextLength("Notes", req.Notes, TicketTextLimits.Notes) ??
+                ValidateTicketTextLength("Dispatch Notes", req.DispatchNotes, TicketTextLimits.DispatchNotes) ??
+                ValidateTicketTextLength("Created By", req.CreatedBy, TicketTextLimits.CreatedBy);
+        }
+
+        private static string? ValidateUpdateTicketRequest(UpdateTicketRequest req)
+        {
+            if (string.IsNullOrWhiteSpace(req.Site))
+            {
+                return
+                    "Site is required before this ticket can be saved. " +
+                    "Enter the site number first, then set the problem/issue, work order, and dispatch notes. " +
+                    "For TOP sites, use the TOP site only, like XX-MWB. Do not include the sector.";
+            }
+
+            return
+                ValidateTicketTextLength("Site", req.Site, TicketTextLimits.Site) ??
+                ValidateTicketTextLength("Notification Name", req.NotificationName, TicketTextLimits.NotificationName) ??
+                ValidateTicketTextLength("Notification #", req.Notification, TicketTextLimits.Notification) ??
+                ValidateTicketTextLength("Work Order", req.WorkOrder, TicketTextLimits.WorkOrder) ??
+                ValidateTicketTextLength("Work Order Type", req.WorkOrderClass, TicketTextLimits.WorkOrderClass) ??
+                ValidateTicketTextLength("Work Order Code", req.GroupCode, TicketTextLimits.GroupCode) ??
+                ValidateTicketTextLength("Status", req.Status, TicketTextLimits.Status) ??
+                ValidateTicketTextLength("Assigned Tech", req.AssignedTech, TicketTextLimits.AssignedTech) ??
+                ValidateTicketTextLength("Problem", req.Problem, TicketTextLimits.Problem) ??
+                ValidateTicketTextLength("Notes", req.Notes, TicketTextLimits.Notes) ??
+                ValidateTicketTextLength("Dispatch Notes", req.DispatchNotes, TicketTextLimits.DispatchNotes);
+        }
+
+        private static bool IsColumnTooLongException(DbUpdateException ex, string columnName)
+        {
+            var message = ex.InnerException?.Message ?? ex.Message;
+
+            return message.Contains("Data too long for column", StringComparison.OrdinalIgnoreCase) &&
+                   message.Contains(columnName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string? ValidateTicketTextLength(string fieldName, string? value, int maxLength)
+        {
+            var length = (value ?? string.Empty).Trim().Length;
+
+            if (length <= maxLength)
+                return null;
+
+            return $"{fieldName} is limited to {maxLength} characters. Current length is {length} characters.";
         }
 
         private static void AddSiteMatches(HashSet<string> candidates, string text, string pattern)
@@ -2492,6 +2642,13 @@ namespace SmartGridSuite.Api.Controllers
 
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
+
+                await TrySendWriteUpSubmittedEmailAsync(
+                    entity.Id,
+                    req.SubmittedBy,
+                    finalWriteUp,
+                    submittedAt,
+                    ct);
 
                 return Ok(new UpdateTicketResponse(entity.Id));
             }
@@ -3509,6 +3666,837 @@ namespace SmartGridSuite.Api.Controllers
                            "client_submission_id",
                            StringComparison.OrdinalIgnoreCase)
                    );
+        }
+
+        private async Task<EmailSendResult> TrySendPublishedAssignmentTicketModifiedEmailAsync(
+            long ticketId,
+            string changeTitle,
+            IReadOnlyList<string> changeLines,
+            CancellationToken ct)
+        {
+            try
+            {
+                var assignmentDate = ActiveAssignmentDate;
+                var emailDate = DateTime.Today.Date;
+                var changedAt = DateTime.Now;
+
+                var publishedTarget = await _db.DailyTicketAssignmentPublished
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.AssignmentDate == assignmentDate &&
+                        x.TicketId == ticketId)
+                    .OrderByDescending(x => x.PublishedAt)
+                    .ThenByDescending(x => x.PublishedVersion)
+                    .ThenByDescending(x => x.Id)
+                    .FirstOrDefaultAsync(ct);
+
+                if (publishedTarget == null)
+                {
+                    return new EmailSendResult
+                    {
+                        Status = "Skipped",
+                        Message = $"Ticket {ticketId} is not on a published Daily Assignment route."
+                    };
+                }
+
+                var targetType = (publishedTarget.TargetType ?? string.Empty).Trim();
+
+                var targetRowsQuery = _db.DailyTicketAssignmentPublished
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.AssignmentDate == assignmentDate &&
+                        x.TargetType == targetType);
+
+                if (targetType.Equals("Technician", StringComparison.OrdinalIgnoreCase))
+                {
+                    targetRowsQuery = targetRowsQuery
+                        .Where(x => x.TechnicianId == publishedTarget.TechnicianId);
+                }
+                else
+                {
+                    targetRowsQuery = targetRowsQuery
+                        .Where(x => x.TruckId == publishedTarget.TruckId);
+                }
+
+                var latestPublishedVersion = await targetRowsQuery
+                    .Select(x => (int?)x.PublishedVersion)
+                    .MaxAsync(ct);
+
+                if (!latestPublishedVersion.HasValue)
+                {
+                    return new EmailSendResult
+                    {
+                        Status = "Skipped",
+                        Message = $"No current published route was found for ticket {ticketId}."
+                    };
+                }
+
+                var currentRouteRows = await targetRowsQuery
+                    .Where(x => x.PublishedVersion == latestPublishedVersion.Value)
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.Id)
+                    .ToListAsync(ct);
+
+                if (currentRouteRows.Count == 0)
+                {
+                    return new EmailSendResult
+                    {
+                        Status = "Skipped",
+                        Message = $"Current published route is empty for ticket {ticketId}."
+                    };
+                }
+
+                var routeTicketIds = currentRouteRows
+                    .Select(x => x.TicketId)
+                    .Distinct()
+                    .ToList();
+
+                var ticketsById = await _db.Tickets
+                    .AsNoTracking()
+                    .Where(x => routeTicketIds.Contains(x.Id))
+                    .ToDictionaryAsync(x => x.Id, ct);
+
+                if (!ticketsById.TryGetValue(ticketId, out var changedTicket))
+                {
+                    return new EmailSendResult
+                    {
+                        Status = "Skipped",
+                        Message = $"Ticket {ticketId} was not found while building modified Daily Assignment email."
+                    };
+                }
+
+                var truckId = publishedTarget.TruckId;
+                var technicianId = publishedTarget.TechnicianId;
+
+                var truckNumberDisplay = await ResolveTicketTruckNumberDisplayAsync(
+                    ticketId,
+                    emailDate,
+                    ct);
+
+                var recipients = new List<WriteUpEmailRecipientInfo>();
+                var targetDisplay = "";
+
+                if (truckId.HasValue)
+                {
+                    var truckNumber = await _db.Trucks
+                        .AsNoTracking()
+                        .Where(x => x.Id == truckId.Value)
+                        .Select(x => x.TruckNumber)
+                        .FirstOrDefaultAsync(ct);
+
+                    truckNumberDisplay = string.IsNullOrWhiteSpace(truckNumber)
+                        ? ""
+                        : $"Truck {truckNumber.Trim()}";
+
+                    var rosterRows = await (
+                        from roster in _db.TruckRosters.AsNoTracking()
+                        join tech in _db.Technicians.AsNoTracking()
+                            on roster.TechnicianId equals tech.Id
+                        where roster.WorkDate == emailDate &&
+                              roster.TruckId == truckId.Value &&
+                              tech.IsActive
+                        select new
+                        {
+                            tech.EmployeeId,
+                            tech.FirstName,
+                            tech.LastName,
+                            tech.EmailAddress
+                        })
+                        .ToListAsync(ct);
+
+                    var techNames = rosterRows
+                        .Select(x => FormatTechnicianName(
+                            x.FirstName,
+                            x.LastName,
+                            x.EmployeeId))
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(x => x)
+                        .ToList();
+
+                    targetDisplay = FormatCrewDisplayText(techNames);
+
+                    recipients = rosterRows
+                        .Select(x => new WriteUpEmailRecipientInfo
+                        {
+                            Name = FormatTechnicianName(
+                                x.FirstName,
+                                x.LastName,
+                                x.EmployeeId),
+                            EmailAddress = (x.EmailAddress ?? string.Empty).Trim()
+                        })
+                        .Where(x => !string.IsNullOrWhiteSpace(x.EmailAddress))
+                        .GroupBy(x => x.EmailAddress, StringComparer.OrdinalIgnoreCase)
+                        .Select(x => x.First())
+                        .OrderBy(x => x.Name)
+                        .ToList();
+                }
+
+                if (recipients.Count == 0 && technicianId.HasValue)
+                {
+                    var technician = await _db.Technicians
+                        .AsNoTracking()
+                        .Where(x => x.Id == technicianId.Value && x.IsActive)
+                        .Select(x => new
+                        {
+                            x.EmployeeId,
+                            x.FirstName,
+                            x.LastName,
+                            x.EmailAddress
+                        })
+                        .FirstOrDefaultAsync(ct);
+
+                    if (technician != null)
+                    {
+                        targetDisplay = FormatTechnicianName(
+                            technician.FirstName,
+                            technician.LastName,
+                            technician.EmployeeId);
+
+                        if (!string.IsNullOrWhiteSpace(technician.EmailAddress))
+                        {
+                            recipients.Add(new WriteUpEmailRecipientInfo
+                            {
+                                Name = targetDisplay,
+                                EmailAddress = technician.EmailAddress.Trim()
+                            });
+                        }
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(targetDisplay))
+                    targetDisplay = "Daily Assignment Target";
+
+                var modificationNumber = await GetNextDailyAssignmentModificationNumberAsync(
+                    targetDisplay,
+                    emailDate,
+                    ct);
+
+                var subject =
+                    $"{targetDisplay} - Modified({modificationNumber}) Daily Assignments - {emailDate:MM/dd/yyyy}";
+
+                var body = BuildPublishedAssignmentTicketModifiedEmailBody(
+                    emailDate,
+                    targetDisplay,
+                    truckNumberDisplay,
+                    changedAt,
+                    $"Modified({modificationNumber}) Daily Assignments",
+                    changeTitle,
+                    changeLines,
+                    changedTicket,
+                    currentRouteRows,
+                    ticketsById);
+
+                var allEmailsAddress = await GetAllEmailsAddressAsync(ct);
+
+                return await _emailService.SendAsync(
+                    new EmailSendRequest
+                    {
+                        EmailType = "DailyAssignment",
+
+                        ToAddresses = recipients
+                            .Select(x => x.EmailAddress)
+                            .Where(x => !string.IsNullOrWhiteSpace(x))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList(),
+
+                        CcAddresses = string.IsNullOrWhiteSpace(allEmailsAddress)
+                            ? Array.Empty<string>()
+                            : new[] { allEmailsAddress },
+
+                        Subject = subject,
+                        Body = body,
+                        IsHtml = true,
+
+                        RelatedTicketId = changedTicket.Id,
+                        RelatedSite = changedTicket.Site,
+
+                        CreatedBy = "Ticket Update"
+                    },
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Modified Daily Assignment email failed for TicketId={TicketId}",
+                    ticketId);
+
+                return new EmailSendResult
+                {
+                    Status = "Failed",
+                    Message = ex.Message
+                };
+            }
+        }
+
+        private async Task<int> GetNextDailyAssignmentModificationNumberAsync(
+            string targetDisplay,
+            DateTime workDate,
+            CancellationToken ct)
+        {
+            var cleanTarget = (targetDisplay ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(cleanTarget))
+                return 1;
+
+            var dateText = workDate.ToString("MM/dd/yyyy");
+
+            var subjectPrefix =
+                $"{cleanTarget} - Modified(";
+
+            var subjectSuffix =
+                $") Daily Assignments - {dateText}";
+
+            var previousModifiedCount = await _db.EmailLogs
+                .AsNoTracking()
+                .Where(x =>
+                    x.EmailType == "DailyAssignment" &&
+                    x.Subject.StartsWith(subjectPrefix) &&
+                    x.Subject.Contains(subjectSuffix))
+                .CountAsync(ct);
+
+            return previousModifiedCount + 1;
+        }
+
+        private static string BuildPublishedAssignmentTicketModifiedEmailBody(
+            DateTime workDate,
+            string targetDisplay,
+            string truckNumberDisplay,
+            DateTime changedAt,
+            string emailTitle,
+            string changeTitle,
+            IReadOnlyList<string> changeLines,
+            TicketEntity changedTicket,
+            IReadOnlyList<DailyTicketAssignmentPublishedEntity> currentRouteRows,
+            IReadOnlyDictionary<long, TicketEntity> ticketsById)
+        {
+            static string H(string? value)
+                => WebUtility.HtmlEncode((value ?? string.Empty).Trim());
+
+            static string DashIfBlank(string? value)
+            {
+                var clean = (value ?? string.Empty).Trim();
+
+                return string.IsNullOrWhiteSpace(clean)
+                    ? "—"
+                    : WebUtility.HtmlEncode(clean);
+            }
+
+            var truckRowHtml = string.IsNullOrWhiteSpace(truckNumberDisplay)
+                ? ""
+                : $$"""
+                      <tr>
+                        <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Truck</td>
+                        <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{H(truckNumberDisplay)}}</td>
+                        <td></td>
+                        <td></td>
+                      </tr>
+                  """;
+
+            var sb = new StringBuilder();
+
+            sb.AppendLine($$"""
+                <!DOCTYPE html>
+                <html>
+                <body style="margin:0; padding:0; background:#f3f4f6; font-family:Segoe UI, Arial, sans-serif; color:#111827;">
+                  <div style="max-width:1100px; margin:0 auto; padding:24px;">
+                    <div style="background:#ffffff; border:1px solid #d1d5db; border-radius:12px; overflow:hidden;">
+                      <div style="background:#1f2937; color:#ffffff; padding:18px 22px;">
+                        <div style="font-size:22px; font-weight:700;">{{H(emailTitle)}}</div>
+                      </div>
+
+                      <div style="padding:18px 22px;">
+                        <table cellpadding="0" cellspacing="0" style="width:100%; margin-bottom:18px; border-collapse:collapse;">
+                          <tr>
+                            <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Date</td>
+                            <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{workDate:MM/dd/yyyy}}</td>
+
+                            <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Assigned To</td>
+                            <td style="font-size:14px; font-weight:600; padding:3px 0;">{{H(targetDisplay)}}</td>
+                          </tr>
+                          <tr>
+                            <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Changed At</td>
+                            <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{changedAt:MM/dd/yyyy HH:mm}}</td>
+
+                            <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Changed Ticket</td>
+                            <td style="font-size:14px; font-weight:600; padding:3px 0;">{{DashIfBlank(changedTicket.Site)}}</td>
+                          </tr>
+                          {{truckRowHtml}}
+                        </table>
+
+                        <div style="font-size:15px; font-weight:700; margin:0 0 8px 0;">Ticket Details Changed</div>
+
+                        <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #d1d5db; margin-bottom:18px;">
+                          <thead>
+                            <tr style="background:#e5e7eb;">
+                              <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db; width:220px;">Change</th>
+                              <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Details</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db; font-weight:700;">{{H(changeTitle)}}</td>
+                              <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">
+                """);
+
+            if (changeLines.Count == 0)
+            {
+                sb.AppendLine("                —");
+            }
+            else
+            {
+                foreach (var line in changeLines)
+                    sb.AppendLine($"                {H(line)}<br/>");
+            }
+
+            sb.AppendLine("""
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+
+                        <div style="font-size:15px; font-weight:700; margin:0 0 8px 0;">Current Route</div>
+
+                        <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #d1d5db;">
+                          <thead>
+                            <tr style="background:#e5e7eb;">
+                              <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">#</th>
+                              <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Site</th>
+                              <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Notification Name</th>
+                              <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Problem</th>
+                              <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Notification</th>
+                              <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Work Order</th>
+                              <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">WO Type</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                """);
+
+            var routeOrder = 0;
+
+            foreach (var row in currentRouteRows
+                         .OrderBy(x => x.SortOrder)
+                         .ThenBy(x => x.Id))
+            {
+                if (!ticketsById.TryGetValue(row.TicketId, out var ticket))
+                    continue;
+
+                routeOrder++;
+
+                var background = routeOrder % 2 == 0
+                    ? "#f9fafb"
+                    : "#ffffff";
+
+                var rowBorder = row.TicketId == changedTicket.Id
+                    ? "border:2px solid #f59e0b;"
+                    : "border:1px solid #d1d5db;";
+
+                sb.AppendLine($$"""
+                    <tr style="background:{{background}};">
+                        <td style="font-size:13px; padding:9px 10px; {{rowBorder}} font-weight:600;">{{routeOrder}}</td>
+                        <td style="font-size:13px; padding:9px 10px; {{rowBorder}} font-weight:700;">{{DashIfBlank(ticket.Site)}}</td>
+                        <td style="font-size:13px; padding:9px 10px; {{rowBorder}}">{{DashIfBlank(ticket.NotificationName)}}</td>
+                        <td style="font-size:13px; padding:9px 10px; {{rowBorder}}">{{DashIfBlank(ticket.Problem)}}</td>
+                        <td style="font-size:13px; padding:9px 10px; {{rowBorder}}">{{DashIfBlank(ticket.Notification)}}</td>
+                        <td style="font-size:13px; padding:9px 10px; {{rowBorder}}">{{DashIfBlank(ticket.CurrentWorkOrder)}}</td>
+                        <td style="font-size:13px; padding:9px 10px; {{rowBorder}}">{{DashIfBlank(NormalizeWorkOrderType(ticket.WorkOrderClass))}}</td>
+                    </tr>
+                    """);
+            }
+
+            if (routeOrder == 0)
+            {
+                sb.AppendLine("""
+                    <tr>
+                        <td colspan="7" style="font-size:13px; padding:14px 10px; border:1px solid #d1d5db; color:#6b7280; font-style:italic;">
+                        No route details were available.
+                        </td>
+                    </tr>
+                    """);
+            }
+
+            sb.AppendLine("""
+                            </tbody>
+                        </table>
+
+                        <div style="font-size:12px; color:#6b7280; margin-top:16px;">
+                            This message was generated by SmartGridSuite.
+                        </div>
+                        </div>
+                    </div>
+                    </div>
+                </body>
+                </html>
+                """);
+
+            return sb.ToString();
+        }
+
+        private async Task<EmailSendResult> TrySendWriteUpSubmittedEmailAsync(long ticketId, string? submittedByEmployeeId,
+            string submittedWriteUp, DateTime submittedAt, CancellationToken ct)
+        {
+            try
+            {
+                var ticket = await _db.Tickets
+                    .AsNoTracking()
+                    .Include(x => x.TaskCategory)
+                    .FirstOrDefaultAsync(x => x.Id == ticketId, ct);
+
+                if (ticket == null)
+                {
+                    return new EmailSendResult
+                    {
+                        Status = "Skipped",
+                        Message = $"Ticket {ticketId} was not found after write-up submission."
+                    };
+                }
+
+                var submitterEmployeeId = (submittedByEmployeeId ?? string.Empty).Trim();
+
+                var submitter = string.IsNullOrWhiteSpace(submitterEmployeeId)
+                    ? null
+                    : await _db.Technicians
+                        .AsNoTracking()
+                        .Where(x => x.EmployeeId == submitterEmployeeId)
+                        .Select(x => new
+                        {
+                            x.EmployeeId,
+                            x.FirstName,
+                            x.LastName,
+                            x.EmailAddress
+                        })
+                        .FirstOrDefaultAsync(ct);
+
+                var submittedByName = submitter == null
+                    ? string.IsNullOrWhiteSpace(submitterEmployeeId) ? "Unknown" : submitterEmployeeId
+                    : FormatTechnicianName(
+                        submitter.FirstName,
+                        submitter.LastName,
+                        submitter.EmployeeId);
+
+                var submitterEmail = (submitter?.EmailAddress ?? string.Empty).Trim();
+
+                var allEmailsAddress = await GetAllEmailsAddressAsync(ct);
+
+                var recipients = string.IsNullOrWhiteSpace(allEmailsAddress)
+                    ? await LoadWriteUpEmailRecipientsAsync(ct)
+                    : new List<WriteUpEmailRecipientInfo>
+                    {
+                        new()
+                        {
+                            Name = "SmartGridSuite Write-Ups",
+                            EmailAddress = allEmailsAddress
+                        }
+                    };
+
+                var truckNumberDisplay = await ResolveTicketTruckNumberDisplayAsync(
+                    ticket.Id,
+                    submittedAt.Date,
+                    ct);
+
+                var subject = $"{ticket.Site} - {submittedByName} - Write-Up Submitted";
+
+                var body = BuildWriteUpSubmittedEmailBody(
+                    ticket,
+                    submittedByName,
+                    submittedAt,
+                    truckNumberDisplay,
+                    submittedWriteUp);
+
+                return await _emailService.SendAsync(
+                    new EmailSendRequest
+                    {
+                        EmailType = "WriteUp",
+
+                        ToAddresses = recipients
+                            .Select(x => x.EmailAddress)
+                            .Where(x => !string.IsNullOrWhiteSpace(x))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList(),
+
+                        ReplyToAddresses = string.IsNullOrWhiteSpace(submitterEmail)
+                            ? Array.Empty<string>()
+                            : new[] { submitterEmail },
+
+                        FromAddress = submitterEmail,
+                        FromDisplayName = submittedByName,
+
+                        Subject = subject,
+                        Body = body,
+                        IsHtml = true,
+
+                        RelatedTicketId = ticket.Id,
+                        RelatedSite = ticket.Site,
+
+                        CreatedBy = submittedByName
+                    },
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Write-up submission email failed. TicketId={TicketId}",
+                    ticketId);
+
+                return new EmailSendResult
+                {
+                    Status = "Failed",
+                    Message = ex.Message
+                };
+            }
+        }
+
+        private async Task<List<WriteUpEmailRecipientInfo>> LoadWriteUpEmailRecipientsAsync(CancellationToken ct)
+        {
+            /*
+             * Send submitted write-up notifications to active Dispatch/Admin users
+             * who have an email address configured in Administration > Technicians.
+             */
+            var recipients = await _db.Technicians
+                .AsNoTracking()
+                .Where(x =>
+                    x.IsActive &&
+                    !string.IsNullOrWhiteSpace(x.EmailAddress) &&
+                    x.TechnicianRoles.Any(role =>
+                        role.Role.Code == "DISPATCH" ||
+                        role.Role.Code == "ADMIN"))
+                .Select(x => new WriteUpEmailRecipientInfo
+                {
+                    Name = ((x.FirstName ?? "") + " " + (x.LastName ?? "")).Trim(),
+                    EmailAddress = x.EmailAddress ?? ""
+                })
+                .ToListAsync(ct);
+
+            return recipients
+                .Where(x => !string.IsNullOrWhiteSpace(x.EmailAddress))
+                .GroupBy(x => x.EmailAddress, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.First())
+                .OrderBy(x => x.Name)
+                .ToList();
+        }
+
+        private static string BuildWriteUpSubmittedEmailBody(
+            TicketEntity ticket, 
+            string submittedByName, 
+            DateTime submittedAt, 
+            string truckNumberDisplay, 
+            string submittedWriteUp)
+        {
+            static string H(string? value) => WebUtility.HtmlEncode((value ?? string.Empty).Trim());
+
+            static string DashIfBlank(string? value)
+            {
+                var clean = (value ?? string.Empty).Trim();
+
+                return string.IsNullOrWhiteSpace(clean)
+                    ? "—"
+                    : WebUtility.HtmlEncode(clean);
+            }
+
+            static string WriteUpTextHtml(string? value)
+            {
+                var raw = value ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(raw))
+                    return "—";
+
+                return WebUtility.HtmlEncode(raw);
+            }
+
+            var truckRowHtml = string.IsNullOrWhiteSpace(truckNumberDisplay)
+                ? ""
+                : $$"""
+                      <tr>
+                        <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Truck</td>
+                        <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{H(truckNumberDisplay)}}</td>
+                        <td></td>
+                        <td></td>
+                      </tr>
+                  """;
+
+            var writeUpHtml = WriteUpTextHtml(submittedWriteUp);
+
+            var workOrderType = NormalizeWorkOrderType(ticket.WorkOrderClass);
+
+            var sb = new StringBuilder();
+
+            sb.AppendLine("""
+                <!DOCTYPE html>
+                <html>
+                <body style="margin:0; padding:0; background:#f3f4f6; font-family:Segoe UI, Arial, sans-serif; color:#111827;">
+                  <div style="max-width:1000px; margin:0 auto; padding:24px;">
+                    <div style="background:#ffffff; border:1px solid #d1d5db; border-radius:12px; overflow:hidden;">
+                      <div style="background:#1f2937; color:#ffffff; padding:18px 22px;">
+                        <div style="font-size:22px; font-weight:700;">Write-Up Submitted</div>
+                      </div>
+                """);
+
+            sb.AppendLine($$"""
+                  <div style="padding:18px 22px;">
+                    <table cellpadding="0" cellspacing="0" style="width:100%; margin-bottom:18px; border-collapse:collapse;">
+                      <tr>
+                        <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Submitted By</td>
+                        <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{H(submittedByName)}}</td>
+
+                        <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Submitted At</td>
+                        <td style="font-size:14px; font-weight:600; padding:3px 0;">{{submittedAt:MM/dd/yyyy HH:mm}}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Site</td>
+                        <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{DashIfBlank(ticket.Site)}}</td>
+
+                        <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Status</td>
+                        <td style="font-size:14px; font-weight:600; padding:3px 0;">{{DashIfBlank(ticket.Status)}}</td>
+                      </tr>
+                      {{truckRowHtml}}
+                    </table>
+
+                    <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #d1d5db; margin-bottom:18px;">
+                      <thead>
+                        <tr style="background:#e5e7eb;">
+                          <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Site</th>
+                          <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Notification Name</th>
+                          <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Problem</th>
+                          <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Notification</th>
+                          <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Work Order</th>
+                          <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">WO Type</th>
+                          <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Assigned To</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db; font-weight:700;">{{DashIfBlank(ticket.Site)}}</td>
+                          <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.NotificationName)}}</td>
+                          <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.Problem)}}</td>
+                          <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.Notification)}}</td>
+                          <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.CurrentWorkOrder)}}</td>
+                          <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(workOrderType)}}</td>
+                          <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.AssignedTech)}}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                        <div style="font-size:15px; font-weight:700; margin-bottom:8px;">Submitted Write-Up</div>
+
+                <div style="background:#f9fafb; border:1px solid #d1d5db; border-radius:10px; padding:12px 14px;">
+                  <pre style="margin:0; font-family:Segoe UI, Arial, sans-serif; font-size:14px; line-height:19px; color:#111827; white-space:pre-wrap; word-wrap:break-word;">{{writeUpHtml}}</pre>
+                </div>
+
+                        <div style="font-size:12px; color:#6b7280; margin-top:16px;">
+                          This message was generated by SmartGridSuite.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """);
+
+            return sb.ToString();
+        }
+
+        private async Task<string> ResolveTicketTruckNumberDisplayAsync(
+            long ticketId,
+            DateTime workDate,
+            CancellationToken ct)
+        {
+            var publishedTarget = await _db.DailyTicketAssignmentPublished
+                .AsNoTracking()
+                .Where(x =>
+                    x.AssignmentDate == ActiveAssignmentDate &&
+                    x.TicketId == ticketId)
+                .OrderByDescending(x => x.PublishedAt)
+                .ThenByDescending(x => x.PublishedVersion)
+                .ThenByDescending(x => x.Id)
+                .Select(x => new
+                {
+                    x.TruckId,
+                    x.TechnicianId
+                })
+                .FirstOrDefaultAsync(ct);
+
+            uint? truckId = publishedTarget?.TruckId;
+
+            /*
+             * Older published rows, individual-looking technician routes, or migrated rows
+             * may not have TruckId stored. In that case, use the published owner technician
+             * and today's/submission day's truck roster to recover the truck context.
+             */
+            if (!truckId.HasValue &&
+                publishedTarget?.TechnicianId is uint publishedTechnicianId)
+            {
+                truckId = await _db.TruckRosters
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.WorkDate == workDate.Date &&
+                        x.TechnicianId == publishedTechnicianId)
+                    .Select(x => (uint?)x.TruckId)
+                    .FirstOrDefaultAsync(ct);
+            }
+
+            if (!truckId.HasValue)
+            {
+                var activeTarget = await _db.DailyTicketAssignments
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.AssignmentDate == ActiveAssignmentDate &&
+                        x.TicketId == ticketId)
+                    .OrderByDescending(x => x.UpdatedAt)
+                    .ThenByDescending(x => x.Id)
+                    .Select(x => new
+                    {
+                        x.TruckId,
+                        x.TechnicianId
+                    })
+                    .FirstOrDefaultAsync(ct);
+
+                truckId = activeTarget?.TruckId;
+
+                if (!truckId.HasValue &&
+                    activeTarget?.TechnicianId is uint activeTechnicianId)
+                {
+                    truckId = await _db.TruckRosters
+                        .AsNoTracking()
+                        .Where(x =>
+                            x.WorkDate == workDate.Date &&
+                            x.TechnicianId == activeTechnicianId)
+                        .Select(x => (uint?)x.TruckId)
+                        .FirstOrDefaultAsync(ct);
+                }
+            }
+
+            if (!truckId.HasValue)
+                return "";
+
+            var truckNumber = await _db.Trucks
+                .AsNoTracking()
+                .Where(x => x.Id == truckId.Value)
+                .Select(x => x.TruckNumber)
+                .FirstOrDefaultAsync(ct);
+
+            return string.IsNullOrWhiteSpace(truckNumber)
+                ? ""
+                : $"Truck {truckNumber.Trim()}";
+        }
+
+        private async Task<string> GetAllEmailsAddressAsync(CancellationToken ct)
+        {
+            var value = await _db.AppSettings
+                .AsNoTracking()
+                .Where(x => x.SettingKey == "Email.AllEmailsAddress")
+                .Select(x => x.SettingValue)
+                .FirstOrDefaultAsync(ct);
+
+            return (value ?? string.Empty).Trim();
+        }
+
+        private sealed class WriteUpEmailRecipientInfo
+        {
+            public string Name { get; set; } = "";
+
+            public string EmailAddress { get; set; } = "";
         }
     }
 }

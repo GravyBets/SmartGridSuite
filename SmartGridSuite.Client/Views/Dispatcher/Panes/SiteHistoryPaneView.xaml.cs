@@ -29,6 +29,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private bool _isEditing;
         private bool _isLoading;
 
+        private int _busyOverlayDepth;
+
         public SiteHistoryPaneView()
         {
             InitializeComponent();
@@ -114,6 +116,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _isLoading = true;
             _currentSiteId = siteId;
 
+            ShowBusyOverlay($"Loading history for {siteId}...");
+
             try
             {
                 SetEditMode(false);
@@ -165,12 +169,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             finally
             {
                 _isLoading = false;
+                HideBusyOverlay();
                 UpdateButtons();
             }
         }
 
         private async Task LoadTechnicianOptionsAsync()
         {
+            ShowBusyOverlay("Loading technician list...");
+
             try
             {
                 var currentPrimary = GetSelectedComboText(Tech1ComboBox);
@@ -200,6 +207,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 if (TechnicianOptions.Count == 0)
                     TechnicianOptions.Add("—");
+            }
+            finally
+            {
+                HideBusyOverlay();
             }
         }
 
@@ -346,6 +357,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
             }
 
+            ShowBusyOverlay("Saving site history write-up...");
+
             try
             {
                 SaveButton.IsEnabled = false;
@@ -397,6 +410,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
             finally
             {
+                HideBusyOverlay();
                 UpdateButtons();
             }
         }
@@ -430,6 +444,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             if (confirm != MessageBoxResult.Yes)
                 return;
+
+            ShowBusyOverlay("Deleting site history write-up...");
 
             try
             {
@@ -473,6 +489,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
             finally
             {
+                HideBusyOverlay();
                 UpdateButtons();
             }
         }
@@ -653,6 +670,54 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return string.IsNullOrWhiteSpace(name)
                 ? "Dispatcher"
                 : name.Trim();
+        }
+
+        private void ShowBusyOverlay(string message)
+        {
+            _busyOverlayDepth++;
+
+            if (BusyOverlay is null ||
+                BusyOverlayMessageTextBlock is null)
+            {
+                return;
+            }
+
+            BusyOverlayMessageTextBlock.Text = string.IsNullOrWhiteSpace(message)
+                ? "Loading..."
+                : message;
+
+            BusyOverlay.Visibility = Visibility.Visible;
+            SetSiteHistoryControlsEnabled(false);
+
+            Cursor = Cursors.Wait;
+        }
+
+        private void HideBusyOverlay()
+        {
+            if (_busyOverlayDepth > 0)
+                _busyOverlayDepth--;
+
+            if (_busyOverlayDepth > 0)
+                return;
+
+            if (BusyOverlay is null)
+                return;
+
+            BusyOverlay.Visibility = Visibility.Collapsed;
+            SetSiteHistoryControlsEnabled(true);
+
+            Cursor = null;
+
+            UpdateButtons();
+        }
+
+        private void SetSiteHistoryControlsEnabled(bool enabled)
+        {
+            SiteSearchTextBox.IsEnabled = enabled;
+            SearchSiteHistoryButton.IsEnabled = enabled;
+
+            HistoryListCard.IsEnabled = enabled;
+            HistoryDetailsCard.IsEnabled = enabled;
         }
 
         private void OnPropertyChanged([CallerMemberName] string? name = null)

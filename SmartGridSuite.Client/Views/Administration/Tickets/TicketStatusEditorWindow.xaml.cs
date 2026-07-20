@@ -20,6 +20,7 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
         public bool IsWriteUpSubmitTarget => IsWriteUpSubmitTargetCheckBox.IsChecked == true;
         public bool IsAssignmentPublishTarget => IsAssignmentPublishTargetCheckBox.IsChecked == true;
         public bool IsUnassignmentTarget => IsUnassignmentTargetCheckBox.IsChecked == true;
+        private const int StatusNameMaxLength = 100;
 
         public TicketStatusEditorWindow()
         {
@@ -84,6 +85,18 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
                 MessageBox.Show(
                     "Status name is required.",
                     "Validation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                NameTextBox.Focus();
+                return;
+            }
+
+            if (StatusName.Length > StatusNameMaxLength)
+            {
+                MessageBox.Show(
+                    $"Status name must be {StatusNameMaxLength} characters or less.\n\nCurrent length: {StatusName.Length}",
+                    "Status Name Too Long",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
 

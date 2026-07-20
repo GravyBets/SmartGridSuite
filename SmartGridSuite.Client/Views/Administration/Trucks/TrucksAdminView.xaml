@@ -5,9 +5,9 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -24,7 +24,7 @@
                                FontSize="16"
                                FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimary}"/>
-                    <TextBlock Text="Add / edit trucks and manage truck styles"
+                    <TextBlock Text="Add/edit trucks, manage truck styles, and control service state."
                                Margin="0,2,0,0"
                                Foreground="{DynamicResource TextSecondary}"/>
                 </StackPanel>
@@ -34,20 +34,32 @@
                             VerticalAlignment="Center">
                     <Button Content="Refresh"
                             Padding="10,4"
-                            Margin="0,0,8,0"
+                            Width="90"
+                            Margin="0,0,4,0"
                             Click="Refresh_Click"/>
-                    
-                    <Button Content="Edit Selected"
+
+                    <Button x:Name="EditSelectedButton"
+                            Content="Edit"
                             Padding="10,4"
-                            Margin="0,0,8,0"
+                            Margin="0,0,4,0"
+                            Width="90"
+                            Visibility="Collapsed"
                             Click="EditSelected_Click"/>
+
+                    <Button x:Name="DeleteSelectedButton"
+                            Content="Delete"
+                            Style="{DynamicResource DangerButtonStyle}"
+                            Margin="0,0,4,0"
+                            FontWeight="Bold"
+                            Width="90"
+                            Visibility="Collapsed"
+                            Click="DeleteSelected_Click"/>
 
                     <Button Content="Add Truck"
                             Style="{DynamicResource PrimaryButtonStyle}"
-                            Padding="10,4"                            
+                            Width="90"
+                            Padding="10,4"
                             Click="AddTruck_Click"/>
-
-                    
                 </StackPanel>
             </Grid>
         </Border>
@@ -55,19 +67,20 @@
         <!-- Grid -->
         <Border Grid.Row="2" Style="{StaticResource Card}" Padding="14">
             <DataGrid x:Name="TrucksGrid"
-              Style="{StaticResource ThemedDataGridStyle}"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              CanUserAddRows="False"
-              CanUserSortColumns="True"
-              HeadersVisibility="Column"              
-              SelectionMode="Single"
-              SelectionUnit="FullRow"
-              RowHeaderWidth="0">
+                      Style="{StaticResource ThemedDataGridStyle}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      CanUserAddRows="False"
+                      CanUserSortColumns="True"
+                      HeadersVisibility="Column"
+                      SelectionMode="Single"
+                      SelectionUnit="FullRow"
+                      RowHeaderWidth="0"
+                      SelectionChanged="TrucksGrid_SelectionChanged">
 
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow"
-                   BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                           BasedOn="{StaticResource ThemedDataGridRowStyle}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsActive}" Value="False">
                                 <Setter Property="Opacity" Value="0.45"/>

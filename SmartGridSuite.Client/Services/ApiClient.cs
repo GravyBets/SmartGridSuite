@@ -1,9 +1,11 @@
 ﻿using SmartGridSuite.Contracts.Settings;
+using SmartGridSuite.Contracts.Settings.GeneralSettings;
 using SmartGridSuite.Contracts.SiteDashboard;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Net;
 using System.Text.Json;
+
 
 namespace SmartGridSuite.Client.Services
 {
@@ -99,6 +101,15 @@ namespace SmartGridSuite.Client.Services
                 ct);
         }
 
+        public async Task DeleteAsync(string path, CancellationToken ct = default)
+        {
+            using var response = await SendAsync(
+                HttpMethod.Delete,
+                path,
+                content: null,
+                ct);
+        }
+
         // Sends a JSON PUT request and deserializes the optional response body.
         public async Task<TResponse?> PutAsync<TRequest, TResponse>(string path, TRequest body, CancellationToken ct = default)
         {
@@ -182,6 +193,15 @@ namespace SmartGridSuite.Client.Services
                 request);
         }
 
+        public async Task DeleteCommunicationDeviceTypeAsync(uint id, CancellationToken ct = default)
+        {
+            using var response = await SendAsync(
+                HttpMethod.Delete,
+                $"api/admin/general-settings/communication-device-types/{id}",
+                content: null,
+                ct);
+        }
+
         public async Task<RangeExtenderLinkUrlDto?> GetRangeExtenderLinkUrlAsync(
             CancellationToken ct = default)
         {
@@ -199,6 +219,33 @@ namespace SmartGridSuite.Client.Services
                 {
                     Url = url ?? string.Empty
                 },
+                ct);
+        }
+
+        // -------------------------
+        // Admin Email Settings
+        // -------------------------
+
+        public async Task<EmailSettingsDto?> GetEmailSettingsAsync(CancellationToken ct = default)
+        {
+            return await GetAsync<EmailSettingsDto>(
+                "api/admin/email-settings",
+                ct);
+        }
+
+        public async Task<EmailSettingsDto?> UpdateEmailSettingsAsync(UpdateEmailSettingsRequest request, CancellationToken ct = default)
+        {
+            return await PostAsync<UpdateEmailSettingsRequest, EmailSettingsDto>(
+                "api/admin/email-settings",
+                request,
+                ct);
+        }
+
+        public async Task<SendTestEmailResponse?> SendTestEmailAsync(SendTestEmailRequest request, CancellationToken ct = default)
+        {
+            return await PostAsync<SendTestEmailRequest, SendTestEmailResponse>(
+                "api/admin/email-settings/test",
+                request,
                 ct);
         }
 

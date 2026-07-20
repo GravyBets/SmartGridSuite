@@ -4,12 +4,14 @@
         xmlns:local="clr-namespace:SmartGridSuite.Client.Views.Dispatcher.Dialogs"
         Title="New Ticket"
         Width="1080"
-        Height="760"
+        Height="772"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
-        Loaded="Window_Loaded">
+        Loaded="Window_Loaded"
+        Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
+        Background="{StaticResource AppBackground}">
 
-    <Grid Margin="12">
+    <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -28,23 +30,27 @@
 
                     <!-- Site -->
                     <StackPanel Grid.Column="0"
-                                Margin="0,0,10,0">
+                                Margin="0,0,4,0">
                         <TextBlock Text="Site * (If TOP, just XX-MWB, not sector too)"
                                    FontWeight="SemiBold"
-                                   Margin="2,0,0,4"/>
+                                   Margin="4,0,0,4"/>
 
-                        <TextBox Height="34"
+                        <TextBox x:Name="SiteTextBox"
+                                 Height="34"
+                                 MaxLength="100"
                                  Text="{Binding Site, UpdateSourceTrigger=PropertyChanged}"/>
                     </StackPanel>
 
                     <!-- Problem -->
                     <StackPanel Grid.Column="1">
                         <TextBlock Text="Problem"
-                                   Margin="2,0,0,4"
+                                   Margin="4,0,0,4"
                                    FontWeight="SemiBold"/>
 
-                        <TextBox MinHeight="34"
+                        <TextBox x:Name="ProblemTextBox"
+                                 MinHeight="34"
                                  MaxHeight="140"
+                                 MaxLength="5000"
                                  AcceptsReturn="True"
                                  TextWrapping="Wrap"
                                  VerticalScrollBarVisibility="Disabled"
@@ -54,55 +60,55 @@
                 </Grid>
 
                 <!-- Assignment / Workflow -->
-                <Grid Margin="0,10,0,0">
+                <Grid Margin="0,4,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="4"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Assigned To -->
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="Assigned To"
-               Margin="2,0,0,4"
-               FontWeight="SemiBold"/>
+                                   Margin="2,0,0,4"
+                                   FontWeight="SemiBold"/>
 
                         <Grid>
                             <Button x:Name="AssignedTechDropDownButton"
-                Height="34"
-                HorizontalContentAlignment="Stretch"
-                Click="AssignedTechDropDownButton_Click">
+                                    Height="34"
+                                    HorizontalContentAlignment="Stretch"
+                                    Click="AssignedTechDropDownButton_Click">
 
                                 <DockPanel LastChildFill="True">
                                     <TextBlock DockPanel.Dock="Right"
-                           Text="▾"
-                           Margin="10,0,0,0"
-                           FontSize="14"
-                           VerticalAlignment="Center"/>
+                                               Text="▾"
+                                               Margin="10,0,0,0"
+                                               FontSize="14"
+                                               VerticalAlignment="Center"/>
 
                                     <TextBlock x:Name="AssignedTechDropDownTextBlock"
-                           Text="(Unassigned)"
-                           TextTrimming="CharacterEllipsis"
-                           VerticalAlignment="Center"/>
+                                               Text="(Unassigned)"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center"/>
                                 </DockPanel>
                             </Button>
 
                             <Popup x:Name="AssignedTechDropDownPopup"
-               Placement="Bottom"
-               PlacementTarget="{Binding ElementName=AssignedTechDropDownButton}"
-               VerticalOffset="4"
-               StaysOpen="False"
-               AllowsTransparency="True"
-               PopupAnimation="Fade">
+                                   Placement="Bottom"
+                                   PlacementTarget="{Binding ElementName=AssignedTechDropDownButton}"
+                                   VerticalOffset="4"
+                                   StaysOpen="False"
+                                   AllowsTransparency="True"
+                                   PopupAnimation="Fade">
 
                                 <Border Width="{Binding ActualWidth, ElementName=AssignedTechDropDownButton}"
-                    MinWidth="430"
-                    MaxHeight="520"
-                    Padding="10"
-                    CornerRadius="10"
-                    BorderThickness="1"
-                    BorderBrush="{DynamicResource SurfaceBorder}"
-                    Background="{DynamicResource CardBackground}">
+                                        MinWidth="430"
+                                        MaxHeight="520"
+                                        Padding="10"
+                                        CornerRadius="10"
+                                        BorderThickness="1"
+                                        BorderBrush="{DynamicResource SurfaceBorder}"
+                                        Background="{DynamicResource CardBackground}">
 
                                     <Grid>
                                         <Grid.RowDefinitions>
@@ -114,11 +120,11 @@
                                         </Grid.RowDefinitions>
 
                                         <CheckBox x:Name="AssignedToUnassignedCheckBox"
-                              Grid.Row="0"
-                              Content="(Unassigned)"
-                              FontWeight="SemiBold"
-                              Checked="AssignedToUnassignedCheckBox_Checked"
-                              Unchecked="AssignedToUnassignedCheckBox_Unchecked"/>
+                                                  Grid.Row="0"
+                                                  Content="(Unassigned)"
+                                                  FontWeight="SemiBold"
+                                                  Checked="AssignedToUnassignedCheckBox_Checked"
+                                                  Unchecked="AssignedToUnassignedCheckBox_Unchecked"/>
 
                                         <Grid Grid.Row="2">
                                             <Grid.ColumnDefinitions>
@@ -129,37 +135,37 @@
                                             </Grid.ColumnDefinitions>
 
                                             <TextBlock Grid.Column="0"
-                                   Text="Technicians"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center"/>
+                                                       Text="Technicians"
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center"/>
 
                                             <Button Grid.Column="1"
-                                Content="Select All"
-                                Height="28"
-                                MinWidth="86"
-                                Padding="10,0"
-                                Click="SelectAllAssignedTechs_Click"/>
+                                                    Content="Select All"
+                                                    Height="28"
+                                                    MinWidth="86"
+                                                    Padding="10,0"
+                                                    Click="SelectAllAssignedTechs_Click"/>
 
                                             <Button Grid.Column="3"
-                                Content="Clear"
-                                Height="28"
-                                MinWidth="70"
-                                Padding="10,0"
-                                Click="ClearAssignedTechs_Click"/>
+                                                    Content="Clear"
+                                                    Height="28"
+                                                    MinWidth="70"
+                                                    Padding="10,0"
+                                                    Click="ClearAssignedTechs_Click"/>
                                         </Grid>
 
                                         <ScrollViewer Grid.Row="4"
-                                  MaxHeight="390"
-                                  VerticalScrollBarVisibility="Auto">
+                                                      MaxHeight="390"
+                                                      VerticalScrollBarVisibility="Auto">
 
                                             <ItemsControl ItemsSource="{Binding AssignedTechOptions, RelativeSource={RelativeSource AncestorType=Window}}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <CheckBox Content="{Binding Name}"
-                                              IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                              Margin="0,3"
-                                              Checked="AssignedTechOption_Changed"
-                                              Unchecked="AssignedTechOption_Changed"/>
+                                                                  IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  Margin="0,3"
+                                                                  Checked="AssignedTechOption_Changed"
+                                                                  Unchecked="AssignedTechOption_Changed"/>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
@@ -170,10 +176,10 @@
                         </Grid>
 
                         <TextBlock x:Name="AssignedTechSummaryTextBlock"
-               Margin="2,4,0,0"
-               FontSize="11"
-               TextWrapping="Wrap"
-               Foreground="{DynamicResource TextSecondary}"/>
+                                   Margin="2,4,0,0"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondary}"/>
                     </StackPanel>
 
                     <!-- Status -->
@@ -190,10 +196,10 @@
                     </StackPanel>
                 </Grid>
 
-                <Separator Margin="0,10,0,4"/>
+                <Separator Margin="0,6,0,4"/>
 
                 <!-- Work Information -->
-                <Grid Margin="0,8,0,0">
+                <Grid Margin="0,4,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -207,29 +213,33 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0"
-                                    Margin="0,0,8,0">
+                                    Margin="0,0,4,0">
                             <TextBlock Text="Notification #"
-                                       Margin="2,0,0,4"
+                                       Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
-                            <TextBox Height="34"
+                            <TextBox x:Name="NotificationNumberTextBox"
+                                     Height="34"
                                      MinWidth="220"
+                                     MaxLength="100"
                                      Text="{Binding NotificationNumber, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="Notification Name"
-                                       Margin="2,0,0,4"
+                                       Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
-                            <TextBox Height="34"
+                            <TextBox x:Name="NotificationNameTextBox"
+                                     Height="34"
+                                     MaxLength="100"
                                      Text="{Binding NotificationName, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                     </Grid>
 
                     <!-- Work Order -->
                     <Grid Grid.Row="1"
-                          Margin="0,8,0,0">
+                          Margin="0,6,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
@@ -238,20 +248,29 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0"
-                                    Margin="0,0,10,0">
+                                    Margin="0,0,4,0">
                             <TextBlock Text="Work Order"
-                                       Margin="2,0,0,4"
+                                       Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
-                            <TextBox Height="34"
-                                     MinWidth="160"
-                                     Text="{Binding WorkOrder, UpdateSourceTrigger=PropertyChanged}"/>
+                            <StackPanel>
+                                <TextBox x:Name="WorkOrderTextBox"
+                                         Height="34"
+                                         MinWidth="160"
+                                         MaxLength="10"
+                                         Text="{Binding WorkOrder, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                <TextBlock Text="Work Order is limited to 10 characters."
+                                           Margin="2,3,0,0"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1"
-                                    Margin="0,0,10,0">
+                                    Margin="0,0,4,0">
                             <TextBlock Text="Work Order Type"
-                                       Margin="2,0,0,4"
+                                       Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
                             <ComboBox x:Name="WorkOrderTypeBox"
@@ -261,9 +280,9 @@
                         </StackPanel>
 
                         <StackPanel Grid.Column="2"
-                                    Margin="0,0,10,0">
+                                    Margin="0,0,4,0">
                             <TextBlock Text="Work Order Code"
-                                       Margin="2,0,0,4"
+                                       Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
                             <ComboBox Height="34"
@@ -273,7 +292,7 @@
 
                         <StackPanel Grid.Column="3">
                             <TextBlock Text="Priority"
-                                       Margin="2,0,0,4"
+                                       Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
                             <ComboBox x:Name="PriorityBox"
@@ -283,7 +302,7 @@
                     </Grid>
                 </Grid>
 
-                <Separator Margin="0,10,0,8"/>
+                <Separator Margin="0,4,0,8"/>
 
                 <!-- Dispatch Notes -->
                 <TextBlock Text="Dispatch Notes"
@@ -298,6 +317,7 @@
 
                 <TextBox x:Name="DispatchNotesTextBox"
                          MaxHeight="360"
+                         MaxLength="10000"
                          Padding="6,6"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
@@ -365,13 +385,13 @@
             <Button x:Name="CancelBtn"
                     Content="Cancel"
                     MinWidth="110"
-                    Margin="0,0,8,0"
+                    Margin="0,0,4,0"
                     Click="Cancel_Click"/>
 
             <Button x:Name="CreateBtn"
                     Style="{StaticResource PrimaryButtonStyle}"
                     Content="Create Ticket"
-                    MinWidth="150"
+                    MinWidth="110"
                     Click="Create_Click"/>
         </StackPanel>
     </Grid>

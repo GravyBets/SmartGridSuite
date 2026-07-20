@@ -18,6 +18,15 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
         {
             InitializeComponent();
 
+            MaxHeight = SystemParameters.WorkArea.Height - 40;
+            MaxWidth = SystemParameters.WorkArea.Width - 40;
+
+            if (Height > MaxHeight)
+                Height = MaxHeight;
+
+            if (Width > MaxWidth)
+                Width = MaxWidth;
+
             HookEvents();
             SetDefaults();
         }
@@ -40,10 +49,27 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                 SetComboText(DecodeModeComboBox, "Raw");
                 ShowRawAlongsideDecodedCheckBox.IsChecked = false;
 
+                // Formula fields start blank for new OIDs.
+                // They only apply when Decode Mode is Formula.
+                ReadFormulaTextBox.Text = string.Empty;
+                WriteFormulaTextBox.Text = string.Empty;
+                DecimalPlacesTextBox.Text = string.Empty;
+                UnitLabelTextBox.Text = string.Empty;
+
+                // Preview fields are only for testing formulas in the editor.
+                // They are not saved to the OID.
+                RawFormulaPreviewTextBox.Text = string.Empty;
+                DisplayFormulaPreviewTextBox.Text = string.Empty;
+                ReadFormulaPreviewTextBlock.Text = "—";
+                WriteFormulaPreviewTextBlock.Text = "—";
+
                 _decodeValues.Clear();
                 RefreshDecodeGrid();
                 ClearDecodeEditor();
-                SetDecodeUiEnabled(false);
+
+                // Keep Raw / ValueMap / Formula UI states synced with the selected decode mode.
+                UpdateDecodeModeUi();
+
                 return;
             }
 
@@ -60,6 +86,20 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             SetComboText(DecodeModeComboBox, string.IsNullOrWhiteSpace(oid.DecodeMode) ? "Raw" : oid.DecodeMode);
             ShowRawAlongsideDecodedCheckBox.IsChecked = oid.ShowRawValueAlongsideDecoded;
 
+            // Load formula settings saved on this OID.
+            // Different radio profiles can use different formulas.
+            ReadFormulaTextBox.Text = oid.ReadFormula ?? string.Empty;
+            WriteFormulaTextBox.Text = oid.WriteFormula ?? string.Empty;
+            DecimalPlacesTextBox.Text = oid.DecimalPlaces?.ToString() ?? string.Empty;
+            UnitLabelTextBox.Text = oid.UnitLabel ?? string.Empty;
+
+            // Keep preview inputs blank when opening an existing OID.
+            // The admin can type sample values without changing the saved OID.
+            RawFormulaPreviewTextBox.Text = string.Empty;
+            DisplayFormulaPreviewTextBox.Text = string.Empty;
+            ReadFormulaPreviewTextBlock.Text = "—";
+            WriteFormulaPreviewTextBlock.Text = "—";
+
             _decodeValues.Clear();
             _decodeValues.AddRange(
                 oid.DecodeValues
@@ -75,7 +115,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
             RefreshDecodeGrid();
             ClearDecodeEditor();
-            SetDecodeUiEnabled(string.Equals(GetComboText(DecodeModeComboBox, "Raw"), "ValueMap", StringComparison.OrdinalIgnoreCase));
+            UpdateDecodeModeUi();
         }
 
         private void HookEvents()
@@ -85,6 +125,16 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             ApplyDecodeRowButton.Click += ApplyDecodeRowButton_Click;
             DecodeValuesDataGrid.SelectionChanged += DecodeValuesDataGrid_SelectionChanged;
             DecodeModeComboBox.SelectionChanged += DecodeModeComboBox_SelectionChanged;
+
+            // Formula preview updates live as the admin types.
+            // This lets us confirm radio raw value -> display value,
+            // and display/user value -> raw SET value before saving the OID.
+            ReadFormulaTextBox.TextChanged += FormulaPreviewChanged;
+            WriteFormulaTextBox.TextChanged += FormulaPreviewChanged;
+            DecimalPlacesTextBox.TextChanged += FormulaPreviewChanged;
+            UnitLabelTextBox.TextChanged += FormulaPreviewChanged;
+            RawFormulaPreviewTextBox.TextChanged += FormulaPreviewChanged;
+            DisplayFormulaPreviewTextBox.TextChanged += FormulaPreviewChanged;
 
             SaveButtonEx.Click += SaveButtonEx_Click;
             CancelButtonEx.Click += CancelButtonEx_Click;
@@ -99,7 +149,21 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             ShowInWorkspaceCheckBox.IsChecked = true;
             DecodeSortOrderTextBox.Text = "0";
 
-            SetDecodeUiEnabled(false);
+            // Formula decoder defaults.
+            // These are disabled unless Decode Mode is Formula.
+            ReadFormulaTextBox.Text = string.Empty;
+            WriteFormulaTextBox.Text = string.Empty;
+            DecimalPlacesTextBox.Text = string.Empty;
+            UnitLabelTextBox.Text = string.Empty;
+
+            // Preview fields are only for testing formulas in the editor.
+            // They are not saved to the OID.
+            RawFormulaPreviewTextBox.Text = string.Empty;
+            DisplayFormulaPreviewTextBox.Text = string.Empty;
+            ReadFormulaPreviewTextBlock.Text = "—";
+            WriteFormulaPreviewTextBlock.Text = "—";
+
+            UpdateDecodeModeUi();
             RefreshDecodeGrid();
         }
 
@@ -221,16 +285,118 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             if (!int.TryParse((SortOrderTextBox.Text ?? "0").Trim(), out var sortOrder))
                 sortOrder = 0;
 
+            // Decode mode controls whether Raw, ValueMap, or Formula behavior is used.
+            var decodeMode = GetComboText(DecodeModeComboBox, "Raw");
+
+            // Value type is important because Formula mode expects a numeric integer raw value.
+            var valueType = GetComboText(ValueTypeComboBox, "String");
+
+            // Formula values are configured per OID.
+            // ReadFormula: raw radio value -> display value.
+            // WriteFormula: displayed/user-entered value -> raw radio SET value.
+            var readFormula = (ReadFormulaTextBox.Text ?? string.Empty).Trim();
+            var writeFormula = (WriteFormulaTextBox.Text ?? string.Empty).Trim();
+            var unitLabel = (UnitLabelTextBox.Text ?? string.Empty).Trim();
+
+            int? decimalPlaces = null;
+
+            if (!string.IsNullOrWhiteSpace(DecimalPlacesTextBox.Text))
+            {
+                if (!int.TryParse(DecimalPlacesTextBox.Text.Trim(), out var parsedDecimalPlaces) ||
+                    parsedDecimalPlaces < 0 ||
+                    parsedDecimalPlaces > 10)
+                {
+                    MessageBox.Show(
+                        "Decimals must be a whole number between 0 and 10.",
+                        "SNMP OID Formula Decoder",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    DecimalPlacesTextBox.Focus();
+                    return;
+                }
+
+                decimalPlaces = parsedDecimalPlaces;
+            }
+
+            if (string.Equals(decodeMode, "Formula", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.Equals(valueType, "Integer", StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show(
+                        "Formula Decode can only be used with Integer OIDs.",
+                        "SNMP OID Formula Decoder",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    ValueTypeComboBox.Focus();
+                    return;
+                }
+
+                if (!SnmpFormulaEvaluator.IsValidFormula(readFormula))
+                {
+                    MessageBox.Show(
+                        "Read Formula is required and must use x.\n\nExamples:\nx / 100000\nx / 10\n(x / 10) + 2",
+                        "SNMP OID Formula Decoder",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    ReadFormulaTextBox.Focus();
+                    return;
+                }
+
+                if (WritableCheckBox.IsChecked == true &&
+                    !SnmpFormulaEvaluator.IsValidFormula(writeFormula))
+                {
+                    MessageBox.Show(
+                        "Writable Formula OIDs need a valid Write Formula so the displayed value can be converted back to a whole-number radio SET value.\n\nExamples:\nx * 100000\nx * 10",
+                        "SNMP OID Formula Decoder",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    WriteFormulaTextBox.Focus();
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(writeFormula) &&
+                    !SnmpFormulaEvaluator.IsValidFormula(writeFormula))
+                {
+                    MessageBox.Show(
+                        "Write Formula must use x and contain only safe math.\n\nExamples:\nx * 100000\nx * 10",
+                        "SNMP OID Formula Decoder",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    WriteFormulaTextBox.Focus();
+                    return;
+                }
+            }
+            else
+            {
+                // Keep non-formula OIDs clean so old Raw/ValueMap behavior stays simple.
+                readFormula = string.Empty;
+                writeFormula = string.Empty;
+                decimalPlaces = null;
+                unitLabel = string.Empty;
+            }
+
             Result = new SnmpOidConfigDto
             {
                 Category = GetComboText(CategoryComboBox, "Config"),
                 Label = label,
                 Oid = oid,
-                ValueType = GetComboText(ValueTypeComboBox, "String"),
+                ValueType = valueType,
                 IsWritable = WritableCheckBox.IsChecked == true,
                 ShowInWorkspace = ShowInWorkspaceCheckBox.IsChecked == true,
                 SortOrder = sortOrder,
-                DecodeMode = GetComboText(DecodeModeComboBox, "Raw"),
+                DecodeMode = decodeMode,
+
+                // Formula decoder config.
+                // Stored per OID so every radio/profile can use its own scaling.
+                ReadFormula = string.IsNullOrWhiteSpace(readFormula) ? null : readFormula,
+                WriteFormula = string.IsNullOrWhiteSpace(writeFormula) ? null : writeFormula,
+                DecimalPlaces = decimalPlaces,
+                UnitLabel = string.IsNullOrWhiteSpace(unitLabel) ? null : unitLabel,
                 ShowRawValueAlongsideDecoded = ShowRawAlongsideDecodedCheckBox.IsChecked == true,
                 DecodeValues = _decodeValues
                     .OrderBy(x => x.SortOrder)
@@ -310,8 +476,156 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
         private void DecodeModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            UpdateDecodeModeUi();
+        }
+
+        private void UpdateDecodeModeUi()
+        {
             var mode = GetComboText(DecodeModeComboBox, "Raw");
-            SetDecodeUiEnabled(string.Equals(mode, "ValueMap", StringComparison.OrdinalIgnoreCase));
+
+            var isValueMap = string.Equals(
+                mode,
+                "ValueMap",
+                StringComparison.OrdinalIgnoreCase);
+
+            var isFormula = string.Equals(
+                mode,
+                "Formula",
+                StringComparison.OrdinalIgnoreCase);
+
+            // ValueMap rows only matter for ValueMap mode.
+            SetDecodeUiEnabled(isValueMap);
+
+            // Formula fields and preview only matter for Formula mode.
+            SetFormulaDecodeUiEnabled(isFormula);
+
+            UpdateFormulaPreview();
+        }
+
+        private void SetFormulaDecodeUiEnabled(bool enabled)
+        {
+            if (FormulaDecodeBorder is null)
+                return;
+
+            FormulaDecodeBorder.IsEnabled = enabled;
+            FormulaDecodeBorder.Opacity = enabled ? 1.0 : 0.55;
+        }
+
+        private void FormulaPreviewChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdateFormulaPreview();
+        }
+
+        private void UpdateFormulaPreview()
+        {
+            if (ReadFormulaPreviewTextBlock is null ||
+                WriteFormulaPreviewTextBlock is null)
+            {
+                return;
+            }
+
+            var decodeMode = GetComboText(DecodeModeComboBox, "Raw");
+
+            if (!string.Equals(decodeMode, "Formula", StringComparison.OrdinalIgnoreCase))
+            {
+                ReadFormulaPreviewTextBlock.Text = "Formula mode not selected.";
+                WriteFormulaPreviewTextBlock.Text = "Formula mode not selected.";
+                return;
+            }
+
+            UpdateReadFormulaPreview();
+            UpdateWriteFormulaPreview();
+        }
+
+        private void UpdateReadFormulaPreview()
+        {
+            var rawSample = (RawFormulaPreviewTextBox.Text ?? string.Empty).Trim();
+            var readFormula = (ReadFormulaTextBox.Text ?? string.Empty).Trim();
+            var unitLabel = (UnitLabelTextBox.Text ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(rawSample))
+            {
+                ReadFormulaPreviewTextBlock.Text = "Enter a raw sample.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(readFormula))
+            {
+                ReadFormulaPreviewTextBlock.Text = "Enter a Read Formula.";
+                return;
+            }
+
+            if (!decimal.TryParse(
+                    rawSample,
+                    System.Globalization.NumberStyles.Number,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var rawNumber))
+            {
+                ReadFormulaPreviewTextBlock.Text = "Raw sample must be numeric.";
+                return;
+            }
+
+            if (!SnmpFormulaEvaluator.TryEvaluate(readFormula, rawNumber, out var decodedNumber))
+            {
+                ReadFormulaPreviewTextBlock.Text = "Invalid Read Formula.";
+                return;
+            }
+
+            var displayText = FormatFormulaNumber(decodedNumber);
+
+            if (!string.IsNullOrWhiteSpace(unitLabel))
+                displayText += " " + unitLabel;
+
+            ReadFormulaPreviewTextBlock.Text = displayText;
+        }
+
+        private void UpdateWriteFormulaPreview()
+        {
+            var displaySample = (DisplayFormulaPreviewTextBox.Text ?? string.Empty).Trim();
+            var writeFormula = (WriteFormulaTextBox.Text ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(displaySample))
+            {
+                WriteFormulaPreviewTextBlock.Text = "Enter a display sample.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(writeFormula))
+            {
+                WriteFormulaPreviewTextBlock.Text = "Enter a Write Formula.";
+                return;
+            }
+
+            if (!SnmpFormulaEvaluator.TryBuildWriteValue(
+                    displaySample,
+                    writeFormula,
+                    out var rawWriteValue))
+            {
+                WriteFormulaPreviewTextBlock.Text = "Invalid Write Formula.";
+                return;
+            }
+
+            WriteFormulaPreviewTextBlock.Text = rawWriteValue;
+        }
+
+        private string FormatFormulaNumber(decimal value)
+        {
+            if (!string.IsNullOrWhiteSpace(DecimalPlacesTextBox.Text))
+            {
+                if (int.TryParse(DecimalPlacesTextBox.Text.Trim(), out var decimalPlaces) &&
+                    decimalPlaces >= 0 &&
+                    decimalPlaces <= 10)
+                {
+                    return Math.Round(value, decimalPlaces, MidpointRounding.AwayFromZero)
+                        .ToString(
+                            $"F{decimalPlaces}",
+                            System.Globalization.CultureInfo.InvariantCulture);
+                }
+            }
+
+            return value.ToString(
+                "0.##########",
+                System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 }

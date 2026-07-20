@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Contracts.Snmp;
 using System.Net;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Globalization;
 using NetIPAddress = System.Net.IPAddress;
 
 namespace SmartGridSuite.Api.Services
@@ -210,12 +210,25 @@ namespace SmartGridSuite.Api.Services
             try
             {
                 var endpoint = new IPEndPoint(ip, 161);
-                var snmpData = BuildSnmpData(oid.ValueType, req.Value.Trim());
+
+                // This is what the user typed in the WPF Set Tool.
+                // For Raw / ValueMap OIDs, this is already the raw radio value.
+                // For Formula OIDs, this is the displayed value, like 1.2 or 757.00125.
+                var requestedValue = req.Value.Trim();
+
+                // Convert the requested value into the raw whole-number value the radio expects.
+                // Example:
+                //   User enters: 1.2
+                //   WriteFormula: x * 10
+                //   Raw SET value: 12
+                var rawSetValue = BuildRawSetValue(oid, requestedValue);
+
+                var snmpData = BuildSnmpData(oid.ValueType, rawSetValue);
 
                 var variables = new List<Variable>
-        {
-            new(new ObjectIdentifier(oid.Oid), snmpData)
-        };
+                {
+                    new(new ObjectIdentifier(oid.Oid), snmpData)
+                };
 
                 string rawValue;
 
@@ -269,7 +282,9 @@ namespace SmartGridSuite.Api.Services
                     Label = oid.Label,
                     Oid = oid.Oid,
                     DecodeMode = oid.DecodeMode,
-                    RequestedValue = req.Value.Trim(),
+                    // Keep this as the user-entered/display value.
+                    // RawValue below is the value returned by the radio after SET.
+                    RequestedValue = requestedValue,
                     RawValue = rawValue,
                     DisplayValue = displayValue
                 };
@@ -290,9 +305,32 @@ namespace SmartGridSuite.Api.Services
         {
             var mode = (oid.DecodeMode ?? "Raw").Trim();
 
+            // Formula mode:
+            // raw radio value -> displayed value
+            //
+            // Example:
+            //   RawValue: 75700125
+            //   ReadFormula: x / 100000
+            //   DecimalPlaces: 5
+            //   UnitLabel: MHz
+            //   DisplayValue: 757.00125 MHz
+            if (mode.Equals("Formula", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryDecodeFormulaValue(oid, rawValue, out var formulaDisplayValue))
+                    return rawValue;
+
+                if (oid.ShowRawValueAlongsideDecoded)
+                    return $"{formulaDisplayValue} ({rawValue})";
+
+                return formulaDisplayValue;
+            }
+
+            // Raw mode returns the radio value exactly as received.
             if (!mode.Equals("ValueMap", StringComparison.OrdinalIgnoreCase))
                 return rawValue;
 
+            // ValueMap mode:
+            // exact raw value -> configured display text.
             var match = oid.DecodeValues
                 .Where(x => !x.IsDeleted)
                 .OrderBy(x => x.SortOrder)
@@ -309,6 +347,81 @@ namespace SmartGridSuite.Api.Services
                 return $"{match.DisplayText} ({rawValue})";
 
             return match.DisplayText;
+        }
+
+        private static bool TryDecodeFormulaValue(Data.Entities.SnmpOidEntity oid, string rawValue, out string displayValue)
+        {
+            displayValue = string.Empty;
+
+            var cleanRaw = (rawValue ?? string.Empty).Trim();
+
+            if (!decimal.TryParse(
+                    cleanRaw,
+                    NumberStyles.Number,
+                    CultureInfo.InvariantCulture,
+                    out var rawNumber))
+            {
+                return false;
+            }
+
+            // ReadFormula converts raw radio response into display value.
+            // Example: raw 12 with "x / 10" becomes 1.2.
+            if (!SnmpFormulaEvaluator.TryEvaluate(
+                    oid.ReadFormula,
+                    rawNumber,
+                    out var decodedNumber))
+            {
+                return false;
+            }
+
+            var formatted = oid.DecimalPlaces.HasValue
+                ? Math.Round(decodedNumber, oid.DecimalPlaces.Value, MidpointRounding.AwayFromZero)
+                    .ToString($"F{oid.DecimalPlaces.Value}", CultureInfo.InvariantCulture)
+                : decodedNumber.ToString("0.##########", CultureInfo.InvariantCulture);
+
+            var unit = (oid.UnitLabel ?? string.Empty).Trim();
+
+            displayValue = string.IsNullOrWhiteSpace(unit)
+                ? formatted
+                : $"{formatted} {unit}";
+
+            return true;
+        }
+
+        private static string BuildRawSetValue(Data.Entities.SnmpOidEntity oid, string requestedValue)
+        {
+            var mode = (oid.DecodeMode ?? "Raw").Trim();
+
+            // Raw and ValueMap OIDs already pass raw values to the radio.
+            if (!mode.Equals("Formula", StringComparison.OrdinalIgnoreCase))
+                return requestedValue.Trim();
+
+            // Formula SET only makes sense for integer-style radio values.
+            if (!string.Equals(
+                    oid.ValueType,
+                    "Integer",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"OID '{oid.Label}' uses Formula Decode, but its Type is not Integer.");
+            }
+
+            // WriteFormula converts display/user-entered value back into radio raw value.
+            //
+            // Example:
+            //   User enters: 757.00125
+            //   WriteFormula: x * 100000
+            //   Raw SET value: 75700125
+            if (!SnmpFormulaEvaluator.TryBuildWriteValue(
+                    requestedValue,
+                    oid.WriteFormula,
+                    out var rawWriteValue))
+            {
+                throw new InvalidOperationException(
+                    $"Unable to convert '{requestedValue}' using Write Formula for OID '{oid.Label}'. Check the OID's Write Formula.");
+            }
+
+            return rawWriteValue;
         }
 
         private static SnmpRunResultDto Fail(string error, SnmpRunSelectedRequestDto req, string profileName = "", string label = "", 
@@ -332,15 +445,59 @@ namespace SmartGridSuite.Api.Services
         private static ISnmpData BuildSnmpData(string? valueType, string rawValue)
         {
             var type = (valueType ?? "String").Trim();
+            var cleanRaw = (rawValue ?? string.Empty).Trim();
 
-            return type switch
+            // Admin now only exposes String and Integer.
+            // Gauge/Counter/IpAddress are left here for compatibility with any older saved rows.
+            if (type.Equals("Integer", StringComparison.OrdinalIgnoreCase))
             {
-                "Integer" => new Integer32(int.Parse(rawValue)),
-                "Gauge" => new Gauge32(uint.Parse(rawValue)),
-                "Counter" => new Counter32(uint.Parse(rawValue)),
-                "IpAddress" => new IP(rawValue),
-                _ => new OctetString(rawValue)
-            };
+                if (!int.TryParse(
+                        cleanRaw,
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out var parsed))
+                {
+                    throw new InvalidOperationException(
+                        $"'{cleanRaw}' is not a valid Integer SNMP SET value.");
+                }
+
+                return new Integer32(parsed);
+            }
+
+            if (type.Equals("Gauge", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!uint.TryParse(
+                        cleanRaw,
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out var parsed))
+                {
+                    throw new InvalidOperationException(
+                        $"'{cleanRaw}' is not a valid Gauge SNMP SET value.");
+                }
+
+                return new Gauge32(parsed);
+            }
+
+            if (type.Equals("Counter", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!uint.TryParse(
+                        cleanRaw,
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out var parsed))
+                {
+                    throw new InvalidOperationException(
+                        $"'{cleanRaw}' is not a valid Counter SNMP SET value.");
+                }
+
+                return new Counter32(parsed);
+            }
+
+            if (type.Equals("IpAddress", StringComparison.OrdinalIgnoreCase))
+                return new IP(cleanRaw);
+
+            return new OctetString(cleanRaw);
         }
 
         private static string SetV3(Data.Entities.SnmpProfileEntity profile, IPEndPoint endpoint, IList<Variable> variables)

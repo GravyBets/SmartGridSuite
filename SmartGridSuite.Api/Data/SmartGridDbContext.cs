@@ -29,6 +29,8 @@ namespace SmartGridSuite.Api.Data
 
         public DbSet<AppSettingEntity> AppSettings => Set<AppSettingEntity>();
 
+        public DbSet<EmailLogEntity> EmailLogs => Set<EmailLogEntity>();
+
         public DbSet<SiteNoteEntity> SiteNotes => Set<SiteNoteEntity>();
 
         public DbSet<SiteHistoryEntity> SiteHistory => Set<SiteHistoryEntity>();
@@ -143,6 +145,8 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.FirstName).HasColumnName("first_name").HasMaxLength(64).IsRequired();
                 e.Property(x => x.LastName).HasColumnName("last_name").HasMaxLength(64).IsRequired();
                 e.Property(x => x.Title).HasColumnName("Title").HasMaxLength(32);
+
+                e.Property(x => x.EmailAddress).HasColumnName("email_address").HasMaxLength(255);
 
                 e.Property(x => x.IsActive).HasColumnName("is_active");
 
@@ -363,10 +367,15 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.DecodeMode).HasColumnName("decode_mode").HasMaxLength(30).IsRequired();
                 e.Property(x => x.ShowRawValueAlongsideDecoded).HasColumnName("show_raw_value_alongside_decoded");
 
-                e.HasMany(x => x.DecodeValues)
-                    .WithOne(x => x.SnmpOid)
-                    .HasForeignKey(x => x.SnmpOidId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                // Formula decode fields.
+                // These columns live on snmp_oids and are configured per OID.
+                e.Property(x => x.ReadFormula).HasColumnName("read_formula").HasMaxLength(100);
+                e.Property(x => x.WriteFormula).HasColumnName("write_formula").HasMaxLength(100);
+                e.Property(x => x.DecimalPlaces).HasColumnName("decimal_places");
+
+                e.Property(x => x.UnitLabel).HasColumnName("unit_label").HasMaxLength(20);
+
+                e.HasMany(x => x.DecodeValues).WithOne(x => x.SnmpOid).HasForeignKey(x => x.SnmpOidId).OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<SnmpOidDecodeValueEntity>(e =>
@@ -399,6 +408,90 @@ namespace SmartGridSuite.Api.Data
 
                 e.Property(x => x.UpdatedAt)
                     .HasColumnName("updated_at");
+            });
+
+            modelBuilder.Entity<EmailLogEntity>(e =>
+            {
+                e.ToTable("email_logs");
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.Id)
+                    .HasColumnName("id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.EmailType)
+                    .HasColumnName("email_type")
+                    .HasMaxLength(64)
+                    .IsRequired();
+
+                e.Property(x => x.EnabledAtSendTime)
+                    .HasColumnName("enabled_at_send_time")
+                    .HasColumnType("tinyint(1)");
+
+                e.Property(x => x.DryRun)
+                    .HasColumnName("dry_run")
+                    .HasColumnType("tinyint(1)");
+
+                e.Property(x => x.FromAddress)
+                    .HasColumnName("from_address")
+                    .HasMaxLength(255)
+                    .IsRequired();
+
+                e.Property(x => x.FromDisplayName)
+                    .HasColumnName("from_display_name")
+                    .HasMaxLength(255);
+
+                e.Property(x => x.ToAddresses)
+                    .HasColumnName("to_addresses")
+                    .IsRequired();
+
+                e.Property(x => x.CcAddresses)
+                    .HasColumnName("cc_addresses");
+
+                e.Property(x => x.BccAddresses)
+                    .HasColumnName("bcc_addresses");
+
+                e.Property(x => x.Subject)
+                    .HasColumnName("subject")
+                    .HasMaxLength(255)
+                    .IsRequired();
+
+                e.Property(x => x.BodyPreview)
+                    .HasColumnName("body_preview");
+
+                e.Property(x => x.Status)
+                    .HasColumnName("status")
+                    .HasMaxLength(32)
+                    .IsRequired();
+
+                e.Property(x => x.ErrorMessage)
+                    .HasColumnName("error_message");
+
+                e.Property(x => x.RelatedTicketId)
+                    .HasColumnName("related_ticket_id");
+
+                e.Property(x => x.RelatedSite)
+                    .HasColumnName("related_site")
+                    .HasMaxLength(64);
+
+                e.Property(x => x.CreatedBy)
+                    .HasColumnName("created_by")
+                    .HasMaxLength(100);
+
+                e.HasIndex(x => x.CreatedAt)
+                    .HasDatabaseName("ix_email_logs_created_at");
+
+                e.HasIndex(x => x.Status)
+                    .HasDatabaseName("ix_email_logs_status");
+
+                e.HasIndex(x => x.EmailType)
+                    .HasDatabaseName("ix_email_logs_email_type");
+
+                e.HasIndex(x => x.RelatedTicketId)
+                    .HasDatabaseName("ix_email_logs_related_ticket");
             });
 
             modelBuilder.Entity<CommunicationDeviceTypeEntity>(entity =>

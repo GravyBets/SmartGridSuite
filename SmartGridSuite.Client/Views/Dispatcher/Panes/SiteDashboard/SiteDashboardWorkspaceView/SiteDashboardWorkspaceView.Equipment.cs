@@ -573,9 +573,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             var comboBox = new ComboBox
             {
                 Height = 30,
+                MinWidth = 180,
                 VerticalContentAlignment = VerticalAlignment.Center,
                 IsEditable = false,
-                Tag = "ReplacementDeviceType"
+                Tag = "ReplacementDeviceType",
+                ToolTip = "Select a device type before submitting this replacement."
             };
 
             if (TryFindResource("ModernComboBoxStyle") is Style comboStyle)
@@ -595,7 +597,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             foreach (var name in names)
                 comboBox.Items.Add(name);
 
-            comboBox.SelectedIndex = names.Count > 0 ? 0 : -1;
+            // Important: blank by default. The tech/dispatcher must choose.
+            comboBox.SelectedIndex = -1;
+
+            comboBox.SelectionChanged += (_, _) =>
+            {
+                ClearRequiredFieldWarning(comboBox);
+            };
 
             stack.Children.Add(comboBox);
 
@@ -788,6 +796,103 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             var cleanOldSerial = (oldSerial ?? string.Empty).Trim();
 
             return $"{cleanLabel}|{cleanOldSerial}";
+        }
+
+        public bool TryValidateEquipmentReplacementEntriesForSubmit()
+        {
+            if (ReplacementEntriesPanel is null)
+                return true;
+
+            var rowNumber = 0;
+
+            foreach (var rowBorder in ReplacementEntriesPanel.Children.OfType<Border>())
+            {
+                rowNumber++;
+
+                if (rowBorder.Tag is not ReplacementEntryRowTag rowTag)
+                    continue;
+
+                if (!rowTag.UsesCommunicationDeviceTypePicker)
+                    continue;
+
+                var comboBox = FindVisualChildByTag<ComboBox>(
+                    rowBorder,
+                    "ReplacementDeviceType");
+
+                if (comboBox is null)
+                    continue;
+
+                var selectedDeviceType = GetComboBoxSelectedText(comboBox);
+
+                if (!string.IsNullOrWhiteSpace(selectedDeviceType))
+                {
+                    ClearRequiredFieldWarning(comboBox);
+                    continue;
+                }
+
+                MarkRequiredFieldWarning(comboBox);
+
+                var rowLabel = string.IsNullOrWhiteSpace(rowTag.Label)
+                    ? $"replacement row {rowNumber}"
+                    : $"{rowTag.Label} replacement";
+
+                MessageBox.Show(
+                    $"Select a Device Type for the {rowLabel} before submitting the write-up.",
+                    "Equipment Replacement Required",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                comboBox.Focus();
+                return false;
+            }
+
+            return true;
+        }
+
+        private static string GetComboBoxSelectedText(ComboBox comboBox)
+        {
+            if (comboBox.SelectedItem is ComboBoxItem item)
+                return item.Content?.ToString()?.Trim() ?? string.Empty;
+
+            return comboBox.SelectedItem?.ToString()?.Trim()
+                   ?? comboBox.Text?.Trim()
+                   ?? string.Empty;
+        }
+
+        private void MarkRequiredFieldWarning(Control control)
+        {
+            control.BorderBrush = new SolidColorBrush(Color.FromRgb(220, 80, 80));
+            control.BorderThickness = new Thickness(1.5);
+        }
+
+        private static void ClearRequiredFieldWarning(Control control)
+        {
+            control.ClearValue(Control.BorderBrushProperty);
+            control.ClearValue(Control.BorderThicknessProperty);
+        }
+
+        private static T? FindVisualChildByTag<T>(DependencyObject root, object tag)
+            where T : FrameworkElement
+        {
+            var childCount = VisualTreeHelper.GetChildrenCount(root);
+
+            for (var i = 0; i < childCount; i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+
+                if (child is T typedChild &&
+                    Equals(typedChild.Tag, tag))
+                {
+                    return typedChild;
+                }
+
+                var nested = FindVisualChildByTag<T>(child, tag);
+
+                if (nested is not null)
+                    return nested;
+            }
+
+            return null;
         }
 
         private bool CanAddReplacementEntry(bool showMessage = true)

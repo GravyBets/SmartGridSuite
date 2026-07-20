@@ -82,7 +82,9 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
             try
             {
                 _busyLoading = true;
+
                 StatusMessage = "Loading assigned tasks...";
+                ShowBusyOverlay(StatusMessage);
 
                 var technician = await CurrentUserService
                     .LoadCurrentTechnicianAsync(forceRefresh: true);
@@ -158,6 +160,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
             finally
             {
                 _busyLoading = false;
+                HideBusyOverlay();
             }
         }
 
@@ -467,5 +470,38 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
 
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        private void ShowBusyOverlay(string message)
+        {
+            if (BusyOverlay is null ||
+                BusyOverlayMessageTextBlock is null)
+            {
+                return;
+            }
+
+            BusyOverlayMessageTextBlock.Text = string.IsNullOrWhiteSpace(message)
+                ? "Loading..."
+                : message;
+
+            BusyOverlay.Visibility = Visibility.Visible;
+
+            RefreshTasksButton.IsEnabled = false;
+            OpenAllTasksButton.IsEnabled = false;
+            DailyAssignmentsGrid.IsEnabled = false;
+            OtherAssignedTicketsGrid.IsEnabled = false;
+        }
+
+        private void HideBusyOverlay()
+        {
+            if (BusyOverlay is null)
+                return;
+
+            BusyOverlay.Visibility = Visibility.Collapsed;
+
+            RefreshTasksButton.IsEnabled = true;
+            OpenAllTasksButton.IsEnabled = true;
+            DailyAssignmentsGrid.IsEnabled = true;
+            OtherAssignedTicketsGrid.IsEnabled = true;
+        }
     }
 }

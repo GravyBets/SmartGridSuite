@@ -9,7 +9,7 @@
             <!-- Header -->
             <Border Style="{StaticResource Card}"
                     Padding="16"
-                    Margin="0,0,0,12">
+                    Margin="0,0,0,4">
                 <StackPanel>
                     <TextBlock Text="General Settings"
                                FontSize="24"
@@ -22,133 +22,362 @@
                 </StackPanel>
             </Border>
 
-            <!-- IGSD Portal URL -->
+            <!-- Email Settings -->
             <Border Style="{StaticResource Card}"
                     Padding="16"
-                    Margin="0,0,0,12">
+                    Margin="0,0,0,4">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="4"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="8"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0">
-                        <TextBlock Text="IGSD Portal URL"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextPrimary}"/>
-
-                        <TextBlock Text="This URL is used by the IGSD Portal tab in Site Dashboard. Leave blank to disable the portal tab."
-                                   Margin="0,4,0,0"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-                    </StackPanel>
-
-                    <Grid Grid.Row="2">
+                    <!-- Header -->
+                    <Grid Grid.Row="0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="4"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <TextBox x:Name="IgsdPortalUrlTextBox"
-                                 Grid.Column="0"
+                        <StackPanel>
+                            <TextBlock Text="Email Settings"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                            <TextBlock Text="Controls server-side email sending from the SmartGridSuite API on the VM."
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </StackPanel>
+
+                        <Button x:Name="ReloadEmailSettingsButton"
+                                Grid.Column="1"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Content="Reload"
+                                Height="34"
+                                Padding="14,0"/>
+
+                        <Button x:Name="SaveEmailSettingsButton"
+                                Grid.Column="3"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Width="138"
+                                Content="Save Email Settings"
+                                Height="34"
+                                Padding="14,0"/>
+                    </Grid>
+
+                    <!-- Toggles -->
+                    <Border Grid.Row="2"
+                            Padding="12"
+                            CornerRadius="10"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            Background="{DynamicResource SurfaceBg}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="18"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <CheckBox x:Name="EmailEnabledCheckBox"
+                                          Content="Emails Enabled"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock Text="Master switch. When off, emails are skipped and logged."
+                                           Margin="24,3,0,10"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+
+                                <CheckBox x:Name="EmailDryRunCheckBox"
+                                          Content="Dry Run Mode"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock Text="Builds and logs emails but does not send them."
+                                           Margin="24,3,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <CheckBox x:Name="EmailDailyAssignmentsCheckBox"
+                                          Content="Daily Assignment Emails"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock Text="Allows emails when Daily Assignments are published."
+                                           Margin="24,3,0,10"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+
+                                <CheckBox x:Name="EmailWriteUpsCheckBox"
+                                          Content="Write-Up Emails"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock Text="Allows emails when technician write-ups are submitted."
+                                           Margin="24,3,0,10"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+
+                                <CheckBox x:Name="EmailBccSenderCheckBox"
+                                          Content="BCC Sender Copy"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock Text="When a workflow sends from a tech or dispatcher, BCC that person so they receive a copy."
+                                           Margin="24,3,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- All emails address -->
+                    <StackPanel Grid.Row="4">
+                        <TextBlock Text="All Emails Address"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   Margin="0,0,0,3"/>
+
+                        <TextBox x:Name="EmailAllEmailsAddressTextBox"
                                  Style="{StaticResource ModernTextBox}"
                                  Height="34"
                                  Padding="10,0"
                                  VerticalContentAlignment="Center"/>
 
-                        <Button x:Name="ReloadPortalUrlButton"
-                                Grid.Column="2"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Content="Reload"
-                                Height="34"
-                                Padding="14,0"
-                                Click="ReloadPortalUrlButton_Click"/>
+                        <TextBlock Text="Daily Assignment and Modified Assignment emails CC this address. Write-up emails are sent to this address."
+                                   Margin="0,4,0,0"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                    </StackPanel>
 
-                        <Button x:Name="SavePortalUrlButton"
+                    <!-- Test recipient override -->
+                    <Grid Grid.Row="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Test Recipient Override"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Margin="0,0,0,3"/>
+
+                            <TextBox x:Name="EmailTestRecipientOverrideTextBox"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Height="34"
+                                     Padding="10,0"
+                                     VerticalContentAlignment="Center"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Send Test Email To"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Margin="0,0,0,3"/>
+
+                            <TextBox x:Name="EmailTestRecipientTextBox"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Height="34"
+                                     Padding="10,0"
+                                     VerticalContentAlignment="Center"/>
+                        </StackPanel>
+
+                        <Button x:Name="SendTestEmailButton"
                                 Grid.Column="4"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Content="Save URL"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Content="Send Test Email"
                                 Height="34"
                                 Padding="14,0"
-                                Click="SavePortalUrlButton_Click"/>
+                                VerticalAlignment="Bottom"/>
                     </Grid>
 
-                    <TextBlock x:Name="PortalUrlStatusTextBlock"
-                               Grid.Row="4"
+                    <TextBlock Grid.Row="8"
+                               x:Name="EmailSettingsStatusTextBlock"
                                Text="Ready."
                                Foreground="{DynamicResource TextSecondary}"/>
                 </Grid>
             </Border>
-            
-            <!-- Range Extender Portal URL -->
+
+            <!-- External Links -->
             <Border Style="{StaticResource Card}"
                     Padding="16"
-                    Margin="0,12,0,0">
+                    Margin="0,0,0,4">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="6"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="8"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0">
-                        <TextBlock Text="Range Extender Link URL"
+                        <TextBlock Text="External Links"
                                    FontSize="18"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextPrimary}"/>
 
-                        <TextBlock Text="This URL opens from the Range Extender tab in Site Dashboard. Leave blank to disable the button."
+                        <TextBlock Text="Shared URLs used by Site Dashboard tabs and actions."
                                    Margin="0,4,0,0"
                                    TextWrapping="Wrap"
                                    Foreground="{DynamicResource TextSecondary}"/>
                     </StackPanel>
 
-                    <Grid Grid.Row="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
+                    <!-- IGSD Portal URL -->
+                    <Border Grid.Row="2"
+                            Padding="12"
+                            CornerRadius="10"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            Background="{DynamicResource SurfaceBg}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
 
-                        <TextBox x:Name="RangeExtenderLinkUrlTextBox"
-                                 Grid.Column="0"
-                                 Style="{StaticResource ModernTextBox}"
-                                 Height="34"
-                                 Padding="10,0"
-                                 VerticalContentAlignment="Center"/>
+                            <TextBlock Text="IGSD Portal URL"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
 
-                        <Button x:Name="ReloadRangeExtenderLinkButton"
-                                Grid.Column="2"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Content="Reload"
-                                Height="34"
-                                Padding="14,0"
-                                Click="ReloadRangeExtenderLinkButton_Click"/>
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
 
-                        <Button x:Name="SaveRangeExtenderLinkButton"
-                                Grid.Column="4"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Content="Save URL"
-                                Height="34"
-                                Padding="14,0"
-                                Click="SaveRangeExtenderLinkButton_Click"/>
-                    </Grid>
+                                <TextBox x:Name="IgsdPortalUrlTextBox"
+                                         Grid.Column="0"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Height="34"
+                                         Padding="10,0"
+                                         VerticalContentAlignment="Center"
+                                         Tag="IGSD Portal URL"/>
 
-                    <TextBlock x:Name="RangeExtenderLinkStatusTextBlock"
-                               Grid.Row="4"
-                               Text="Ready."
-                               Foreground="{DynamicResource TextSecondary}"/>
+                                <Button x:Name="ReloadPortalUrlButton"
+                                        Grid.Column="2"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Reload"
+                                        Width="84"
+                                        Height="34"
+                                        Padding="14,0"
+                                        Click="ReloadPortalUrlButton_Click"/>
+
+                                <Button x:Name="SavePortalUrlButton"
+                                        Grid.Column="4"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Content="Save"
+                                        Width="84"
+                                        Height="34"
+                                        Padding="14,0"
+                                        Click="SavePortalUrlButton_Click"/>
+                            </Grid>
+
+                            <TextBlock x:Name="PortalUrlStatusTextBlock"
+                                       Grid.Row="4"
+                                       Text="Ready."
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Range Extender Link URL -->
+                    <Border Grid.Row="4"
+                            Padding="12"
+                            CornerRadius="10"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            Background="{DynamicResource SurfaceBg}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="Range Extender Link URL"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBox x:Name="RangeExtenderLinkUrlTextBox"
+                                         Grid.Column="0"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Height="34"
+                                         Padding="10,0"
+                                         VerticalContentAlignment="Center"
+                                         Tag="Range Extender Link URL"/>
+
+                                <Button x:Name="ReloadRangeExtenderLinkButton"
+                                        Grid.Column="2"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Reload"
+                                        Width="84"
+                                        Height="34"
+                                        Padding="14,0"
+                                        Click="ReloadRangeExtenderLinkButton_Click"/>
+
+                                <Button x:Name="SaveRangeExtenderLinkButton"
+                                        Grid.Column="4"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Content="Save"
+                                        Width="84"
+                                        Height="34"
+                                        Padding="14,0"
+                                        Click="SaveRangeExtenderLinkButton_Click"/>
+                            </Grid>
+
+                            <TextBlock x:Name="RangeExtenderLinkStatusTextBlock"
+                                       Grid.Row="4"
+                                       Text="Ready."
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </Grid>
+                    </Border>
                 </Grid>
             </Border>
 
@@ -158,21 +387,22 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="8"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="8"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="8"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
+                    <!-- Header -->
                     <Grid Grid.Row="0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel>
+                        <StackPanel Grid.Column="0">
                             <TextBlock Text="Communication Device Types"
                                        FontSize="18"
                                        FontWeight="SemiBold"
@@ -184,93 +414,279 @@
                                        Foreground="{DynamicResource TextSecondary}"/>
                         </StackPanel>
 
-                        <Button x:Name="ReloadDeviceTypesButton"
-                                Grid.Column="1"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Content="Reload"
-                                Height="34"
-                                Padding="14,0"
-                                VerticalAlignment="Top"
-                                Click="ReloadDeviceTypesButton_Click"/>
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Top">
+
+                            <Button x:Name="ReloadDeviceTypesButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Reload"
+                                    MinWidth="86"
+                                    Height="34"
+                                    Padding="14,0"
+                                    Margin="0,0,6,0"
+                                    Click="ReloadDeviceTypesButton_Click"/>
+
+                            <Button x:Name="ToggleAddDeviceTypeButton"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Content="+ New Type"
+                                    MinWidth="108"
+                                    Height="34"
+                                    Padding="14,0"
+                                    Margin="0,0,6,0"
+                                    Click="ToggleAddDeviceTypeButton_Click"/>
+
+                            <Button x:Name="EditSelectedDeviceTypeButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Edit Selected"
+                                    MinWidth="112"
+                                    Height="34"
+                                    Padding="14,0"
+                                    Margin="0,0,6,0"
+                                    IsEnabled="False"
+                                    Click="EditSelectedDeviceTypeButton_Click"/>
+
+                            <Button x:Name="DeleteSelectedDeviceTypeButton"
+                                    Style="{StaticResource DangerButtonStyle}"
+                                    Content="Delete Selected"
+                                    MinWidth="122"
+                                    Height="34"
+                                    Padding="14,0"
+                                    IsEnabled="False"
+                                    Click="DeleteSelectedDeviceTypeButton_Click"/>
+                        </StackPanel>
                     </Grid>
 
-                    <!-- Add New Type -->
-                    <Border Grid.Row="2"
+                    <!-- Add/Edit Form Card -->
+                    <Border x:Name="AddDeviceTypeCard"
+                            Grid.Row="2"
+                            Style="{StaticResource Card}"
                             Padding="12"
-                            CornerRadius="10"
-                            BorderBrush="{DynamicResource SurfaceBorder}"
-                            BorderThickness="1"
-                            Background="{DynamicResource SurfaceBg}">
+                            Visibility="Collapsed">
                         <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="10"/>
-                                <ColumnDefinition Width="120"/>
-                                <ColumnDefinition Width="10"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="10"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
 
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="New Device Type"
-                                           FontSize="11"
+                            <StackPanel Grid.Row="0">
+                                <TextBlock x:Name="DeviceTypeFormTitleTextBlock"
+                                           Text="Add Communication Device Type"
+                                           FontSize="14"
                                            FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextSecondary}"
-                                           Margin="0,0,0,3"/>
+                                           Foreground="{DynamicResource TextPrimary}"/>
 
-                                <TextBox x:Name="NewDeviceTypeNameTextBox"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Height="32"
-                                         Padding="10,0"
-                                         VerticalContentAlignment="Center"/>
+                                <TextBlock x:Name="DeviceTypeFormHelpTextBlock"
+                                           Text="Create a new selectable communication device type."
+                                           Margin="0,3,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
                             </StackPanel>
 
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="Sort Order"
-                                           FontSize="11"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextSecondary}"
-                                           Margin="0,0,0,3"/>
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
 
-                                <TextBox x:Name="NewDeviceTypeSortOrderTextBox"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Height="32"
-                                         Padding="10,0"
-                                         VerticalContentAlignment="Center"
-                                         Text="40"/>
-                            </StackPanel>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Device Type"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
 
-                            <CheckBox x:Name="NewDeviceTypeActiveCheckBox"
-                                      Grid.Column="4"
-                                      Content="Active"
-                                      IsChecked="True"
-                                      VerticalAlignment="Bottom"
-                                      Margin="0,0,0,7"
-                                      Foreground="{DynamicResource TextPrimary}"/>
+                                    <TextBox x:Name="NewDeviceTypeNameTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Height="32"
+                                             MaxLength="100"
+                                             Padding="10,0"
+                                             VerticalContentAlignment="Center"
+                                             Tag="Device Type Name"/>
+                                </StackPanel>
 
-                            <Button x:Name="AddDeviceTypeButton"
-                                    Grid.Column="6"
-                                    Style="{StaticResource PrimaryButtonStyle}"
-                                    Content="Add"
-                                    Height="32"
-                                    Padding="16,0"
-                                    VerticalAlignment="Bottom"
-                                    Click="AddDeviceTypeButton_Click"/>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Sort"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
+
+                                    <TextBox x:Name="NewDeviceTypeSortOrderTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Height="32"
+                                             Padding="10,0"
+                                             VerticalContentAlignment="Center"
+                                             Text="100"/>
+                                </StackPanel>
+
+                                <CheckBox x:Name="NewDeviceTypeActiveCheckBox"
+                                          Grid.Column="4"
+                                          Content="Active"
+                                          IsChecked="True"
+                                          VerticalAlignment="Bottom"
+                                          Margin="0,0,0,7"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <Button x:Name="AddDeviceTypeButton"
+                                        Grid.Column="6"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Content="Add"
+                                        MinWidth="84"
+                                        Height="32"
+                                        Padding="16,0"
+                                        VerticalAlignment="Bottom"
+                                        Click="AddDeviceTypeButton_Click"/>
+
+                                <Button x:Name="CancelAddDeviceTypeButton"
+                                        Grid.Column="8"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Cancel"
+                                        MinWidth="84"
+                                        Height="32"
+                                        Padding="14,0"
+                                        VerticalAlignment="Bottom"
+                                        Click="CancelAddDeviceTypeButton_Click"/>
+                            </Grid>
                         </Grid>
                     </Border>
 
-                    <!-- Existing Types -->
-                    <StackPanel x:Name="DeviceTypesPanel"
-                                Grid.Row="4"/>
+                    <!-- Existing Types Table -->
+                    <Border Grid.Row="4"
+                            Style="{StaticResource Card}"
+                            Padding="8"
+                            ClipToBounds="False">
+                        <DataGrid x:Name="DeviceTypesDataGrid"
+                                  Height="230"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  CanUserResizeRows="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  RowHeaderWidth="0"
+                                  BorderThickness="0"
+                                  Background="{DynamicResource CardBackground}"
+                                  GridLinesVisibility="None"
+                                  HeadersVisibility="Column"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  SelectionChanged="DeviceTypesDataGrid_SelectionChanged">
 
-                    <TextBlock x:Name="DeviceTypesStatusTextBlock"
-                               Grid.Row="6"
+                            <DataGrid.Resources>
+                                <Style TargetType="{x:Type DataGridColumnHeader}">
+                                    <Setter Property="Background" Value="{DynamicResource TabBgHover}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                    <Setter Property="Height" Value="32"/>
+                                    <Setter Property="Padding" Value="12,0"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource DataGridHeaderBorder}"/>
+                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                </Style>
+
+                                <Style TargetType="{x:Type DataGridRow}">
+                                    <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                    <Setter Property="MinHeight" Value="34"/>
+                                    <Setter Property="BorderThickness" Value="0"/>
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource TileFillHover}"/>
+                                        </Trigger>
+
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource TileFillPressed}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+
+                                <Style TargetType="{x:Type DataGridCell}">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                    <Setter Property="Padding" Value="12,6"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                    <Setter Property="IsTabStop" Value="False"/>
+
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+
+                                <Style x:Key="DeviceTypeGridTextStyle"
+                                       TargetType="{x:Type TextBlock}">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                                </Style>
+                            </DataGrid.Resources>
+
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID"
+                                                    Width="64"
+                                                    Binding="{Binding Id}"
+                                                    ElementStyle="{StaticResource DeviceTypeGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Device Type"
+                                                    Width="*"
+                                                    Binding="{Binding DisplayName}"
+                                                    ElementStyle="{StaticResource DeviceTypeGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Sort"
+                                                    Width="80"
+                                                    Binding="{Binding SortOrder}"
+                                                    ElementStyle="{StaticResource DeviceTypeGridTextStyle}"/>
+
+                                <DataGridTemplateColumn Header="Active"
+                                                        Width="86">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsActive}"
+                                                      IsHitTestVisible="False"
+                                                      Focusable="False"
+                                                      HorizontalAlignment="Left"
+                                                      VerticalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <TextBlock Grid.Row="6"
+                               x:Name="DeviceTypesStatusTextBlock"
                                Text="Ready."
+                               FontSize="12"
                                Foreground="{DynamicResource TextSecondary}"/>
                 </Grid>
             </Border>
-
         </StackPanel>
     </ScrollViewer>
 </UserControl>

@@ -55,6 +55,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private string _statusText = "Ready.";
         private string _ticketSearchText = "";
 
+        private int _busyOverlayDepth;
+
         private AssignmentTargetVm? _selectedTarget;
 
         private DailyAssignmentsBoardDto _board = new()
@@ -197,7 +199,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             try
             {
                 _busyLoading = true;
+
                 StatusText = "Loading daily assignments...";
+                ShowBusyOverlay(StatusText);
 
                 var date = DateTime.Today.ToString("yyyy-MM-dd");
 
@@ -234,6 +238,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             finally
             {
                 _busyLoading = false;
+                HideBusyOverlay();
             }
         }
 
@@ -420,6 +425,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
             }
 
+            ShowBusyOverlay("Assigning selected ticket(s)...");
+
             try
             {
                 StatusText = "Assigning selected ticket(s)...";
@@ -435,9 +442,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     UpdatedBy = Environment.UserName
                 };
 
-                var result = await _api.PostAsync<AssignDailyTicketsRequest, AssignDailyTicketsResponse>(
-                    "api/daily-assignments/assign",
-                    req);
+                var result = await AssignTicketsWithConflictWarningAsync(
+                    req,
+                    target.PrimaryText);
+
+                if (result == null)
+                    return;
 
                 ClearSelectedTickets();
 
@@ -463,6 +473,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
+            finally
+            {
+                HideBusyOverlay();
+            }
         }
 
         private async void RemoveAssignedTicket_Click(object sender, RoutedEventArgs e)
@@ -480,6 +494,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         {
             if (ticketIds.Count == 0)
                 return;
+
+            ShowBusyOverlay(workingStatus);
 
             try
             {
@@ -517,6 +533,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     "Remove Failed",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+            }
+            finally
+            {
+                HideBusyOverlay();
             }
         }
 
@@ -1195,6 +1215,55 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _routePreviewDraggedTicket = null;
         }
 
+        private void ShowBusyOverlay(string message)
+        {
+            _busyOverlayDepth++;
+
+            if (BusyOverlay is null ||
+                BusyOverlayMessageTextBlock is null)
+            {
+                return;
+            }
+
+            BusyOverlayMessageTextBlock.Text = string.IsNullOrWhiteSpace(message)
+                ? "Loading..."
+                : message;
+
+            BusyOverlay.Visibility = Visibility.Visible;
+            SetDailyAssignmentsControlsEnabled(false);
+        }
+
+        private void HideBusyOverlay()
+        {
+            if (_busyOverlayDepth > 0)
+                _busyOverlayDepth--;
+
+            if (_busyOverlayDepth > 0)
+                return;
+
+            if (BusyOverlay is null)
+                return;
+
+            BusyOverlay.Visibility = Visibility.Collapsed;
+            SetDailyAssignmentsControlsEnabled(true);
+
+            RefreshAllBindings();
+        }
+
+        private void SetDailyAssignmentsControlsEnabled(bool enabled)
+        {
+            RefreshAssignmentsButton.IsEnabled = enabled;
+
+            TicketPoolCard.IsEnabled = enabled;
+            WorkListCard.IsEnabled = enabled;
+
+            if (!enabled)
+            {
+                EndDragGhost();
+                ResetRouteCardPreview();
+            }
+        }
+
         private async Task AssignDroppedPoolTicketsAsync(IReadOnlyList<long> ticketIds, long? insertBeforeTicketId)
         {
             var target = SelectedTarget;
@@ -1211,6 +1280,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
 
             var targetKey = target.TargetKey;
+
+            ShowBusyOverlay("Assigning dropped ticket(s)...");
 
             try
             {
@@ -1231,9 +1302,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     UpdatedBy = Environment.UserName
                 };
 
-                await _api.PostAsync<AssignDailyTicketsRequest, AssignDailyTicketsResponse>(
-                    "api/daily-assignments/assign",
-                    request);
+                var assignResult = await AssignTicketsWithConflictWarningAsync(
+                    request,
+                    target.PrimaryText);
+
+                if (assignResult == null)
+                    return;
 
                 ClearSelectedTickets();
 
@@ -1326,6 +1400,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 _isAssigningByDragDrop = false;
                 _draggedPoolTicket = null;
+                HideBusyOverlay();
             }
         }
 
@@ -1335,6 +1410,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             if (target == null || orderedTickets.Count == 0)
                 return;
+
+            ShowBusyOverlay("Updating ticket order...");
 
             try
             {
@@ -1385,6 +1462,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 _isReorderingByDragDrop = false;
                 _draggedAssignedTicket = null;
+                HideBusyOverlay();
             }
         }
 
@@ -1421,19 +1499,77 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
 
             var confirm = MessageBox.Show(
-                $"Clear all {ticketIds.Count} ticket(s) from {target.PrimaryText}?\n\n" +
-                "This clears the dispatcher list only. Click Save & Publish after this if the field tech task list should also be emptied.",
+                $"Clear and publish an empty task list for {target.PrimaryText}?\n\n" +
+                $"This will remove all {ticketIds.Count} ticket(s) from this route, clear the field tech My Tasks list for this target, " +
+                "and return eligible tickets to unassigned.",
                 "Clear Assignment List",
                 MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+                MessageBoxImage.Warning);
 
             if (confirm != MessageBoxResult.Yes)
                 return;
 
-            await RemoveAssignedTicketsAsync(
-                ticketIds,
-                $"Clearing list for {target.PrimaryText}...",
-                $"Cleared {ticketIds.Count} ticket(s) from {target.PrimaryText}. Click Save & Publish to update field tech tasks.");
+            ShowBusyOverlay($"Clearing and publishing empty list for {target.PrimaryText}...");
+
+            try
+            {
+                StatusText = $"Clearing and publishing empty list for {target.PrimaryText}...";
+
+                var removeReq = new RemoveDailyTicketAssignmentsRequest
+                {
+                    WorkDate = Board.WorkDate,
+                    TicketIds = ticketIds,
+                    UpdatedBy = Environment.UserName
+                };
+
+                await _api.PostAsync<RemoveDailyTicketAssignmentsRequest, RemoveDailyTicketAssignmentsResponse>(
+                    "api/daily-assignments/remove",
+                    removeReq);
+
+                var publishReq = new PublishDailyAssignmentTargetRequest
+                {
+                    WorkDate = Board.WorkDate,
+                    TargetType = target.TargetType,
+                    TruckId = target.TruckId,
+                    TechnicianId = target.TechnicianId,
+                    PublishedBy = Environment.UserName
+                };
+
+                var publishResult = await _api.PostAsync<PublishDailyAssignmentTargetRequest, PublishDailyAssignmentTargetResponse>(
+                    "api/daily-assignments/publish-target",
+                    publishReq);
+
+                await LoadBoardAsync();
+
+                StatusText =
+                    publishResult == null
+                        ? $"Cleared and published empty list for {target.PrimaryText}."
+                        : $"Cleared and published empty list for {target.PrimaryText} as version {publishResult.PublishedVersion}.";
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                StatusText = $"Clear list failed: {ex.Body ?? ex.Message}";
+
+                MessageBox.Show(
+                    ex.Body ?? ex.Message,
+                    "Clear List Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                StatusText = "Clear list failed: " + ex.Message;
+
+                MessageBox.Show(
+                    ex.Message,
+                    "Clear List Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                HideBusyOverlay();
+            }
         }
 
         private async Task MoveAssignedTicketAsync(DailyAssignedTicketDto ticket, int direction)
@@ -1461,6 +1597,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             var moving = orderedTickets[currentIndex];
             orderedTickets.RemoveAt(currentIndex);
             orderedTickets.Insert(newIndex, moving);
+
+            ShowBusyOverlay("Updating ticket order...");
 
             try
             {
@@ -1502,6 +1640,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
+            finally
+            {
+                HideBusyOverlay();
+            }
         }
 
         private async void PublishSelectedTarget_Click(object sender, RoutedEventArgs e)
@@ -1533,6 +1675,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             if (confirm != MessageBoxResult.Yes)
                 return;
+
+            ShowBusyOverlay($"Saving and publishing list for {target.PrimaryText}...");
 
             try
             {
@@ -1582,6 +1726,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     "Save & Publish Failed",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+            }
+            finally
+            {
+                HideBusyOverlay();
             }
         }
 
@@ -1659,6 +1807,66 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return target.TechnicianName
                    ?? target.TruckNumber
                    ?? "";
+        }
+
+        private async Task<AssignDailyTicketsResponse?> AssignTicketsWithConflictWarningAsync(
+            AssignDailyTicketsRequest request, string targetName)
+        {
+            try
+            {
+                return await _api.PostAsync<AssignDailyTicketsRequest, AssignDailyTicketsResponse>(
+                    "api/daily-assignments/assign",
+                    request);
+            }
+            catch (ApiClient.ApiException ex) when (IsConflictResponse(ex))
+            {
+                var warningText = CleanApiMessage(ex.Body ?? ex.Message);
+
+                var confirm = MessageBox.Show(
+                    warningText,
+                    "Assignment Warning",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (confirm != MessageBoxResult.Yes)
+                {
+                    StatusText = $"Assignment to {targetName} canceled.";
+                    return null;
+                }
+
+                request.ConfirmConflictWarnings = true;
+
+                return await _api.PostAsync<AssignDailyTicketsRequest, AssignDailyTicketsResponse>(
+                    "api/daily-assignments/assign",
+                    request);
+            }
+        }
+
+        private static bool IsConflictResponse(ApiClient.ApiException ex)
+        {
+            var status = ex.StatusCode.ToString();
+
+            return status.Equals("Conflict", StringComparison.OrdinalIgnoreCase) ||
+                   status.Equals("409", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string CleanApiMessage(string? value)
+        {
+            var text = (value ?? string.Empty).Trim();
+
+            if (text.Length >= 2 &&
+                text.StartsWith("\"") &&
+                text.EndsWith("\""))
+            {
+                text = text[1..^1]
+                    .Replace("\\r\\n", Environment.NewLine)
+                    .Replace("\\n", Environment.NewLine)
+                    .Replace("\\\"", "\"");
+            }
+
+            return string.IsNullOrWhiteSpace(text)
+                ? "Assignment warning."
+                : text;
         }
 
         private static T? FindVisualParent<T>(DependencyObject? source)

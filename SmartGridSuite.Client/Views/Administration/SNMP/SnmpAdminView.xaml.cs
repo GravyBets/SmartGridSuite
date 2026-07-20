@@ -28,7 +28,9 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
         private bool _suppressProfileSelection;
         private ulong _loadedProfileId;
 
-        
+        private bool _editorUnlocked;
+
+
         public SnmpAdminView()
             : this(new ApiClient("https://localhost:7140"))
         {
@@ -45,6 +47,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                 HookEvents();
                 SetDefaults();
                 UpdateSnmpVersionUi();
+                SetProfileEditorUnlocked(false);
             }
             finally
             {
@@ -71,6 +74,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             ProfilesDataGrid.SelectionChanged += ProfilesDataGrid_SelectionChanged;
             
             ProfileSearchTextBox.TextChanged += ProfileSearchTextBox_TextChanged;
+            OidSearchTextBox.TextChanged += OidSearchTextBox_TextChanged;
 
             ProfileNameTextBox.TextChanged += EditorChanged;
             ProfileIsActiveCheckBox.Checked += EditorChanged;
@@ -144,6 +148,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
             ProfilesDataGrid.SelectedItem = null;
             ClearEditorForNewProfile();
+            SetProfileEditorUnlocked(true);
             SnmpStatusTextBlock.Text = "New SNMP profile.";
         }
 
@@ -224,6 +229,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
                 await LoadProfilesAsync();
                 ClearEditorForNewProfile();
+                SetProfileEditorUnlocked(false);
 
                 ClearDirty();
                 SnmpStatusTextBlock.Text = "Profile deactivated.";
@@ -238,7 +244,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             }
         }
 
-        private void AddOidButton_Click(object sender, RoutedEventArgs e)
+        private async void AddOidButton_Click(object sender, RoutedEventArgs e)
         {
             var nextSort = _currentOids.Count == 0
                 ? 10
@@ -257,22 +263,22 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             _currentOids.Add(window.Result);
             RefreshOidGrid();
 
-            SnmpStatusTextBlock.Text = "OID added to profile editor.";
+            SnmpStatusTextBlock.Text = "OID added. Auto-saving profile...";
 
-            MarkDirty();
+            await AutoSaveProfileAfterOidChangeAsync("OID added and profile saved.");
         }
 
-        private void EditOidButton_Click(object sender, RoutedEventArgs e)
+        private async void EditOidButton_Click(object sender, RoutedEventArgs e)
         {
-            EditSelectedOid();
+            await EditSelectedOidAsync();
         }
 
-        private void OidConfigDataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private async void OidConfigDataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            EditSelectedOid();
+            await EditSelectedOidAsync();
         }
 
-        private void EditSelectedOid()
+        private async Task EditSelectedOidAsync()
         {
             if (OidConfigDataGrid.SelectedItem is not SnmpOidConfigDto selected)
             {
@@ -309,7 +315,13 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                         DisplayText = x.DisplayText,
                         SortOrder = x.SortOrder
                     })
-                    .ToList()
+                    .ToList(),
+
+                // Preserve formula decoder settings when editing an existing OID.
+                ReadFormula = selected.ReadFormula,
+                WriteFormula = selected.WriteFormula,
+                DecimalPlaces = selected.DecimalPlaces,
+                UnitLabel = selected.UnitLabel
             });
 
             if (window.ShowDialog() != true || window.Result is null)
@@ -326,12 +338,18 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             selected.ShowRawValueAlongsideDecoded = window.Result.ShowRawValueAlongsideDecoded;
             selected.DecodeValues = window.Result.DecodeValues;
 
+            // Copy formula decoder settings back into the in-memory profile editor.
+            selected.ReadFormula = window.Result.ReadFormula;
+            selected.WriteFormula = window.Result.WriteFormula;
+            selected.DecimalPlaces = window.Result.DecimalPlaces;
+            selected.UnitLabel = window.Result.UnitLabel;
+
             RefreshOidGrid();
 
-            SnmpStatusTextBlock.Text = "OID updated in profile editor.";
+            SnmpStatusTextBlock.Text = "OID updated. Auto-saving profile...";
 
-            MarkDirty();
-        }        
+            await AutoSaveProfileAfterOidChangeAsync("OID updated and profile saved.");
+        }
 
         private void RemoveOidButton_Click(object sender, RoutedEventArgs e)
         {
@@ -425,6 +443,11 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
         private void ProfileSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             ApplyProfileFilter();
+        }
+
+        private void OidSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            RefreshOidGrid();
         }
 
         private async Task LoadProfilesAsync(ulong? selectProfileId = null)
@@ -521,6 +544,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                 _suppressDirtyTracking = false;
             }
 
+            SetProfileEditorUnlocked(true);
             ClearDirty();
         }
 
@@ -570,11 +594,62 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
         private void RefreshOidGrid()
         {
+            var search = OidSearchTextBox is null
+                ? string.Empty
+                : (OidSearchTextBox.Text ?? string.Empty).Trim();
+
+            IEnumerable<SnmpOidConfigDto> filtered = _currentOids;
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                filtered = filtered.Where(x => OidMatchesSearch(x, search));
+            }
+
             OidConfigDataGrid.ItemsSource = null;
-            OidConfigDataGrid.ItemsSource = _currentOids
+            OidConfigDataGrid.ItemsSource = filtered
                 .OrderBy(x => x.SortOrder)
                 .ThenBy(x => x.Label)
                 .ToList();
+        }
+
+        private static bool OidMatchesSearch(SnmpOidConfigDto oid, string search)
+        {
+            if (string.IsNullOrWhiteSpace(search))
+                return true;
+
+            return ContainsSearch(oid.Category, search) ||
+                   ContainsSearch(oid.Label, search) ||
+                   ContainsSearch(oid.Oid, search) ||
+                   ContainsSearch(oid.ValueType, search) ||
+                   ContainsSearch(oid.DecodeMode, search) ||
+                   ContainsSearch(oid.ReadFormula, search) ||
+                   ContainsSearch(oid.WriteFormula, search) ||
+                   ContainsSearch(oid.UnitLabel, search) ||
+                   ContainsSearch(oid.SortOrder.ToString(), search);
+        }
+
+        private static bool ContainsSearch(string? value, string search)
+        {
+            return (value ?? string.Empty)
+                .Contains(search, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task AutoSaveProfileAfterOidChangeAsync(string successMessage)
+        {
+            // Keep the existing dirty workflow intact first.
+            // If save fails, _isDirty stays true so the user still gets the unsaved-changes warning.
+            MarkDirty();
+
+            var saved = await SaveCurrentProfileAsync();
+
+            if (saved)
+            {
+                SnmpStatusTextBlock.Text = successMessage;
+                return;
+            }
+
+            // SaveCurrentProfileAsync already writes the detailed failure message.
+            // Do not clear dirty state here.
         }
 
         private UpsertSnmpProfileRequest BuildSaveRequest()
@@ -624,6 +699,13 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                     SortOrder = x.SortOrder,
                     DecodeMode = x.DecodeMode,
                     ShowRawValueAlongsideDecoded = x.ShowRawValueAlongsideDecoded,
+
+                    // Send formula decoder settings to the API with the OID config.
+                    ReadFormula = x.ReadFormula,
+                    WriteFormula = x.WriteFormula,
+                    DecimalPlaces = x.DecimalPlaces,
+                    UnitLabel = x.UnitLabel,
+
                     DecodeValues = x.DecodeValues.Select(d => new UpsertSnmpOidDecodeValueRequest
                     {
                         Id = d.Id > 0 ? d.Id : null,
@@ -643,7 +725,8 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             NewProfileButton.IsEnabled = false;
             SaveProfileButton.IsEnabled = false;
             DeactivateProfileButton.IsEnabled = false;
-            AddOidButton.IsEnabled = false;            
+            AddOidButton.IsEnabled = false;
+            EditOidButton.IsEnabled = false;
             RemoveOidButton.IsEnabled = false;
             DeleteProfileButton.IsEnabled = false;
         }
@@ -654,7 +737,8 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
             NewProfileButton.IsEnabled = true;
             SaveProfileButton.IsEnabled = true;
             DeactivateProfileButton.IsEnabled = true;
-            AddOidButton.IsEnabled = true;            
+            AddOidButton.IsEnabled = true;
+            EditOidButton.IsEnabled = true;
             RemoveOidButton.IsEnabled = true;
             DeleteProfileButton.IsEnabled = true;
         }
@@ -789,6 +873,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
                 await LoadProfilesAsync();
                 ClearEditorForNewProfile();
+                SetProfileEditorUnlocked(false);
 
                 ClearDirty();
                 SnmpStatusTextBlock.Text = "Profile deleted.";
@@ -832,6 +917,16 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
                 SnmpStatusTextBlock.Text = "Ready.";
         }
 
+        private void SetProfileEditorUnlocked(bool unlocked)
+        {
+            _editorUnlocked = unlocked;
 
+            if (ProfileEditorOverlay is null)
+                return;
+
+            ProfileEditorOverlay.Visibility = unlocked
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
     }
 }

@@ -111,6 +111,25 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(ToDto(entity));
         }
 
+        [HttpDelete("communication-device-types/{id:long}")]
+        public async Task<IActionResult> DeleteCommunicationDeviceType(long id, CancellationToken ct)
+        {
+            if (id <= 0)
+                return BadRequest("Communication device type id is required.");
+
+            var entity = await _db.CommunicationDeviceTypes
+                .FirstOrDefaultAsync(x => x.Id == (uint)id, ct);
+
+            if (entity is null)
+                return NotFound($"Communication device type {id} was not found.");
+
+            _db.CommunicationDeviceTypes.Remove(entity);
+
+            await _db.SaveChangesAsync(ct);
+
+            return NoContent();
+        }
+
         private static CommunicationDeviceTypeDto ToDto(CommunicationDeviceTypeEntity entity)
         {
             return new CommunicationDeviceTypeDto

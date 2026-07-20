@@ -60,6 +60,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private readonly Dictionary<string, string> _createdByDisplayByUserId = new(StringComparer.OrdinalIgnoreCase);
         private string _selectedTicketOriginalDispatchNotes = "";
 
+        private int _busyOverlayDepth;
+
         private readonly SiteNotesApi _siteNotesApi = new(new ApiClient("https://localhost:7140/"));
 
         private readonly ObservableCollection<SiteNoteDto> _selectedTicketSiteNotes = new();
@@ -555,6 +557,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
 
             _isInitialLoadRunning = true;
+            ShowBusyOverlay("Loading tickets, filters, and summary...");
 
             try
             {
@@ -574,6 +577,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             finally
             {
                 _isInitialLoadRunning = false;
+                HideBusyOverlay();
             }
         }
 
@@ -655,6 +659,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             _ticketQueryCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var queryCt = _ticketQueryCts.Token;
+            ShowBusyOverlay("Loading tickets...");
 
             try
             {
@@ -722,6 +727,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     "API Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+            }
+            finally
+            {
+                HideBusyOverlay();
             }
         }
 
@@ -999,6 +1008,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (AssignSelectedButton != null)
                 AssignSelectedButton.IsEnabled = selectedCount > 0;
 
+            if (CopySelectedWorkOrdersButton != null)
+                CopySelectedWorkOrdersButton.IsEnabled =
+                    GetSelectedTicketsInVisibleOrder()
+                        .Any(x => !string.IsNullOrWhiteSpace(x.CurrentWorkOrder));
+
             if (EditSelectedTicketButton != null)
                 EditSelectedTicketButton.IsEnabled = selectedCount > 0;
 
@@ -1137,11 +1151,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)
         {
-            await LoadStatusOptionsFromApiAsync(
-                preserveSelections: true);
+            ShowBusyOverlay("Refreshing tickets, filters, and summary...");
 
-            await LoadSummaryFromApiAsync();
-            await LoadTicketsFromApiAsync();
+            try
+            {
+                await LoadStatusOptionsFromApiAsync(
+                    preserveSelections: true);
+
+                await LoadSummaryFromApiAsync();
+                await LoadTicketsFromApiAsync();
+            }
+            finally
+            {
+                HideBusyOverlay();
+            }
         }
 
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -1277,6 +1300,59 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             e.Handled = true;
         }
 
+        private async void CopySelectedWorkOrders_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedTickets = GetSelectedTicketsInVisibleOrder();
+
+            if (selectedTickets.Count == 0)
+            {
+                MessageBox.Show(
+                    "Select one or more tickets first.",
+                    "Copy Work Orders",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                return;
+            }
+
+            var workOrders = selectedTickets
+                .Select(x => (x.CurrentWorkOrder ?? string.Empty).Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+
+            if (workOrders.Count == 0)
+            {
+                MessageBox.Show(
+                    "None of the selected tickets have a Work Order to copy.",
+                    "Copy Work Orders",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                return;
+            }
+
+            Clipboard.SetText(string.Join(Environment.NewLine, workOrders));
+
+            if (sender is Button button)
+            {
+                var originalContent = button.Content;
+                var originalIsEnabled = button.IsEnabled;
+
+                button.Content = workOrders.Count == 1
+                    ? "Copied 1"
+                    : $"Copied {workOrders.Count}";
+
+                button.IsEnabled = false;
+
+                await Task.Delay(1800);
+
+                button.Content = originalContent;
+                button.IsEnabled = originalIsEnabled;
+
+                UpdateTicketListUiState();
+            }
+        }
+
         private void HeaderSelectAllCheckBox_Click(object sender, RoutedEventArgs e)
         {
             if (TicketsGrid == null)
@@ -1354,6 +1430,24 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return TicketsView
                 .Cast<DispatchTicket>()
                 .FirstOrDefault(ticket => selected.Contains(ticket));
+        }
+
+        private List<DispatchTicket> GetSelectedTicketsInVisibleOrder()
+        {
+            if (TicketsGrid?.SelectedItems == null ||
+                TicketsGrid.SelectedItems.Count == 0)
+            {
+                return new List<DispatchTicket>();
+            }
+
+            var selected = TicketsGrid.SelectedItems
+                .OfType<DispatchTicket>()
+                .ToHashSet();
+
+            return TicketsView
+                .Cast<DispatchTicket>()
+                .Where(ticket => selected.Contains(ticket))
+                .ToList();
         }
 
         private async void CloseDetails_Click(object sender, RoutedEventArgs e)
@@ -2313,6 +2407,77 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return statusName.Equals(
                 "Closed",
                 StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ShowBusyOverlay(string message)
+        {
+            _busyOverlayDepth++;
+
+            if (BusyOverlay is null ||
+                BusyOverlayMessageTextBlock is null)
+            {
+                return;
+            }
+
+            BusyOverlayMessageTextBlock.Text = string.IsNullOrWhiteSpace(message)
+                ? "Loading..."
+                : message;
+
+            BusyOverlay.Visibility = Visibility.Visible;
+            SetTicketPaneControlsEnabled(false);
+        }
+
+        private void HideBusyOverlay()
+        {
+            if (_busyOverlayDepth > 0)
+                _busyOverlayDepth--;
+
+            if (_busyOverlayDepth > 0)
+                return;
+
+            if (BusyOverlay is null)
+                return;
+
+            BusyOverlay.Visibility = Visibility.Collapsed;
+            SetTicketPaneControlsEnabled(true);
+
+            // Restore action buttons based on current selection after controls unlock.
+            UpdateTicketListUiState();
+            RefreshTicketPagingBindings();
+        }
+
+        private void SetTicketPaneControlsEnabled(bool enabled)
+        {
+            if (StatusPopup is not null && !enabled)
+                StatusPopup.IsOpen = false;
+
+            RefreshTicketsButton.IsEnabled = enabled;
+            ImportSapQueueButton.IsEnabled = enabled;
+            NewTicketButton.IsEnabled = enabled;
+            ClearTicketsFiltersButton.IsEnabled = enabled;
+
+            SearchBox.IsEnabled = enabled;
+            DateFieldFilter.IsEnabled = enabled;
+            DateRangeFilter.IsEnabled = enabled;
+            FromDatePicker.IsEnabled = enabled;
+            ToDatePicker.IsEnabled = enabled;
+            StatusFilterButton.IsEnabled = enabled;
+            TechFilter.IsEnabled = enabled;
+            QuickFilterComboBox.IsEnabled = enabled;
+
+            TicketsGrid.IsEnabled = enabled;
+            PreviousTicketPageButton.IsEnabled = enabled && CanGoToPreviousTicketPage;
+            NextTicketPageButton.IsEnabled = enabled && CanGoToNextTicketPage;
+
+            AssignSelectedButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
+            BulkSetProblemButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
+            BulkSetWorkOrderTypeButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
+            BulkSetStatusButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
+            EditSelectedTicketButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
+            OpenDetailsButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
+
+            EditTicketButton.IsEnabled = enabled && SelectedTicket is not null;
+            SaveTicketButton.IsEnabled = enabled && SaveTicketButton.IsEnabled;
         }
     }
 }

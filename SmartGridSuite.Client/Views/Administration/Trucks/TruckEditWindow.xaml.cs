@@ -10,6 +10,7 @@ namespace SmartGridSuite.Client.Views.Administration
     {
         private readonly TruckStylesApi _truckStylesApi;
         private readonly List<TruckStyleDto> _styles = new();
+        private const int TruckNumberMaxLength = 20;
 
         public TruckEditWindow(
             TruckStylesApi truckStylesApi,
@@ -24,7 +25,7 @@ namespace SmartGridSuite.Client.Views.Administration
             if (truck != null)
                 LoadTruck(truck);
             else
-                InServiceComboBox.SelectedItem = 0;
+                InServiceComboBox.SelectedIndex = 0;
         }
 
         public CreateTruckRequest BuildCreateRequest()
@@ -129,6 +130,16 @@ namespace SmartGridSuite.Client.Views.Administration
             {
                 MessageBox.Show("Truck # is required.", "Validation",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (truckNumber.Length > TruckNumberMaxLength)
+            {
+                MessageBox.Show(
+                    $"Truck # must be {TruckNumberMaxLength} characters or less.\n\nCurrent length: {truckNumber.Length}",
+                    "Truck # Too Long",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
                 return;
             }
 

@@ -1,11 +1,9 @@
 ﻿using SmartGridSuite.Client.Services;
 using SmartGridSuite.Client.Views.FieldTechnician;
 using SmartGridSuite.Client.Views.Administration;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Controls;
 
 namespace SmartGridSuite.Client.Views
 {
@@ -26,15 +24,11 @@ namespace SmartGridSuite.Client.Views
                 ConnectivityService.CurrentMessage);
 
             LoadThemeControl();
-
-            LoadUiScaleControl();
-            UiScaleSlider.ValueChanged += UiScaleSlider_ValueChanged;
         }
 
         private readonly ApiClient _connectivityApi =
             new("https://localhost:7140/");
-
-        private bool _loadingUiScale;
+       
         private bool _isOpeningModule;
         private bool _loadingThemeControl;
 
@@ -42,21 +36,69 @@ namespace SmartGridSuite.Client.Views
         {
             _loadingThemeControl = true;
 
-            ThemeComboBox.ItemsSource = ThemeService.ThemeOptions;
-            ThemeComboBox.DisplayMemberPath = nameof(AppThemeOption.DisplayName);
-            ThemeComboBox.SelectedValuePath = nameof(AppThemeOption.Theme);
-            ThemeComboBox.SelectedValue = ThemeService.Current;
+            try
+            {
+                ThemeComboBox.Items.Clear();
 
-            _loadingThemeControl = false;
+                foreach (var option in ThemeService.ThemeOptions)
+                {
+                    ThemeComboBox.Items.Add(new ComboBoxItem
+                    {
+                        Content = option.DisplayName,
+                        Tag = option.Theme
+                    });
+                }
+
+                foreach (var item in ThemeComboBox.Items.OfType<ComboBoxItem>())
+                {
+                    if (item.Tag is AppTheme theme &&
+                        EqualityComparer<AppTheme>.Default.Equals(theme, ThemeService.Current))
+                    {
+                        ThemeComboBox.SelectedItem = item;
+                        break;
+                    }
+                }
+
+                if (ThemeComboBox.SelectedItem == null && ThemeComboBox.Items.Count > 0)
+                    ThemeComboBox.SelectedIndex = 0;
+            }
+            finally
+            {
+                _loadingThemeControl = false;
+            }
         }
 
-        private void ThemeComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_loadingThemeControl)
                 return;
 
-            if (ThemeComboBox.SelectedValue is AppTheme theme)
-                ThemeService.Apply(theme);
+            if (ThemeComboBox.SelectedItem is not ComboBoxItem item ||
+                item.Tag is not AppTheme theme)
+            {
+                return;
+            }
+
+            ThemeService.Apply(theme);
+
+            _loadingThemeControl = true;
+
+            try
+            {
+                foreach (var comboItem in ThemeComboBox.Items.OfType<ComboBoxItem>())
+                {
+                    if (comboItem.Tag is AppTheme comboTheme &&
+                        EqualityComparer<AppTheme>.Default.Equals(comboTheme, ThemeService.Current))
+                    {
+                        ThemeComboBox.SelectedItem = comboItem;
+                        break;
+                    }
+                }
+            }
+            finally
+            {
+                _loadingThemeControl = false;
+            }
         }
 
         private async void Tech_Click(object sender, RoutedEventArgs e)
@@ -312,43 +354,24 @@ namespace SmartGridSuite.Client.Views
             }
         }
 
-        private void Rma_Click(object sender, RoutedEventArgs e)
-            => MessageBox.Show("RMA Testing (later).");
-
         private void About_Click(object sender, RoutedEventArgs e)
-            => MessageBox.Show("About (later).");
+        {
+            var window = new AboutWindow
+            {
+                Owner = this
+            };
+
+            window.ShowDialog();
+        }
 
         private void BugFeature_Click(object sender, RoutedEventArgs e)
-            => MessageBox.Show("Bug/Feature link (later).");
-
-        private void LoadUiScaleControl()
         {
-            _loadingUiScale = true;
+            var window = new BugFeatureRequestWindow
+            {
+                Owner = this
+            };
 
-            var percent = Math.Round(UiScaleService.CurrentScale * 100);
-
-            UiScaleSlider.Value = percent;
-            UiScaleValueTextBlock.Text = $"{percent:0}%";
-
-            _loadingUiScale = false;
-        }
-
-        private void UiScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (_loadingUiScale)
-                return;
-
-            var percent = Math.Round(e.NewValue);
-            var scale = percent / 100.0;
-
-            UiScaleValueTextBlock.Text = $"{percent:0}%";
-            UiScaleService.SaveScale(scale);
-        }
-
-        private void ResetUiScaleButton_Click(object sender, RoutedEventArgs e)
-        {
-            UiScaleService.SaveScale(0.80);
-            LoadUiScaleControl();
+            window.ShowDialog();
         }
 
         // Receives application-wide connection changes and safely updates this window

@@ -115,9 +115,21 @@ namespace SmartGridSuite.Api.Controllers
 
             entity.SnmpVersion = string.IsNullOrWhiteSpace(req.SnmpVersion)
                 ? "v3" : req.SnmpVersion.Trim().ToLowerInvariant();
-                        
 
-            var incomingOidIds = req.Oids
+            // Validate all incoming OID rows before touching the existing profile/OID rows.
+            // This keeps bad formula config from being partially saved.
+            foreach (var oidReq in req.Oids ?? new List<UpsertSnmpOidRequest>())
+            {
+                var validationError = ValidateSnmpOidRequest(oidReq);
+
+                if (!string.IsNullOrWhiteSpace(validationError))
+                    return BadRequest(validationError);
+            }
+
+
+            var oidRequests = req.Oids ?? new List<UpsertSnmpOidRequest>();
+
+            var incomingOidIds = oidRequests
                 .Where(x => x.Id.HasValue && x.Id.Value > 0)
                 .Select(x => x.Id!.Value)
                 .ToHashSet();
@@ -137,7 +149,7 @@ namespace SmartGridSuite.Api.Controllers
                 }
             }
 
-            foreach (var oidReq in req.Oids)
+            foreach (var oidReq in oidRequests)
             {
                 if (string.IsNullOrWhiteSpace(oidReq.Label) || string.IsNullOrWhiteSpace(oidReq.Oid))
                     continue;
@@ -166,22 +178,53 @@ namespace SmartGridSuite.Api.Controllers
 
                 oidEntity.Label = oidReq.Label.Trim();
                 oidEntity.Oid = oidReq.Oid.Trim();
-                oidEntity.ValueType = string.IsNullOrWhiteSpace(oidReq.ValueType)
+                // Only String and Integer are supported in Admin now.
+                // Keep this normalized because downstream display/set logic depends on it.
+                var valueType = string.IsNullOrWhiteSpace(oidReq.ValueType)
                     ? "String"
                     : oidReq.ValueType.Trim();
+
+                var decodeMode = string.IsNullOrWhiteSpace(oidReq.DecodeMode)
+                    ? "Raw"
+                    : oidReq.DecodeMode.Trim();
+
+                var isFormula = decodeMode.Equals(
+                    "Formula",
+                    StringComparison.OrdinalIgnoreCase);
+
+                oidEntity.ValueType = valueType;
 
                 oidEntity.IsWritable = oidReq.IsWritable;
                 oidEntity.ShowInWorkspace = oidReq.ShowInWorkspace;
                 oidEntity.SortOrder = oidReq.SortOrder;
-                oidEntity.DecodeMode = string.IsNullOrWhiteSpace(oidReq.DecodeMode)
-                    ? "Raw"
-                    : oidReq.DecodeMode.Trim();
+
+                oidEntity.DecodeMode = decodeMode;
                 oidEntity.ShowRawValueAlongsideDecoded = oidReq.ShowRawValueAlongsideDecoded;
+
+                // Formula decoder settings.
+                // These stay null for Raw and ValueMap OIDs so old behavior remains clean.
+                oidEntity.ReadFormula = isFormula
+                    ? Clean(oidReq.ReadFormula)
+                    : null;
+
+                oidEntity.WriteFormula = isFormula
+                    ? Clean(oidReq.WriteFormula)
+                    : null;
+
+                oidEntity.DecimalPlaces = isFormula
+                    ? oidReq.DecimalPlaces
+                    : null;
+
+                oidEntity.UnitLabel = isFormula
+                    ? Clean(oidReq.UnitLabel)
+                    : null;
 
                 oidEntity.IsDeleted = false;
                 oidEntity.UpdatedAt = DateTime.Now;
 
-                var incomingDecodeIds = oidReq.DecodeValues
+                var decodeRequests = oidReq.DecodeValues ?? new List<UpsertSnmpOidDecodeValueRequest>();
+
+                var incomingDecodeIds = decodeRequests
                     .Where(x => x.Id.HasValue && x.Id.Value > 0)
                     .Select(x => x.Id!.Value)
                     .ToHashSet();
@@ -195,7 +238,7 @@ namespace SmartGridSuite.Api.Controllers
                     }
                 }
 
-                foreach (var decodeReq in oidReq.DecodeValues)
+                foreach (var decodeReq in decodeRequests)
                 {
                     if (string.IsNullOrWhiteSpace(decodeReq.RawValue) ||
                         string.IsNullOrWhiteSpace(decodeReq.DisplayText))
@@ -347,6 +390,13 @@ namespace SmartGridSuite.Api.Controllers
                         SortOrder = x.SortOrder,
                         DecodeMode = x.DecodeMode,
                         ShowRawValueAlongsideDecoded = x.ShowRawValueAlongsideDecoded,
+
+                        // Formula decoder settings.
+                        ReadFormula = x.ReadFormula,
+                        WriteFormula = x.WriteFormula,
+                        DecimalPlaces = x.DecimalPlaces,
+                        UnitLabel = x.UnitLabel,
+
                         DecodeValues = x.DecodeValues
                             .Where(d => !d.IsDeleted)
                             .OrderBy(d => d.SortOrder)
@@ -364,11 +414,75 @@ namespace SmartGridSuite.Api.Controllers
             };
         }
 
+        private static string? ValidateSnmpOidRequest(UpsertSnmpOidRequest oid)
+        {
+            var label = (oid.Label ?? string.Empty).Trim();
+            var oidValue = (oid.Oid ?? string.Empty).Trim();
+
+            var valueType = string.IsNullOrWhiteSpace(oid.ValueType)
+                ? "String"
+                : oid.ValueType.Trim();
+
+            var decodeMode = string.IsNullOrWhiteSpace(oid.DecodeMode)
+                ? "Raw"
+                : oid.DecodeMode.Trim();
+
+            if (string.IsNullOrWhiteSpace(label))
+                return "OID label is required.";
+
+            if (string.IsNullOrWhiteSpace(oidValue))
+                return $"OID is required for '{label}'.";
+
+            if (!valueType.Equals("String", StringComparison.OrdinalIgnoreCase) &&
+                !valueType.Equals("Integer", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"OID '{label}' has an invalid Type. Type must be String or Integer.";
+            }
+
+            if (!decodeMode.Equals("Raw", StringComparison.OrdinalIgnoreCase) &&
+                !decodeMode.Equals("ValueMap", StringComparison.OrdinalIgnoreCase) &&
+                !decodeMode.Equals("Formula", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"OID '{label}' has an invalid Decode Mode.";
+            }
+
+            if (oid.DecimalPlaces.HasValue &&
+                (oid.DecimalPlaces.Value < 0 || oid.DecimalPlaces.Value > 10))
+            {
+                return $"OID '{label}' decimals must be between 0 and 10.";
+            }
+
+            if (decodeMode.Equals("Formula", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!valueType.Equals("Integer", StringComparison.OrdinalIgnoreCase))
+                {
+                    return $"OID '{label}' uses Formula Decode, so Type must be Integer.";
+                }
+
+                if (!SnmpFormulaEvaluator.IsValidFormula(oid.ReadFormula))
+                {
+                    return $"OID '{label}' has an invalid Read Formula. Example: x / 100000";
+                }
+
+                if (oid.IsWritable &&
+                    !SnmpFormulaEvaluator.IsValidFormula(oid.WriteFormula))
+                {
+                    return $"OID '{label}' is writable and uses Formula Decode, so it needs a valid Write Formula. Example: x * 100000";
+                }
+
+                if (!string.IsNullOrWhiteSpace(oid.WriteFormula) &&
+                    !SnmpFormulaEvaluator.IsValidFormula(oid.WriteFormula))
+                {
+                    return $"OID '{label}' has an invalid Write Formula. Example: x * 100000";
+                }
+            }
+
+            return null;
+        }
+
         private static string? Clean(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }        
-
-        
     }
 }

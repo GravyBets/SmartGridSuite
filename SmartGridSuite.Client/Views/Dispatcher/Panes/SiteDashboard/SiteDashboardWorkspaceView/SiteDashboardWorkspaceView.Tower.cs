@@ -16,6 +16,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             public TextBox? PingCountTextBox { get; set; }
 
+            public Button? PingButton { get; set; }
+            public Button? ClearButton { get; set; }
+
             public CancellationTokenSource? PingCts { get; set; }
             public bool IsRunning { get; set; }
 
@@ -28,6 +31,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             public string Label { get; set; } = "";
             public string IpAddress { get; set; } = "";
+
+            public Button? PingButton { get; set; }
 
             public TextBox? IpTextBox { get; set; }
             public Brush? DefaultIpBorderBrush { get; set; }
@@ -167,8 +172,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             controls.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             controls.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
             controls.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            controls.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-            controls.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var pingCountBox = new TextBox
             {
@@ -187,22 +190,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 Content = "Ping Sector",
                 Style = (Style)FindResource("PrimaryButtonStyle"),
                 Height = 28,
-                MinWidth = 92,
+                MinWidth = 100,
                 Padding = new Thickness(12, 0, 12, 0),
                 Tag = card
             };
             pingSectorButton.Click += PingTowerSectorButton_Click;
-
-            var stopButton = new Button
-            {
-                Content = "Stop",
-                Style = (Style)FindResource("SecondaryButtonStyle"),
-                Height = 28,
-                MinWidth = 70,
-                Padding = new Thickness(12, 0, 12, 0),
-                Tag = card
-            };
-            stopButton.Click += StopTowerSectorButton_Click;
+            card.PingButton = pingSectorButton;
 
             var clearButton = new Button
             {
@@ -214,15 +207,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 Tag = card
             };
             clearButton.Click += ClearTowerSectorButton_Click;
+            card.ClearButton = clearButton;
 
             Grid.SetColumn(pingCountBox, 0);
             Grid.SetColumn(pingSectorButton, 2);
-            Grid.SetColumn(stopButton, 4);
-            Grid.SetColumn(clearButton, 6);
+            Grid.SetColumn(clearButton, 4);
 
             controls.Children.Add(pingCountBox);
             controls.Children.Add(pingSectorButton);
-            controls.Children.Add(stopButton);
             controls.Children.Add(clearButton);
 
             Grid.SetRow(controls, 2);
@@ -316,6 +308,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             };
 
             pingButton.Click += PingTowerEndpointButton_Click;
+
+            endpoint.PingButton = pingButton;
 
             Grid.SetColumn(pingButton, 1);
             top.Children.Add(pingButton);
@@ -496,6 +490,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             if ((sender as FrameworkElement)?.Tag is not TowerPingEndpoint endpoint)
                 return;
 
+            var sector = endpoint.ParentSector;
+
+            if (endpoint.IsRunning || sector?.IsRunning == true)
+            {
+                if (sector is not null)
+                    StopTowerSectorPings(sector);
+
+                RefreshTowerPingButtonStates();
+                return;
+            }
+
             await RunSingleTowerEndpointPingAsync(endpoint);
         }
 
@@ -511,13 +516,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             StopTowerSectorPings(sector);
 
-            sector.PingCts = new CancellationTokenSource();
-            var token = sector.PingCts.Token;
+            var cts = new CancellationTokenSource();
+            sector.PingCts = cts;
             sector.IsRunning = true;
+            RefreshTowerPingButtonStates();
 
             try
             {
-                await PingTowerEndpointAsync(endpoint, pingCount, continuous, token);
+                await PingTowerEndpointAsync(endpoint, pingCount, continuous, cts.Token);
             }
             catch (OperationCanceledException)
             {
@@ -525,7 +531,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
             finally
             {
+                if (ReferenceEquals(sector.PingCts, cts))
+                {
+                    sector.PingCts.Dispose();
+                    sector.PingCts = null;
+                }
+
                 sector.IsRunning = false;
+                RefreshTowerPingButtonStates();
             }
         }
 
@@ -535,6 +548,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 return;
 
             endpoint.IsRunning = true;
+            RefreshTowerPingButtonStates();
 
             try
             {
@@ -611,6 +625,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             finally
             {
                 endpoint.IsRunning = false;
+                RefreshTowerPingButtonStates();
             }
         }
 
@@ -618,6 +633,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         {
             if ((sender as FrameworkElement)?.Tag is not TowerSectorPingCard sector)
                 return;
+
+            if (sector.IsRunning || sector.PingCts is not null || sector.Endpoints.Any(x => x.IsRunning))
+            {
+                StopTowerSectorPings(sector);
+                RefreshTowerPingButtonStates();
+                return;
+            }
 
             await RunTowerSectorPingAsync(sector);
         }
@@ -632,15 +654,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             StopTowerSectorPings(sector);
 
-            sector.PingCts = new CancellationTokenSource();
-            var token = sector.PingCts.Token;
+            var cts = new CancellationTokenSource();
+            sector.PingCts = cts;
             sector.IsRunning = true;
+            RefreshTowerPingButtonStates();
 
             try
             {
                 var tasks = sector.Endpoints
                     .Where(x => !x.IsRunning)
-                    .Select(x => PingTowerEndpointAsync(x, pingCount, continuous, token))
+                    .Select(x => PingTowerEndpointAsync(x, pingCount, continuous, cts.Token))
                     .ToList();
 
                 if (tasks.Count > 0)
@@ -652,7 +675,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
             finally
             {
+                if (ReferenceEquals(sector.PingCts, cts))
+                {
+                    sector.PingCts.Dispose();
+                    sector.PingCts = null;
+                }
+
                 sector.IsRunning = false;
+                RefreshTowerPingButtonStates();
             }
         }
 
@@ -697,59 +727,137 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             sector.PingCts?.Dispose();
             sector.PingCts = null;
             sector.IsRunning = false;
+
+            foreach (var endpoint in sector.Endpoints)
+                endpoint.IsRunning = false;
+
+            RefreshTowerPingButtonStates();
         }
 
         private async void TestAllTowerSectorsButton_Click(object sender, RoutedEventArgs e)
         {
+            if (_towerTestAllCts is not null || _towerPingCards.Any(x => x.IsRunning || x.Endpoints.Any(y => y.IsRunning)))
+            {
+                StopTowerPings();
+                return;
+            }
+
             StopTowerPings();
 
-            foreach (var sector in _towerPingCards)
-                await TestTowerSectorAsync(sector);
+            var cts = new CancellationTokenSource();
+            _towerTestAllCts = cts;
+            RefreshTowerPingButtonStates();
+
+            try
+            {
+                foreach (var sector in _towerPingCards)
+                    await TestTowerSectorAsync(sector, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // expected when stopped
+            }
+            finally
+            {
+                if (ReferenceEquals(_towerTestAllCts, cts))
+                {
+                    _towerTestAllCts.Dispose();
+                    _towerTestAllCts = null;
+                }
+
+                RefreshTowerPingButtonStates();
+            }
         }
 
-        private async Task TestTowerSectorAsync(TowerSectorPingCard sector)
+        private async Task TestTowerSectorAsync(TowerSectorPingCard sector, CancellationToken token)
         {
             StopTowerSectorPings(sector);
 
-            foreach (var endpoint in sector.Endpoints)
-                await TestTowerEndpointAsync(endpoint);
+            sector.IsRunning = true;
+            RefreshTowerPingButtonStates();
+
+            try
+            {
+                foreach (var endpoint in sector.Endpoints)
+                    await TestTowerEndpointAsync(endpoint, token);
+            }
+            finally
+            {
+                sector.IsRunning = false;
+                RefreshTowerPingButtonStates();
+            }
         }
 
-        private async Task TestTowerEndpointAsync(TowerPingEndpoint endpoint)
+        private async Task TestTowerEndpointAsync(TowerPingEndpoint endpoint, CancellationToken token)
         {
             var ip = (endpoint.IpAddress ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(ip))
                 return;
 
-            ResetTowerIpStatus(endpoint);
+            token.ThrowIfCancellationRequested();
 
-            var successAfterWarmup = false;
+            endpoint.IsRunning = true;
+            RefreshTowerPingButtonStates();
 
-            using var ping = new Ping();
-
-            for (var i = 0; i < 5; i++)
+            try
             {
-                try
-                {
-                    var reply = await ping.SendPingAsync(ip, 1000);
+                ResetTowerIpStatus(endpoint);
 
-                    if (reply.Status == IPStatus.Success && i > 0)
-                        successAfterWarmup = true;
-                }
-                catch
+                if (endpoint.SummaryTextBlock is not null)
+                    endpoint.SummaryTextBlock.Text = "Testing...";
+
+                var successAfterWarmup = false;
+
+                using var ping = new Ping();
+
+                for (var i = 0; i < 5; i++)
                 {
-                    // Treat failed ping attempt as no response.
+                    token.ThrowIfCancellationRequested();
+
+                    try
+                    {
+                        var reply = await ping.SendPingAsync(ip, 1000);
+
+                        if (reply.Status == IPStatus.Success && i > 0)
+                            successAfterWarmup = true;
+                    }
+                    catch
+                    {
+                        // Treat failed ping attempt as no response.
+                    }
                 }
+
+                ApplyTowerIpStatus(endpoint, successAfterWarmup);
+
+                if (endpoint.SummaryTextBlock is not null)
+                    endpoint.SummaryTextBlock.Text = successAfterWarmup ? "Test Successful" : "Test Failed";
             }
-
-            ApplyTowerIpStatus(endpoint, successAfterWarmup);
+            finally
+            {
+                endpoint.IsRunning = false;
+                RefreshTowerPingButtonStates();
+            }
         }
 
         public void StopTowerPings()
         {
+            try
+            {
+                _towerTestAllCts?.Cancel();
+            }
+            catch
+            {
+                // ignore
+            }
+
+            _towerTestAllCts?.Dispose();
+            _towerTestAllCts = null;
+
             foreach (var sector in _towerPingCards)
                 StopTowerSectorPings(sector);
+
+            RefreshTowerPingButtonStates();
         }
 
         private void RefreshTowerHeaderDisplay()
@@ -823,16 +931,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
                 foreach (var endpoint in sector.Endpoints)
                 {
-                    var summary = endpoint.SummaryTextBlock?.Text?.Trim() ?? string.Empty;
+                    var ip = (endpoint.IpAddress ?? string.Empty).Trim();
 
-                    if (string.IsNullOrWhiteSpace(summary) ||
-                        summary.Equals("Ready.", StringComparison.OrdinalIgnoreCase) ||
-                        summary.Equals("Testing...", StringComparison.OrdinalIgnoreCase))
-                    {
+                    if (string.IsNullOrWhiteSpace(ip) || ip == "—")
                         continue;
-                    }
 
-                    sectorLines.Add($"{endpoint.Label} ({endpoint.IpAddress}) - {summary.TrimEnd('.')}");
+                    var summary = CleanTowerPingSummaryForWriteUp(endpoint.SummaryTextBlock?.Text);
+
+                    sectorLines.Add(string.IsNullOrWhiteSpace(summary)
+                        ? $"{endpoint.Label} ({ip})"
+                        : $"{endpoint.Label} ({ip}) - {summary}");
                 }
 
                 if (sectorLines.Count == 0)
@@ -848,6 +956,117 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             return lines.Count > 1
                 ? string.Join(Environment.NewLine, lines)
                 : string.Empty;
+        }
+
+        private static string CleanTowerPingSummaryForWriteUp(string? summary)
+        {
+            var value = (summary ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(value) ||
+                value.Equals("Ready.", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Ready", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Testing...", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("No IP available.", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            return value.TrimEnd('.');
+        }
+
+        private bool IsAnyTowerPingRunning()
+        {
+            return _towerTestAllCts is not null ||
+                   _towerPingCards.Any(x =>
+                       x.IsRunning ||
+                       x.PingCts is not null ||
+                       x.Endpoints.Any(y => y.IsRunning));
+        }
+
+        private void RefreshTowerPingButtonStates()
+        {
+            var testAllRunning = _towerTestAllCts is not null;
+
+            foreach (var sector in _towerPingCards)
+            {
+                var sectorManualPingRunning =
+                    !testAllRunning &&
+                    (sector.IsRunning ||
+                     sector.PingCts is not null ||
+                     sector.Endpoints.Any(x => x.IsRunning));
+
+                // Sector Ping button:
+                // - Red Stop only for manual sector/endpoint ping
+                // - Normal/disabled during Test All
+                SetTowerButtonState(
+                    sector.PingButton,
+                    sectorManualPingRunning,
+                    normalText: "Ping Sector",
+                    normalStyleKey: "PrimaryButtonStyle");
+
+                if (sector.PingButton is not null && testAllRunning)
+                {
+                    sector.PingButton.Content = "Ping Sector";
+                    sector.PingButton.Style = (Style)FindResource("PrimaryButtonStyle");
+                    sector.PingButton.IsEnabled = false;
+                }
+                else if (sector.PingButton is not null)
+                {
+                    sector.PingButton.IsEnabled = true;
+                }
+
+                if (sector.ClearButton is not null)
+                    sector.ClearButton.IsEnabled = !testAllRunning && !sectorManualPingRunning;
+
+                foreach (var endpoint in sector.Endpoints)
+                {
+                    var endpointManualPingRunning =
+                        !testAllRunning &&
+                        endpoint.IsRunning;
+
+                    // Endpoint Ping button:
+                    // - Red Stop only for manual endpoint ping
+                    // - Normal/disabled during Test All
+                    SetTowerButtonState(
+                        endpoint.PingButton,
+                        endpointManualPingRunning,
+                        normalText: "Ping",
+                        normalStyleKey: "SecondaryButtonStyle");
+
+                    if (endpoint.PingButton is not null && testAllRunning)
+                    {
+                        endpoint.PingButton.Content = "Ping";
+                        endpoint.PingButton.Style = (Style)FindResource("SecondaryButtonStyle");
+                        endpoint.PingButton.IsEnabled = false;
+                    }
+                    else if (endpoint.PingButton is not null)
+                    {
+                        endpoint.PingButton.IsEnabled = true;
+                    }
+                }
+            }
+
+            // Test All button:
+            // - Turns into Stop
+            // - Does NOT turn red
+            if (TestAllTowerSectorsButton is not null)
+            {
+                TestAllTowerSectorsButton.Content = testAllRunning ? "Stop" : "Test All";
+                TestAllTowerSectorsButton.Style = (Style)FindResource("PrimaryButtonStyle");
+                TestAllTowerSectorsButton.IsEnabled = true;
+            }
+        }
+
+        private void SetTowerButtonState(Button? button, bool isRunning, string normalText, string normalStyleKey)
+        {
+            if (button is null)
+                return;
+
+            button.Content = isRunning ? "Stop" : normalText;
+
+            button.Style = isRunning
+                ? (Style)FindResource("DangerButtonStyle")
+                : (Style)FindResource(normalStyleKey);
         }
     }
 }

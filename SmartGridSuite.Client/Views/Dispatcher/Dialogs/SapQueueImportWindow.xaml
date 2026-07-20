@@ -5,14 +5,16 @@
         Width="1380"
         Height="820"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResize">
+        ResizeMode="CanResize"
+        Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
+        Background="{StaticResource AppBackground}">
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="8"/>
             <RowDefinition Height="Auto"/>
@@ -80,9 +82,9 @@
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="4"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="4"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
@@ -382,7 +384,7 @@
                     Style="{StaticResource SecondaryButtonStyle}"
                     Content="Close"
                     MinWidth="110"
-                    Margin="0,0,8,0"
+                    Margin="0,0,4,0"
                     Click="Close_Click"/>
 
             <Button x:Name="ImportBtn"

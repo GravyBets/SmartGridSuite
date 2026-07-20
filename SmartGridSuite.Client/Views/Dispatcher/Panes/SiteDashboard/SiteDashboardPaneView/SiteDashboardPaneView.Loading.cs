@@ -227,7 +227,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         }
 
         //Load Async
-        private async Task LoadAsync(string rawSiteId)
+        private async Task LoadAsync(string rawSiteId, bool runAutoQuickTest = true, bool useSiteLoadOverlay = true)
         {
             WorkspaceView.StopTowerPings();
             var siteId = (rawSiteId ?? string.Empty).Trim();
@@ -293,13 +293,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             try
             {
+                if (useSiteLoadOverlay)
+                    ShowSiteLoadOverlay($"Loading {siteId}...");
+
                 TopBarView.SetLoading(true);
                 TopBarView.StatusText = $"Loading {siteId}...";
+
+                UpdateSiteLoadOverlayMessage($"Loading dashboard data for {siteId}...");
 
                 var dashboard = await GetSiteOrTowerDashboardAsync(siteId, _loadCts.Token);
                 var loadedSiteId = GetObjectPropertyText(dashboard, "SiteId") ?? siteId;
 
                 selectedSession.TicketInfoText = "Loading ticket data...";
+
+                UpdateSiteLoadOverlayMessage($"Loading ticket data for {siteId}...");
 
                 ApplyDashboardToSession(selectedSession, dashboard, loadedSiteId);
                 await ApplyPingScreenPortalUrlAsync(selectedSession, dashboard, _loadCts.Token);
@@ -319,10 +326,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 _selectedSessionKey = selectedSession.SessionKey;
                 RenderSelectedSession();
 
+                UpdateSiteLoadOverlayMessage($"Refreshing tickets for {loadedSiteId}...");
+
                 await RefreshTicketInfoAsync(selectedSession, _loadCts.Token);
 
                 if (ShouldLoadSnmpForDashboard(selectedSession))
                 {
+                    UpdateSiteLoadOverlayMessage($"Loading SNMP configuration for {loadedSiteId}...");
                     await RefreshSnmpConfigAsync(selectedSession, _loadCts.Token);
                 }
                 else
@@ -333,11 +343,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 if (selectedSession.SessionKey == _selectedSessionKey)
                     RenderSelectedSession();
 
-                if (shouldClearForSiteLoad && ShouldRunNetworkAutoQuickTest(selectedSession))
+                if (runAutoQuickTest && shouldClearForSiteLoad && ShouldRunNetworkAutoQuickTest(selectedSession))
                 {
                     await Dispatcher.InvokeAsync(
                         () => { },
                         System.Windows.Threading.DispatcherPriority.Loaded);
+
+                    UpdateSiteLoadOverlayMessage($"Running quick network test for {loadedSiteId}...");
 
                     await NetworkView.RunQuickReachabilityTestForAllAsync();
 
@@ -390,6 +402,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             finally
             {
                 TopBarView.SetLoading(false);
+                if (useSiteLoadOverlay)
+                    HideSiteLoadOverlay();
             }
         }
 

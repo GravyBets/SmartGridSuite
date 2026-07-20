@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows;
@@ -38,7 +39,7 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
             await LoadAsync();
         }
 
-        private async Task LoadAsync()
+        private async Task LoadAsync(ulong? selectStatusId = null)
         {
             if (_isLoading)
                 return;
@@ -50,9 +51,21 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
                 var statuses = await _ticketAdminApi.GetStatusesAsync();
 
                 Statuses.Clear();
+                StatusesGrid.SelectedItem = null;
 
                 foreach (var item in statuses)
                     Statuses.Add(item);
+
+                if (selectStatusId.HasValue)
+                {
+                    var match = Statuses.FirstOrDefault(x => x.Id == selectStatusId.Value);
+
+                    if (match != null)
+                    {
+                        StatusesGrid.SelectedItem = match;
+                        StatusesGrid.ScrollIntoView(match);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -77,18 +90,35 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
 
         private void UpdateStatusButtons()
         {
-            var hasSelection = SelectedStatus != null;
-            var isSystemRequired = IsSystemRequiredStatus(SelectedStatus?.Name);
+            var selected = SelectedStatus;
+            var hasSelection = selected != null;
+            var isSystemRequired = IsSystemRequiredStatus(selected?.Name);
 
-            EditStatusButton.IsEnabled = hasSelection;
+            var visibility = hasSelection
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            MoveStatusUpButton.Visibility = visibility;
+            MoveStatusDownButton.Visibility = visibility;
+            EditStatusButton.Visibility = visibility;
+            DeactivateStatusButton.Visibility = visibility;
+            DeleteStatusButton.Visibility = visibility;
+
+            if (!hasSelection)
+                return;
+
+            var index = Statuses.IndexOf(selected!);
+
+            MoveStatusUpButton.IsEnabled = index > 0;
+            MoveStatusDownButton.IsEnabled = index >= 0 && index < Statuses.Count - 1;
+
+            EditStatusButton.IsEnabled = true;
 
             DeactivateStatusButton.IsEnabled =
-                hasSelection &&
-                SelectedStatus?.IsActive == true &&
+                selected?.IsActive == true &&
                 !isSystemRequired;
 
             DeleteStatusButton.IsEnabled =
-                hasSelection &&
                 !isSystemRequired;
         }
 
@@ -106,7 +136,7 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
 
             try
             {
-                await _ticketAdminApi.CreateStatusAsync(new CreateTicketStatusRequest
+                var created = await _ticketAdminApi.CreateStatusAsync(new CreateTicketStatusRequest
                 {
                     Name = dialog.StatusName,
                     SortOrder = 0,
@@ -121,7 +151,7 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
                     IsUnassignmentTarget = dialog.IsUnassignmentTarget
                 });
 
-                await LoadAsync();
+                await LoadAsync(created.Id);
             }
             catch (Exception ex)
             {
@@ -150,6 +180,8 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
 
             try
             {
+                var selectedId = SelectedStatus.Id;
+
                 await _ticketAdminApi.UpdateStatusAsync(new UpdateTicketStatusRequest
                 {
                     Id = SelectedStatus.Id,
@@ -166,7 +198,7 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
                     IsUnassignmentTarget = dialog.IsUnassignmentTarget
                 });
 
-                await LoadAsync();
+                await LoadAsync(selectedId);
             }
             catch (Exception ex)
             {
@@ -232,15 +264,15 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
                 return;
             }
 
-            var confirm = MessageBox.Show(
-                $"Permanently delete '{SelectedStatus.Name}'?\n\n" +
-                "If this status is already used by tickets, delete will be blocked. " +
-                "If you only want to hide this status, use Deactivate instead.",
-                "Delete Ticket Status",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
+            var confirm = new DangerConfirmWindow(
+                "Delete ticket status?",
+                $"Permanently delete '{SelectedStatus.Name}'?\n\nIf this status is already used by tickets, delete will be blocked. If you only want to hide this status, use Deactivate instead.",
+                "Delete")
+            {
+                Owner = Window.GetWindow(this)
+            };
 
-            if (confirm != MessageBoxResult.Yes)
+            if (confirm.ShowDialog() != true)
                 return;
 
             try
@@ -275,6 +307,53 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
             return $"'{statusName}' is required by SmartGridSuite and cannot be deactivated.";
         }
 
+        private async void Refresh_Click(object sender, RoutedEventArgs e)
+        {
+            await LoadAsync(SelectedStatus?.Id);
+        }
 
+        private async void MoveStatusUp_Click(object sender, RoutedEventArgs e)
+        {
+            await MoveSelectedStatusAsync(-1);
+        }
+
+        private async void MoveStatusDown_Click(object sender, RoutedEventArgs e)
+        {
+            await MoveSelectedStatusAsync(1);
+        }
+
+        private async Task MoveSelectedStatusAsync(int offset)
+        {
+            var selected = SelectedStatus;
+            if (selected == null)
+                return;
+
+            var currentIndex = Statuses.IndexOf(selected);
+            var targetIndex = currentIndex + offset;
+
+            if (currentIndex < 0 || targetIndex < 0 || targetIndex >= Statuses.Count)
+                return;
+
+            var orderedIds = Statuses
+                .Select(x => x.Id)
+                .ToList();
+
+            (orderedIds[currentIndex], orderedIds[targetIndex]) =
+                (orderedIds[targetIndex], orderedIds[currentIndex]);
+
+            try
+            {
+                await _ticketAdminApi.ReorderStatusesAsync(orderedIds);
+                await LoadAsync(selected.Id);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to reorder ticket statuses.\n\n{ex.Message}",
+                    "Reorder Status Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
     }
 }

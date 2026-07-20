@@ -4,6 +4,7 @@ using SmartGridSuite.Contracts.Administration.Ticket.Status;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace SmartGridSuite.Client.Services
 {
@@ -77,6 +78,17 @@ namespace SmartGridSuite.Client.Services
             await _api.PostAsync<object, object?>(
                 $"api/admin/tickets/statuses/{id}/delete",
                 new { },
+                ct);
+        }
+
+        public async Task ReorderStatusesAsync(IEnumerable<ulong> orderedIds, CancellationToken ct = default)
+        {
+            await _api.PutAsync<ReorderTicketStatusesRequest>(
+                "api/admin/tickets/statuses/reorder",
+                new ReorderTicketStatusesRequest
+                {
+                    OrderedIds = orderedIds.ToList()
+                },
                 ct);
         }
     }

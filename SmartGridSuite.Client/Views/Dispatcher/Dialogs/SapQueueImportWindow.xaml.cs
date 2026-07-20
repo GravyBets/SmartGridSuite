@@ -15,6 +15,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
     public partial class SapQueueImportWindow : Window, INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
+
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
@@ -47,7 +48,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
         }
 
         private string _lastImportDisplay = "Never";
-
         public string LastImportDisplay
         {
             get => _lastImportDisplay;
@@ -256,7 +256,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                 return;
             }
 
-            SetBusy(true);
+            SetBusy(true, "Loading SAP preview...");
 
             try
             {
@@ -441,15 +441,24 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
         private void SetBusy(bool busy, string message = "Working...")
         {
-            BusyOverlay.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
-            BusyText.Text = message;
+            BusyOverlay.Visibility = busy
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            BusyText.Text = string.IsNullOrWhiteSpace(message)
+                ? "Working..."
+                : message;
 
             BrowseBtn.IsEnabled = !busy;
             LoadPreviewBtn.IsEnabled = !busy;
             ImportBtn.IsEnabled = !busy && ReadyCount > 0;
             CloseBtn.IsEnabled = !busy;
 
-            Cursor = busy ? System.Windows.Input.Cursors.Wait : null;
+            PreviewGrid.IsEnabled = !busy;
+
+            Cursor = busy
+                ? System.Windows.Input.Cursors.Wait
+                : null;
         }
 
         private void Close_Click(object sender, RoutedEventArgs e)
@@ -668,8 +677,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
             return null;
         }
-
-
     }
 
     public sealed class SapQueuePreviewDisplayRow

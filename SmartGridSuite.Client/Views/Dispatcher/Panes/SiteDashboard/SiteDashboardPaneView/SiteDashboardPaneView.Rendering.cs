@@ -27,6 +27,24 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void ApplyShellLayoutMode(SiteDashboardTabSession session)
         {
+            var showDashboardBody = ShouldShowDashboardBody(session);
+
+            EmptyDashboardPlaceholder.Visibility = showDashboardBody
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+            if (!showDashboardBody)
+            {
+                NetworkView.Visibility = Visibility.Collapsed;
+                WorkspaceView.Visibility = Visibility.Collapsed;
+
+                NetworkColumn.Width = new GridLength(0);
+                NetworkGapColumn.Width = new GridLength(0);
+                return;
+            }
+
+            WorkspaceView.Visibility = Visibility.Visible;
+
             var hideNetwork =
                 string.Equals(session.DashboardKind, SiteDashboardKinds.Rx, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(session.DashboardKind, SiteDashboardKinds.Tower, StringComparison.OrdinalIgnoreCase);
@@ -35,11 +53,30 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             NetworkColumn.Width = hideNetwork
                 ? new GridLength(0)
-                : new GridLength(295);
+                : new GridLength(284);
 
             NetworkGapColumn.Width = hideNetwork
                 ? new GridLength(0)
                 : new GridLength(8);
+        }
+
+        private static bool ShouldShowDashboardBody(SiteDashboardTabSession? session)
+        {
+            if (session is null)
+                return false;
+
+            var header = (session.HeaderText ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(header))
+                return false;
+
+            if (header.Equals("Blank", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (header.StartsWith("Blank (", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return true;
         }
 
         private void ApplyNetworkLabels(SiteDashboardTabSession session)
@@ -129,6 +166,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 }
 
                 HidePoppedOutOverlay();
+
+                if (!ShouldShowDashboardBody(session))
+                {
+                    NetworkView.Reset();
+                    WorkspaceView.Reset();
+                    return;
+                }
 
                 //Networking
                 NetworkView.Reset();

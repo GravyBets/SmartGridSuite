@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Windows.Controls;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs;
 
@@ -520,15 +521,34 @@ public partial class NewTicketWindow : Window
         if (string.IsNullOrWhiteSpace(site))
         {
             MessageBox.Show(
-                "Site is required.",
+                "Site is required before this ticket can be saved.\n\n" +
+                "Enter the site number first, then set the problem/issue, work order, and dispatch notes.\n\n" +
+                "For TOP sites, use the TOP site only, like XX-MWB. Do not include the sector.",
                 Title,
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
 
+            SiteTextBox.Focus();
+            SiteTextBox.SelectAll();
             return;
         }
 
         var problem = (Draft.Problem ?? "").Trim();
+        var notificationName = (Draft.NotificationName ?? "").Trim();
+        var notification = (Draft.NotificationNumber ?? "").Trim();
+        var workOrderText = (Draft.WorkOrder ?? "").Trim();
+        var dispatchNotes = (Draft.DispatchNotes ?? "").Trim();
+
+        if (!ValidateTicketTextLengths(
+                site,
+                notificationName,
+                notification,
+                workOrderText,
+                problem,
+                dispatchNotes))
+        {
+            return;
+        }
 
         var status = (Draft.Status ?? "").Trim();
 
@@ -542,10 +562,6 @@ public partial class NewTicketWindow : Window
 
             return;
         }
-
-        var notification = (Draft.NotificationNumber ?? "").Trim();
-
-        var workOrderText = (Draft.WorkOrder ?? "").Trim();
 
         string? workOrder = string.IsNullOrWhiteSpace(workOrderText)
             ? null
@@ -596,7 +612,7 @@ public partial class NewTicketWindow : Window
             {
                 var updateRequest = new UpdateTicketRequest(
                     Site: site,
-                    NotificationName: (Draft.NotificationName ?? "").Trim(),
+                    NotificationName: notificationName,
                     Notification: notification,
                     WorkOrder: workOrder,
                     WorkOrderClass: workOrderType,
@@ -611,7 +627,7 @@ public partial class NewTicketWindow : Window
                     // Technician write-ups are shown read-only and preserved exactly.
                     Notes: _preservedNotes,
 
-                    DispatchNotes: (Draft.DispatchNotes ?? "").Trim()
+                    DispatchNotes: dispatchNotes
                 );
 
                 CreatedTicketId = await _ticketsApi.UpdateTicketAsync(
@@ -627,7 +643,7 @@ public partial class NewTicketWindow : Window
 
                 var createRequest = new CreateTicketRequest(
                     Site: site,
-                    NotificationName: (Draft.NotificationName ?? "").Trim(),
+                    NotificationName: notificationName,
                     Notification: notification,
                     WorkOrder: workOrder,
                     WorkOrderClass: workOrderType,
@@ -642,7 +658,7 @@ public partial class NewTicketWindow : Window
                     // New tickets cannot create technician write-ups.
                     Notes: "",
 
-                    DispatchNotes: (Draft.DispatchNotes ?? "").Trim(),
+                    DispatchNotes: dispatchNotes,
                     CreatedBy: createdBy
                 );
 
@@ -693,6 +709,60 @@ public partial class NewTicketWindow : Window
             "15 Days" => 15,
             _ => -1
         };
+    }
+
+    private bool ValidateTicketTextLengths(
+    string site,
+    string notificationName,
+    string notification,
+    string workOrder,
+    string problem,
+    string dispatchNotes)
+    {
+        if (!ValidateTextLength("Site", site, TicketTextLimits.Site, SiteTextBox))
+            return false;
+
+        if (!ValidateTextLength("Notification Name", notificationName, TicketTextLimits.NotificationName, NotificationNameTextBox))
+            return false;
+
+        if (!ValidateTextLength("Notification #", notification, TicketTextLimits.Notification, NotificationNumberTextBox))
+            return false;
+
+        if (!ValidateTextLength("Work Order", workOrder, TicketTextLimits.WorkOrder, WorkOrderTextBox))
+            return false;
+
+        if (!ValidateTextLength("Problem", problem, TicketTextLimits.Problem, ProblemTextBox))
+            return false;
+
+        if (!ValidateTextLength("Dispatch Notes", dispatchNotes, TicketTextLimits.DispatchNotes, DispatchNotesTextBox))
+            return false;
+
+        return true;
+    }
+
+    private bool ValidateTextLength(string fieldName, string? value, int maxLength, Control? controlToFocus)
+    {
+        var length = (value ?? string.Empty).Length;
+
+        if (length <= maxLength)
+            return true;
+
+        MessageBox.Show(
+            $"{fieldName} is too long.\n\n" +
+            $"Maximum allowed: {maxLength} characters\n" +
+            $"Current length: {length} characters",
+            Title,
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+
+        controlToFocus?.Focus();
+
+        if (controlToFocus is TextBox textBox)
+        {
+            textBox.SelectAll();
+        }
+
+        return false;
     }
 
     private void SetBusy(bool busy)

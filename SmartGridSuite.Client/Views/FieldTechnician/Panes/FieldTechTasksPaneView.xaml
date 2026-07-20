@@ -429,8 +429,12 @@
                            Foreground="{DynamicResource TextSecondary}"/>
             </StackPanel>
 
-            <Button Grid.Column="1"
+            <Button x:Name="RefreshTasksButton"
+                    Grid.Column="1"
                     Content="Refresh"
+                    Height="34"
+                    Padding="12,0"
+                    Width="72"
                     VerticalAlignment="Top"
                     Click="Refresh_Click"/>
         </Grid>
@@ -461,7 +465,8 @@
                                    FontSize="12"
                                    Foreground="{DynamicResource TextSecondary}"/>
 
-                        <Button Content="Open All"
+                        <Button x:Name="OpenAllTasksButton"
+                                Content="Open All"
                                 Height="30"
                                 Padding="12,0"
                                 Width="76"
@@ -671,6 +676,44 @@
                    Margin="4,10,0,0"
                    FontSize="12"
                    Foreground="{DynamicResource TextSecondary}"/>
+
+        <!-- Loading overlay -->
+        <Border x:Name="BusyOverlay"
+                Grid.Row="0"
+                Grid.RowSpan="6"
+                Panel.ZIndex="100"
+                Background="#66000000"
+                Visibility="Collapsed">
+
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Width="360"
+                    Padding="22"
+                    CornerRadius="16"
+                    Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource CardBorder}"
+                    BorderThickness="1">
+
+                <StackPanel>
+                    <TextBlock Text="Loading"
+                               HorizontalAlignment="Center"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <ProgressBar IsIndeterminate="True"
+                                 Height="6"
+                                 Margin="0,18,0,14"/>
+
+                    <TextBlock x:Name="BusyOverlayMessageTextBlock"
+                               Text="Loading assigned tasks..."
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+            </Border>
+        </Border>
 
     </Grid>
 </UserControl>

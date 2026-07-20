@@ -5,6 +5,8 @@ using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Api.Services;
 using SmartGridSuite.Contracts.Dispatcher.DailyAssignments;
+using System.Text;
+using System.Net;
 
 namespace SmartGridSuite.Api.Controllers
 {
@@ -14,14 +16,19 @@ namespace SmartGridSuite.Api.Controllers
     {
         private readonly SmartGridDbContext _db;
         private readonly TruckBoardInitializationService _truckBoardInitialization;
+        private readonly EmailService _emailService;
+        private readonly ILogger<DailyAssignmentsController> _logger;
 
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
         private const string TechnicianRoleCode = "TECHNICIAN";
 
-        public DailyAssignmentsController(SmartGridDbContext db, TruckBoardInitializationService truckBoardInitialization)
+        public DailyAssignmentsController(SmartGridDbContext db, TruckBoardInitializationService truckBoardInitialization,
+            EmailService emailService, ILogger<DailyAssignmentsController> logger)
         {
             _db = db;
             _truckBoardInitialization = truckBoardInitialization;
+            _emailService = emailService;
+            _logger = logger;
         }
 
         [HttpGet("board")]
@@ -416,6 +423,20 @@ namespace SmartGridSuite.Api.Controllers
                         .Select(c => (uint?)c.Id)
                         .FirstOrDefaultAsync(ct);
                 }
+            }
+
+            if (!req.ConfirmConflictWarnings)
+            {
+                var conflictWarning = await BuildAssignmentConflictWarningMessageAsync(
+                    rosterDate,
+                    workDate,
+                    cleanTargetType,
+                    truckId,
+                    technicianId,
+                    ct);
+
+                if (!string.IsNullOrWhiteSpace(conflictWarning))
+                    return Conflict(conflictWarning);
             }
 
             var tickets = await _db.Tickets
@@ -1251,68 +1272,12 @@ namespace SmartGridSuite.Api.Controllers
                 ? "Dispatcher"
                 : req.PublishedBy.Trim();
 
-            var draftAssignments = await _db.DailyTicketAssignments
-                .Where(x =>
-                    x.AssignmentDate == workDate &&
-                    x.TargetType == cleanTargetType &&
-                    x.TruckId == truckId &&
-                    x.TechnicianId == technicianId)
-                .OrderBy(x => x.SortOrder)
-                .ThenBy(x => x.Id)
-                .ToListAsync(ct);
-
-            var currentTicketIds = draftAssignments
-                .Select(x => x.TicketId)
-                .Distinct()
-                .ToList();
-
-            /*
-             * Find the last published list for this specific target.
-             * Any ticket previously published here but no longer in the current draft
-             * list has been removed from this target.
-             */
-            var previousTargetPublishedVersion = await _db.DailyTicketAssignmentPublished
-                .AsNoTracking()
-                .Where(x =>
-                    x.AssignmentDate == workDate &&
-                    x.TargetType == cleanTargetType &&
-                    x.TruckId == truckId &&
-                    x.TechnicianId == technicianId)
-                .Select(x => (int?)x.PublishedVersion)
-                .MaxAsync(ct);
-
-            var previouslyPublishedTicketIds = previousTargetPublishedVersion.HasValue
-                ? await _db.DailyTicketAssignmentPublished
-                    .AsNoTracking()
-                    .Where(x =>
-                        x.AssignmentDate == workDate &&
-                        x.TargetType == cleanTargetType &&
-                        x.TruckId == truckId &&
-                        x.TechnicianId == technicianId &&
-                        x.PublishedVersion == previousTargetPublishedVersion.Value)
-                    .Select(x => x.TicketId)
-                    .Distinct()
-                    .ToListAsync(ct)
-                : new List<long>();
-
-            var releasedTicketIds = previouslyPublishedTicketIds
-                .Except(currentTicketIds)
-                .Distinct()
-                .ToList();
-
-            var nextPublishedVersion = (await _db.DailyTicketAssignmentPublished
-                .AsNoTracking()
-                .Where(x => x.AssignmentDate == workDate)
-                .Select(x => (int?)x.PublishedVersion)
-                .MaxAsync(ct) ?? 0) + 1;
-
             var now = DateTime.Now;
 
             /*
-             * Resolve configurable workflow statuses.
-             * Assignment Target is needed whenever tickets are being published.
-             * Unassignment Target is only needed when an actual non-terminal ticket
-             * must be returned to unassigned.
+             * Resolve configurable workflow statuses before loading the publishable draft.
+             * Closed tickets may still have old draft assignment rows, but they must not be
+             * republished into the field technician route.
              */
             var statusRows = await _db.TicketStatuses
                 .AsNoTracking()
@@ -1332,9 +1297,42 @@ namespace SmartGridSuite.Api.Controllers
                 .Select(x => x.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+            var closedStatusNamesForPublish = statusRows
+                .Where(x => x.IsClosed)
+                .Select(x => x.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             var assignmentTargetStatuses = statusRows
                 .Where(x => x.IsAssignmentPublishTarget)
                 .Select(x => x.Name)
+                .ToList();
+
+            /*
+             * Technician route ownership is by TechnicianId only.
+             * TruckId is current crew/display context and must not split the route.
+             */
+            var rawDraftAssignments = await FilterDraftTargetRows(
+                    _db.DailyTicketAssignments.Include(x => x.Ticket),
+                    workDate,
+                    cleanTargetType,
+                    truckId,
+                    technicianId)
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Id)
+                .ToListAsync(ct);
+
+            /*
+             * Closed tickets are hidden from Dispatcher Daily Assignments and must not be
+             * re-published from stale draft rows.
+             */
+            var draftAssignments = rawDraftAssignments
+                .Where(x => x.Ticket != null)
+                .Where(x => !closedStatusNamesForPublish.Contains(x.Ticket!.Status ?? string.Empty))
+                .ToList();
+
+            var currentTicketIds = draftAssignments
+                .Select(x => x.TicketId)
+                .Distinct()
                 .ToList();
 
             if (currentTicketIds.Count > 0 && assignmentTargetStatuses.Count != 1)
@@ -1345,6 +1343,50 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             var assignmentTargetStatusName = assignmentTargetStatuses.SingleOrDefault();
+
+            /*
+             * Look up the previous active route snapshot for this target using the same
+             * route identity rule: Technician targets are owned by TechnicianId only.
+             */
+            var previousTargetPublishedVersion = await FilterPublishedTargetRows(
+                    _db.DailyTicketAssignmentPublished.AsNoTracking(),
+                    workDate,
+                    cleanTargetType,
+                    truckId,
+                    technicianId)
+                .Select(x => (int?)x.PublishedVersion)
+                .MaxAsync(ct);
+
+            var previousPublishedRowsForEmail = previousTargetPublishedVersion.HasValue
+                ? await FilterPublishedTargetRows(
+                        _db.DailyTicketAssignmentPublished.AsNoTracking(),
+                        workDate,
+                        cleanTargetType,
+                        truckId,
+                        technicianId)
+                    .Where(x => x.PublishedVersion == previousTargetPublishedVersion.Value)
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.Id)
+                    .ToListAsync(ct)
+                : new List<DailyTicketAssignmentPublishedEntity>();
+
+            var previouslyPublishedTicketIds = previousPublishedRowsForEmail
+                .Select(x => x.TicketId)
+                .Distinct()
+                .ToList();
+
+            var isModifiedPublish = previousPublishedRowsForEmail.Count > 0;
+
+            var releasedTicketIds = previouslyPublishedTicketIds
+                .Except(currentTicketIds)
+                .Distinct()
+                .ToList();
+
+            var nextPublishedVersion = (await _db.DailyTicketAssignmentPublished
+                .AsNoTracking()
+                .Where(x => x.AssignmentDate == workDate)
+                .Select(x => (int?)x.PublishedVersion)
+                .MaxAsync(ct) ?? 0) + 1;
 
             var affectedTicketIds = currentTicketIds
                 .Concat(releasedTicketIds)
@@ -1359,6 +1401,10 @@ namespace SmartGridSuite.Api.Controllers
 
             var ticketsById = affectedTickets.ToDictionary(x => x.Id);
 
+            var currentTicketsById = ticketsById
+                .Where(x => currentTicketIds.Contains(x.Key))
+                .ToDictionary(x => x.Key, x => x.Value);
+
             var missingCurrentTicketIds = currentTicketIds
                 .Where(id => !ticketsById.ContainsKey(id))
                 .ToList();
@@ -1370,25 +1416,41 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             /*
-             * A ticket may have been moved to another target and published there
-             * before this old target is republished. In that case, do not clear the
-             * ticket's newly published assignment.
+             * A released ticket should not be returned to unassigned if it has already been
+             * published somewhere else.
              */
-            var publishedElsewhereTicketIds = releasedTicketIds.Count == 0
-                ? new HashSet<long>()
-                : (await _db.DailyTicketAssignments
+            var publishedElsewhereTicketIds = new HashSet<long>();
+
+            if (releasedTicketIds.Count > 0)
+            {
+                var publishedElsewhereQuery = _db.DailyTicketAssignments
                     .AsNoTracking()
                     .Where(x =>
                         x.AssignmentDate == workDate &&
                         x.IsPublished &&
-                        releasedTicketIds.Contains(x.TicketId) &&
-                        !(x.TargetType == cleanTargetType &&
-                          x.TruckId == truckId &&
-                          x.TechnicianId == technicianId))
-                    .Select(x => x.TicketId)
-                    .Distinct()
-                    .ToListAsync(ct))
+                        releasedTicketIds.Contains(x.TicketId));
+
+                if (cleanTargetType.Equals("Technician", StringComparison.OrdinalIgnoreCase))
+                {
+                    publishedElsewhereQuery = publishedElsewhereQuery
+                        .Where(x =>
+                            !(x.TargetType == "Technician" &&
+                              x.TechnicianId == technicianId));
+                }
+                else
+                {
+                    publishedElsewhereQuery = publishedElsewhereQuery
+                        .Where(x =>
+                            !(x.TargetType == "Truck" &&
+                              x.TruckId == truckId));
+                }
+
+                publishedElsewhereTicketIds = (await publishedElsewhereQuery
+                        .Select(x => x.TicketId)
+                        .Distinct()
+                        .ToListAsync(ct))
                     .ToHashSet();
+            }
 
             var ticketsToUnassign = releasedTicketIds
                 .Where(id => ticketsById.ContainsKey(id))
@@ -1440,6 +1502,18 @@ namespace SmartGridSuite.Api.Controllers
 
             var techniciansById = directTechnicians.ToDictionary(x => x.Id);
 
+            var technicianEmailRecipientsById = directTechnicians
+                .ToDictionary(
+                    x => x.Id,
+                    x => new DailyAssignmentEmailRecipient
+                    {
+                        Name = FormatTechnicianName(
+                            x.FirstName,
+                            x.LastName,
+                            x.EmployeeId),
+                        EmailAddress = (x.EmailAddress ?? string.Empty).Trim()
+                    });
+
             var truckRosterRows = await (
                 from roster in _db.TruckRosters.AsNoTracking()
                 join tech in _db.Technicians.AsNoTracking()
@@ -1452,7 +1526,8 @@ namespace SmartGridSuite.Api.Controllers
                     roster.TruckId,
                     tech.EmployeeId,
                     tech.FirstName,
-                    tech.LastName
+                    tech.LastName,
+                    tech.EmailAddress
                 })
                 .ToListAsync(ct);
 
@@ -1468,6 +1543,24 @@ namespace SmartGridSuite.Api.Controllers
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .OrderBy(x => x)
                         .ToList());
+
+            var truckEmailRecipientsByTruckId = truckRosterRows
+                .GroupBy(x => x.TruckId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(x => new DailyAssignmentEmailRecipient
+                    {
+                        Name = FormatTechnicianName(
+                            x.FirstName,
+                            x.LastName,
+                            x.EmployeeId),
+                        EmailAddress = (x.EmailAddress ?? string.Empty).Trim()
+                    })
+                    .Where(x => !string.IsNullOrWhiteSpace(x.EmailAddress))
+                    .GroupBy(x => x.EmailAddress, StringComparer.OrdinalIgnoreCase)
+                    .Select(g2 => g2.First())
+                    .OrderBy(x => x.Name)
+                    .ToList());
 
             var publishedRows = new List<DailyTicketAssignmentPublishedEntity>();
 
@@ -1537,13 +1630,13 @@ namespace SmartGridSuite.Api.Controllers
                  * Publishing an empty target removes that target's field-tech task list.
                  * The ticket records above are also returned to unassigned when eligible.
                  */
-                var existingPublishedRows = await _db.DailyTicketAssignmentPublished
-                    .Where(x =>
-                        x.AssignmentDate == workDate &&
-                        x.TargetType == cleanTargetType &&
-                        x.TruckId == truckId &&
-                        x.TechnicianId == technicianId)
-                    .ToListAsync(ct);
+                var existingPublishedRows = await FilterPublishedTargetRows(
+                    _db.DailyTicketAssignmentPublished,
+                    workDate,
+                    cleanTargetType,
+                    truckId,
+                    technicianId)
+                .ToListAsync(ct);
 
                 if (existingPublishedRows.Count > 0)
                     _db.DailyTicketAssignmentPublished.RemoveRange(existingPublishedRows);
@@ -1559,13 +1652,53 @@ namespace SmartGridSuite.Api.Controllers
                     PublishedCount = 0,
                     PublishedVersion = nextPublishedVersion,
                     PublishedAt = now,
-                    PublishedBy = publishedBy
+                    PublishedBy = publishedBy,
+
+                    EmailStatus = "Skipped",
+                    EmailMessage = "No tickets are currently published for this target. Email was not sent."
                 });
             }
+
+            /*
+             * DailyTicketAssignmentPublished is the active published route snapshot
+             * used by Field Technician My Tasks.
+             *
+             * Replace this target's old published rows with the newly published list.
+             * Otherwise removed/moved tickets remain visible to the field tech.
+             */
+            var existingPublishedRowsForTarget = await FilterPublishedTargetRows(
+                _db.DailyTicketAssignmentPublished,
+                workDate,
+                cleanTargetType,
+                truckId,
+                technicianId)
+            .ToListAsync(ct);
+
+            if (existingPublishedRowsForTarget.Count > 0)
+                _db.DailyTicketAssignmentPublished.RemoveRange(existingPublishedRowsForTarget);
 
             _db.DailyTicketAssignmentPublished.AddRange(publishedRows);
 
             await _db.SaveChangesAsync(ct);
+
+            var emailResult = await TrySendDailyAssignmentPublishedEmailAsync(
+                rosterDate,
+                publishedBy,
+                cleanTargetType,
+                truckId,
+                technicianId,
+                nextPublishedVersion,
+                now,
+                isModifiedPublish,
+                previousPublishedRowsForEmail,
+                publishedRows,
+                ticketsById,
+                trucksById,
+                truckTechNamesByTruckId,
+                techniciansById,
+                truckEmailRecipientsByTruckId,
+                technicianEmailRecipientsById,
+                ct);
 
             return Ok(new PublishDailyAssignmentTargetResponse
             {
@@ -1580,7 +1713,11 @@ namespace SmartGridSuite.Api.Controllers
                 PublishedBy = publishedBy,
 
                 PublishedCount = publishedRows.Count,
-                TicketIds = currentTicketIds.OrderBy(x => x).ToList()
+                TicketIds = currentTicketIds.OrderBy(x => x).ToList(),
+
+                EmailLogId = emailResult.LogId,
+                EmailStatus = emailResult.Status,
+                EmailMessage = emailResult.Message
             });
         }
 
@@ -1956,6 +2093,856 @@ namespace SmartGridSuite.Api.Controllers
                 return "Technician";
 
             return "";
+        }
+
+        private sealed class DailyAssignmentEmailRecipient
+        {
+            public string Name { get; set; } = "";
+
+            public string EmailAddress { get; set; } = "";
+        }
+
+        private async Task<EmailSendResult> TrySendDailyAssignmentPublishedEmailAsync(
+            DateTime workDate,
+            string publishedBy,
+            string targetType,
+            uint? truckId,
+            uint? technicianId,
+            int publishedVersion,
+            DateTime publishedAt,
+            bool isModifiedPublish,
+            IReadOnlyList<DailyTicketAssignmentPublishedEntity> previousPublishedRows,
+            IReadOnlyList<DailyTicketAssignmentPublishedEntity> publishedRows,
+            IReadOnlyDictionary<long, TicketEntity> ticketsById,
+            IReadOnlyDictionary<uint, TruckEntity> trucksById,
+            IReadOnlyDictionary<uint, List<string>> truckTechNamesByTruckId,
+            IReadOnlyDictionary<uint, TechnicianEntity> techniciansById,
+            IReadOnlyDictionary<uint, List<DailyAssignmentEmailRecipient>> truckEmailRecipientsByTruckId,
+            IReadOnlyDictionary<uint, DailyAssignmentEmailRecipient> technicianEmailRecipientsById,
+            CancellationToken ct)
+        {
+            try
+            {
+                var currentPublishedRows = publishedRows
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.Id)
+                    .ToList();
+
+                var currentTicketIdSet = currentPublishedRows
+                    .Select(x => x.TicketId)
+                    .Distinct()
+                    .ToHashSet();
+
+                var currentTicketsById = ticketsById
+                    .Where(x => currentTicketIdSet.Contains(x.Key))
+                    .ToDictionary(x => x.Key, x => x.Value);
+
+                var recipients = ResolveDailyAssignmentEmailRecipients(
+                    truckId,
+                    technicianId,
+                    truckEmailRecipientsByTruckId,
+                    technicianEmailRecipientsById);
+
+                var targetDisplay = BuildDailyAssignmentEmailTargetDisplay(
+                    targetType,
+                    truckId,
+                    technicianId,
+                    trucksById,
+                    truckTechNamesByTruckId,
+                    techniciansById);
+
+                var truckNumberDisplay = ResolveTruckNumberDisplay(
+                    truckId,
+                    trucksById);
+
+                var publishedByDisplayName = await ResolvePublishedByDisplayNameAsync(
+                    publishedBy,
+                    ct);
+
+                var modificationNumber = isModifiedPublish
+                    ? await GetNextDailyAssignmentModificationNumberAsync(
+                        targetDisplay,
+                        workDate,
+                        ct)
+                    : 0;
+
+                var emailTitle = isModifiedPublish
+                    ? $"Modified({modificationNumber}) Daily Assignments"
+                    : "Daily Assignments";
+
+                var subject = isModifiedPublish
+                    ? $"{targetDisplay} - Modified({modificationNumber}) Daily Assignments - {workDate:MM/dd/yyyy}"
+                    : $"{targetDisplay} - Daily Assignments - {workDate:MM/dd/yyyy}";
+
+                var changeSummaryHtml = isModifiedPublish
+                    ? BuildDailyAssignmentChangeSummaryHtml(
+                        previousPublishedRows,
+                        currentPublishedRows,
+                        ticketsById)
+                    : "";
+
+                var body = BuildDailyAssignmentPublishedEmailBody(
+                    workDate,
+                    targetDisplay,
+                    truckNumberDisplay,
+                    publishedByDisplayName,
+                    publishedAt,
+                    emailTitle,
+                    changeSummaryHtml,
+                    currentPublishedRows,
+                    currentTicketsById);
+
+                var ticketIds = currentPublishedRows
+                    .Select(x => x.TicketId)
+                    .Distinct()
+                    .OrderBy(x => x)
+                    .ToList();
+
+                TicketEntity? onlyTicket = null;
+
+                if (ticketIds.Count == 1)
+                    currentTicketsById.TryGetValue(ticketIds[0], out onlyTicket);
+
+                var allEmailsAddress = await GetAllEmailsAddressAsync(ct);
+
+                return await _emailService.SendAsync(
+                    new EmailSendRequest
+                    {
+                        EmailType = "DailyAssignment",
+
+                        ToAddresses = recipients
+                            .Select(x => x.EmailAddress)
+                            .Where(x => !string.IsNullOrWhiteSpace(x))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList(),
+
+                        CcAddresses = string.IsNullOrWhiteSpace(allEmailsAddress)
+                            ? Array.Empty<string>()
+                            : new[] { allEmailsAddress },
+
+                        Subject = subject,
+                        Body = body,
+                        IsHtml = true,
+
+                        CreatedBy = publishedBy,
+
+                        RelatedTicketId = ticketIds.Count == 1
+                            ? ticketIds[0]
+                            : null,
+
+                        RelatedSite = onlyTicket?.Site
+                    },
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Daily Assignment publish email failed. TargetType={TargetType}, TruckId={TruckId}, TechnicianId={TechnicianId}",
+                    targetType,
+                    truckId,
+                    technicianId);
+
+                return new EmailSendResult
+                {
+                    Status = "Failed",
+                    Message = ex.Message
+                };
+            }
+        }
+
+        private static List<DailyAssignmentEmailRecipient> ResolveDailyAssignmentEmailRecipients(
+            uint? truckId,
+            uint? technicianId,
+            IReadOnlyDictionary<uint, List<DailyAssignmentEmailRecipient>> truckEmailRecipientsByTruckId,
+            IReadOnlyDictionary<uint, DailyAssignmentEmailRecipient> technicianEmailRecipientsById)
+        {
+            var recipients = new List<DailyAssignmentEmailRecipient>();
+
+            if (truckId.HasValue &&
+                truckEmailRecipientsByTruckId.TryGetValue(truckId.Value, out var truckRecipients))
+            {
+                recipients.AddRange(truckRecipients);
+            }
+
+            if (recipients.Count == 0 &&
+                technicianId.HasValue &&
+                technicianEmailRecipientsById.TryGetValue(technicianId.Value, out var technicianRecipient))
+            {
+                recipients.Add(technicianRecipient);
+            }
+
+            return recipients
+                .Where(x => !string.IsNullOrWhiteSpace(x.EmailAddress))
+                .GroupBy(x => x.EmailAddress.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .OrderBy(x => x.Name)
+                .ToList();
+        }
+
+        private static string BuildDailyAssignmentEmailTargetDisplay(
+            string targetType,
+            uint? truckId,
+            uint? technicianId,
+            IReadOnlyDictionary<uint, TruckEntity> trucksById,
+            IReadOnlyDictionary<uint, List<string>> truckTechNamesByTruckId,
+            IReadOnlyDictionary<uint, TechnicianEntity> techniciansById)
+        {
+            if (truckId.HasValue &&
+                truckTechNamesByTruckId.TryGetValue(truckId.Value, out var techNames) &&
+                techNames.Count > 0)
+            {
+                return FormatCrewDisplayText(techNames);
+            }
+
+            if (technicianId.HasValue &&
+                techniciansById.TryGetValue(technicianId.Value, out var technician))
+            {
+                return FormatTechnicianName(
+                    technician.FirstName,
+                    technician.LastName,
+                    technician.EmployeeId);
+            }
+
+            if (truckId.HasValue &&
+                trucksById.TryGetValue(truckId.Value, out var truck))
+            {
+                return $"Truck {truck.TruckNumber}".Trim();
+            }
+
+            return string.IsNullOrWhiteSpace(targetType)
+                ? "Daily Assignment Target"
+                : targetType;
+        }
+
+        private static string BuildDailyAssignmentPublishedEmailBody(
+            DateTime workDate,
+            string targetDisplay,
+            string truckNumberDisplay,
+            string publishedBy,
+            DateTime publishedAt,
+            string emailTitle,
+            string changeSummaryHtml,
+            IReadOnlyList<DailyTicketAssignmentPublishedEntity> publishedRows,
+            IReadOnlyDictionary<long, TicketEntity> ticketsById)
+        {
+            static string H(string? value)
+                => WebUtility.HtmlEncode((value ?? string.Empty).Trim());
+
+            static string DashIfBlank(string? value)
+            {
+                var clean = (value ?? string.Empty).Trim();
+
+                return string.IsNullOrWhiteSpace(clean)
+                    ? "—"
+                    : WebUtility.HtmlEncode(clean);
+            }
+            var truckRowHtml = string.IsNullOrWhiteSpace(truckNumberDisplay)
+                ? ""
+                : $$"""
+                        <tr>
+                        <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Truck</td>
+                        <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{H(truckNumberDisplay)}}</td>
+                        <td></td>
+                        <td></td>
+                        </tr>
+                    """;
+
+            var sb = new StringBuilder();
+
+            sb.AppendLine($$"""
+                <!DOCTYPE html>
+                <html>
+                <body style="margin:0; padding:0; background:#f3f4f6; font-family:Segoe UI, Arial, sans-serif; color:#111827;">
+                  <div style="max-width:1100px; margin:0 auto; padding:24px;">
+                    <div style="background:#ffffff; border:1px solid #d1d5db; border-radius:12px; overflow:hidden;">
+                      <div style="background:#1f2937; color:#ffffff; padding:18px 22px;">
+                        <div style="font-size:22px; font-weight:700;">{{H(emailTitle)}}</div>
+                      </div>
+                """);
+
+            sb.AppendLine($$"""
+                <div style="padding:18px 22px;">
+                <table cellpadding="0" cellspacing="0" style="width:100%; margin-bottom:18px; border-collapse:collapse;">
+                    <tr>
+                    <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Date</td>
+                    <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{workDate:MM/dd/yyyy}}</td>
+
+                    <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Assigned To</td>
+                    <td style="font-size:14px; font-weight:600; padding:3px 0;">{{H(targetDisplay)}}</td>
+                    </tr>
+                    <tr>
+                    <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Published By</td>
+                    <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{H(publishedBy)}}</td>
+
+                    <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Published At</td>
+                    <td style="font-size:14px; font-weight:600; padding:3px 0;">{{publishedAt:MM/dd/yyyy HH:mm}}</td>
+                    </tr>
+                    {{truckRowHtml}}
+                </table>
+
+                {{changeSummaryHtml}}
+
+                <div style="font-size:15px; font-weight:700; margin:0 0 8px 0;">Current Route</div>
+
+                <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #d1d5db;">
+                  <thead>
+                    <tr style="background:#e5e7eb;">
+                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">#</th>
+                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Site</th>
+                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Notification Name</th>
+                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Problem</th>
+                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Notification</th>
+                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Work Order</th>
+                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">WO Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                """);
+
+            var rowNumber = 0;
+
+            foreach (var assignment in publishedRows
+                         .OrderBy(x => x.SortOrder)
+                         .ThenBy(x => x.Id))
+            {
+                if (!ticketsById.TryGetValue(assignment.TicketId, out var ticket))
+                    continue;
+
+                rowNumber++;
+
+                var background = rowNumber % 2 == 0
+                    ? "#f9fafb"
+                    : "#ffffff";
+
+                sb.AppendLine($$"""
+                    <tr style="background:{{background}};">
+                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db; font-weight:600;">{{rowNumber}}</td>
+                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db; font-weight:700;">{{DashIfBlank(ticket.Site)}}</td>
+                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.NotificationName)}}</td>
+                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.Problem)}}</td>
+                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.Notification)}}</td>
+                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.CurrentWorkOrder)}}</td>
+                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(NormalizeWorkOrderType(ticket.WorkOrderClass))}}</td>
+                    </tr>
+                    """);
+
+                var assignmentNotes = (assignment.AssignmentNotes ?? string.Empty).Trim();
+
+                if (!string.IsNullOrWhiteSpace(assignmentNotes))
+                {
+                    sb.AppendLine($$"""
+                        <tr style="background:{{background}};">
+                            <td style="font-size:12px; padding:8px 10px; border:1px solid #d1d5db;"></td>
+                            <td colspan="6" style="font-size:12px; padding:8px 10px; border:1px solid #d1d5db; color:#374151;">
+                            <strong>Assignment Notes:</strong> {{H(assignmentNotes)}}
+                            </td>
+                        </tr>
+                        """);
+                }
+            }
+
+            if (rowNumber == 0)
+            {
+                sb.AppendLine("""
+                    <tr>
+                        <td colspan="7" style="font-size:13px; padding:14px 10px; border:1px solid #d1d5db; color:#6b7280; font-style:italic;">
+                        No ticket details were available.
+                        </td>
+                    </tr>
+                    """);
+            }
+
+            sb.AppendLine("""
+                          </tbody>
+                        </table>
+
+                        <div style="font-size:12px; color:#6b7280; margin-top:16px;">
+                          This message was generated by SmartGridSuite.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """);
+
+            return sb.ToString();
+        }
+
+        private static string BuildDailyAssignmentChangeSummaryHtml(
+            IReadOnlyList<DailyTicketAssignmentPublishedEntity> previousRows,
+            IReadOnlyList<DailyTicketAssignmentPublishedEntity> currentRows,
+            IReadOnlyDictionary<long, TicketEntity> ticketsById)
+        {
+            static string H(string? value)
+                => WebUtility.HtmlEncode((value ?? string.Empty).Trim());
+
+            static string TicketLabel(
+                long ticketId,
+                IReadOnlyDictionary<long, TicketEntity> ticketsById)
+            {
+                if (!ticketsById.TryGetValue(ticketId, out var ticket))
+                    return $"Ticket {ticketId}";
+
+                var site = (ticket.Site ?? string.Empty).Trim();
+                var notificationName = (ticket.NotificationName ?? string.Empty).Trim();
+
+                if (!string.IsNullOrWhiteSpace(site) &&
+                    !string.IsNullOrWhiteSpace(notificationName))
+                {
+                    return $"{site} - {notificationName}";
+                }
+
+                if (!string.IsNullOrWhiteSpace(site))
+                    return site;
+
+                if (!string.IsNullOrWhiteSpace(notificationName))
+                    return notificationName;
+
+                return $"Ticket {ticketId}";
+            }
+
+            static string FormatTicketList(
+                IEnumerable<long> ticketIds,
+                IReadOnlyDictionary<long, TicketEntity> ticketsById)
+            {
+                var labels = ticketIds
+                    .Select(id => H(TicketLabel(id, ticketsById)))
+                    .ToList();
+
+                return labels.Count == 0
+                    ? "—"
+                    : string.Join("<br/>", labels);
+            }
+
+            var previousOrdered = previousRows
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Id)
+                .GroupBy(x => x.TicketId)
+                .Select(g => g.First())
+                .ToList();
+
+            var currentOrdered = currentRows
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Id)
+                .GroupBy(x => x.TicketId)
+                .Select(g => g.First())
+                .ToList();
+
+            var previousTicketIds = previousOrdered
+                .Select(x => x.TicketId)
+                .ToList();
+
+            var currentTicketIds = currentOrdered
+                .Select(x => x.TicketId)
+                .ToList();
+
+            var previousTicketIdSet = previousTicketIds.ToHashSet();
+            var currentTicketIdSet = currentTicketIds.ToHashSet();
+
+            var addedTicketIds = currentTicketIds
+                .Where(id => !previousTicketIdSet.Contains(id))
+                .ToList();
+
+            var removedTicketIds = previousTicketIds
+                .Where(id => !currentTicketIdSet.Contains(id))
+                .ToList();
+
+            var previousIndexByTicketId = previousTicketIds
+                .Select((id, index) => new
+                {
+                    TicketId = id,
+                    RouteOrder = index + 1
+                })
+                .ToDictionary(x => x.TicketId, x => x.RouteOrder);
+
+            var currentIndexByTicketId = currentTicketIds
+                .Select((id, index) => new
+                {
+                    TicketId = id,
+                    RouteOrder = index + 1
+                })
+                .ToDictionary(x => x.TicketId, x => x.RouteOrder);
+
+            var reorderedTicketIds = currentTicketIds
+                .Where(id =>
+                    previousIndexByTicketId.ContainsKey(id) &&
+                    currentIndexByTicketId.ContainsKey(id) &&
+                    previousIndexByTicketId[id] != currentIndexByTicketId[id])
+                .ToList();
+
+            var rows = new List<(string Change, string Details)>();
+
+            if (addedTicketIds.Count > 0)
+            {
+                rows.Add((
+                    $"Added ({addedTicketIds.Count})",
+                    FormatTicketList(addedTicketIds, ticketsById)));
+            }
+
+            if (removedTicketIds.Count > 0)
+            {
+                rows.Add((
+                    $"Removed ({removedTicketIds.Count})",
+                    FormatTicketList(removedTicketIds, ticketsById)));
+            }
+
+            if (reorderedTicketIds.Count > 0)
+            {
+                var reorderedDetails = reorderedTicketIds
+                    .Select(id =>
+                        $"{H(TicketLabel(id, ticketsById))}: " +
+                        $"#{previousIndexByTicketId[id]} → #{currentIndexByTicketId[id]}")
+                    .ToList();
+
+                rows.Add((
+                    $"Route Order Changed ({reorderedTicketIds.Count})",
+                    string.Join("<br/>", reorderedDetails)));
+            }
+
+            if (rows.Count == 0)
+            {
+                rows.Add((
+                    "Republished",
+                    "No ticket additions, removals, or route-order changes were detected."));
+            }
+
+            var sb = new StringBuilder();
+
+            sb.AppendLine("""
+                <div style="margin-bottom:18px;">
+                  <div style="font-size:15px; font-weight:700; margin:0 0 8px 0;">Changes Since Previous Publish</div>
+
+                  <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #d1d5db;">
+                    <thead>
+                      <tr style="background:#e5e7eb;">
+                        <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db; width:220px;">Change</th>
+                        <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                """);
+
+            foreach (var row in rows)
+            {
+                sb.AppendLine($$"""
+                      <tr>
+                        <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db; font-weight:700;">{{H(row.Change)}}</td>
+                        <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{row.Details}}</td>
+                      </tr>
+                    """);
+            }
+
+            sb.AppendLine("""
+                    </tbody>
+                  </table>
+                </div>
+                """);
+
+            return sb.ToString();
+        }
+
+        private static IQueryable<DailyTicketAssignmentEntity> FilterDraftTargetRows(
+            IQueryable<DailyTicketAssignmentEntity> query, DateTime assignmentDate,
+            string targetType, uint? truckId, uint? technicianId)
+        {
+            query = query.Where(x =>
+                x.AssignmentDate == assignmentDate &&
+                x.TargetType == targetType);
+
+            if (targetType.Equals("Technician", StringComparison.OrdinalIgnoreCase))
+            {
+                return query.Where(x => x.TechnicianId == technicianId);
+            }
+
+            return query.Where(x => x.TruckId == truckId);
+        }
+
+        private static IQueryable<DailyTicketAssignmentPublishedEntity> FilterPublishedTargetRows(
+            IQueryable<DailyTicketAssignmentPublishedEntity> query, DateTime assignmentDate,
+            string targetType, uint? truckId, uint? technicianId)
+        {
+            query = query.Where(x =>
+                x.AssignmentDate == assignmentDate &&
+                x.TargetType == targetType);
+
+            if (targetType.Equals("Technician", StringComparison.OrdinalIgnoreCase))
+            {
+                return query.Where(x => x.TechnicianId == technicianId);
+            }
+
+            return query.Where(x => x.TruckId == truckId);
+        }
+
+        private async Task<string> BuildAssignmentConflictWarningMessageAsync(
+            DateTime rosterDate,
+            DateTime assignmentDate,
+            string targetType,
+            uint? truckId,
+            uint? technicianId,
+            CancellationToken ct)
+        {
+            /*
+             * Only crew-context assignments need this warning.
+             * Example: assigning work to Daniel's crew while Alex, a crew member, still
+             * has individual or other-route work assigned.
+             */
+            if (!targetType.Equals("Technician", StringComparison.OrdinalIgnoreCase) ||
+                !truckId.HasValue ||
+                !technicianId.HasValue)
+            {
+                return "";
+            }
+
+            var targetOwnerTechnicianId = technicianId.Value;
+
+            var crewTechnicians = await (
+                from roster in _db.TruckRosters.AsNoTracking()
+                join tech in ActiveFieldTechniciansQuery()
+                    on roster.TechnicianId equals tech.Id
+                where roster.WorkDate == rosterDate &&
+                      roster.TruckId == truckId.Value
+                select new
+                {
+                    tech.Id,
+                    tech.EmployeeId,
+                    tech.FirstName,
+                    tech.LastName
+                })
+                .ToListAsync(ct);
+
+            var nonLeadCrewTechnicians = crewTechnicians
+                .Where(x => x.Id != targetOwnerTechnicianId)
+                .ToList();
+
+            if (nonLeadCrewTechnicians.Count == 0)
+                return "";
+
+            var nonLeadTechIds = nonLeadCrewTechnicians
+                .Select(x => x.Id)
+                .ToHashSet();
+
+            var statusRows = await _db.TicketStatuses
+                .AsNoTracking()
+                .Where(x => x.IsActive)
+                .Select(x => new
+                {
+                    x.Name,
+                    x.IsClosed,
+                    x.IsFieldComplete
+                })
+                .ToListAsync(ct);
+
+            var terminalStatusNames = statusRows
+                .Where(x => x.IsClosed || x.IsFieldComplete)
+                .Select(x => x.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var conflicts = new Dictionary<uint, List<string>>();
+
+            void AddConflict(uint techId, string site)
+            {
+                if (string.IsNullOrWhiteSpace(site))
+                    site = "(blank site)";
+
+                if (!conflicts.TryGetValue(techId, out var list))
+                {
+                    list = new List<string>();
+                    conflicts[techId] = list;
+                }
+
+                if (!list.Contains(site, StringComparer.OrdinalIgnoreCase))
+                    list.Add(site);
+            }
+
+            /*
+             * Draft/current assignment conflicts.
+             * These are un-published or current Daily Assignment rows owned by non-lead
+             * crew members.
+             */
+            var draftConflicts = await _db.DailyTicketAssignments
+                .AsNoTracking()
+                .Include(x => x.Ticket)
+                .Where(x =>
+                    x.AssignmentDate == assignmentDate &&
+                    x.TargetType == "Technician" &&
+                    x.TechnicianId.HasValue &&
+                    nonLeadTechIds.Contains(x.TechnicianId.Value) &&
+                    x.Ticket != null)
+                .ToListAsync(ct);
+
+            foreach (var row in draftConflicts)
+            {
+                var ticketStatus = row.Ticket?.Status ?? "";
+
+                if (terminalStatusNames.Contains(ticketStatus))
+                    continue;
+
+                AddConflict(
+                    row.TechnicianId!.Value,
+                    row.Ticket?.Site ?? $"Ticket {row.TicketId}");
+            }
+
+            /*
+             * Latest published route conflicts.
+             * This catches cases where a non-lead tech still has a published individual
+             * route even if their draft list was not currently selected in Dispatcher.
+             */
+            foreach (var techId in nonLeadTechIds)
+            {
+                var latestVersion = await _db.DailyTicketAssignmentPublished
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.AssignmentDate == assignmentDate &&
+                        x.TargetType == "Technician" &&
+                        x.TechnicianId == techId)
+                    .Select(x => (int?)x.PublishedVersion)
+                    .MaxAsync(ct);
+
+                if (!latestVersion.HasValue)
+                    continue;
+
+                var publishedConflicts = await _db.DailyTicketAssignmentPublished
+                    .AsNoTracking()
+                    .Include(x => x.Ticket)
+                    .Where(x =>
+                        x.AssignmentDate == assignmentDate &&
+                        x.TargetType == "Technician" &&
+                        x.TechnicianId == techId &&
+                        x.PublishedVersion == latestVersion.Value &&
+                        x.Ticket != null)
+                    .ToListAsync(ct);
+
+                foreach (var row in publishedConflicts)
+                {
+                    var ticketStatus = row.Ticket?.Status ?? "";
+
+                    if (terminalStatusNames.Contains(ticketStatus))
+                        continue;
+
+                    AddConflict(
+                        techId,
+                        row.Ticket?.Site ?? $"Ticket {row.TicketId}");
+                }
+            }
+
+            if (conflicts.Count == 0)
+                return "";
+
+            var lines = new List<string>
+            {
+                "This crew includes technician(s) who already have active Daily Assignment work elsewhere:",
+                ""
+            };
+
+            foreach (var tech in nonLeadCrewTechnicians
+                         .Where(x => conflicts.ContainsKey(x.Id))
+                         .OrderBy(x => x.LastName)
+                         .ThenBy(x => x.FirstName))
+            {
+                var name = FormatTechnicianName(
+                    tech.FirstName,
+                    tech.LastName,
+                    tech.EmployeeId);
+
+                var sites = conflicts[tech.Id]
+                    .OrderBy(x => x)
+                    .ToList();
+
+                var sitePreview = string.Join(", ", sites.Take(8));
+
+                if (sites.Count > 8)
+                    sitePreview += $", +{sites.Count - 8} more";
+
+                lines.Add($"{name}: {sites.Count} ticket(s)");
+                lines.Add($"Sites: {sitePreview}");
+                lines.Add("");
+            }
+
+            lines.Add("Continue assignment anyway?");
+
+            return string.Join(Environment.NewLine, lines).Trim();
+        }
+
+        private async Task<string> ResolvePublishedByDisplayNameAsync(
+            string? publishedBy, CancellationToken ct)
+        {
+            var clean = (publishedBy ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(clean))
+                return "Dispatcher";
+
+            var technician = await _db.Technicians
+                .AsNoTracking()
+                .Where(x => x.EmployeeId == clean)
+                .Select(x => new
+                {
+                    x.FirstName,
+                    x.LastName,
+                    x.EmployeeId
+                })
+                .FirstOrDefaultAsync(ct);
+
+            if (technician == null)
+                return clean;
+
+            return FormatTechnicianName(
+                technician.FirstName,
+                technician.LastName,
+                technician.EmployeeId);
+        }
+
+        private async Task<int> GetNextDailyAssignmentModificationNumberAsync(
+            string targetDisplay, DateTime workDate, CancellationToken ct)
+        {
+            var cleanTarget = (targetDisplay ?? string.Empty).Trim();
+            var dateText = workDate.ToString("MM/dd/yyyy");
+
+            if (string.IsNullOrWhiteSpace(cleanTarget))
+                return 1;
+
+            var subjectPrefix =
+                $"{cleanTarget} - Modified(";
+
+            var subjectSuffix =
+                $") Daily Assignments - {dateText}";
+
+            var previousModifiedCount = await _db.EmailLogs
+                .AsNoTracking()
+                .Where(x =>
+                    x.EmailType == "DailyAssignment" &&
+                    x.Subject.StartsWith(subjectPrefix) &&
+                    x.Subject.Contains(subjectSuffix))
+                .CountAsync(ct);
+
+            return previousModifiedCount + 1;
+        }
+
+        private static string ResolveTruckNumberDisplay(uint? truckId, IReadOnlyDictionary<uint, TruckEntity> trucksById)
+        {
+            if (!truckId.HasValue)
+                return "";
+
+            if (!trucksById.TryGetValue(truckId.Value, out var truck))
+                return "";
+
+            var truckNumber = (truck.TruckNumber ?? string.Empty).Trim();
+
+            return string.IsNullOrWhiteSpace(truckNumber)
+                ? ""
+                : $"Truck {truckNumber}";
+        }
+
+        private async Task<string> GetAllEmailsAddressAsync(CancellationToken ct)
+        {
+            var value = await _db.AppSettings
+                .AsNoTracking()
+                .Where(x => x.SettingKey == "Email.AllEmailsAddress")
+                .Select(x => x.SettingValue)
+                .FirstOrDefaultAsync(ct);
+
+            return (value ?? string.Empty).Trim();
         }
     }
 }

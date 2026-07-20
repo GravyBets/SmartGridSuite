@@ -3,8 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Technician"
         Width="760"
-        Height="580"
+        Height="640"
         WindowStartupLocation="CenterOwner"
+        Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
         ResizeMode="NoResize">
 
     <Grid Margin="16">
@@ -29,6 +30,8 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="12"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="12"/>
                             <RowDefinition Height="Auto"/>
@@ -100,6 +103,18 @@
                                 <ComboBoxItem Content="No"/>
                             </ComboBox>
                         </StackPanel>
+
+                        <StackPanel Grid.Row="6"
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="3">
+                            <TextBlock Text="Email Address"
+                                       Style="{DynamicResource FormLabelStyle}"
+                                       Margin="0,0,0,4"/>
+
+                            <TextBox x:Name="EmailAddressTextBox"
+                                     Height="30"/>
+                        </StackPanel>
+                        
                     </Grid>
                 </GroupBox>
 

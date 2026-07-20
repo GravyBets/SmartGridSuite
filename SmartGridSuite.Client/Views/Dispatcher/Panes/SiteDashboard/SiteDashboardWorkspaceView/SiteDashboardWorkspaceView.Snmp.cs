@@ -403,7 +403,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 SnmpSetValueTextBox.Visibility = Visibility.Visible;
                 SnmpSetValueTextBox.IsEnabled = true;
 
-                SnmpDecoderValuesTextBox.Text = "No decoder values configured for this OID. Enter the raw value manually.";
+                // Formula OIDs should be entered as the displayed/user-friendly value.
+                // The API will convert it back to the whole-number raw radio SET value
+                // using WriteFormula before sending the SNMP SET.
+                if (string.Equals(oid.DecodeMode, "Formula", StringComparison.OrdinalIgnoreCase))
+                {
+                    var lines = new List<string>
+                    {
+                        "Formula Decoder:",
+                        $"Read Formula: {BlankForDisplay(oid.ReadFormula)}",
+                        $"Write Formula: {BlankForDisplay(oid.WriteFormula)}"
+                    };
+
+                    if (oid.DecimalPlaces.HasValue)
+                        lines.Add($"Decimals: {oid.DecimalPlaces.Value}");
+
+                    if (!string.IsNullOrWhiteSpace(oid.UnitLabel))
+                        lines.Add($"Unit: {oid.UnitLabel.Trim()}");
+
+                    lines.Add("");
+                    lines.Add("Enter the displayed value. SmartGridSuite will convert it to the raw whole-number radio value before SET.");
+
+                    SnmpDecoderValuesTextBox.Text = string.Join(Environment.NewLine, lines);
+                }
+                else
+                {
+                    SnmpDecoderValuesTextBox.Text = "No decoder values configured for this OID. Enter the raw value manually.";
+                }
             }
         }
 
@@ -506,6 +532,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         }
 
         //SNMP Helpers
+
+        private static string BlankForDisplay(string? value)
+        {
+            var clean = (value ?? string.Empty).Trim();
+
+            return string.IsNullOrWhiteSpace(clean)
+                ? "—"
+                : clean;
+        }
+
         private sealed class SnmpProfileChoice
         {
             public ulong Id { get; set; }

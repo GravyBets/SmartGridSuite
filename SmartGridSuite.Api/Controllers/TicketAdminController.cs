@@ -28,6 +28,8 @@ namespace SmartGridSuite.Api.Controllers
             "Closed"
         };
 
+        private const int TicketStatusNameMaxLength = 100;
+
         private static bool IsRequiredTicketStatus(string? statusName)
         {
             var clean = (statusName ?? string.Empty).Trim();
@@ -100,6 +102,9 @@ namespace SmartGridSuite.Api.Controllers
             if (string.IsNullOrWhiteSpace(name))
                 return BadRequest("Status name is required.");
 
+            if (name.Length > TicketStatusNameMaxLength)
+                return BadRequest($"Status name must be {TicketStatusNameMaxLength} characters or less.");
+
             var exists = await _db.TicketStatuses
                 .AsNoTracking()
                 .AnyAsync(x => x.Name.ToLower() == name.ToLower(), ct);
@@ -169,6 +174,9 @@ namespace SmartGridSuite.Api.Controllers
 
             if (string.IsNullOrWhiteSpace(name))
                 return BadRequest("Status name is required.");
+
+            if (name.Length > TicketStatusNameMaxLength)
+                return BadRequest($"Status name must be {TicketStatusNameMaxLength} characters or less.");
 
             var entity = await _db.TicketStatuses
                 .FirstOrDefaultAsync(x => x.Id == id, ct);
@@ -245,6 +253,54 @@ namespace SmartGridSuite.Api.Controllers
             await _db.SaveChangesAsync(ct);
 
             return Ok(MapStatusDto(entity));
+        }
+
+        [HttpPut("statuses/reorder")]
+        public async Task<IActionResult> ReorderStatuses([FromBody] ReorderTicketStatusesRequest request, CancellationToken ct)
+        {
+            var requestedIds = (request.OrderedIds ?? new List<ulong>())
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            if (requestedIds.Count == 0)
+                return BadRequest("At least one status id is required.");
+
+            var statuses = await _db.TicketStatuses
+                .ToListAsync(ct);
+
+            var statusById = statuses.ToDictionary(x => x.Id);
+
+            var missingIds = requestedIds
+                .Where(x => !statusById.ContainsKey(x))
+                .ToList();
+
+            if (missingIds.Count > 0)
+                return BadRequest("One or more status ids were not found.");
+
+            /*
+             * The client normally sends every row, but append anything missing just in case.
+             * This keeps sort order normalized for all statuses.
+             */
+            var finalIds = requestedIds
+                .Concat(
+                    statuses
+                        .OrderBy(x => x.SortOrder)
+                        .ThenBy(x => x.Name)
+                        .Select(x => x.Id)
+                        .Where(x => !requestedIds.Contains(x)))
+                .ToList();
+
+            for (var i = 0; i < finalIds.Count; i++)
+            {
+                var status = statusById[finalIds[i]];
+                status.SortOrder = (i + 1) * 10;
+                status.UpdatedAt = DateTime.Now;
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            return NoContent();
         }
 
         [HttpPost("statuses/{id:long}/deactivate")]

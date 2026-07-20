@@ -5,6 +5,7 @@ using SmartGridSuite.Contracts.Administration.Trucks;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Net.Mail;
 
 namespace SmartGridSuite.Client.Views.Administration
 {
@@ -49,6 +50,7 @@ namespace SmartGridSuite.Client.Views.Administration
                 FirstName = FirstNameTextBox.Text.Trim(),
                 LastName = LastNameTextBox.Text.Trim(),
                 Title = (TitleComboBox.SelectedItem as string ?? "").Trim(),
+                EmailAddress = EmailAddressTextBox.Text.Trim(),
                 IsActive = GetSelectedActiveEmployee(),
                 HomeTruckId = HomeTruckComboBox.SelectedValue as int?,
                 WorksMonday = WorksMondayCheckBox.IsChecked == true,
@@ -70,6 +72,7 @@ namespace SmartGridSuite.Client.Views.Administration
                 FirstName = FirstNameTextBox.Text.Trim(),
                 LastName = LastNameTextBox.Text.Trim(),
                 Title = (TitleComboBox.SelectedItem as string ?? "").Trim(),
+                EmailAddress = EmailAddressTextBox.Text.Trim(),
                 IsActive = GetSelectedActiveEmployee(),
                 HomeTruckId = HomeTruckComboBox.SelectedValue as int?,
                 WorksMonday = WorksMondayCheckBox.IsChecked == true,
@@ -117,6 +120,7 @@ namespace SmartGridSuite.Client.Views.Administration
             FirstNameTextBox.Text = row.FirstName;
             LastNameTextBox.Text = row.LastName;
             EmployeeIdTextBox.Text = row.EmployeeId;
+            EmailAddressTextBox.Text = row.EmailAddress ?? "";
             ActiveEmployeeComboBox.SelectedIndex = row.IsActive ? 0 : 1;
 
             HomeTruckComboBox.SelectedValue = row.HomeTruckId;
@@ -163,8 +167,7 @@ namespace SmartGridSuite.Client.Views.Administration
             return roles;
         }
 
-        private static string? NormalizeTitle(string? title)
-            => (title ?? "").Trim().ToUpperInvariant() switch
+        private static string? NormalizeTitle(string? title) => (title ?? "").Trim().ToUpperInvariant() switch
             {
                 "APPRENTICE" => "Apprentice",
                 "JOURNEYMAN" => "Journeyman",
@@ -184,6 +187,7 @@ namespace SmartGridSuite.Client.Views.Administration
             var firstName = FirstNameTextBox.Text.Trim();
             var lastName = LastNameTextBox.Text.Trim();
             var employeeId = EmployeeIdTextBox.Text.Trim();
+            var emailAddress = EmailAddressTextBox.Text.Trim();
             var title = TitleComboBox.SelectedItem as string;
 
             if (firstName.Length == 0)
@@ -203,6 +207,13 @@ namespace SmartGridSuite.Client.Views.Administration
             if (employeeId.Length == 0)
             {
                 MessageBox.Show("Employee ID is required.", "Validation",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(emailAddress) && !IsValidEmailAddress(emailAddress))
+            {
+                MessageBox.Show("Email Address is invalid.", "Validation",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -229,6 +240,19 @@ namespace SmartGridSuite.Client.Views.Administration
         {
             DialogResult = false;
             Close();
+        }
+
+        private static bool IsValidEmailAddress(string value)
+        {
+            try
+            {
+                _ = new MailAddress(value.Trim());
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

@@ -5,7 +5,7 @@
     <Grid Margin="0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -37,14 +37,8 @@
                             Style="{StaticResource SecondaryButtonStyle}"
                             Width="82"
                             Content="Refresh"
-                            Padding="16,8"
+                            Padding="16,6"
                             Margin="0,0,8,0"/>
-
-                    <Button x:Name="NewProfileButton"
-                            Style="{StaticResource PrimaryButtonStyle}"
-                            Width="96"
-                            Content="New Profile"
-                            Padding="16,8"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -52,8 +46,8 @@
         <!-- Body -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="360"/>
-                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="380"/>
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
@@ -64,16 +58,31 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="4"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="4"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Profiles"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimary}"/>
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="Profiles"
+                                   VerticalAlignment="Center"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+
+                        <Button x:Name="NewProfileButton"
+                                Grid.Column="1"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Content="New Profile"
+                                Padding="14,8"
+                                MinWidth="112"/>
+                    </Grid>
 
                     <TextBox x:Name="ProfileSearchTextBox"
                              Grid.Row="2"
@@ -81,11 +90,13 @@
                              Height="34"
                              Padding="10,0"
                              VerticalContentAlignment="Center"
+                             Tag="Search Profiles"
                              Text=""
                              ToolTip="Search profiles"/>
 
                     <DataGrid x:Name="ProfilesDataGrid"
                               Grid.Row="4"
+                              Style="{StaticResource ThemedDataGridStyle}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
@@ -97,20 +108,13 @@
                               RowHeaderWidth="0"
                               BorderThickness="0"
                               Background="Transparent"
+                              FontSize="18"
                               GridLinesVisibility="Horizontal"
                               HeadersVisibility="Column">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Name"
                                                 Width="*"
                                                 Binding="{Binding Name}" />
-
-                            <DataGridTextColumn Header="OIDs"
-                                                Width="60"
-                                                Binding="{Binding OidCount}" />
-
-                            <DataGridCheckBoxColumn Header="Active"
-                                                    Width="70"
-                                                    Binding="{Binding IsActive}" />
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -120,11 +124,11 @@
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="8"/>                    
+                    <RowDefinition Height="4"/>                    
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="4"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="4"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
@@ -135,9 +139,9 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="10"/>                            
+                            <RowDefinition Height="4"/>                            
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="4"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
@@ -149,15 +153,8 @@
                         <Grid Grid.Row="2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="4"/>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="24"/>
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Column="0"
@@ -171,35 +168,23 @@
                                      Height="34"
                                      Padding="10,0"
                                      VerticalContentAlignment="Center"/>
-
-                            <CheckBox x:Name="ProfileIsActiveCheckBox"
-                                      Grid.Column="4"
-                                      Content="Active"
-                                      VerticalAlignment="Center"/>
-
-                            <TextBlock Grid.Column="6"
-                                       Text="Profile ID"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextSecondary}"/>
-
-                            <TextBlock x:Name="ProfileIdTextBlock"
-                                       Grid.Column="8"
-                                       VerticalAlignment="Center"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextPrimary}"
-                                       Text="(new)"/>
                         </Grid>
 
                         <Grid Grid.Row="4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="60"/>
                                 <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="60"/>
                                 <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="38"/>
+                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="4"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Column="0"
@@ -226,6 +211,23 @@
                                         Padding="2,0"
                                         TextAlignment="Center"
                                         VerticalContentAlignment="Center"/>
+
+                            <CheckBox x:Name="ProfileIsActiveCheckBox"
+                                      Grid.Column="8"
+                                      Content="Active"
+                                      VerticalAlignment="Center"/>
+
+                            <TextBlock Grid.Column="10"
+                                       Text="Profile ID"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+
+                            <TextBlock x:Name="ProfileIdTextBlock"
+                                       Grid.Column="12"
+                                       VerticalAlignment="Center"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       Text="(new)"/>
                         </Grid>
                     </Grid>
                 </Border>
@@ -237,17 +239,17 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="10"/>
+                            <RowDefinition Height="4"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="4"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="4"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="4"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="4"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="4"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
@@ -437,7 +439,9 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="4"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="10"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
@@ -450,31 +454,54 @@
                             <TextBlock Text="OID Configuration"
                                        FontSize="18"
                                        FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextPrimary}"/>
+                                       Foreground="{DynamicResource TextPrimary}"/>                            
+                        </Grid>
 
-                            <StackPanel Grid.Column="1"
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+
+                            <TextBox x:Name="OidSearchTextBox"
+                                     Grid.Column="0"
+                                     Style="{StaticResource ClearableSearchTextBox}"
+                                     Height="34"
+                                     Padding="10,0"
+                                     Tag="Search OID label, category, OID, type, decode mode, formula, or unit"
+                                     VerticalContentAlignment="Center"
+                                     ToolTip="Search OID label, category, OID, type, decode mode, formula, or unit"/>
+
+                            <StackPanel Grid.Column="2"
                                         Orientation="Horizontal">
                                 <Button x:Name="AddOidButton"
-                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Width="96"
                                         Content="Add OID"
                                         Padding="14,8"
-                                        Margin="0,0,8,0"/>
+                                        Margin="0,0,4,0"/>
 
                                 <Button x:Name="EditOidButton"
                                         Style="{StaticResource SecondaryButtonStyle}"
-                                        Content="Edit Selected"
-                                        Padding="14,8"
-                                        Margin="0,0,8,0"/>
+                                        Width="96"
+                                        Content="Edit OID"
+                                        Padding="14,6"
+                                        Margin="0,0,4,0"/>
 
                                 <Button x:Name="RemoveOidButton"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Content="Remove Selected"
-                                        Padding="14,8"/>
+                                        Style="{StaticResource DangerButtonStyle}"
+                                        Width="96"
+                                        FontWeight="Bold"
+                                        Content="Remove OID"
+                                        Padding="14,6"/>
                             </StackPanel>
                         </Grid>
 
                         <DataGrid x:Name="OidConfigDataGrid"
-                                  Grid.Row="2"
+                                  Grid.Row="4"
+                                  Style="{StaticResource ThemedDataGridStyle}"
                                   AutoGenerateColumns="False"
                                   CanUserAddRows="False"
                                   CanUserDeleteRows="False"
@@ -492,22 +519,37 @@
                                                     Width="88"
                                                     Binding="{Binding Category}" />
                                 <DataGridTextColumn Header="Label"
-                                                    Width="*"
+                                                    Width="2*"
                                                     Binding="{Binding Label}" />
                                 <DataGridTextColumn Header="OID"
-                                                    Width="188"
+                                                    Width="2*"
                                                     Binding="{Binding Oid}" />
                                 <DataGridTextColumn Header="Type"
                                                     Width="68"
                                                     Binding="{Binding ValueType}" />
-                                <DataGridTextColumn Header="Decode"
-                                                    Width="68"
-                                                    Binding="{Binding DecodeMode}" />
+                                <DataGridTemplateColumn Header="Decode"
+                                                        Width="120">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,4">
+                                                <TextBlock Text="{Binding DecodeMode}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextPrimary}"/>
+
+                                                <TextBlock Text="{Binding ReadFormula}"
+                                                           Margin="0,2,0,0"
+                                                           FontSize="12"
+                                                           Foreground="{DynamicResource TextSecondary}"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridCheckBoxColumn Header="Writable"
                                                         Width="80"
                                                         Binding="{Binding IsWritable}" />
                                 <DataGridCheckBoxColumn Header="Workspace"
-                                                        Width="90"
+                                                        Width="108"
                                                         Binding="{Binding ShowInWorkspace}" />
                                 <DataGridTextColumn Header="Sort"
                                                     Width="70"
@@ -535,25 +577,55 @@
                         <StackPanel Grid.Column="1"
                                     Orientation="Horizontal">
                             <Button x:Name="DeleteProfileButton"
+                                    Style="{StaticResource DangerButtonStyle}"
+                                    FontWeight="Bold"
                                     Content="Delete Profile"
                                     Padding="16,0"
-                                    Margin="0,0,8,0"
-                                    Foreground="White"
-                                    Background="#DC2626"
-                                    BorderBrush="#B91C1C"/>
+                                    Margin="0,0,4,0"/>
 
                             <Button x:Name="DeactivateProfileButton"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Width="104"
                                     Content="Deactivate"
                                     Padding="16,0"
-                                    Margin="0,0,8,0"/>
+                                    Margin="0,0,4,0"/>
 
                             <Button x:Name="SaveProfileButton"
                                     Style="{StaticResource PrimaryButtonStyle}"
                                     Width="104"
                                     Content="Save Profile"
                                     Padding="16,8"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Editor locked overlay -->
+                <Border x:Name="ProfileEditorOverlay"
+                        Grid.Row="0"
+                        Grid.RowSpan="7"
+                        Panel.ZIndex="50"
+                        Background="{DynamicResource CardBackground}"
+                        BorderBrush="{DynamicResource CardBorder}"
+                        BorderThickness="1"
+                        CornerRadius="14"
+                        Padding="28"
+                        Visibility="Visible">
+                    <Grid>
+                        <StackPanel HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    MaxWidth="540">
+                            <TextBlock Text="Select an SNMP profile"
+                                       HorizontalAlignment="Center"
+                                       FontSize="24"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                            <TextBlock Text="Choose a profile from the list on the left, or create a new profile to begin editing SNMP connection settings and OIDs."
+                                       Margin="0,10,0,0"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource TextSecondary}"/>
                         </StackPanel>
                     </Grid>
                 </Border>

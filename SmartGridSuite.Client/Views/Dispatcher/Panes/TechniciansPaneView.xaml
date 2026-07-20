@@ -217,7 +217,8 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextSecondary}"/>
 
-                        <Button Content="Refresh"
+                        <Button x:Name="RefreshBoardButton"
+                                Content="Refresh"
                                 Height="32"
                                 MinWidth="90"
                                 IsEnabled="{Binding CanEditBoard}"
@@ -277,7 +278,8 @@
             </Grid.ColumnDefinitions>
 
             <!-- Technician drawer -->
-            <Border Grid.Column="0"
+            <Border x:Name="TechnicianDrawerCard"
+                    Grid.Column="0"
                     Style="{StaticResource Card}"
                     Padding="10">
                 <Grid>
@@ -356,7 +358,8 @@
             </Border>
 
             <!-- Truck board -->
-            <Border Grid.Column="2"
+            <Border x:Name="TruckBoardCard"
+                    Grid.Column="2"
                     Style="{StaticResource Card}"
                     Padding="14">
                 <Grid>
@@ -558,5 +561,43 @@
                 </Grid>
             </Border>
         </Grid>
+        
+        <!-- Loading overlay -->
+        <Border x:Name="BusyOverlay"
+                Grid.Row="0"
+                Grid.RowSpan="3"
+                Panel.ZIndex="100"
+                Background="#66000000"
+                Visibility="Collapsed">
+
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Width="390"
+                    Padding="22"
+                    CornerRadius="16"
+                    Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource CardBorder}"
+                    BorderThickness="1">
+
+                <StackPanel>
+                    <TextBlock Text="Loading"
+                               HorizontalAlignment="Center"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <ProgressBar IsIndeterminate="True"
+                                 Height="6"
+                                 Margin="0,18,0,14"/>
+
+                    <TextBlock x:Name="BusyOverlayMessageTextBlock"
+                               Text="Loading truck board..."
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 </UserControl>

@@ -12,6 +12,7 @@ public partial class AdminTechnicianRow : ObservableObject
     private string _firstName = "";
     private string _lastName = "";
     private string _title = "";
+
     private bool _isActive;
     private int? _homeTruckId;
     private string? _homeTruckNumber;
@@ -55,6 +56,8 @@ public partial class AdminTechnicianRow : ObservableObject
         get => _title;
         set => SetProperty(ref _title, value ?? "");
     }
+
+    public string EmailAddress { get; set; } = "";
 
     public string FullName => $"{FirstName} {LastName}".Trim();
 

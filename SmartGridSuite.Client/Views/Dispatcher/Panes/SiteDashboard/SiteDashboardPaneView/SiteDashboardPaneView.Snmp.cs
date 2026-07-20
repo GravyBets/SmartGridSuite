@@ -76,9 +76,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
             }
 
+            // For Formula OIDs, the value coming from the UI is the displayed value.
+            // The API/SNMP service will use WriteFormula to convert it to the raw integer
+            // required by the radio before sending the SET.
+            var setStatusValueText = string.Equals(
+                selectedOid.DecodeMode,
+                "Formula",
+                StringComparison.OrdinalIgnoreCase)
+                    ? $"display value {setValue}"
+                    : setValue;
+
             try
             {
-                TopBarView.StatusText = $"Setting {selectedOid.Label}...";
+                TopBarView.StatusText = $"Setting {selectedOid.Label} to {setStatusValueText}...";
 
                 var setResult = await _api.PostAsync<SnmpSetSelectedRequestDto, SnmpSetResultDto>(
                     "api/snmp-profiles/set-selected",

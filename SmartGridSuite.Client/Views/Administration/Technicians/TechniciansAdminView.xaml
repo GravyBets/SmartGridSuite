@@ -5,9 +5,9 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -23,7 +23,7 @@
                                FontSize="16"
                                FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimary}"/>
-                    <TextBlock Text="Add / edit technicians and manage title, schedule, roles, and home truck."
+                    <TextBlock Text="Add / edit technicians and manage title, email, schedule, roles, and home truck."
                                Margin="0,2,0,0"
                                Foreground="{DynamicResource TextSecondary}"/>
                 </StackPanel>
@@ -33,19 +33,28 @@
                             VerticalAlignment="Center">
                     <Button Content="Refresh"
                             Padding="10,4"
-                            Margin="0,0,8,0"
+                            Margin="0,0,4,0"
                             Click="Refresh_Click"/>
 
-                    <Button Content="Edit Selected"
+                    <Button x:Name="EditSelectedButton"
+                            Content="Edit Selected"
                             Padding="10,4"
-                            Margin="0,0,8,0"
+                            Margin="0,0,4,0"
+                            Visibility="Collapsed"
                             Click="EditSelected_Click"/>
+
+                    <Button x:Name="DeleteSelectedButton"
+                            Content="Delete Selected"
+                            Style="{DynamicResource DangerButtonStyle}"
+                            Margin="0,0,4,0"
+                            Visibility="Collapsed"
+                            Click="DeleteSelected_Click"/>
 
                     <Button Content="Add Tech"
                             Style="{DynamicResource PrimaryButtonStyle}"
-                            Padding="10,4"                            
+                            Width="96"
+                            Padding="10,4"
                             Click="Add_Click"/>
-                    
                 </StackPanel>
             </Grid>
         </Border>
@@ -56,10 +65,11 @@
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
                       CanUserAddRows="False"
-                      HeadersVisibility="Column"                      
+                      HeadersVisibility="Column"
                       SelectionMode="Single"
                       SelectionUnit="FullRow"
-                      RowHeaderWidth="0">
+                      RowHeaderWidth="0"
+                      SelectionChanged="AdminTechGrid_SelectionChanged">
 
                 <DataGrid.RowStyle>
                     <Style TargetType="DataGridRow"
@@ -101,6 +111,10 @@
                     <DataGridTextColumn Header="Employee ID"
                                 Binding="{Binding EmployeeId}"
                                 Width="0.5*"/>
+
+                    <DataGridTextColumn Header="Email"
+                                        Binding="{Binding EmailAddress}"
+                                        Width="0.8*"/>
 
                     <DataGridTextColumn Header="Roles"
                                 Binding="{Binding RolesSummary}"

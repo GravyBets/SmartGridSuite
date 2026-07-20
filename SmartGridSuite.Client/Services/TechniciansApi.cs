@@ -27,5 +27,12 @@ namespace SmartGridSuite.Client.Services
         {
             return _api.PutAsync($"api/technicians/{id}", req, ct);
         }
+
+        public async Task DeleteTechnicianAsync(int id, CancellationToken ct = default)
+        {
+            await _api.DeleteAsync(
+                $"api/technicians/{id}",
+                ct);
+        }
     }
 }

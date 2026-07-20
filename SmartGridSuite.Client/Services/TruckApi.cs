@@ -25,5 +25,12 @@ namespace SmartGridSuite.Client.Services
         {
             return _api.PutAsync($"api/trucks/{truckId}", req, ct);
         }
+
+        public async Task DeleteTruckAsync(int truckId, CancellationToken ct = default)
+        {
+            await _api.DeleteAsync(
+                $"api/trucks/{truckId}",
+                ct);
+        }
     }
 }

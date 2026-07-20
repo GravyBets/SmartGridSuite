@@ -15,6 +15,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private void SubmitWriteUpButton_Click(object sender, RoutedEventArgs e)
         {
+            FlushWriteUpTextChangedDebounce();
+
+            if (!TryValidateEquipmentReplacementEntriesForSubmit())
+                return;
+
             if (!TryBuildSubmitWriteUpText(
                 out var finalWriteUpText,
                 out var siteHistoryWriteUpText))

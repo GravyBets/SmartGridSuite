@@ -1,14 +1,13 @@
 ﻿using SmartGridSuite.Client.Services;
 using SmartGridSuite.Client.Views.Dispatcher.Panes;
-using System.Windows;
-using System.Windows.Controls;
 using SmartGridSuite.Client.Views.FieldTechnician.Panes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace SmartGridSuite.Client.Views.FieldTechnician
 {
@@ -19,6 +18,9 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
 
         private bool _navCollapsed;
         private bool _syncingNav;
+
+        private const double NavExpandedWidth = 260;
+        private const double NavCollapsedWidth = 58;
 
         private FieldTechTasksPaneView? _tasksPaneView;
         private FieldTechHistoryPaneView? _historyPaneView;
@@ -36,11 +38,15 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
 
             Closed += FieldTechnicianShellWindow_Closed;
 
-            ApplyConnectivityState(ConnectivityService.CurrentState,
+            ApplyConnectivityState(
+                ConnectivityService.CurrentState,
                 ConnectivityService.CurrentMessage);
 
+            _navCollapsed = true;
+            ApplyNavState();
+
             // Default selection = Site Dashboard
-            SelectNavIndex(0);
+            SelectNavIndex(1);
         }
 
         private void SelectNavIndex(int index)
@@ -116,10 +122,18 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
         private void ToggleNav_Click(object sender, RoutedEventArgs e)
         {
             _navCollapsed = !_navCollapsed;
+            ApplyNavState();
+        }
 
+        private void ApplyNavState()
+        {
             NavCol.Width = _navCollapsed
-                ? new GridLength(88)
-                : new GridLength(280);
+                ? new GridLength(NavCollapsedWidth)
+                : new GridLength(NavExpandedWidth);
+
+            NavShellBorder.Padding = _navCollapsed
+                ? new Thickness(5)
+                : new Thickness(12);
 
             NavListExpanded.Visibility = _navCollapsed
                 ? Visibility.Collapsed
@@ -128,6 +142,17 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
             NavListCollapsed.Visibility = _navCollapsed
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+
+            NavHeaderTextPanel.Visibility = _navCollapsed
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+            Grid.SetColumn(NavHeaderBtn, _navCollapsed ? 0 : 1);
+            Grid.SetColumnSpan(NavHeaderBtn, _navCollapsed ? 2 : 1);
+
+            NavHeaderBtn.HorizontalAlignment = _navCollapsed
+                ? HorizontalAlignment.Center
+                : HorizontalAlignment.Right;
 
             NavSectionLabel.Visibility = _navCollapsed
                 ? Visibility.Collapsed
@@ -140,6 +165,15 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
             HomeButtonCollapsed.Visibility = _navCollapsed
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+
+            if (NavHeaderArrowPath.RenderTransform is RotateTransform rotate)
+            {
+                rotate.Angle = _navCollapsed ? 0 : 180;
+            }
+
+            NavHeaderBtn.ToolTip = _navCollapsed
+                ? "Expand navigation"
+                : "Collapse navigation";
         }
 
         private void HomeButton_Click(object sender, RoutedEventArgs e)
@@ -185,7 +219,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
             var dashboard = GetOrCreateSiteDashboardPane();
             MainPaneHost.Content = dashboard;
 
-            await dashboard.OpenSitesFromFieldTechAsync(cleanSites);
+            await dashboard.OpenSitesFromFieldTechTasksAsync(cleanSites);
         }
 
         private SiteDashboardPaneView GetOrCreateSiteDashboardPane()

@@ -2,6 +2,8 @@
 using SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard;
 using SmartGridSuite.Contracts.Settings;
 using System.Windows.Controls;
+using System.Windows;
+using System.Windows.Input;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
@@ -11,6 +13,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private readonly TicketsApi _ticketsApi;
         private CancellationTokenSource? _loadCts;
 
+        private int _siteLoadOverlayDepth;
 
         private bool _isPopOutInstance;
         private SiteDashboardPopOutWindow? _poppedOutWindow;
@@ -80,6 +83,59 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             EnsureInitialBlankTab();
             RenderSelectedSession();
+        }
+
+        private void ShowSiteLoadOverlay(string message)
+        {
+            _siteLoadOverlayDepth++;
+
+            if (SiteLoadOverlay is null ||
+                SiteLoadOverlayMessageTextBlock is null)
+            {
+                return;
+            }
+
+            SiteLoadOverlayMessageTextBlock.Text = string.IsNullOrWhiteSpace(message)
+                ? "Loading site data..."
+                : message;
+
+            SiteLoadOverlay.Visibility = Visibility.Visible;
+
+            TopBarView.IsEnabled = false;
+            NetworkView.IsEnabled = false;
+            WorkspaceView.IsEnabled = false;
+
+            Cursor = Cursors.Wait;
+        }
+
+        private void HideSiteLoadOverlay()
+        {
+            if (_siteLoadOverlayDepth > 0)
+                _siteLoadOverlayDepth--;
+
+            if (_siteLoadOverlayDepth > 0)
+                return;
+
+            if (SiteLoadOverlay is null)
+                return;
+
+            SiteLoadOverlay.Visibility = Visibility.Collapsed;
+
+            TopBarView.IsEnabled = true;
+            NetworkView.IsEnabled = true;
+            WorkspaceView.IsEnabled = true;
+
+            Cursor = null;
+        }
+
+        private void UpdateSiteLoadOverlayMessage(string message)
+        {
+            if (SiteLoadOverlayMessageTextBlock is null)
+                return;
+
+            SiteLoadOverlayMessageTextBlock.Text = string.IsNullOrWhiteSpace(message)
+                ? "Loading site data..."
+                : message;
         }
     }
 }

@@ -57,6 +57,9 @@ namespace SmartGridSuite.Client.Views.Administration
                 var techs = await _techniciansApi.GetTechniciansAsync(includeInactive: true);
 
                 Items.Clear();
+                AdminTechGrid.SelectedItem = null;
+                UpdateSelectionButtons();
+
                 foreach (var t in techs.OrderBy(x => x.LastName).ThenBy(x => x.FirstName))
                 {
                     Items.Add(new AdminTechnicianRow
@@ -66,6 +69,7 @@ namespace SmartGridSuite.Client.Views.Administration
                         FirstName = t.FirstName,
                         LastName = t.LastName,
                         Title = t.Title,
+                        EmailAddress = t.EmailAddress ?? "",
                         IsActive = t.IsActive,
                         HomeTruckId = t.HomeTruckId,
                         HomeTruckNumber = t.HomeTruckNumber,
@@ -124,7 +128,64 @@ namespace SmartGridSuite.Client.Views.Administration
             await OpenEditWindowAsync(row);
         }
 
-        
+        private async void DeleteSelected_Click(object sender, RoutedEventArgs e)
+        {
+            if (AdminTechGrid.SelectedItem is not AdminTechnicianRow row)
+            {
+                SetStatus("Select a technician first.");
+                return;
+            }
+
+            await DeleteTechnicianAsync(row);
+        }
+
+        private async Task DeleteTechnicianAsync(AdminTechnicianRow row)
+        {
+            if (_busy) return;
+
+            var name = string.IsNullOrWhiteSpace(row.FullName)
+                ? row.EmployeeId
+                : row.FullName;
+
+            var confirm = new DangerConfirmWindow(
+                "Delete technician?",
+                $"Are you sure you want to permanently delete {name}?\n\nThis cannot be undone. If this technician has related history, assignments, or roster records, the API may block the delete.",
+                "Delete")
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (confirm.ShowDialog() != true)
+            {
+                SetStatus("Delete canceled.");
+                return;
+            }
+
+            try
+            {
+                _busy = true;
+                SetStatus($"Deleting {name}...");
+
+                await _techniciansApi.DeleteTechnicianAsync(row.Id);
+
+                _busy = false;
+                await RefreshAsync();
+
+                SetStatus($"Deleted {name}.");
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                SetStatus("Error: " + (ex.Body ?? ex.Message));
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Error: " + ex.Message);
+            }
+            finally
+            {
+                _busy = false;
+            }
+        }
 
         private async Task OpenAddWindowAsync()
         {
@@ -157,7 +218,9 @@ namespace SmartGridSuite.Client.Views.Administration
                 var req = window.BuildCreateRequest();
                 await _techniciansApi.CreateTechnicianAsync(req);
 
+                _busy = false;
                 await RefreshAsync();
+
                 SetStatus("Technician created.");
             }
             catch (ApiClient.ApiException ex)
@@ -205,7 +268,9 @@ namespace SmartGridSuite.Client.Views.Administration
                 var req = window.BuildUpdateRequest();
                 await _techniciansApi.UpdateTechnicianAsync(row.Id, req);
 
+                _busy = false;
                 await RefreshAsync();
+
                 SetStatus("Technician updated.");
             }
             catch (ApiClient.ApiException ex)
@@ -229,6 +294,24 @@ namespace SmartGridSuite.Client.Views.Administration
                 .Where(t => t.IsActive)
                 .OrderBy(t => t.TruckNumber)
                 .ToList();
+        }
+
+        private void AdminTechGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateSelectionButtons();
+        }
+
+        private void UpdateSelectionButtons()
+        {
+            var hasSelection = AdminTechGrid.SelectedItem is AdminTechnicianRow;
+
+            EditSelectedButton.Visibility = hasSelection
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            DeleteSelectedButton.Visibility = hasSelection
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
     }
 }

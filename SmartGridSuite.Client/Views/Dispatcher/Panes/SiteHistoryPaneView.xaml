@@ -117,7 +117,7 @@
     <Grid Margin="0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -140,12 +140,13 @@
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1.15*"/>
-                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="1.35*"/>
             </Grid.ColumnDefinitions>
 
             <!-- LEFT: Search + history grid -->
-            <Border Grid.Column="0"
+            <Border x:Name="HistoryListCard"
+                    Grid.Column="0"
                     Style="{StaticResource Card}"
                     Padding="12">
                 <Grid>
@@ -174,7 +175,8 @@
                                  Style="{StaticResource ModernWatermarkTextBox}"
                                  KeyDown="SiteSearchTextBox_KeyDown"/>
 
-                        <Button Grid.Column="2"
+                        <Button x:Name="SearchSiteHistoryButton"
+                                Grid.Column="2"
                                 Content="Search"
                                 Width="90"
                                 Height="34"
@@ -271,7 +273,8 @@
                           HorizontalAlignment="Stretch"/>
 
             <!-- RIGHT: Selected history details -->
-            <Border Grid.Column="2"
+            <Border x:Name="HistoryDetailsCard"
+                    Grid.Column="2"
                     Style="{StaticResource Card}"
                     Padding="12">
                 <Grid>
@@ -314,7 +317,7 @@
                                     Content="Edit"
                                     Width="90"
                                     Height="32"
-                                    Margin="0,0,8,0"
+                                    Margin="0,0,4,0"
                                     Style="{StaticResource PrimaryButtonStyle}"
                                     Click="Edit_Click"
                                     IsEnabled="False"/>
@@ -422,7 +425,7 @@
                                 Content="Cancel"
                                 Width="90"
                                 Height="32"
-                                Margin="0,0,8,0"
+                                Margin="0,0,4,0"
                                 Style="{StaticResource SecondaryButtonStyle}"
                                 Click="Cancel_Click"
                                 IsEnabled="False"/>
@@ -438,5 +441,43 @@
                 </Grid>
             </Border>
         </Grid>
+
+        <!-- Loading overlay -->
+        <Border x:Name="BusyOverlay"
+                Grid.Row="0"
+                Grid.RowSpan="3"
+                Panel.ZIndex="100"
+                Background="#66000000"
+                Visibility="Collapsed">
+
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Width="390"
+                    Padding="22"
+                    CornerRadius="16"
+                    Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource CardBorder}"
+                    BorderThickness="1">
+
+                <StackPanel>
+                    <TextBlock Text="Loading"
+                               HorizontalAlignment="Center"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <ProgressBar IsIndeterminate="True"
+                                 Height="6"
+                                 Margin="0,18,0,14"/>
+
+                    <TextBlock x:Name="BusyOverlayMessageTextBlock"
+                               Text="Loading site history..."
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 </UserControl>

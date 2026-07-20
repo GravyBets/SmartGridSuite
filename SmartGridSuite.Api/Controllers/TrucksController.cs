@@ -149,6 +149,30 @@ public sealed class TrucksController : ControllerBase
         return NoContent();
     }
 
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete([FromRoute] int id)
+    {
+        var entity = await _db.Set<TruckEntity>()
+            .FirstOrDefaultAsync(t => t.Id == (uint)id);
+
+        if (entity == null)
+            return NotFound();
+
+        _db.Set<TruckEntity>().Remove(entity);
+
+        try
+        {
+            await _db.SaveChangesAsync();
+            return NoContent();
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(
+                "This truck cannot be deleted because related records exist. " +
+                "Take the truck out of service instead.");
+        }
+    }
+
     [HttpGet("board")]
     public async Task<ActionResult<TruckBoardDto>> GetBoard([FromQuery] string? date = null)
     {
@@ -366,7 +390,7 @@ public sealed class TrucksController : ControllerBase
     }
 
     [HttpPut("board/commit")]
-    public async Task<IActionResult> CommitBoard([FromBody] CommitTruckBoardRequest req)
+    public async Task<IActionResult> CommitBoard([FromBody] CommitTruckBoardRequest req, CancellationToken ct)
     {
         var workDate = (req.WorkDate == default ? DateTime.Today : req.WorkDate).Date;
 
@@ -532,7 +556,12 @@ public sealed class TrucksController : ControllerBase
             await _truckBoardInitialization.MarkExplicitSaveAsync(workDate);
 
             await _db.SaveChangesAsync();
-            await tx.CommitAsync();
+
+            await ReconcilePublishedCrewTicketAssignedTechAsync(
+                workDate,
+                ct);
+
+            await tx.CommitAsync(ct);
 
             return NoContent();
         }
@@ -1157,6 +1186,195 @@ public sealed class TrucksController : ControllerBase
             return 100;
 
         return 0;
+    }
+
+    private async Task ReconcilePublishedCrewTicketAssignedTechAsync(DateTime rosterDate, CancellationToken ct)
+    {
+        var assignmentDate = new DateTime(2000, 1, 1);
+
+        /*
+         * When truck membership changes, published crew-route tickets need their
+         * AssignedTech display recalculated. Otherwise a removed non-lead technician
+         * can keep seeing old crew tickets under Field Tech > Other Assigned Tickets.
+         */
+
+        var statusRows = await _db.TicketStatuses
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Select(x => new
+            {
+                x.Name,
+                x.IsClosed,
+                x.IsFieldComplete
+            })
+            .ToListAsync(ct);
+
+        var protectedStatusNames = statusRows
+            .Where(x => x.IsClosed || x.IsFieldComplete)
+            .Select(x => x.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var allPublishedRows = await _db.Set<DailyTicketAssignmentPublishedEntity>()
+            .AsNoTracking()
+            .Where(x =>
+                x.AssignmentDate == assignmentDate &&
+                x.TargetType == "Technician" &&
+                x.TechnicianId.HasValue)
+            .ToListAsync(ct);
+
+        var currentCrewPublishedRows = allPublishedRows
+            .GroupBy(x => x.TechnicianId!.Value)
+            .SelectMany(g =>
+            {
+                var latestVersion = g.Max(x => x.PublishedVersion);
+
+                return g.Where(x =>
+                    x.PublishedVersion == latestVersion &&
+                    x.TruckId.HasValue);
+            })
+            .ToList();
+
+        if (currentCrewPublishedRows.Count == 0)
+            return;
+
+        var truckIds = currentCrewPublishedRows
+            .Select(x => x.TruckId!.Value)
+            .Distinct()
+            .ToList();
+
+        var ownerTechnicianIds = currentCrewPublishedRows
+            .Select(x => x.TechnicianId!.Value)
+            .Distinct()
+            .ToList();
+
+        var ticketIds = currentCrewPublishedRows
+            .Select(x => x.TicketId)
+            .Distinct()
+            .ToList();
+
+        var rosterRows = await (
+            from roster in _db.Set<TruckRosterEntity>().AsNoTracking()
+            join tech in ActiveFieldTechniciansQuery()
+                on roster.TechnicianId equals tech.Id
+            where roster.WorkDate == rosterDate.Date &&
+                  truckIds.Contains(roster.TruckId)
+            select new
+            {
+                roster.TruckId,
+                tech.Id,
+                tech.EmployeeId,
+                tech.FirstName,
+                tech.LastName
+            })
+            .ToListAsync(ct);
+
+        var assignedTextByTruckId = rosterRows
+            .GroupBy(x => x.TruckId)
+            .ToDictionary(
+                g => g.Key,
+                g => FormatCrewDisplayText(
+                    g.Select(x => FormatTechnicianName(
+                            x.FirstName,
+                            x.LastName,
+                            x.EmployeeId))
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(x => x)
+                        .ToList()));
+
+        var ownerTechsById = await ActiveFieldTechniciansQuery()
+            .Where(x => ownerTechnicianIds.Contains(x.Id))
+            .ToDictionaryAsync(
+                x => x.Id,
+                x => FormatTechnicianName(
+                    x.FirstName,
+                    x.LastName,
+                    x.EmployeeId),
+                ct);
+
+        var ticketsById = await _db.Set<TicketEntity>()
+            .Where(x => ticketIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, ct);
+
+        var changed = false;
+
+        foreach (var row in currentCrewPublishedRows)
+        {
+            if (!ticketsById.TryGetValue(row.TicketId, out var ticket))
+                continue;
+
+            if (protectedStatusNames.Contains(ticket.Status ?? string.Empty))
+                continue;
+
+            var newAssignedTech = "";
+
+            if (row.TruckId.HasValue &&
+                assignedTextByTruckId.TryGetValue(row.TruckId.Value, out var crewText) &&
+                !string.IsNullOrWhiteSpace(crewText))
+            {
+                newAssignedTech = crewText;
+            }
+            else if (row.TechnicianId.HasValue &&
+                     ownerTechsById.TryGetValue(row.TechnicianId.Value, out var ownerName))
+            {
+                newAssignedTech = ownerName;
+            }
+
+            if (string.IsNullOrWhiteSpace(newAssignedTech))
+                continue;
+
+            if (string.Equals(
+                    ticket.AssignedTech ?? "",
+                    newAssignedTech,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            ticket.AssignedTech = newAssignedTech;
+
+            /*
+             * Do not touch LastActivityAt here. This is roster-display cleanup,
+             * not a ticket activity event.
+             */
+            changed = true;
+        }
+
+        if (changed)
+            await _db.SaveChangesAsync(ct);
+    }
+
+    private static string FormatTechnicianName(string? firstName, string? lastName, string? fallbackEmployeeId)
+    {
+        var fullName =
+            $"{firstName ?? string.Empty} {lastName ?? string.Empty}".Trim();
+
+        if (!string.IsNullOrWhiteSpace(fullName))
+            return fullName;
+
+        return (fallbackEmployeeId ?? "Unknown").Trim();
+    }
+
+    private static string FormatCrewDisplayText(IReadOnlyList<string> names)
+    {
+        var cleanNames = names
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (cleanNames.Count == 0)
+            return "";
+
+        if (cleanNames.Count == 1)
+            return cleanNames[0];
+
+        if (cleanNames.Count == 2)
+            return $"{cleanNames[0]} & {cleanNames[1]}";
+
+        return string.Join(", ", cleanNames.Take(cleanNames.Count - 1)) +
+               " & " +
+               cleanNames.Last();
     }
 
     private static bool GetDefaultWorkingStatus(TechnicianEntity t, DayOfWeek day)

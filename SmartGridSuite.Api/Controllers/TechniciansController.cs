@@ -5,6 +5,7 @@ using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Contracts.Administration.Technicians;
 using SmartGridSuite.Contracts.Crews;
+using System.Net.Mail;
 
 namespace SmartGridSuite.Api.Controllers;
 
@@ -63,6 +64,8 @@ public sealed class TechniciansController : ControllerBase
                 Name = fullName,
                 Title = t.Title,
 
+                EmailAddress = t.EmailAddress,
+
                 IsActive = t.IsActive,
 
                 HomeTruckId = t.HomeTruckId == null ? null : (int?)t.HomeTruckId.Value,
@@ -97,6 +100,7 @@ public sealed class TechniciansController : ControllerBase
         var firstName = (req.FirstName ?? "").Trim();
         var lastName = (req.LastName ?? "").Trim();
         var title = NormalizeTitle(req.Title);
+        var emailAddress = NormalizeEmailAddress(req.EmailAddress);
         var roleCodes = NormalizeRoleCodes(req.RoleCodes);
 
         if (employeeId.Length == 0)
@@ -110,6 +114,11 @@ public sealed class TechniciansController : ControllerBase
 
         if (title == null)
             return BadRequest("Title must be one of: Apprentice, Journeyman, Head Journeyman, Supervisor.");
+
+        if (!string.IsNullOrWhiteSpace(emailAddress) && !IsValidEmailAddress(emailAddress))
+        {
+            return BadRequest("Email address is invalid.");
+        }
 
         if (roleCodes.Count == 0)
             return BadRequest("At least one role is required.");
@@ -146,6 +155,7 @@ public sealed class TechniciansController : ControllerBase
             FirstName = firstName,
             LastName = lastName,
             Title = title,
+            EmailAddress = emailAddress,
             IsActive = req.IsActive,
 
             HomeTruckId = homeTruckId,
@@ -190,6 +200,7 @@ public sealed class TechniciansController : ControllerBase
         var firstName = (req.FirstName ?? "").Trim();
         var lastName = (req.LastName ?? "").Trim();
         var title = NormalizeTitle(req.Title);
+        var emailAddress = NormalizeEmailAddress(req.EmailAddress);
         var roleCodes = NormalizeRoleCodes(req.RoleCodes);
 
         if (employeeId.Length == 0)
@@ -203,6 +214,11 @@ public sealed class TechniciansController : ControllerBase
 
         if (title == null)
             return BadRequest("Title must be one of: Apprentice, Journeyman, Head Journeyman, Supervisor.");
+
+        if (!string.IsNullOrWhiteSpace(emailAddress) && !IsValidEmailAddress(emailAddress))
+        {
+            return BadRequest("Email address is invalid.");
+        }
 
         if (roleCodes.Count == 0)
             return BadRequest("At least one role is required.");
@@ -237,6 +253,7 @@ public sealed class TechniciansController : ControllerBase
         entity.FirstName = firstName;
         entity.LastName = lastName;
         entity.Title = title;
+        entity.EmailAddress = emailAddress;
         entity.IsActive = req.IsActive;
 
         entity.HomeTruckId = homeTruckId;
@@ -268,6 +285,42 @@ public sealed class TechniciansController : ControllerBase
         return NoContent();
     }
 
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete([FromRoute] int id)
+    {
+        var entity = await _db.Technicians
+            .FirstOrDefaultAsync(t => t.Id == (uint)id);
+
+        if (entity == null)
+            return NotFound();
+
+        var existingRoles = await _db.TechnicianRoles
+            .Where(x => x.TechnicianId == entity.Id)
+            .ToListAsync();
+
+        _db.TechnicianRoles.RemoveRange(existingRoles);
+
+        var workdayOverrides = await _db.TechnicianWorkdayOverrides
+            .Where(x => x.TechnicianId == entity.Id)
+            .ToListAsync();
+
+        _db.TechnicianWorkdayOverrides.RemoveRange(workdayOverrides);
+
+        _db.Technicians.Remove(entity);
+
+        try
+        {
+            await _db.SaveChangesAsync();
+            return NoContent();
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(
+                "This technician cannot be deleted because related records exist. " +
+                "Set Active Employee to No instead.");
+        }
+    }
+
     private static DateTime ParseDateOrToday(string? date)
         => (!string.IsNullOrWhiteSpace(date) && DateTime.TryParse(date, out var parsed))
             ? parsed.Date
@@ -289,6 +342,29 @@ public sealed class TechniciansController : ControllerBase
             "SUPERVISOR" => "Supervisor",
             _ => null
         };
+
+    private static string? NormalizeEmailAddress(string? value)
+    {
+        var text = (value ?? string.Empty).Trim();
+
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+
+        return text;
+    }
+
+    private static bool IsValidEmailAddress(string value)
+    {
+        try
+        {
+            _ = new MailAddress(value.Trim());
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     private static bool GetDefaultWorkingStatus(TechnicianEntity t, DayOfWeek day)
         => day switch
@@ -343,6 +419,7 @@ public sealed class TechniciansController : ControllerBase
             LastName = tech.LastName,
             Name = fullName,
             Title = tech.Title,
+            EmailAddress = tech.EmailAddress,
 
             IsActive = tech.IsActive,
 

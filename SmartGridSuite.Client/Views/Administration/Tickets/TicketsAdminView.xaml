@@ -8,66 +8,45 @@
              d:DesignWidth="1100"
              Loaded="UserControl_Loaded">
 
-    <UserControl.Resources>
-        <Style x:Key="DangerButtonStyle"
-           TargetType="Button"
-               BasedOn="{StaticResource SecondaryButtonStyle}">
-            <Setter Property="Background" Value="#DC2626"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#B91C1C"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="12,0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="10">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"/>
-                        </Border>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#B91C1C"/>
-                            </Trigger>
-
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#991B1B"/>
-                            </Trigger>
-
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.55"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </UserControl.Resources>
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="10"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-
         
         <!-- Header -->
-        <StackPanel Grid.Row="0">
-            <TextBlock Text="Tickets"
-                       FontSize="20"
-                       FontWeight="Bold"
-                       Foreground="{DynamicResource TextPrimary}"/>
+        <Border Grid.Row="0"
+                Style="{StaticResource Card}"
+                Padding="14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <TextBlock Text="Manage ticket statuses, filters, summaries, Tasks visibility, and automated workflow transitions."
-                       Margin="0,4,0,0"
-                       Foreground="{DynamicResource TextSecondary}"/>
-        </StackPanel>
+                <StackPanel>
+                    <TextBlock Text="Administration — Tickets"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <TextBlock Text="Manage ticket statuses, filters, summaries, Tasks visibility, and workflow transitions."
+                               Margin="0,2,0,0"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button Content="Refresh"
+                            Padding="10,4"
+                            Margin="0,0,8,0"
+                            Click="Refresh_Click"/>
+
+                </StackPanel>
+            </Grid>
+        </Border>
 
         <!-- Statuses only -->
         <Border Grid.Row="2"
@@ -101,11 +80,29 @@
                             HorizontalAlignment="Left">
 
                     <Button Content="Add Status"
-                            Width="102"
+                            Width="112"
                             Height="32"
                             Margin="0,0,8,0"
                             Style="{StaticResource PrimaryButtonStyle}"
                             Click="AddStatus_Click"/>
+
+                    <Button x:Name="MoveStatusUpButton"
+                            Content="Move Up"
+                            Width="102"
+                            Height="32"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Visibility="Collapsed"
+                            Click="MoveStatusUp_Click"/>
+
+                    <Button x:Name="MoveStatusDownButton"
+                            Content="Move Down"
+                            Width="112"
+                            Height="32"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Visibility="Collapsed"
+                            Click="MoveStatusDown_Click"/>
 
                     <Button x:Name="EditStatusButton"
                             Content="Edit"
@@ -113,76 +110,240 @@
                             Height="32"
                             Margin="0,0,8,0"
                             Style="{StaticResource SecondaryButtonStyle}"
-                            Click="EditStatus_Click"
-                            IsEnabled="False"/>
+                            Visibility="Collapsed"
+                            Click="EditStatus_Click"/>
 
                     <Button x:Name="DeactivateStatusButton"
                             Content="Deactivate"
-                            Width="102"
+                            Width="112"
                             Height="32"
                             Margin="0,0,8,0"
                             Style="{StaticResource SecondaryButtonStyle}"
-                            Click="DeactivateStatus_Click"
-                            IsEnabled="False"/>
+                            Visibility="Collapsed"
+                            Click="DeactivateStatus_Click"/>
 
                     <Button x:Name="DeleteStatusButton"
                             Content="Delete"
                             Width="102"
                             Height="32"
                             Style="{StaticResource DangerButtonStyle}"
-                            Click="DeleteStatus_Click"
-                            IsEnabled="False"/>
+                            FontWeight="Bold"
+                            Visibility="Collapsed"
+                            Click="DeleteStatus_Click"/>
                 </StackPanel>
 
                 <DataGrid Grid.Row="6"
                           x:Name="StatusesGrid"
                           Style="{StaticResource ThemedDataGridStyle}"
                           AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          RowHeaderWidth="0"
                           IsReadOnly="True"
                           HeadersVisibility="Column"
                           SelectionMode="Single"
                           SelectionChanged="StatusesGrid_SelectionChanged">
 
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Name"
-                                            Width="*"
-                                            Binding="{Binding Name}"/>
+                        <DataGridTextColumn Header="#"
+                        Width="70"
+                        Binding="{Binding SortOrder}"/>
 
-                        <DataGridCheckBoxColumn Header="Active"
-                                                Width="80"
-                                                Binding="{Binding IsActive}"/>
+                        <DataGridTemplateColumn Header="Status"
+                            Width="2.2*"
+                            SortMemberPath="Name">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,5">
+                                        <TextBlock Text="{Binding Name}"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"/>
 
-                        <DataGridCheckBoxColumn Header="Closed"
-                                                Width="80"
-                                                Binding="{Binding IsClosed}"/>
+                                        <TextBlock Margin="0,2,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondary}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="Inactive"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                            <Setter Property="Text" Value="Active"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
-                        <DataGridCheckBoxColumn Header="Field Complete"
-                                                Width="Auto"
-                                                Binding="{Binding IsFieldComplete}"/>
+                        <DataGridTemplateColumn Header="Lifecycle"
+                            Width="1.6*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <WrapPanel Margin="0,4"
+                           VerticalAlignment="Center">
 
-                        <DataGridCheckBoxColumn Header="Filter"
-                                                Width="80"
-                                                Binding="{Binding ShowInFilter}"/>
+                                        <Border Margin="0,0,6,4"
+                            Padding="8,3"
+                            CornerRadius="8"
+                            Background="{DynamicResource TileFillHover}"
+                            BorderBrush="{DynamicResource CardBorder}"
+                            BorderThickness="1">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsClosed}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="Closed"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+                                        </Border>
 
-                        <DataGridCheckBoxColumn Header="Summary"
-                                                Width="Auto"
-                                                Binding="{Binding IncludeInSummary}"/>
+                                        <Border Margin="0,0,6,4"
+                            Padding="8,3"
+                            CornerRadius="8"
+                            Background="{DynamicResource TileFillHover}"
+                            BorderBrush="{DynamicResource CardBorder}"
+                            BorderThickness="1">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsFieldComplete}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Text="Field Complete"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+                                        </Border>
+                                    </WrapPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
-                        <DataGridCheckBoxColumn Header="Tasks Pane"
-                                                Width="Auto"
-                                                Binding="{Binding SendToDispatchTasks}"/>
+                        <DataGridTemplateColumn Header="Shows In"
+                            Width="2.1*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <WrapPanel Margin="0,4"
+                           VerticalAlignment="Center">
 
-                        <DataGridCheckBoxColumn Header="Write-Up Target"
-                                                Width="130"
-                                                Binding="{Binding IsWriteUpSubmitTarget}"/>
+                                        <TextBlock Text="Filter"
+                               Margin="0,0,10,4"
+                               Foreground="{DynamicResource TextSecondary}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ShowInFilter}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
 
-                        <DataGridCheckBoxColumn Header="Assignment Target"
-                                                Width="Auto"
-                                                Binding="{Binding IsAssignmentPublishTarget}"/>
+                                        <TextBlock Text="Summary"
+                               Margin="0,0,10,4"
+                               Foreground="{DynamicResource TextSecondary}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IncludeInSummary}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
 
-                        <DataGridCheckBoxColumn Header="Unassignment Target"
-                                                Width="*"
-                                                Binding="{Binding IsUnassignmentTarget}"/>
+                                        <TextBlock Text="Tasks Pane"
+                               Margin="0,0,10,4"
+                               Foreground="{DynamicResource TextSecondary}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SendToDispatchTasks}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </WrapPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTemplateColumn Header="Workflow Targets"
+                            Width="2.6*">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <WrapPanel Margin="0,4"
+                           VerticalAlignment="Center">
+
+                                        <TextBlock Text="Write-Up Submit"
+                               Margin="0,0,10,4"
+                               Foreground="{DynamicResource TextSecondary}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsWriteUpSubmitTarget}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+
+                                        <TextBlock Text="Assignment Publish"
+                               Margin="0,0,10,4"
+                               Foreground="{DynamicResource TextSecondary}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsAssignmentPublishTarget}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+
+                                        <TextBlock Text="Unassignment"
+                               Margin="0,0,10,4"
+                               Foreground="{DynamicResource TextSecondary}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsUnassignmentTarget}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </WrapPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>

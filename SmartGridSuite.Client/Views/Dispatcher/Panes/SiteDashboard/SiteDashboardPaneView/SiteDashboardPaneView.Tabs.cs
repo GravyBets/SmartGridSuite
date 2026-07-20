@@ -342,5 +342,176 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             window.Topmost = false;
             window.Focus();
         }
+
+        private bool CanUseCurrentSessionForOpenAllLoad()
+        {
+            var session = GetSelectedSession();
+
+            if (session is null)
+                return false;
+
+            var header = (session.HeaderText ?? string.Empty).Trim();
+            var search = (session.SearchText ?? string.Empty).Trim();
+
+            var headerLooksBlank =
+                string.IsNullOrWhiteSpace(header) ||
+                header.StartsWith("Blank", StringComparison.OrdinalIgnoreCase);
+
+            var searchLooksBlank =
+                string.IsNullOrWhiteSpace(search) ||
+                search.StartsWith("Blank", StringComparison.OrdinalIgnoreCase);
+
+            return headerLooksBlank && searchLooksBlank;
+        }
+
+        private SiteDashboardTabSession? FindExistingSessionForSearchText(string searchText)
+        {
+            var candidates = BuildSiteDashboardSearchCandidates(searchText)
+                .ToList();
+
+            if (candidates.Count == 0)
+                return null;
+
+            return _sessions.FirstOrDefault(x =>
+                !string.IsNullOrWhiteSpace(x.HeaderText) &&
+                !x.HeaderText.StartsWith("Blank", StringComparison.OrdinalIgnoreCase) &&
+                candidates.Any(candidate =>
+                    string.Equals(x.HeaderText, candidate, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(x.SearchText, candidate, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        private async Task RunQuickTestsForOpenAllSessionsAsync(IReadOnlyList<string> sessionKeys, string? returnToSessionKey)
+        {
+            var uniqueSessionKeys = sessionKeys
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            for (var index = 0; index < uniqueSessionKeys.Count; index++)
+            {
+                var session = _sessions.FirstOrDefault(x =>
+                    string.Equals(x.SessionKey, uniqueSessionKeys[index], StringComparison.Ordinal));
+
+                if (session is null)
+                    continue;
+
+                if (!ShouldRunNetworkAutoQuickTest(session))
+                    continue;
+
+                UpdateSiteLoadOverlayMessage(
+                    $"Running quick network test {index + 1} of {uniqueSessionKeys.Count}: {session.HeaderText}...");
+
+                _selectedSessionKey = session.SessionKey;
+                RenderSelectedSession();
+
+                await Dispatcher.InvokeAsync(
+                    () => { },
+                    System.Windows.Threading.DispatcherPriority.Loaded);
+
+                await NetworkView.RunQuickReachabilityTestForAllAsync();
+
+                session.NetworkPingState =
+                    NetworkView.GetPingSessionState();
+            }
+
+            if (!string.IsNullOrWhiteSpace(returnToSessionKey))
+            {
+                _selectedSessionKey = returnToSessionKey;
+                RenderSelectedSession();
+            }
+        }
+
+        public async Task OpenSitesFromFieldTechTasksAsync(IReadOnlyList<string> sites)
+        {
+            var cleanSites = (sites ?? Array.Empty<string>())
+                .Select(x => (x ?? string.Empty).Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (cleanSites.Count == 0)
+            {
+                TopBarView.StatusText = "No Daily Assignment sites were provided.";
+                return;
+            }
+
+            ShowSiteLoadOverlay($"Opening {cleanSites.Count} Daily Assignment site tab(s)...");
+
+            var openedSessionKeys = new List<string>();
+            string? firstOpenedSessionKey = null;
+
+            try
+            {
+                SaveCurrentTabUiState();
+
+                for (var index = 0; index < cleanSites.Count; index++)
+                {
+                    var site = cleanSites[index];
+
+                    UpdateSiteLoadOverlayMessage(
+                        $"Opening site {index + 1} of {cleanSites.Count}: {site}...");
+
+                    var existingSession =
+                        FindExistingSessionForSearchText(site);
+
+                    if (existingSession is null &&
+                        !CanUseCurrentSessionForOpenAllLoad())
+                    {
+                        CreateBlankTab(selectNewTab: true);
+                        RenderSelectedSession();
+
+                        await Dispatcher.InvokeAsync(
+                            () => { },
+                            System.Windows.Threading.DispatcherPriority.Loaded);
+                    }
+
+                    await LoadAsync(
+                        site,
+                        runAutoQuickTest: false,
+                        useSiteLoadOverlay: false);
+
+                    var loadedSession = GetSelectedSession();
+
+                    if (loadedSession is null)
+                        continue;
+
+                    openedSessionKeys.Add(loadedSession.SessionKey);
+
+                    firstOpenedSessionKey ??=
+                        loadedSession.SessionKey;
+                }
+
+                if (!string.IsNullOrWhiteSpace(firstOpenedSessionKey))
+                {
+                    _selectedSessionKey = firstOpenedSessionKey;
+                    RenderSelectedSession();
+                }
+
+                UpdateSiteLoadOverlayMessage("All tabs opened. Starting quick network tests...");
+
+                await RunQuickTestsForOpenAllSessionsAsync(
+                    openedSessionKeys,
+                    firstOpenedSessionKey);
+
+                TopBarView.StatusText =
+                    $"Opened {openedSessionKeys.Distinct(StringComparer.OrdinalIgnoreCase).Count()} Daily Assignment site tab(s).";
+            }
+            catch (Exception ex)
+            {
+                TopBarView.StatusText =
+                    $"Open All failed: {ex.Message}";
+
+                MessageBox.Show(
+                    Window.GetWindow(this),
+                    ex.Message,
+                    "Open All Site Dashboards",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                HideSiteLoadOverlay();
+            }
+        }
     }
 }

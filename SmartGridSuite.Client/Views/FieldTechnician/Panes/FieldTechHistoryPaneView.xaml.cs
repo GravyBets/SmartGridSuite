@@ -158,7 +158,9 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
             try
             {
                 _busyLoading = true;
+
                 StatusMessage = "Loading completed write-up history...";
+                ShowBusyOverlay(StatusMessage);
 
                 var technician = await CurrentUserService
                     .LoadCurrentTechnicianAsync(forceRefresh: true);
@@ -246,6 +248,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
             finally
             {
                 _busyLoading = false;
+                HideBusyOverlay();
             }
         }
 
@@ -665,6 +668,43 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
 
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        private void ShowBusyOverlay(string message)
+        {
+            if (BusyOverlay is null ||
+                BusyOverlayMessageTextBlock is null)
+            {
+                return;
+            }
+
+            BusyOverlayMessageTextBlock.Text = string.IsNullOrWhiteSpace(message)
+                ? "Loading..."
+                : message;
+
+            BusyOverlay.Visibility = Visibility.Visible;
+
+            RefreshHistoryButton.IsEnabled = false;
+            ApplyHistoryFiltersButton.IsEnabled = false;
+            SearchBox.IsEnabled = false;
+            DateRangeFilter.IsEnabled = false;
+            FromDatePicker.IsEnabled = false;
+            ToDatePicker.IsEnabled = false;
+        }
+
+        private void HideBusyOverlay()
+        {
+            if (BusyOverlay is null)
+                return;
+
+            BusyOverlay.Visibility = Visibility.Collapsed;
+
+            RefreshHistoryButton.IsEnabled = true;
+            ApplyHistoryFiltersButton.IsEnabled = true;
+            SearchBox.IsEnabled = true;
+            DateRangeFilter.IsEnabled = true;
+            FromDatePicker.IsEnabled = true;
+            ToDatePicker.IsEnabled = true;
+        }
 
         private sealed class HistoryDateRangeOption
         {

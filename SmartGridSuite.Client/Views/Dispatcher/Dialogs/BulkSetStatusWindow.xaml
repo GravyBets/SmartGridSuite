@@ -5,14 +5,16 @@
         Width="460"
         Height="230"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
+        Background="{StaticResource AppBackground}">
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -38,6 +40,7 @@
         <ComboBox Grid.Row="4"
                   x:Name="StatusComboBox"                 
                   Height="34"
+                  Width="408"
                   IsTextSearchEnabled="True"/>
 
         <StackPanel Grid.Row="6"
@@ -46,7 +49,7 @@
             <Button Content="Cancel"
                     Width="90"
                     Height="32"
-                    Margin="0,0,8,0"
+                    Margin="0,0,4,0"
                     IsCancel="True"/>
 
             <Button Content="Apply"

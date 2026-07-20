@@ -5,7 +5,9 @@
         Width="460"
         Height="250"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
+        Background="{StaticResource AppBackground}">
 
     <Grid Margin="12">
         <Grid.RowDefinitions>
@@ -55,7 +57,7 @@
             <Button Content="Cancel"
                     Width="90"
                     Height="32"
-                    Margin="0,0,8,0"
+                    Margin="0,0,4,0"
                     IsCancel="True"/>
 
             <Button Content="Apply"

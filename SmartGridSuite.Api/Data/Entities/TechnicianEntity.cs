@@ -13,6 +13,8 @@ namespace SmartGridSuite.Api.Data.Entities
         public string LastName { get; set; } = "";
         public string Title { get; set; } = "";
 
+        public string? EmailAddress { get; set; }
+
         public bool IsActive { get; set; }
 
         public uint? HomeTruckId { get; set; }

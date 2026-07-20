@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <UserControl.Resources>
-
         <Style x:Key="FilterLabelText" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -101,7 +100,6 @@
             <Setter Property="CornerRadius" Value="12"/>
             <Setter Property="Padding" Value="12"/>
         </Style>
-        
     </UserControl.Resources>
 
     <Grid Margin="0,8,0,0">
@@ -137,17 +135,21 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Top">
 
-                <Button Content="Refresh"
-                        Margin="0,0,8,0"
+                <Button x:Name="RefreshTicketsButton"
+                        Content="Refresh"
+                        Width="96"
+                        Margin="0,0,4,0"
                         Click="Refresh_Click"/>
 
-                <Button Content="Import SAP Queue"
-                        Margin="0,0,8,0"
+                <Button x:Name="ImportSapQueueButton"
+                        Content="Import SAP Queue"
+                        Margin="0,0,4,0"
                         Click="ImportSapQueue_Click"/>
 
-                <Button Content="New Ticket"
+                <Button x:Name="NewTicketButton"
+                        Content="New Ticket"
                         Style="{StaticResource PrimaryButtonStyle}"
-                        Width="86"
+                        Width="96"
                         Click="NewTicket_Click"/>
             </StackPanel>
         </Grid>
@@ -162,10 +164,9 @@
 
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="12"/>
-
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="150"/>
-                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="170"/>
 
                 <ColumnDefinition x:Name="CustomFromSpacerCol" Width="0"/>
@@ -173,11 +174,11 @@
                 <ColumnDefinition x:Name="CustomToSpacerCol" Width="0"/>
                 <ColumnDefinition x:Name="CustomToCol" Width="0"/>
 
-                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="220"/>
-                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="160"/>
-                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
@@ -200,7 +201,7 @@
 
             <TextBlock Grid.Row="0"
                        Grid.Column="10"
-                       Text="Status"
+                       Text="Status Filter"
                        Style="{StaticResource FilterLabelText}"/>
 
             <TextBlock Grid.Row="0"
@@ -263,19 +264,36 @@
                         Height="36"
                         Padding="12,0"
                         HorizontalContentAlignment="Stretch"
-                        Click="StatusFilterButton_Click">
-                    <DockPanel LastChildFill="True">
-                        <TextBlock Text="{Binding SelectedStatusesSummary}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Click="StatusFilterButton_Click"
+                        ToolTip="Choose which ticket statuses are shown">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="Filter Statuses"
+                                   FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextPrimary}"
                                    VerticalAlignment="Center"/>
 
-                        <TextBlock DockPanel.Dock="Right"
-                                   Margin="10,0,0,0"
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding SelectedStatusesSummary}"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"/>
+
+                        <TextBlock Grid.Column="3"
                                    Text="▾"
+                                   Margin="10,0,0,0"
                                    FontSize="14"
                                    Foreground="{DynamicResource TextSecondary}"
                                    VerticalAlignment="Center"/>
-                    </DockPanel>
+                    </Grid>
                 </Button>
 
                 <Popup x:Name="StatusPopup"
@@ -290,39 +308,75 @@
                             BorderThickness="1"
                             CornerRadius="12"
                             Padding="12"
-                            Width="260">
+                            Width="300">
                         <StackPanel>
-                            <ItemsControl ItemsSource="{Binding StatusOptions}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <CheckBox Content="{Binding Name}"
-                                                  IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                                  Style="{StaticResource StatusCheckBoxStyle}"
-                                                  Checked="StatusOption_Changed"
-                                                  Unchecked="StatusOption_Changed"/>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+
+                            <TextBlock Text="Filter Tickets by Status"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                            <TextBlock Text="Check the statuses you want visible in the Tickets list."
+                                       Margin="0,3,0,10"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+
+                            <Border Padding="10"
+                                    CornerRadius="10"
+                                    BorderBrush="{DynamicResource SurfaceBorder}"
+                                    BorderThickness="1"
+                                    Background="{DynamicResource SurfaceBg}">
+                                <ItemsControl ItemsSource="{Binding StatusOptions}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Content="{Binding Name}"
+                                                      IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                      Style="{StaticResource StatusCheckBoxStyle}"
+                                                      Checked="StatusOption_Changed"
+                                                      Unchecked="StatusOption_Changed"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
 
                             <Border Height="1"
-                                    Margin="0,4,0,10"
+                                    Margin="0,12,0,10"
                                     Background="{DynamicResource CardBorder}"/>
 
-                            <StackPanel Orientation="Horizontal"
-                                        HorizontalAlignment="Right">
-                                <Button Content="All Active"
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding SelectedStatusesSummary}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center"/>
+
+                                <Button Grid.Column="1"
+                                        Content="Active Only"
                                         Height="30"
-                                        MinWidth="80"
+                                        MinWidth="92"
                                         Padding="10,0"
-                                        Margin="0,0,8,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        ToolTip="Show all active/non-closed ticket statuses"
                                         Click="SelectAllOpenStatuses_Click"/>
 
-                                <Button Content="All"
+                                <Button Grid.Column="3"
+                                        Content="Include Closed"
                                         Height="30"
-                                        MinWidth="64"
+                                        MinWidth="104"
                                         Padding="10,0"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        ToolTip="Show every ticket status, including Closed"
                                         Click="SelectAllStatuses_Click"/>
-                            </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </Popup>
@@ -337,7 +391,8 @@
                       HorizontalAlignment="Stretch"
                       SelectionChanged="Filters_SelectionChanged"/>
 
-            <Button Grid.Row="2"
+            <Button x:Name="ClearTicketsFiltersButton"
+                    Grid.Row="2"
                     Grid.Column="14"
                     Content="Clear Filters"
                     Height="36"
@@ -410,16 +465,27 @@
                                     Content="Assign Selected"
                                     Height="30"
                                     Padding="12,0"
-                                    Margin="0,0,8,0"
+                                    Margin="0,0,4,0"
                                     IsEnabled="False"
                                     Click="AssignSelected_Click"/>
+
+                            <Button x:Name="CopySelectedWorkOrdersButton"
+                                    Content="Copy WOs"
+                                    Height="30"
+                                    Width="92"
+                                    Padding="12,0"
+                                    Margin="0,0,4,0"
+                                    IsEnabled="False"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    ToolTip="Copy selected Work Orders as a vertical list for Excel"
+                                    Click="CopySelectedWorkOrders_Click"/>
 
                             <Button x:Name="BulkSetProblemButton"
                                     Content="Set Problem"
                                     Height="30"
                                     Width="108"
                                     Padding="12,0"
-                                    Margin="0,0,8,0"
+                                    Margin="0,0,4,0"
                                     IsEnabled="False"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Click="BulkSetProblem_Click"/>
@@ -429,7 +495,7 @@
                                     Height="30"
                                     Width="116"
                                     Padding="12,0"
-                                    Margin="0,0,8,0"
+                                    Margin="0,0,4,0"
                                     IsEnabled="False"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Click="BulkSetWorkOrderType_Click"/>
@@ -439,7 +505,7 @@
                                     Height="30"
                                     Width="104"
                                     Padding="12,0"
-                                    Margin="0,0,8,0"
+                                    Margin="0,0,4,0"
                                     IsEnabled="False"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Click="BulkSetStatus_Click"/>
@@ -448,7 +514,7 @@
                                     Content="Edit Ticket"
                                     Height="30"
                                     Padding="12,0"
-                                    Margin="0,0,8,0"
+                                    Margin="0,0,4,0"
                                     IsEnabled="False"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Click="EditSelectedTicket_Click"/>
@@ -690,26 +756,28 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0"
-               Text="{Binding TicketPageSummary}"
-               Foreground="{DynamicResource TextSecondary}"
-               FontSize="12"
-               VerticalAlignment="Center"/>
+                                   Text="{Binding TicketPageSummary}"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"/>
 
                         <StackPanel Grid.Column="1"
-                Orientation="Horizontal">
+                                    Orientation="Horizontal">
 
-                            <Button Content="Previous"
-                Height="30"
-                MinWidth="90"
-                Margin="0,0,8,0"
-                IsEnabled="{Binding CanGoToPreviousTicketPage}"
-                Click="PreviousTicketPage_Click"/>
+                            <Button x:Name="PreviousTicketPageButton"
+                                    Content="Previous"
+                                    Height="30"
+                                    MinWidth="90"
+                                    Margin="0,0,4,0"
+                                    IsEnabled="{Binding CanGoToPreviousTicketPage}"
+                                    Click="PreviousTicketPage_Click"/>
 
-                            <Button Content="Next"
-                Height="30"
-                MinWidth="90"
-                IsEnabled="{Binding CanGoToNextTicketPage}"
-                Click="NextTicketPage_Click"/>
+                            <Button x:Name="NextTicketPageButton"
+                                    Content="Next"
+                                    Height="30"
+                                    MinWidth="90"
+                                    IsEnabled="{Binding CanGoToNextTicketPage}"
+                                    Click="NextTicketPage_Click"/>
                         </StackPanel>
                     </Grid>
                 </Grid>
@@ -1197,10 +1265,10 @@
                                         Orientation="Horizontal"
                                         HorizontalAlignment="Right">
                                 <Button x:Name="EditTicketButton"
-                                        Content="Edit Ticket"
+                                        Content="Edit"
                                         Height="32"
-                                        MinWidth="120"
-                                        Margin="0,0,8,0"
+                                        MinWidth="80"
+                                        Margin="2,0,4,0"
                                         Click="EditTicket_Click"/>
 
                                 <Button x:Name="SaveTicketButton"
@@ -1215,6 +1283,44 @@
                     </Grid>
                 </Border>
             </Grid>
+        </Border>
+
+        <!-- Loading overlay -->
+        <Border x:Name="BusyOverlay"
+                Grid.Row="0"
+                Grid.RowSpan="6"
+                Panel.ZIndex="100"
+                Background="#66000000"
+                Visibility="Collapsed">
+
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Width="380"
+                    Padding="22"
+                    CornerRadius="16"
+                    Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource CardBorder}"
+                    BorderThickness="1">
+
+                <StackPanel>
+                    <TextBlock Text="Loading"
+                               HorizontalAlignment="Center"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <ProgressBar IsIndeterminate="True"
+                                 Height="6"
+                                 Margin="0,18,0,14"/>
+
+                    <TextBlock x:Name="BusyOverlayMessageTextBlock"
+                               Text="Loading tickets..."
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+            </Border>
         </Border>
     </Grid>
 </UserControl>

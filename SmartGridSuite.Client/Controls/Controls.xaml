@@ -366,6 +366,59 @@
         </Setter>
     </Style>
 
+    <!-- Red button -->
+    <Style x:Key="DangerButtonStyle" TargetType="{x:Type Button}">
+        <Setter Property="MinWidth" Value="104"/>
+        <Setter Property="Height" Value="34"/>
+        <Setter Property="Padding" Value="16,0"/>
+        <Setter Property="Background" Value="#DC2626"/>
+        <Setter Property="BorderBrush" Value="#B91C1C"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="BorderThickness" Value="1.5"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="Bd"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="10"
+                        SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      RecognizesAccessKey="True"/>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#B91C1C"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="#991B1B"/>
+                        </Trigger>
+
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#991B1B"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="#7F1D1D"/>
+                        </Trigger>
+
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="#7F1D1D"/>
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- =========================================================
      SHARED PANE / CARD / LIST STYLES
      ========================================================= -->
@@ -1850,145 +1903,7 @@
         </Setter>
     </Style>
 
-    <!-- Little badge used in nav items -->
-    <Style x:Key="NavBadgeStyle" TargetType="Border">
-        <Setter Property="Width" Value="34"/>
-        <Setter Property="Height" Value="34"/>
-        <Setter Property="CornerRadius" Value="11"/>
-        <Setter Property="Background" Value="{DynamicResource TileFill}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
-        <Setter Property="BorderThickness" Value="1.5"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-    </Style>
-
-    <!-- Small section label -->
-    <Style x:Key="NavRailSectionTextStyle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="11"/>
-        <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-        <Setter Property="Opacity" Value="0.88"/>
-        <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
-    </Style>
-
-    <!-- Expanded nav item -->
-    <Style x:Key="NavRailItemStyle" TargetType="ListBoxItem">
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-        <Setter Property="Padding" Value="0"/>
-        <Setter Property="Margin" Value="0,3"/>
-        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ListBoxItem">
-                    <Border x:Name="Outer"
-                        Background="Transparent"
-                        CornerRadius="14"
-                        Padding="0">
-                        <Grid>
-                            <Border x:Name="Accent"
-                                Width="4"
-                                HorizontalAlignment="Left"
-                                Margin="0,8,0,8"
-                                CornerRadius="99"
-                                Background="Transparent"/>
-
-                            <Border x:Name="Bd"
-                                Margin="8,0,0,0"
-                                Padding="10,9"
-                                Background="Transparent"
-                                BorderBrush="Transparent"
-                                BorderThickness="1.5"
-                                CornerRadius="14"
-                                SnapsToDevicePixels="True">
-                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
-                            </Border>
-                        </Grid>
-                    </Border>
-
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillHover}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderHover}"/>
-                        </Trigger>
-
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillPressed}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
-                            <Setter TargetName="Accent" Property="Background" Value="{DynamicResource InputBorderFocus}"/>
-                        </Trigger>
-
-                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
-                        </Trigger>
-
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.55"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- Collapsed nav item -->
-    <Style x:Key="NavRailCollapsedItemStyle" TargetType="ListBoxItem">
-        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-        <Setter Property="Padding" Value="0"/>
-        <Setter Property="Margin" Value="0,4"/>
-        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ListBoxItem">
-                    <Border x:Name="Bd"
-                        Padding="10"
-                        Background="Transparent"
-                        BorderBrush="Transparent"
-                        BorderThickness="1.5"
-                        CornerRadius="14"
-                        SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                    </Border>
-
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillHover}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderHover}"/>
-                        </Trigger>
-
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillPressed}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputBorderFocus}"/>
-                        </Trigger>
-
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.55"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- Expanded home button -->
-    <Style x:Key="NavRailFooterButtonStyle"
-       TargetType="Button"
-       BasedOn="{StaticResource SecondaryButtonStyle}">
-        <Setter Property="Height" Value="56"/>
-        <Setter Property="Padding" Value="10,0"/>
-        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-    </Style>
-
-    <!-- Collapsed home button -->
-    <Style x:Key="NavRailCollapsedFooterButtonStyle"
-       TargetType="Button"
-       BasedOn="{StaticResource SecondaryButtonStyle}">
-        <Setter Property="Width" Value="56"/>
-        <Setter Property="MinWidth" Value="56"/>
-        <Setter Property="Height" Value="56"/>
-        <Setter Property="Padding" Value="0"/>
-    </Style>
+    
 
 
     <!-- Modern DatePicker -->
@@ -2111,32 +2026,371 @@
             </Setter.Value>
         </Setter>
     </Style>
+    
+    
+    <!-- =========================================================
+     SHARED SHELL LEFT NAVIGATION
+     Theme-safe: uses existing Light / Bright Blue resource keys
+     ========================================================= -->
 
-    <!-- Nav rail list -->
+    <!-- Nav shell card -->
+    <Style x:Key="ShellNavCardStyle"
+       TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="18"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Effect" Value="{DynamicResource CardShadow}"/>
+    </Style>
+
+    <!-- Header text -->
+    <Style x:Key="NavRailHeaderTitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+
+    <Style x:Key="NavRailHeaderSubtitleTextStyle" TargetType="TextBlock">
+        <Setter Property="Margin" Value="0,3,0,0"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+
+    <!-- Nav item text -->
+    <Style x:Key="NavRailItemTitleTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+
+    <Style x:Key="NavRailItemSubtitleTextStyle" TargetType="TextBlock">
+        <Setter Property="Margin" Value="0,2,0,0"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+
+    <!-- Icon text -->
+    <Style x:Key="NavRailGlyphTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="NavRailLetterTextStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Floating nav icon holder: no box, no border -->
+    <Style x:Key="NavBadgeStyle" TargetType="Border">
+        <Setter Property="Width" Value="24"/>
+        <Setter Property="Height" Value="24"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
+    <!-- Small section label -->
+    <Style x:Key="NavRailSectionTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="Opacity" Value="0.86"/>
+        <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+    </Style>
+
+    <!-- Nav list host -->
     <Style x:Key="NavRailListStyle" TargetType="ListBox">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
         <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
     </Style>
 
-    <!-- Toggle button in nav header -->
-    <Style x:Key="NavRailToggleButtonStyle"
-           TargetType="Button"
-           BasedOn="{StaticResource SecondaryButtonStyle}">
-        <Setter Property="Width" Value="42"/>
-        <Setter Property="MinWidth" Value="42"/>
-        <Setter Property="Height" Value="42"/>
+    <!-- Expanded nav item -->
+    <Style x:Key="NavRailItemStyle" TargetType="ListBoxItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         <Setter Property="Padding" Value="0"/>
-        <Setter Property="FontSize" Value="16"/>
-        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Margin" Value="0,4"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Bd"
+                        Padding="8,7"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="1.5"
+                        CornerRadius="12"
+                        SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="Center"/>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd"
+                                Property="Background"
+                                Value="{DynamicResource TileFillHover}"/>
+                            <Setter TargetName="Bd"
+                                Property="BorderBrush"
+                                Value="{DynamicResource BorderHover}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd"
+                                Property="Background"
+                                Value="{DynamicResource TileFillPressed}"/>
+                            <Setter TargetName="Bd"
+                                Property="BorderBrush"
+                                Value="{DynamicResource InputBorderFocus}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="Bd"
+                                Property="BorderBrush"
+                                Value="{DynamicResource InputBorderFocus}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
-    
+    <!-- Collapsed nav item with subtle splitter line between icons -->
+    <Style x:Key="NavRailCollapsedItemStyle" TargetType="ListBoxItem">
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,2"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Grid Width="40"
+                      Height="44"
+                      SnapsToDevicePixels="True">
 
-    
-    
+                        <Border x:Name="Bd"
+                            Width="40"
+                            Height="40"
+                            VerticalAlignment="Top"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="1.5"
+                            CornerRadius="11"
+                            SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- test divider between collapsed icons -->
+                        <Border x:Name="IconDivider"
+                            Height="1"
+                            VerticalAlignment="Bottom"
+                            Margin="10,0"
+                            Background="{DynamicResource CardBorder}"
+                            Opacity="0.55"/>
+                    </Grid>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd"
+                                Property="Background"
+                                Value="{DynamicResource TileFillHover}"/>
+                            <Setter TargetName="Bd"
+                                Property="BorderBrush"
+                                Value="{DynamicResource BorderHover}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd"
+                                Property="Background"
+                                Value="{DynamicResource TileFillPressed}"/>
+                            <Setter TargetName="Bd"
+                                Property="BorderBrush"
+                                Value="{DynamicResource InputBorderFocus}"/>
+                            <Setter TargetName="IconDivider"
+                                Property="Opacity"
+                                Value="0.25"/>
+                        </Trigger>
+
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter TargetName="Bd"
+                                Property="BorderBrush"
+                                Value="{DynamicResource InputBorderFocus}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Header collapse/expand button: compact centered arrow -->
+    <Style x:Key="NavRailToggleButtonStyle" TargetType="Button">
+        <Setter Property="Width" Value="40"/>
+        <Setter Property="MinWidth" Value="40"/>
+        <Setter Property="Height" Value="40"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="1.5"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                        Width="{TemplateBinding Width}"
+                        Height="{TemplateBinding Height}"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="12">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd"
+                                Property="Background"
+                                Value="{DynamicResource TileFillHover}"/>
+                            <Setter TargetName="Bd"
+                                Property="BorderBrush"
+                                Value="{DynamicResource BorderHover}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd"
+                                Property="Background"
+                                Value="{DynamicResource TileFillPressed}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Expanded home/footer button: behaves like a nav row, not a normal button -->
+    <Style x:Key="NavRailFooterButtonStyle" TargetType="Button">
+        <Setter Property="Height" Value="56"/>
+        <Setter Property="Padding" Value="8,7"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="1.5"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="12"
+                        Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="Center"/>
+                    </Border>
+
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillHover}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderHover}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TileFillPressed}"/>
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Collapsed home/footer button: icon-only nav row -->
+    <Style x:Key="NavRailCollapsedFooterButtonStyle"
+       TargetType="{x:Type Button}"
+       BasedOn="{StaticResource NavRailToggleButtonStyle}">
+        <Setter Property="Width" Value="40"/>
+        <Setter Property="MinWidth" Value="40"/>
+        <Setter Property="Height" Value="40"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="NavRailPathIconStyle" TargetType="{x:Type Path}">
+        <Setter Property="Width" Value="18"/>
+        <Setter Property="Height" Value="18"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="Fill" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
+    <!-- Bucket Truck Icon Style -->
+    <Style x:Key="NavRailStrokeIconStyle" TargetType="{x:Type Path}">
+        <Setter Property="Stroke" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="StrokeThickness" Value="1.8"/>
+        <Setter Property="StrokeStartLineCap" Value="Round"/>
+        <Setter Property="StrokeEndLineCap" Value="Round"/>
+        <Setter Property="StrokeLineJoin" Value="Round"/>
+        <Setter Property="Fill" Value="Transparent"/>
+        <Setter Property="Stretch" Value="Uniform"/>
+        <Setter Property="Width" Value="20"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
+    <Style x:Key="NavRailCanvasStrokeIconStyle" TargetType="{x:Type Path}">
+        <Setter Property="Stroke" Value="{DynamicResource TextSecondary}"/>
+        <Setter Property="StrokeThickness" Value="3"/>
+        <Setter Property="StrokeStartLineCap" Value="Round"/>
+        <Setter Property="StrokeEndLineCap" Value="Round"/>
+        <Setter Property="StrokeLineJoin" Value="Round"/>
+        <Setter Property="Fill" Value="Transparent"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+    </Style>
+
     <!--Mini Copy Button-->
     <Style x:Key="MiniIconButton" TargetType="Button">
         <Setter Property="Width" Value="28"/>

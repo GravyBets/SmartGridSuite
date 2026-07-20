@@ -5,14 +5,16 @@
         Width="480"
         Height="260"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
+        Background="{StaticResource AppBackground}">
 
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -43,7 +45,7 @@
             <Button Content="Cancel"
                     Width="90"
                     Height="32"
-                    Margin="0,0,8,0"
+                    Margin="0,0,4,0"
                     IsCancel="True"/>
 
             <Button Content="Apply"

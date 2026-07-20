@@ -1,0 +1,158 @@
+﻿<Window x:Class="SmartGridSuite.Client.Views.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="About"
+        Width="620"
+        Height="390"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
+        Background="{DynamicResource AppBackground}">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Padding="16"
+                CornerRadius="16"
+                BorderThickness="1"
+                BorderBrush="{DynamicResource CardBorder}"
+                Background="{DynamicResource CardBackground}">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Smart Grid Suite icon -->
+                    <Image Grid.Column="0"
+                           Source="/Assets/Branding/SmartGridSuite_Logo.png"
+                           Width="54"
+                           Height="54"
+                           Stretch="Uniform"
+                           VerticalAlignment="Center"
+                           Margin="0,0,0,16"/>
+
+                    <!-- Application name and version -->
+                    <StackPanel Grid.Column="2"
+                                VerticalAlignment="Center">
+
+                        <TextBlock Text="Smart Grid Suite"
+                                   FontSize="27"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+
+                        <TextBlock x:Name="VersionTextBlock"
+                                   Margin="0,4,0,0"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                    </StackPanel>
+
+                    <!-- Company logo -->
+                    <Image Grid.Column="4"
+                           Source="/Assets/Branding/CenterPoint Logo Color Transparent bkgrnd.png"
+                           Width="180"
+                           Height="88"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Right"
+                           Stretch="Uniform"/>
+                    
+                </Grid>
+
+                <!-- Developer -->
+                <StackPanel Grid.Row="2"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+
+                    <TextBlock Text="Developed by"
+                               Margin="0,0,8,0"
+                               VerticalAlignment="Center"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondary}"/>
+
+                    <TextBlock Text="CenterPoint Energy"
+                               VerticalAlignment="Center"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <TextBlock Text="  Radio Shop"
+                               VerticalAlignment="Center"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+
+                <!-- Description -->
+                <TextBlock Grid.Row="4"
+                           MaxWidth="545"
+                           Text="Smart Grid Suite centralizes dispatcher, field technician, site diagnostics, history, and administration workflows for Smart Grid radio operations."
+                           TextWrapping="Wrap"
+                           LineHeight="20"
+                           FontSize="13"
+                           Foreground="{DynamicResource TextSecondary}"/>
+
+                <!-- Bottom content -->
+                <Grid Grid.Row="6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="18"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Text="Authorized use only. Do not duplicate or distribute outside the CenterPoint Energy Radio Shop."
+                               TextWrapping="Wrap"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <TextBlock Grid.Row="2"
+                               HorizontalAlignment="Left"
+                               FontSize="13">
+
+                        <Hyperlink Foreground="{DynamicResource PrimaryBg}"
+                                   TextDecorations="None"
+                                   Click="ChangeLogLink_Click">
+                            View Change Log
+                        </Hyperlink>
+                    </TextBlock>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Button Grid.Row="2"
+                Width="96"
+                Height="34"
+                HorizontalAlignment="Right"
+                Content="Close"
+                IsCancel="True"
+                Style="{StaticResource PrimaryButtonStyle}"
+                Click="Close_Click"/>
+    </Grid>
+</Window>

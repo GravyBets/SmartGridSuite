@@ -3,15 +3,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sd="clr-namespace:SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard">
 
-    <Grid Margin="0,0,0,0">
+    <Grid x:Name="SiteDashboardRootGrid"
+          Margin="0,0,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="NetworkColumn" Width="340"/>
-            <ColumnDefinition x:Name="NetworkGapColumn" Width="8"/>
+            <ColumnDefinition x:Name="NetworkGapColumn" Width="4"/>
             <ColumnDefinition x:Name="WorkspaceColumn" Width="*"/>
         </Grid.ColumnDefinitions>
 
@@ -27,7 +28,81 @@
         <sd:SiteDashboardWorkspaceView x:Name="WorkspaceView"
                                        Grid.Row="2"
                                        Grid.Column="2" />
-        
+
+        <Border x:Name="EmptyDashboardPlaceholder"
+                Grid.Row="2"
+                Grid.Column="0"
+                Grid.ColumnSpan="3"
+                Style="{StaticResource Card}"
+                Visibility="Collapsed"
+                Panel.ZIndex="20">
+            <Grid MinHeight="360">
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Width="420">
+                    <TextBlock Text="Site Dashboard"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               HorizontalAlignment="Center" />
+
+                    <TextBlock Text="Search for a site to load tickets, notes, equipment, history, and SNMP tools."
+                               Margin="0,10,0,0"
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextSecondary}" />
+
+                    <TextBlock Text="Use the search box above to begin."
+                               Margin="0,16,0,0"
+                               TextAlignment="Center"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextSecondary}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Site load overlay -->
+        <Border x:Name="SiteLoadOverlay"
+                Grid.Row="0"
+                Grid.RowSpan="3"
+                Grid.Column="0"
+                Grid.ColumnSpan="3"
+                Panel.ZIndex="800"
+                Background="#66000000"
+                Visibility="Collapsed"
+                IsHitTestVisible="True">
+
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Width="430"
+                    Padding="22"
+                    CornerRadius="16"
+                    Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource CardBorder}"
+                    BorderThickness="1">
+
+                <StackPanel>
+                    <TextBlock Text="Loading Site Dashboard"
+                               HorizontalAlignment="Center"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <ProgressBar IsIndeterminate="True"
+                                 Height="6"
+                                 Margin="0,18,0,14"/>
+
+                    <TextBlock x:Name="SiteLoadOverlayMessageTextBlock"
+                               Text="Loading site data..."
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+            </Border>
+        </Border>
+
         <Border x:Name="PoppedOutOverlay"
                 Grid.Row="0"
                 Grid.RowSpan="3"

@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Security.Principal;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 {
@@ -36,7 +37,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public SiteDashboardWorkspaceView()
         {
             InitializeComponent();
-            WriteUpTextBox.TextChanged += WriteUpTextBox_TextChanged;
+
+            _writeUpTextChangedDebounceTimer.Tick += WriteUpTextChangedDebounceTimer_Tick;
 
             SiteNotesItemsControl.ItemsSource = _siteNotes;
             RxAssociatedSitesItemsControl.ItemsSource = _rxAssociatedSiteResults;
@@ -58,6 +60,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public event EventHandler? OpenTopTunnelRequested;
 
         private readonly List<TowerSectorPingCard> _towerPingCards = new();
+
+        private CancellationTokenSource? _towerTestAllCts;
 
         private readonly ObservableCollection<SiteNoteDto> _siteNotes = new();
         private readonly SiteNotesApi _siteNotesApi = new(new ApiClient("https://localhost:7140/"));
@@ -161,7 +165,25 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public string WriteUpText
         {
             get => WriteUpTextBox.Text;
-            set => WriteUpTextBox.Text = value ?? string.Empty;
+            set
+            {
+                var newValue = value ?? string.Empty;
+
+                if (string.Equals(WriteUpTextBox.Text, newValue, StringComparison.Ordinal))
+                    return;
+
+                _suppressWriteUpTextChanged = true;
+
+                try
+                {
+                    WriteUpTextBox.Text = newValue;
+                    _pendingWriteUpText = newValue;
+                }
+                finally
+                {
+                    _suppressWriteUpTextChanged = false;
+                }
+            }
         }
 
         public string EquipmentText
@@ -197,6 +219,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             get => _portalUrl;
             set => _portalUrl = value ?? string.Empty;
         }
+
+        private readonly DispatcherTimer _writeUpTextChangedDebounceTimer = new()
+        {
+            Interval = TimeSpan.FromMilliseconds(300)
+        };
+
+        private string _pendingWriteUpText = string.Empty;
+        private bool _suppressWriteUpTextChanged;
 
         public void Reset()
         {

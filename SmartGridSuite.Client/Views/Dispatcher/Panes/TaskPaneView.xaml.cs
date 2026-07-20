@@ -39,6 +39,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private string _lastAppliedTaskSearch = "";
         private string _lastAppliedTaskStatus = "All";
 
+        private int _busyOverlayDepth;
+
         public bool HasSelectedTask => SelectedTask != null;
 
         private bool _detailsOpen;
@@ -132,10 +134,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 if (SelectedTaskTicket == null || IsSelectedTaskTicketClosed)
                     return false;
 
-                return !string.Equals(
-                    SelectedTaskTicket.DispatchNotes ?? "",
-                    _selectedTaskOriginalDispatchNotes,
-                    StringComparison.Ordinal);
+                var dispatchNotesChanged =
+                    !string.Equals(
+                        SelectedTaskTicket.DispatchNotes ?? "",
+                        _selectedTaskOriginalDispatchNotes,
+                        StringComparison.Ordinal);
+
+                var techWriteUpsChanged =
+                    !string.Equals(
+                        SelectedTaskTicket.Notes ?? "",
+                        _selectedTaskOriginalTechNotes,
+                        StringComparison.Ordinal);
+
+                return dispatchNotesChanged || techWriteUpsChanged;
             }
         }
 
@@ -145,9 +156,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return true;
 
             var result = MessageBox.Show(
-                "You have unsaved Dispatch Notes.\n\n" +
-                "Discard those changes and continue?",
-                "Unsaved Dispatch Notes",
+                "You have unsaved note changes.\n\n" +
+                "Discard changes to Dispatch Notes / Tech Write-Ups and continue?",
+                "Unsaved Notes",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
 
@@ -157,6 +168,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (SelectedTaskTicket != null)
             {
                 SelectedTaskTicket.DispatchNotes = _selectedTaskOriginalDispatchNotes;
+                SelectedTaskTicket.Notes = _selectedTaskOriginalTechNotes;
+
+                if (TaskDispatchNotesTextBox != null)
+                    TaskDispatchNotesTextBox.Text = _selectedTaskOriginalDispatchNotes;
+
+                if (TaskTechWriteUpsTextBox != null)
+                    TaskTechWriteUpsTextBox.Text = _selectedTaskOriginalTechNotes;
+
                 UpdateTaskSaveButtonState();
             }
 
@@ -231,11 +250,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             _hasLoadedOnce = true;
 
-            await LoadFilterOptionsAsync();
+            ShowBusyOverlay("Loading dispatch task filters and task list...");
 
-            _filtersInitialized = true;
+            try
+            {
+                await LoadFilterOptionsAsync();
 
-            await LoadTasksAsync();
+                _filtersInitialized = true;
+
+                await LoadTasksAsync();
+            }
+            finally
+            {
+                HideBusyOverlay();
+            }
         }
 
         private async Task LoadFilterOptionsAsync(CancellationToken ct = default)
@@ -327,6 +355,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _taskQueryCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var queryCt = _taskQueryCts.Token;
 
+            ShowBusyOverlay("Loading dispatch tasks...");
+
             var selectedTicketId = SelectedTask?.TicketId;
 
             try
@@ -366,6 +396,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     "Task Load Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+            }
+            finally
+            {
+                HideBusyOverlay();
             }
         }
 
@@ -515,8 +549,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
                 return;
 
-            await LoadFilterOptionsAsync();
-            await LoadTasksAsync();
+            ShowBusyOverlay("Refreshing dispatch tasks...");
+
+            try
+            {
+                await LoadFilterOptionsAsync();
+                await LoadTasksAsync();
+            }
+            finally
+            {
+                HideBusyOverlay();
+            }
         }
 
         private async void ClearTaskFilters_Click(object sender, RoutedEventArgs e)
@@ -1245,13 +1288,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         {
             if (SaveTaskNotesButton != null)
             {
-                SaveTaskNotesButton.IsEnabled = HasUnsavedSelectedTaskDispatchNotes;
+                SaveTaskNotesButton.IsEnabled =
+                    CanEditSelectedTaskTicket &&
+                    HasUnsavedSelectedTaskDispatchNotes;
             }
 
             UpdateTaskToolbarButtons();
         }
 
         private void TaskDispatchNotesTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdateTaskSaveButtonState();
+        }
+
+        private void TaskTechWriteUpsTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             UpdateTaskSaveButtonState();
         }
@@ -1358,7 +1408,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 UpdateTaskSaveButtonState();
 
                 MessageBox.Show(
-                    "Notes saved.",
+                    "Dispatch Notes / Tech Write-Ups saved.",
                     "Task Notes",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -1373,6 +1423,70 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 UpdateTaskSaveButtonState();
             }
+        }
+
+        private void ShowBusyOverlay(string message)
+        {
+            _busyOverlayDepth++;
+
+            if (BusyOverlay is null ||
+                BusyOverlayMessageTextBlock is null)
+            {
+                return;
+            }
+
+            BusyOverlayMessageTextBlock.Text = string.IsNullOrWhiteSpace(message)
+                ? "Loading..."
+                : message;
+
+            BusyOverlay.Visibility = Visibility.Visible;
+            SetTaskPaneControlsEnabled(false);
+        }
+
+        private void HideBusyOverlay()
+        {
+            if (_busyOverlayDepth > 0)
+                _busyOverlayDepth--;
+
+            if (_busyOverlayDepth > 0)
+                return;
+
+            if (BusyOverlay is null)
+                return;
+
+            BusyOverlay.Visibility = Visibility.Collapsed;
+            SetTaskPaneControlsEnabled(true);
+
+            UpdateTaskToolbarButtons();
+            UpdateTaskSaveButtonState();
+        }
+
+        private void SetTaskPaneControlsEnabled(bool enabled)
+        {
+            SearchBox.IsEnabled = enabled;
+            StatusFilter.IsEnabled = enabled;
+            ClearTaskFiltersButton.IsEnabled = enabled;
+            RefreshTasksButton.IsEnabled = enabled;
+            TasksGrid.IsEnabled = enabled;
+
+            DetailsPanel.IsEnabled = enabled;
+
+            OpenTaskDetailsButton.IsEnabled = enabled && SelectedTask != null;
+            OpenTaskTicketButton.IsEnabled = enabled && SelectedTask != null;
+
+            var canCloseSelectedTask =
+                enabled &&
+                SelectedTask != null &&
+                !HasUnsavedSelectedTaskDispatchNotes &&
+                !IsSelectedTaskTicketClosed;
+
+            MarkTaskClosedButton.IsEnabled = canCloseSelectedTask;
+            MarkDetailsClosedButton.IsEnabled = canCloseSelectedTask;
+
+            SaveTaskNotesButton.IsEnabled =
+                enabled &&
+                CanEditSelectedTaskTicket &&
+                HasUnsavedSelectedTaskDispatchNotes;
         }
     }
 }

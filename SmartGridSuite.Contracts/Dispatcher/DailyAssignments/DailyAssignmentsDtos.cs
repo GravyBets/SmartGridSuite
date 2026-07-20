@@ -134,6 +134,8 @@ namespace SmartGridSuite.Contracts.Dispatcher.DailyAssignments
         public string? AssignmentNotes { get; set; }
 
         public string? UpdatedBy { get; set; }
+
+        public bool ConfirmConflictWarnings { get; set; }
     }
 
     public sealed class AssignDailyTicketsResponse
@@ -248,5 +250,11 @@ namespace SmartGridSuite.Contracts.Dispatcher.DailyAssignments
         public int PublishedCount { get; set; }
 
         public List<long> TicketIds { get; set; } = new();
+
+        public long? EmailLogId { get; set; }
+
+        public string EmailStatus { get; set; } = "";
+
+        public string EmailMessage { get; set; } = "";
     }
 }

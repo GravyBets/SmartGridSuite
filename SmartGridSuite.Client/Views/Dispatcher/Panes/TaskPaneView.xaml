@@ -106,12 +106,12 @@
             </Grid.RowDefinitions>
 
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="8"/>
-                <ColumnDefinition Width="220"/>
-                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="4"/>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
@@ -136,24 +136,30 @@
                  TextChanged="SearchBox_TextChanged"/>
 
             <ComboBox x:Name="StatusFilter"
-                  Grid.Row="2"
-                  Grid.Column="2"
-                  Height="36"
-                  Width="Auto"
-                  MinWidth="0"
-                  HorizontalAlignment="Stretch"
-                  SelectionChanged="Filters_SelectionChanged"/>
+                      Grid.Row="2"
+                      Grid.Column="2"
+                      Height="36"
+                      Width="Auto"
+                      MinWidth="0"
+                      HorizontalAlignment="Stretch"
+                      SelectionChanged="Filters_SelectionChanged"/>
 
-            <Button Grid.Row="2"
-                Grid.Column="4"
-                Content="Clear Filters"
-                Height="36"
-                Padding="14,0"
-                Click="ClearTaskFilters_Click"/>
+            <Button x:Name="ClearTaskFiltersButton"
+                    Grid.Row="2"
+                    Grid.Column="4"
+                    Content="Clear Filters"
+                    Height="36"
+                    Width="104"
+                    Padding="14,0"
+                    Click="ClearTaskFilters_Click"/>
 
-            <Button Grid.Row="2"
+            <Button x:Name="RefreshTasksButton"
+                    Grid.Row="2"
                     Grid.Column="6"
                     Content="Refresh"
+                    Height="36"
+                    Width="104"
+                    Padding="14,0"
                     VerticalAlignment="Top"
                     Click="Refresh_Click"/>
         </Grid>
@@ -187,31 +193,33 @@
                                 VerticalAlignment="Center">
 
                             <Button x:Name="OpenTaskDetailsButton"
-                                Content="Open Details"
-                                Height="30"
-                                Padding="12,0"
-                                Margin="0,0,8,0"
-                                IsEnabled="False"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Click="OpenTaskDetails_Click"/>
+                                    Content="Open Details"
+                                    Height="30"
+                                    Width="108"
+                                    Padding="12,0"
+                                    Margin="0,0,4,0"
+                                    IsEnabled="False"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="OpenTaskDetails_Click"/>
 
                             <Button x:Name="OpenTaskTicketButton"
-                                Content="Edit Ticket"
-                                Height="30"
-                                Padding="12,0"
-                                Margin="0,0,8,0"
-                                IsEnabled="False"
-                                Style="{StaticResource SecondaryButtonStyle}"
-                                Click="OpenNotification_Click"/>
+                                    Content="Edit Ticket"
+                                    Height="30"
+                                    Width="108"
+                                    Padding="12,0"
+                                    Margin="0,0,4,0"
+                                    IsEnabled="False"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="OpenNotification_Click"/>
 
                             <Button x:Name="MarkTaskClosedButton"
-                                Content="Mark Closed"
-                                Height="30"
-                                Width="84"
-                                Padding="12,0"
-                                IsEnabled="False"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Click="MarkClosed_Click"/>
+                                    Content="Mark Closed"
+                                    Height="30"
+                                    Width="108"
+                                    Padding="12,0"
+                                    IsEnabled="False"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="MarkClosed_Click"/>
                         </StackPanel>
 
                         <TextBlock Text="Task List"
@@ -675,20 +683,21 @@
                                                                     </StackPanel.Style>
 
                                                                     <Button Content="Edit"
-                                                                        Height="24"
-                                                                        Width="48"
-                                                                        Padding="8,0"
-                                                                        Margin="0,0,6,0"
-                                                                        Tag="{Binding}"
-                                                                        Style="{StaticResource SecondaryButtonStyle}"
-                                                                        Click="EditSelectedTaskSiteNote_Click"/>
+                                                                            Height="24"
+                                                                            Width="62"
+                                                                            Padding="8,0"
+                                                                            Margin="0,0,6,0"
+                                                                            Tag="{Binding}"
+                                                                            Style="{StaticResource SecondaryButtonStyle}"
+                                                                            Click="EditSelectedTaskSiteNote_Click"/>
 
                                                                     <Button Content="Delete"
-                                                                        Height="24"
-                                                                        Padding="8,0"
-                                                                        Tag="{Binding}"
-                                                                        Style="{StaticResource SecondaryButtonStyle}"
-                                                                        Click="DeleteSelectedTaskSiteNote_Click"/>
+                                                                            Style="{StaticResource DangerButtonStyle}"
+                                                                            Height="24"
+                                                                            Width="62"
+                                                                            Padding="0,0"
+                                                                            Tag="{Binding}"                                                                            
+                                                                            Click="DeleteSelectedTaskSiteNote_Click"/>
                                                                 </StackPanel>
                                                             </Grid>
                                                         </Border>
@@ -701,13 +710,13 @@
 
                                 <!-- Dispatch Notes -->
                                 <Expander x:Name="TaskDispatchNotesExpander"
-                                      Header="Dispatch Notes"
-                                      IsExpanded="False"
-                                      Margin="0,10,0,0"
-                                      Expanded="TaskDetailExpander_ExpandedChanged"
-                                      Collapsed="TaskDetailExpander_ExpandedChanged">
+                                          Header="Dispatch Notes"
+                                          IsExpanded="False"
+                                          Margin="0,10,0,0"
+                                          Expanded="TaskDetailExpander_ExpandedChanged"
+                                          Collapsed="TaskDetailExpander_ExpandedChanged">
                                     <Border Style="{StaticResource TaskDetailSectionCard}"
-                                        Margin="0,8,0,0">
+                                            Margin="0,8,0,0">
                                         <Grid>
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto"/>
@@ -716,33 +725,33 @@
                                             </Grid.RowDefinitions>
 
                                             <TextBlock Grid.Row="0"
-                                                   Text="Visible to the assigned field technician."
-                                                   FontSize="11"
-                                                   TextWrapping="Wrap"
-                                                   Foreground="{DynamicResource TextSecondary}"/>
+                                                       Text="Visible to the assigned field technician."
+                                                       FontSize="11"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource TextSecondary}"/>
 
                                             <Border Grid.Row="2"
-                                                CornerRadius="10"
-                                                BorderThickness="1"
-                                                BorderBrush="{DynamicResource SurfaceBorder}"
-                                                Background="{DynamicResource SurfaceBg}">
+                                                    CornerRadius="10"
+                                                    BorderThickness="1"
+                                                    BorderBrush="{DynamicResource SurfaceBorder}"
+                                                    Background="{DynamicResource SurfaceBg}">
 
                                                 <TextBox x:Name="TaskDispatchNotesTextBox"
-                                                    Style="{x:Null}"
-                                                    Text="{Binding SelectedTaskTicket.DispatchNotes, UpdateSourceTrigger=PropertyChanged}"
-                                                    AcceptsReturn="True"
-                                                    TextWrapping="Wrap"
-                                                    IsReadOnly="{Binding IsSelectedTaskTicketClosed}"
-                                                    MinHeight="160"
-                                                    MaxHeight="328"
-                                                    Padding="10"
-                                                    BorderThickness="0"
-                                                    Background="Transparent"
-                                                    Foreground="{DynamicResource TextPrimary}"
-                                                    VerticalContentAlignment="Top"
-                                                    VerticalScrollBarVisibility="Auto"
-                                                    HorizontalScrollBarVisibility="Disabled"
-                                                    TextChanged="TaskDispatchNotesTextBox_TextChanged"/>
+                                                        Style="{x:Null}"
+                                                        Text="{Binding SelectedTaskTicket.DispatchNotes, UpdateSourceTrigger=PropertyChanged}"
+                                                        AcceptsReturn="True"
+                                                        TextWrapping="Wrap"
+                                                        IsReadOnly="{Binding IsSelectedTaskTicketClosed}"
+                                                        MinHeight="160"
+                                                        MaxHeight="328"
+                                                        Padding="10"
+                                                        BorderThickness="0"
+                                                        Background="Transparent"
+                                                        Foreground="{DynamicResource TextPrimary}"
+                                                        VerticalContentAlignment="Top"
+                                                        VerticalScrollBarVisibility="Auto"
+                                                        HorizontalScrollBarVisibility="Disabled"
+                                                        TextChanged="TaskDispatchNotesTextBox_TextChanged"/>
                                             </Border>
                                         </Grid>
                                     </Border>
@@ -750,13 +759,13 @@
 
                                 <!-- Tech Write-Ups -->
                                 <Expander x:Name="TaskTechWriteUpsExpander"
-                                      Header="Tech Write-Ups"
-                                      IsExpanded="False"
-                                      Margin="0,10,0,0"
-                                      Expanded="TaskDetailExpander_ExpandedChanged"
-                                      Collapsed="TaskDetailExpander_ExpandedChanged">
+                                          Header="Tech Write-Ups"
+                                          IsExpanded="False"
+                                          Margin="0,10,0,0"
+                                          Expanded="TaskDetailExpander_ExpandedChanged"
+                                          Collapsed="TaskDetailExpander_ExpandedChanged">
                                     <Border Style="{StaticResource TaskDetailSectionCard}"
-                                        Margin="0,8,0,0">
+                                            Margin="0,8,0,0">
                                         <Grid>
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto"/>
@@ -765,33 +774,34 @@
                                             </Grid.RowDefinitions>
 
                                             <TextBlock Grid.Row="0"
-                                                   Text="Submitted technician write-ups are shown for reference only."
-                                                   FontSize="11"
-                                                   TextWrapping="Wrap"
-                                                   Foreground="{DynamicResource TextSecondary}"/>
+                                                       Text="Dispatcher can edit submitted technician write-ups here. Click Save Notes to save changes."
+                                                       FontSize="11"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource TextSecondary}"/>
 
                                             <Border Grid.Row="2"
-                                                CornerRadius="10"
-                                                BorderThickness="1"
-                                                BorderBrush="{DynamicResource SurfaceBorder}"
-                                                Background="{DynamicResource SurfaceBg}">
+                                                    CornerRadius="10"
+                                                    BorderThickness="1"
+                                                    BorderBrush="{DynamicResource SurfaceBorder}"
+                                                    Background="{DynamicResource SurfaceBg}">
 
                                                 <TextBox x:Name="TaskTechWriteUpsTextBox"
-                                                     Style="{x:Null}"
-                                                     Text="{Binding SelectedTaskTicket.Notes, Mode=OneWay}"
-                                                     AcceptsReturn="True"
-                                                     TextWrapping="Wrap"
-                                                     IsReadOnly="True"
-                                                     IsReadOnlyCaretVisible="True"
-                                                     MinHeight="220"
-                                                     MaxHeight="342"
-                                                     Padding="10"
-                                                     BorderThickness="0"
-                                                     Background="Transparent"
-                                                     Foreground="{DynamicResource TextPrimary}"
-                                                     VerticalContentAlignment="Top"
-                                                     VerticalScrollBarVisibility="Auto"
-                                                     HorizontalScrollBarVisibility="Disabled"/>
+                                                         Style="{x:Null}"
+                                                         Text="{Binding SelectedTaskTicket.Notes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                         AcceptsReturn="True"
+                                                         TextWrapping="Wrap"
+                                                         IsReadOnly="{Binding IsSelectedTaskTicketClosed}"
+                                                         IsReadOnlyCaretVisible="True"
+                                                         MinHeight="220"
+                                                         MaxHeight="342"
+                                                         Padding="10"
+                                                         BorderThickness="0"
+                                                         Background="Transparent"
+                                                         Foreground="{DynamicResource TextPrimary}"
+                                                         VerticalContentAlignment="Top"
+                                                         VerticalScrollBarVisibility="Auto"
+                                                         HorizontalScrollBarVisibility="Disabled"
+                                                         TextChanged="TaskTechWriteUpsTextBox_TextChanged"/>
                                             </Border>
                                         </Grid>
                                     </Border>
@@ -807,13 +817,13 @@
                             <Button Content="Copy Write-Up"
                                     Height="32"
                                     Padding="12,0"
-                                    Margin="0,0,8,0"
+                                    Margin="0,0,4,0"
                                     Click="CopySummary_Click"/>
 
-                            <Button Content="Open Ticket"
+                            <Button Content="Edit Ticket"
                                     Height="32"
                                     Padding="12,0"
-                                    Margin="0,0,8,0"
+                                    Margin="0,0,4,0"
                                     Click="OpenNotification_Click"/>
 
                             <Button x:Name="SaveTaskNotesButton"
@@ -821,7 +831,7 @@
                                     Height="32"
                                     Width="94"
                                     Padding="12,0"
-                                    Margin="0,0,8,0"
+                                    Margin="0,0,4,0"
                                     IsEnabled="False"
                                     Style="{StaticResource PrimaryButtonStyle}"
                                     Click="SaveTaskNotes_Click"/>
@@ -839,5 +849,44 @@
                 </Border>
             </Grid>
         </Border>
+
+        <!-- Loading overlay -->
+        <Border x:Name="BusyOverlay"
+                Grid.Row="0"
+                Grid.RowSpan="5"
+                Panel.ZIndex="100"
+                Background="#66000000"
+                Visibility="Collapsed">
+
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Width="380"
+                    Padding="22"
+                    CornerRadius="16"
+                    Background="{DynamicResource CardBackground}"
+                    BorderBrush="{DynamicResource CardBorder}"
+                    BorderThickness="1">
+
+                <StackPanel>
+                    <TextBlock Text="Loading"
+                               HorizontalAlignment="Center"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <ProgressBar IsIndeterminate="True"
+                                 Height="6"
+                                 Margin="0,18,0,14"/>
+
+                    <TextBlock x:Name="BusyOverlayMessageTextBlock"
+                               Text="Loading dispatch tasks..."
+                               TextAlignment="Center"
+                               TextWrapping="Wrap"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+            </Border>
+        </Border>
+
     </Grid>
 </UserControl>

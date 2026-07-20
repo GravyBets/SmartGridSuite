@@ -12,6 +12,8 @@ public sealed class UpdateTechnicianRequest
     public string LastName { get; set; } = "";
     public string Title { get; set; } = "";
 
+    public string? EmailAddress { get; set; }
+
     public bool IsActive { get; set; }
 
     public int? HomeTruckId { get; set; }
