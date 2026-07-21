@@ -67,8 +67,6 @@ namespace SmartGridSuite.Api.Controllers
             });
         }
 
-
-
         [HttpGet("range-extender-link-url")]
         public async Task<ActionResult<RangeExtenderLinkUrlDto>> GetRangeExtenderLinkUrl(CancellationToken ct)
         {

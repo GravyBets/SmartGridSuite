@@ -35,7 +35,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         {
             InitializeComponent();
 
-            _api = new ApiClient("https://localhost:7140");
+            _api = ClientAppSettings.CreateApiClient();
             _ticketsApi = new TicketsApi(_api);
 
             DataContext = this;

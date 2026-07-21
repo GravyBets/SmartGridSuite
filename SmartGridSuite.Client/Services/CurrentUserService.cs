@@ -9,8 +9,7 @@ namespace SmartGridSuite.Client.Services
 {
     public static class CurrentUserService
     {
-        private static readonly ApiClient Api =
-            new("https://localhost:7140/");
+        private static readonly ApiClient Api = ClientAppSettings.CreateApiClient();
 
         public static TechnicianDto? CurrentTechnician { get; private set; }
 

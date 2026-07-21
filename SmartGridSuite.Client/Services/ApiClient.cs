@@ -1,5 +1,4 @@
 ﻿using SmartGridSuite.Contracts.Settings;
-using SmartGridSuite.Contracts.Settings.GeneralSettings;
 using SmartGridSuite.Contracts.SiteDashboard;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -247,6 +246,16 @@ namespace SmartGridSuite.Client.Services
                 "api/admin/email-settings/test",
                 request,
                 ct);
+        }
+
+        public async Task<SubmitBugFeatureResponse?> SubmitBugFeatureRequestAsync(SubmitBugFeatureRequest request, CancellationToken ct = default)
+        {
+            return await PostAsync<
+                SubmitBugFeatureRequest,
+                SubmitBugFeatureResponse>(
+                    "api/support-requests/bug-feature",
+                    request,
+                    ct);
         }
 
         //Tower Stuff

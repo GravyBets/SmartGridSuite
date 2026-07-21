@@ -40,7 +40,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         
 
         public SiteDashboardPaneView()
-            : this(new ApiClient("https://localhost:7140"))
+            : this(ClientAppSettings.CreateApiClient())
         {
         }
 

@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Api.Services;
-using SmartGridSuite.Contracts.Settings.GeneralSettings;
+using SmartGridSuite.Contracts.Settings;
 
 namespace SmartGridSuite.Api.Controllers
 {

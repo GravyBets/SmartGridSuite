@@ -1,13 +1,7 @@
 ﻿using SmartGridSuite.Client.Services;
 using SmartGridSuite.Contracts.Settings;
-using SmartGridSuite.Contracts.Settings.GeneralSettings;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 
 namespace SmartGridSuite.Client.Views.Administration.GeneralSettings
 {

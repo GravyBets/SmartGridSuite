@@ -34,7 +34,7 @@ namespace SmartGridSuite.Client.Views.Administration
         {
             InitializeComponent();
 
-            _api = new ApiClient("https://localhost:7140");
+            _api = ClientAppSettings.CreateApiClient();
 
             UiScaleService.ApplyToWindow(this);
 

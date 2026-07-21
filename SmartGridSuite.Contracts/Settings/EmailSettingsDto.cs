@@ -1,6 +1,6 @@
 ﻿#nullable enable
 
-namespace SmartGridSuite.Contracts.Settings.GeneralSettings
+namespace SmartGridSuite.Contracts.Settings
 {
     public sealed class EmailSettingsDto
     {
@@ -55,4 +55,6 @@ namespace SmartGridSuite.Contracts.Settings.GeneralSettings
 
         public string Message { get; set; } = "";
     }
+
+
 }

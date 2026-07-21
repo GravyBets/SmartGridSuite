@@ -45,7 +45,7 @@ public partial class NewTicketWindow : Window
         InitializeComponent();
 
         _ticketsApi = ticketsApi;
-        _ticketAdminApi = new TicketAdminApi(new ApiClient("https://localhost:7140"));
+        _ticketAdminApi = new TicketAdminApi(ClientAppSettings.CreateApiClient());
 
         _techSuggestions = new List<string> { "(Unassigned)" };
 

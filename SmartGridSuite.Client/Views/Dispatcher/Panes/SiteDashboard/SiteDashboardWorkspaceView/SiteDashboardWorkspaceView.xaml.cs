@@ -64,7 +64,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private CancellationTokenSource? _towerTestAllCts;
 
         private readonly ObservableCollection<SiteNoteDto> _siteNotes = new();
-        private readonly SiteNotesApi _siteNotesApi = new(new ApiClient("https://localhost:7140/"));
+        private readonly SiteNotesApi _siteNotesApi = new(ClientAppSettings.CreateApiClient());
         private int _siteNotesLoadVersion;
 
         public static readonly DependencyProperty CanManageSiteNotesProperty = DependencyProperty.Register(

@@ -1,13 +1,24 @@
-﻿using System;
+﻿using SmartGridSuite.Client.Services;
+using SmartGridSuite.Contracts.Settings;
+using System;
 using System.Reflection;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace SmartGridSuite.Client.Views
 {
     public partial class BugFeatureRequestWindow : Window
     {
+        /*
+         * This matches the API address currently used by the launcher.
+         * Use your shared/configured API base URL here if that has since
+         * been centralized.
+         */
+        private readonly ApiClient _api = ClientAppSettings.CreateApiClient();
+
+        private bool _isSending;
+
         public BugFeatureRequestWindow()
         {
             InitializeComponent();
@@ -24,18 +35,24 @@ namespace SmartGridSuite.Client.Views
             object sender,
             RoutedEventArgs e)
         {
+            if (_isSending)
+                return;
+
             Close();
         }
 
-        private void CopyRequest_Click(
+        private async void SendRequest_Click(
             object sender,
             RoutedEventArgs e)
         {
+            if (_isSending)
+                return;
+
             var requestType = GetSelectedText(
                 RequestTypeComboBox,
                 "Request");
 
-            var area = GetSelectedText(
+            var applicationArea = GetSelectedText(
                 AreaComboBox,
                 "Other");
 
@@ -62,7 +79,7 @@ namespace SmartGridSuite.Client.Views
             {
                 MessageBox.Show(
                     this,
-                    "Enter the request details before copying it.",
+                    "Enter the request details before sending it.",
                     "Bug / Feature Request",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -71,36 +88,142 @@ namespace SmartGridSuite.Client.Views
                 return;
             }
 
-            var requestText = BuildRequestText(
-                requestType,
-                area,
-                requestTitle,
-                details);
+            SetSendingState(true);
 
             try
             {
-                Clipboard.SetText(requestText);
+                var response =
+                    await _api.SubmitBugFeatureRequestAsync(
+                        new SubmitBugFeatureRequest
+                        {
+                            RequestType = requestType,
+                            ApplicationArea = applicationArea,
+                            Title = requestTitle,
+                            Details = details,
+                            SubmittedBy = Environment.UserName,
+                            ApplicationVersion =
+                                GetApplicationVersion()
+                        });
+
+                if (response == null)
+                {
+                    MessageBox.Show(
+                        this,
+                        "The server returned an empty response.",
+                        "Bug / Feature Request",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+
+                    return;
+                }
+
+                if (response.Sent)
+                {
+                    MessageBox.Show(
+                        this,
+                        "Your request was emailed successfully.",
+                        "Bug / Feature Request",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    Close();
+                    return;
+                }
+
+                if (response.Status.Equals(
+                        "DryRun",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show(
+                        this,
+                        "The request was logged, but it was not emailed because Dry Run is enabled in General Settings.",
+                        "Bug / Feature Request",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    return;
+                }
+
+                if (response.Status.Equals(
+                        "Skipped",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show(
+                        this,
+                        string.IsNullOrWhiteSpace(response.Message)
+                            ? "The request was not emailed."
+                            : response.Message,
+                        "Bug / Feature Request",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+
+                    return;
+                }
+
+                MessageBox.Show(
+                    this,
+                    string.IsNullOrWhiteSpace(response.Message)
+                        ? "The request could not be emailed."
+                        : response.Message,
+                    "Bug / Feature Request",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (ApiClient.ApiConnectionException ex)
+            {
+                MessageBox.Show(
+                    this,
+                    ex.Message,
+                    "Bug / Feature Request",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                MessageBox.Show(
+                    this,
+                    string.IsNullOrWhiteSpace(ex.Body)
+                        ? "The server rejected the request."
+                        : ex.Body,
+                    "Bug / Feature Request",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
             catch (Exception ex)
             {
                 MessageBox.Show(
                     this,
-                    $"The request could not be copied to the clipboard.\n\n{ex.Message}",
+                    $"The request could not be sent.\n\n{ex.Message}",
                     "Bug / Feature Request",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
-
-                return;
             }
+            finally
+            {
+                SetSendingState(false);
+            }
+        }
 
-            MessageBox.Show(
-                this,
-                "Request copied to the clipboard.",
-                "Bug / Feature Request",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+        private void SetSendingState(bool isSending)
+        {
+            _isSending = isSending;
 
-            Close();
+            RequestTypeComboBox.IsEnabled = !isSending;
+            AreaComboBox.IsEnabled = !isSending;
+            RequestTitleTextBox.IsEnabled = !isSending;
+            DetailsTextBox.IsEnabled = !isSending;
+            CancelButton.IsEnabled = !isSending;
+            SendRequestButton.IsEnabled = !isSending;
+
+            SendRequestButton.Content =
+                isSending
+                    ? "Sending..."
+                    : "Send Request";
+
+            Mouse.OverrideCursor =
+                isSending
+                    ? Cursors.Wait
+                    : null;
         }
 
         private static string GetSelectedText(
@@ -117,66 +240,32 @@ namespace SmartGridSuite.Client.Views
                    ?? fallback;
         }
 
-        private static string BuildRequestText(
-            string requestType,
-            string area,
-            string requestTitle,
-            string details)
-        {
-            var builder = new StringBuilder();
-
-            builder.AppendLine(
-                "SMART GRID SUITE - BUG / FEATURE REQUEST");
-
-            builder.AppendLine();
-
-            builder.AppendLine(
-                $"Type: {requestType}");
-
-            builder.AppendLine(
-                $"Title: {requestTitle}");
-
-            builder.AppendLine(
-                $"Area: {area}");
-
-            builder.AppendLine(
-                $"Submitted By: {Environment.UserName}");
-
-            builder.AppendLine(
-                $"Submitted At: {DateTime.Now:MM/dd/yyyy h:mm tt}");
-
-            builder.AppendLine(
-                $"Application Version: {GetApplicationVersion()}");
-
-            builder.AppendLine();
-
-            builder.AppendLine("DETAILS");
-            builder.AppendLine("-------");
-            builder.AppendLine(details);
-
-            return builder.ToString();
-        }
-
         private static string GetApplicationVersion()
         {
             var assembly =
                 typeof(BugFeatureRequestWindow).Assembly;
 
             var informationalVersion = assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+                .GetCustomAttribute<
+                    AssemblyInformationalVersionAttribute>()?
                 .InformationalVersion;
 
-            if (!string.IsNullOrWhiteSpace(informationalVersion))
+            if (!string.IsNullOrWhiteSpace(
+                    informationalVersion))
             {
                 var metadataSeparator =
                     informationalVersion.IndexOf('+');
 
                 return metadataSeparator >= 0
-                    ? informationalVersion[..metadataSeparator]
+                    ? informationalVersion[
+                        ..metadataSeparator]
                     : informationalVersion;
             }
 
-            return assembly.GetName().Version?.ToString(3)
+            return assembly
+                       .GetName()
+                       .Version?
+                       .ToString(3)
                    ?? "Development";
         }
     }

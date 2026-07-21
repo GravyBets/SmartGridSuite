@@ -32,7 +32,7 @@ namespace SmartGridSuite.Client.Views.Administration.SNMP
 
 
         public SnmpAdminView()
-            : this(new ApiClient("https://localhost:7140"))
+            : this(ClientAppSettings.CreateApiClient())
         {
         }
 

@@ -22,7 +22,7 @@ namespace SmartGridSuite.Client.Views
         private const double NavExpandedWidth = 260;
         private const double NavCollapsedWidth = 58;
 
-        private readonly ApiClient _api = new("https://localhost:7140");
+        private readonly ApiClient _api = ClientAppSettings.CreateApiClient();
 
         public DispatcherShellWindow()
         {

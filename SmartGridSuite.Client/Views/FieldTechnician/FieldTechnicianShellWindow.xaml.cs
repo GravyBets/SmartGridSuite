@@ -13,8 +13,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
 {
     public partial class FieldTechnicianShellWindow
     {
-        private readonly ApiClient _connectivityApi =
-            new("https://localhost:7140/");
+        private readonly ApiClient _connectivityApi = ClientAppSettings.CreateApiClient();
 
         private bool _navCollapsed;
         private bool _syncingNav;

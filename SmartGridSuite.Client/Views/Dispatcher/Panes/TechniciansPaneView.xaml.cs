@@ -1,8 +1,10 @@
 ﻿#nullable enable
+using SmartGridSuite.Client.Services;
 using SmartGridSuite.Contracts.Administration.Technicians;
 using SmartGridSuite.Contracts.Administration.Trucks;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
@@ -11,7 +13,6 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Globalization;
 using System.Windows.Media.Media3D;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
@@ -102,7 +103,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             InitializeComponent();
             DataContext = this;
 
-            _http = new HttpClient { BaseAddress = new Uri("https://localhost:7140/") };
+            _http = ClientAppSettings.CreateHttpClient();
 
             Loaded += async (_, __) => await InitializeAndLoadAsync();
         }

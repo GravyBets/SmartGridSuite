@@ -19,7 +19,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
         public event EventHandler<string>? OpenSiteRequested;
         public event EventHandler<IReadOnlyList<string>>? OpenAllSitesRequested;
 
-        private readonly ApiClient _api = new("https://localhost:7140/");
+        private readonly ApiClient _api = ClientAppSettings.CreateApiClient();
 
         private bool _loadedOnce;
         private bool _busyLoading;

@@ -57,7 +57,7 @@
                                Foreground="{DynamicResource TextPrimary}"/>
 
                     <TextBlock Margin="0,4,0,0"
-                               Text="Create a structured request and copy it to the clipboard. Nothing is submitted automatically."
+                               Text="Submit a bug, feature request, or improvement to the Radio Shop application team."
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource TextSecondary}"/>
                 </StackPanel>
@@ -212,26 +212,28 @@
             </Grid.ColumnDefinitions>
 
             <TextBlock Grid.Column="0"
-                       MaxWidth="360"
-                       VerticalAlignment="Center"
-                       Text="The copied template includes your Windows username, local date/time, and application version."
-                       TextWrapping="Wrap"
-                       Foreground="{DynamicResource TextSecondary}"/>
+               MaxWidth="365"
+               VerticalAlignment="Center"
+               Text="The request will be emailed using the address configured in General Settings."
+               TextWrapping="Wrap"
+               Foreground="{DynamicResource TextSecondary}"/>
 
-            <Button Grid.Column="1"
-                    Width="92"
-                    Height="34"
-                    Content="Cancel"
-                    IsCancel="True"
-                    Style="{StaticResource SecondaryButtonStyle}"
-                    Click="Cancel_Click"/>
+            <Button x:Name="CancelButton"
+            Grid.Column="1"
+            Width="92"
+            Height="34"
+            Content="Cancel"
+            IsCancel="True"
+            Style="{StaticResource SecondaryButtonStyle}"
+            Click="Cancel_Click"/>
 
-            <Button Grid.Column="3"
-                    Width="126"
-                    Height="34"
-                    Content="Copy Request"
-                    Style="{StaticResource PrimaryButtonStyle}"
-                    Click="CopyRequest_Click"/>
+            <Button x:Name="SendRequestButton"
+            Grid.Column="3"
+            Width="126"
+            Height="34"
+            Content="Send Request"
+            Style="{StaticResource PrimaryButtonStyle}"
+            Click="SendRequest_Click"/>
         </Grid>
     </Grid>
 </Window>

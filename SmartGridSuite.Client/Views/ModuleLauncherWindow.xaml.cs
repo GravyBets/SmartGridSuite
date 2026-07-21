@@ -26,9 +26,8 @@ namespace SmartGridSuite.Client.Views
             LoadThemeControl();
         }
 
-        private readonly ApiClient _connectivityApi =
-            new("https://localhost:7140/");
-       
+        private readonly ApiClient _connectivityApi = ClientAppSettings.CreateApiClient();
+
         private bool _isOpeningModule;
         private bool _loadingThemeControl;
 

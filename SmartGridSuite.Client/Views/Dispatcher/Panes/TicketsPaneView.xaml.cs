@@ -54,7 +54,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         }
 
         private readonly ObservableCollection<DispatchTicket> _tickets = new();
-        private readonly TicketsApi _ticketsApi = new TicketsApi(new ApiClient("https://localhost:7140/"));
+        private readonly TicketsApi _ticketsApi = new TicketsApi(ClientAppSettings.CreateApiClient());
         private readonly TechniciansApi _techniciansApi;        
         private readonly HashSet<string> _knownTechs = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _createdByDisplayByUserId = new(StringComparer.OrdinalIgnoreCase);
@@ -62,7 +62,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private int _busyOverlayDepth;
 
-        private readonly SiteNotesApi _siteNotesApi = new(new ApiClient("https://localhost:7140/"));
+        private readonly SiteNotesApi _siteNotesApi = new(ClientAppSettings.CreateApiClient());
 
         private readonly ObservableCollection<SiteNoteDto> _selectedTicketSiteNotes = new();
         public int SelectedTicketSiteNotesCount => _selectedTicketSiteNotes.Count;
@@ -338,7 +338,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             TicketsView = CollectionViewSource.GetDefaultView(_tickets);
             
-            _techniciansApi = new TechniciansApi(new ApiClient("https://localhost:7140"));
+            _techniciansApi = new TechniciansApi(ClientAppSettings.CreateApiClient());
 
             TicketsGrid.ItemsSource = TicketsView;
 

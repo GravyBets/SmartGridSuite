@@ -207,8 +207,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             InitializeComponent();
             DataContext = this;
 
-            var api = new ApiClient("https://localhost:7140/");
-
+            var api = ClientAppSettings.CreateApiClient();
+                
             _ticketsApi = new TicketsApi(api);
             _ticketAdminApi = new TicketAdminApi(api);
             _siteNotesApi = new SiteNotesApi(api);

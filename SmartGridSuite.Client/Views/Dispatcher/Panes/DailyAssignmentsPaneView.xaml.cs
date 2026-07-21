@@ -24,7 +24,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             public List<long> TicketIds { get; init; } = new();
         }
 
-        private readonly ApiClient _api = new("https://localhost:7140");
+        private readonly ApiClient _api = ClientAppSettings.CreateApiClient();
         private readonly DispatcherTimer _ticketSearchTimer;
         private readonly ObservableCollection<DailyAssignmentTicketDto> _filteredTicketPool = new();
         private readonly ObservableCollection<AssignmentTargetVm> _assignmentTargets = new();
