@@ -534,6 +534,7 @@
                     </Grid>
 
                         <DataGrid x:Name="DecodeValuesDataGrid"
+                                  Style="{DynamicResource ThemedDataGridStyle}"
                                   Grid.Row="4"
                                   MinHeight="170"
                                   MaxHeight="240"

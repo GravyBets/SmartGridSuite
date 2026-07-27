@@ -6,12 +6,72 @@
         Height="640"
         WindowStartupLocation="CenterOwner"
         Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Background="{DynamicResource AppBackground}"
+        Foreground="{DynamicResource TextPrimary}">
 
-    <Grid Margin="16">
+    <Window.Resources>
+
+        <Style TargetType="{x:Type GroupBox}">
+            <Setter Property="Foreground"
+                Value="{DynamicResource TextPrimary}"/>
+
+            <Setter Property="BorderBrush"
+                Value="{DynamicResource PrimaryBg}"/>
+
+            <Setter Property="BorderThickness"
+                Value="1"/>
+
+            <Setter Property="Padding"
+                Value="12"/>
+
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type GroupBox}">
+                        <Grid SnapsToDevicePixels="True">
+
+                            <!-- Actual themed border -->
+                            <Border Margin="0,8,0,0"
+                                Background="Transparent"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+
+                                <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              ContentSource="Content"
+                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                            </Border>
+
+                            <!-- Header placed over the top border -->
+                            <Border Margin="10,0,0,0"
+                                Padding="4,0"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                Background="{DynamicResource AppBackground}">
+
+                                <ContentPresenter ContentSource="Header"
+                                              RecognizesAccessKey="True"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"
+                                              TextElement.FontWeight="SemiBold"/>
+                            </Border>
+
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type CheckBox}">
+            <Setter Property="Foreground"
+                Value="{DynamicResource TextPrimary}"/>
+        </Style>
+
+    </Window.Resources>
+
+    <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="12"/>
+            <RowDefinition Height="8"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -72,7 +132,8 @@
                                       TextSearch.TextPath="DisplayText">
                                 <ComboBox.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding DisplayText}"/>
+                                        <TextBlock Text="{Binding DisplayText}"
+                                                   Foreground="{DynamicResource TextPrimary}"/>
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>

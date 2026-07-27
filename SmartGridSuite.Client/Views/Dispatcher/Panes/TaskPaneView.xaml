@@ -565,7 +565,9 @@
                                     <Expander.Header>
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="Site Notes"
-                                                   VerticalAlignment="Center"/>
+                                                       Foreground="{DynamicResource TextPrimary}"
+                                                       FontWeight="Bold"
+                                                       VerticalAlignment="Center"/>
 
                                             <Border Margin="8,0,0,0"
                                                 MinWidth="17"
@@ -711,6 +713,8 @@
                                 <!-- Dispatch Notes -->
                                 <Expander x:Name="TaskDispatchNotesExpander"
                                           Header="Dispatch Notes"
+                                          Foreground="{DynamicResource TextPrimary}"
+                                          FontWeight="Bold"
                                           IsExpanded="False"
                                           Margin="0,10,0,0"
                                           Expanded="TaskDetailExpander_ExpandedChanged"
@@ -760,6 +764,8 @@
                                 <!-- Tech Write-Ups -->
                                 <Expander x:Name="TaskTechWriteUpsExpander"
                                           Header="Tech Write-Ups"
+                                          Foreground="{DynamicResource TextPrimary}"
+                                          FontWeight="Bold"
                                           IsExpanded="False"
                                           Margin="0,10,0,0"
                                           Expanded="TaskDetailExpander_ExpandedChanged"

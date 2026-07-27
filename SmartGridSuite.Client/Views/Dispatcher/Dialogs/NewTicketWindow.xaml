@@ -32,6 +32,7 @@
                     <StackPanel Grid.Column="0"
                                 Margin="0,0,4,0">
                         <TextBlock Text="Site * (If TOP, just XX-MWB, not sector too)"
+                                   Foreground="{DynamicResource TextPrimary}"
                                    FontWeight="SemiBold"
                                    Margin="4,0,0,4"/>
 
@@ -44,6 +45,7 @@
                     <!-- Problem -->
                     <StackPanel Grid.Column="1">
                         <TextBlock Text="Problem"
+                                   Foreground="{DynamicResource TextPrimary}"
                                    Margin="4,0,0,4"
                                    FontWeight="SemiBold"/>
 
@@ -70,6 +72,7 @@
                     <!-- Assigned To -->
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="Assigned To"
+                                   Foreground="{DynamicResource TextPrimary}"
                                    Margin="2,0,0,4"
                                    FontWeight="SemiBold"/>
 
@@ -186,6 +189,7 @@
                     <StackPanel Grid.Column="2">
                         <TextBlock Text="Status"
                                    Margin="2,0,0,4"
+                                   Foreground="{DynamicResource TextPrimary}"
                                    FontWeight="SemiBold"/>
 
                         <ComboBox x:Name="StatusBox"
@@ -196,7 +200,8 @@
                     </StackPanel>
                 </Grid>
 
-                <Separator Margin="0,6,0,4"/>
+                <Separator Margin="0,6,0,4"
+                           Background="{StaticResource PrimaryBg}"/>
 
                 <!-- Work Information -->
                 <Grid Margin="0,4,0,0">
@@ -215,6 +220,7 @@
                         <StackPanel Grid.Column="0"
                                     Margin="0,0,4,0">
                             <TextBlock Text="Notification #"
+                                       Foreground="{DynamicResource TextPrimary}"
                                        Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
@@ -227,6 +233,7 @@
 
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="Notification Name"
+                                       Foreground="{DynamicResource TextPrimary}"
                                        Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
@@ -250,6 +257,7 @@
                         <StackPanel Grid.Column="0"
                                     Margin="0,0,4,0">
                             <TextBlock Text="Work Order"
+                                       Foreground="{DynamicResource TextPrimary}"
                                        Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
@@ -261,15 +269,16 @@
                                          Text="{Binding WorkOrder, UpdateSourceTrigger=PropertyChanged}"/>
 
                                 <TextBlock Text="Work Order is limited to 10 characters."
+                                           Foreground="{DynamicResource TextPrimary}"
                                            Margin="2,3,0,0"
-                                           FontSize="11"
-                                           Foreground="{DynamicResource TextSecondary}"/>
+                                           FontSize="11"/>
                             </StackPanel>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1"
                                     Margin="0,0,4,0">
                             <TextBlock Text="Work Order Type"
+                                       Foreground="{DynamicResource TextPrimary}"
                                        Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
@@ -282,6 +291,7 @@
                         <StackPanel Grid.Column="2"
                                     Margin="0,0,4,0">
                             <TextBlock Text="Work Order Code"
+                                       Foreground="{DynamicResource TextPrimary}"
                                        Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
@@ -292,6 +302,7 @@
 
                         <StackPanel Grid.Column="3">
                             <TextBlock Text="Priority"
+                                       Foreground="{DynamicResource TextPrimary}"
                                        Margin="4,0,0,4"
                                        FontWeight="SemiBold"/>
 
@@ -302,10 +313,12 @@
                     </Grid>
                 </Grid>
 
-                <Separator Margin="0,4,0,8"/>
+                <Separator Margin="0,4,0,8"
+                           Background="{StaticResource PrimaryBg}"/>
 
                 <!-- Dispatch Notes -->
                 <TextBlock Text="Dispatch Notes"
+                           Foreground="{DynamicResource TextPrimary}"
                            Margin="2,0,0,0"
                            FontWeight="SemiBold"/>
 
@@ -378,7 +391,7 @@
 
         <!-- Buttons -->
         <Grid Grid.Row="1"
-      Margin="0,10,0,0">
+              Margin="0,10,0,0">
 
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>

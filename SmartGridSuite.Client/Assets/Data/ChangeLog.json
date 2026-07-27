@@ -1,5 +1,15 @@
 ﻿[
   {
+    "version": "1.0.0.5",
+    "date": "July 27, 2026",
+    "title": "Text Correction, Admin-> Tech-> Add Tech ",
+    "changes": [
+      "Correct Text color on Dispatch->Tickets Details and Dispatch->Tasks Details",
+      "Corrected Admin->Tech-> Add Tech Window to be themed. Changed Border Color.",
+      "Corrected DataGrid in Admin->SNMP->Add OID to be themed."      
+    ]
+  },
+  {
     "version": "1.0.0.4",
     "date": "July 27, 2026",
     "title": "Tickets & Themes",
