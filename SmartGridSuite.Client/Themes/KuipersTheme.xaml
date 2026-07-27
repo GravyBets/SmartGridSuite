@@ -1,0 +1,248 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- =========================
+         NEON FLUX THEME
+         Pink + Purple + Teal
+         ========================= -->
+
+    <!-- App + cards -->
+    <SolidColorBrush x:Key="AppBackground"
+                     Color="#090812"/>
+
+    <SolidColorBrush x:Key="CardBackground"
+                     Color="#141024"/>
+
+    <SolidColorBrush x:Key="CardBorder"
+                     Color="#3A3158"/>
+
+    <!-- DataGrid -->
+    <SolidColorBrush x:Key="DataGridHeaderBg"
+                     Color="#100C1D"/>
+
+    <SolidColorBrush x:Key="DataGridHeaderBorder"
+                     Color="#3A3158"/>
+
+    <SolidColorBrush x:Key="DataGridRowHoverBg"
+                     Color="#16A78BFA"/>
+
+    <SolidColorBrush x:Key="DataGridRowSelectedBg"
+                     Color="#243DD6C5"/>
+
+    <!-- Card depth -->
+    <DropShadowEffect x:Key="CardShadow"
+                      Color="#000000"
+                      BlurRadius="18"
+                      ShadowDepth="2"
+                      Opacity="0.40"/>
+
+    <!-- Surfaces -->
+    <SolidColorBrush x:Key="SurfaceBg"
+                     Color="#1D1832"/>
+
+    <SolidColorBrush x:Key="SurfaceBorder"
+                     Color="#4B3D70"/>
+
+    <!-- Inputs -->
+    <SolidColorBrush x:Key="ControlInputBg"
+                     Color="#120F20"/>
+
+    <SolidColorBrush x:Key="ControlInputText"
+                     Color="#FAF7FF"/>
+
+    <SolidColorBrush x:Key="ControlInputCaret"
+                     Color="#2DD4BF"/>
+
+    <SolidColorBrush x:Key="ControlInputBorder"
+                     Color="#4B3D70"/>
+
+    <SolidColorBrush x:Key="ControlInputHoverBg"
+                     Color="#1B1530"/>
+
+    <SolidColorBrush x:Key="ControlInputHoverBorder"
+                     Color="#A78BFA"/>
+
+    <SolidColorBrush x:Key="ControlInputFocusBorder"
+                     Color="#2DD4BF"/>
+
+    <!-- Secondary buttons -->
+    <SolidColorBrush x:Key="ControlSecondaryBg"
+                     Color="#1D1832"/>
+
+    <SolidColorBrush x:Key="ControlSecondaryText"
+                     Color="#FAF7FF"/>
+
+    <SolidColorBrush x:Key="ControlSecondaryBorder"
+                     Color="#4B3D70"/>
+
+    <SolidColorBrush x:Key="ControlSecondaryHoverBg"
+                     Color="#2A2145"/>
+
+    <SolidColorBrush x:Key="ControlSecondaryHoverBorder"
+                     Color="#A78BFA"/>
+
+    <SolidColorBrush x:Key="ControlSecondaryPressedBg"
+                     Color="#171226"/>
+
+    <!-- Text -->
+    <SolidColorBrush x:Key="TextPrimary"
+                     Color="#FAF7FF"/>
+
+    <SolidColorBrush x:Key="TextSecondary"
+                     Color="#D8D0E8"/>
+
+    <SolidColorBrush x:Key="WatermarkText"
+                     Color="#9F93B4"/>
+
+    <!-- Input interaction -->
+    <SolidColorBrush x:Key="InputBorderHover"
+                     Color="#A78BFA"/>
+
+    <SolidColorBrush x:Key="InputBorderFocus"
+                     Color="#2DD4BF"/>
+
+    <!-- Primary -->
+    <SolidColorBrush x:Key="PrimaryBg"
+                     Color="#C0267E"/>
+
+    <SolidColorBrush x:Key="PrimaryBorder"
+                     Color="#7C3AED"/>
+
+    <SolidColorBrush x:Key="PrimaryBgHover"
+                     Color="#DB2777"/>
+
+    <SolidColorBrush x:Key="PrimaryBgPressed"
+                     Color="#9D174D"/>
+
+    <!-- Tiles -->
+    <SolidColorBrush x:Key="TileFill"
+                     Color="#1D1832"/>
+
+    <SolidColorBrush x:Key="TileFillHover"
+                     Color="#2A2145"/>
+
+    <SolidColorBrush x:Key="TileFillPressed"
+                     Color="#171226"/>
+
+    <!-- Compatibility tile keys -->
+    <SolidColorBrush x:Key="TileHoverBg"
+                     Color="#2A2145"/>
+
+    <SolidColorBrush x:Key="TilePressedBg"
+                     Color="#171226"/>
+
+    <!-- Tabs -->
+    <SolidColorBrush x:Key="TabBg"
+                     Color="#100C1D"/>
+
+    <SolidColorBrush x:Key="TabBgSelected"
+                     Color="#2A2145"/>
+
+    <SolidColorBrush x:Key="TabBgHover"
+                     Color="#342753"/>
+
+    <!-- Lists -->
+    <SolidColorBrush x:Key="ListBg"
+                     Color="#141024"/>
+
+    <SolidColorBrush x:Key="ListBorder"
+                     Color="#3A3158"/>
+
+    <SolidColorBrush x:Key="ListHoverBg"
+                     Color="#1D1832"/>
+
+    <SolidColorBrush x:Key="ListSelectedBg"
+                     Color="#2A2145"/>
+
+    <SolidColorBrush x:Key="ListItemSelectedBorder"
+                     Color="#2DD4BF"/>
+
+    <SolidColorBrush x:Key="ListItemHoverBg"
+                     Color="#1D1832"/>
+
+    <!-- Tab pills -->
+    <SolidColorBrush x:Key="TabPillSelectedBg"
+                     Color="#342753"/>
+
+    <!-- Inner tabs -->
+    <SolidColorBrush x:Key="InnerTabBg"
+                     Color="#171226"/>
+
+    <SolidColorBrush x:Key="InnerTabSelectedBg"
+                     Color="#2A2145"/>
+
+    <SolidColorBrush x:Key="InnerTabHoverBg"
+                     Color="#342753"/>
+
+    <!-- Parts tab strip -->
+    <SolidColorBrush x:Key="PartsTabsBarBg"
+                     Color="#100C1D"/>
+
+    <SolidColorBrush x:Key="PartsTabsBarBorder"
+                     Color="#4B3D70"/>
+
+    <!-- Validation -->
+    <SolidColorBrush x:Key="MissingRefBg"
+                     Color="#4A162F"/>
+
+    <SolidColorBrush x:Key="MissingRefBgHover"
+                     Color="#611C3D"/>
+
+    <SolidColorBrush x:Key="MissingRefBorder"
+                     Color="#FB7185"/>
+
+    <!-- Danger -->
+    <SolidColorBrush x:Key="DangerText"
+                     Color="#FDA4AF"/>
+
+    <SolidColorBrush x:Key="DangerBorder"
+                     Color="#FB7185"/>
+
+    <SolidColorBrush x:Key="DangerBg"
+                     Color="#4A162F"/>
+
+    <SolidColorBrush x:Key="DangerBgHover"
+                     Color="#611C3D"/>
+
+    <SolidColorBrush x:Key="ReturnText"
+                     Color="#FAF7FF"/>
+
+    <!-- Misc -->
+    <SolidColorBrush x:Key="HoverOverlay"
+                     Color="#16A78BFA"/>
+
+    <SolidColorBrush x:Key="PressedOverlay"
+                     Color="#243DD6C5"/>
+
+    <SolidColorBrush x:Key="BorderHover"
+                     Color="#A78BFA"/>
+
+    <!-- Optional direct neon accents -->
+    <SolidColorBrush x:Key="NeonPink"
+                     Color="#F472B6"/>
+
+    <SolidColorBrush x:Key="NeonPurple"
+                     Color="#A78BFA"/>
+
+    <SolidColorBrush x:Key="NeonTeal"
+                     Color="#2DD4BF"/>
+
+    <!-- Fluent Ribbon -->
+    <SolidColorBrush
+        x:Key="Fluent.Ribbon.Brushes.RibbonBackgroundBrush"
+        Color="#090812"/>
+
+    <SolidColorBrush
+        x:Key="Fluent.Ribbon.Brushes.RibbonBorderBrush"
+        Color="#3A3158"/>
+
+    <SolidColorBrush
+        x:Key="Fluent.Ribbon.Brushes.RibbonTabItemForegroundBrush"
+        Color="#D8D0E8"/>
+
+    <SolidColorBrush
+        x:Key="Fluent.Ribbon.Brushes.RibbonTabItemSelectedForegroundBrush"
+        Color="#FAF7FF"/>
+
+</ResourceDictionary>

@@ -4,6 +4,7 @@ using SmartGridSuite.Client.Views.Administration;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Controls;
+using System.ComponentModel;
 
 namespace SmartGridSuite.Client.Views
 {
@@ -17,6 +18,8 @@ namespace SmartGridSuite.Client.Views
 
             ConnectivityService.StateChanged += ConnectivityService_StateChanged;
 
+            Closing += ModuleLauncherWindow_Closing;
+
             Closed += ModuleLauncherWindow_Closed;
 
             ApplyConnectivityState(
@@ -28,8 +31,17 @@ namespace SmartGridSuite.Client.Views
 
         private readonly ApiClient _connectivityApi = ClientAppSettings.CreateApiClient();
 
+        private readonly ClientVersionService _clientVersionService = ClientVersionService.Current;
+
+        private const double NormalLauncherHeight = 580;
+        private const double ConnectivityLauncherHeight = 640;
+
         private bool _isOpeningModule;
         private bool _loadingThemeControl;
+
+        private readonly HashSet<Window> _trackedModuleWindows = new();
+
+        private bool _isClosingApplication;
 
         private void LoadThemeControl()
         {
@@ -107,14 +119,18 @@ namespace SmartGridSuite.Client.Views
 
             try
             {
+                if (!await CanOpenModulesForCurrentVersionAsync())
+                    return;
+
                 var existingWindow = Application.Current.Windows
                     .OfType<FieldTechnicianShellWindow>()
                     .FirstOrDefault();
 
                 if (existingWindow != null)
                 {
+                    TrackModuleWindow(existingWindow);
                     BringExistingWindowForward(existingWindow);
-                    Close();
+                    Hide();
                     return;
                 }
 
@@ -127,15 +143,15 @@ namespace SmartGridSuite.Client.Views
 
                 if (existingWindow != null)
                 {
+                    TrackModuleWindow(existingWindow);
                     BringExistingWindowForward(existingWindow);
-                    Close();
+                    Hide();
                     return;
                 }
 
                 var wnd = new FieldTechnicianShellWindow();
-                wnd.Show();
 
-                Close();
+                OpenModuleWindow(wnd);
             }
             finally
             {
@@ -150,39 +166,46 @@ namespace SmartGridSuite.Client.Views
 
             try
             {
-                var existingWindow = Application.Current.Windows
-                    .OfType<DispatcherShellWindow>()
-                    .FirstOrDefault();
+                if (!await CanOpenModulesForCurrentVersionAsync())
+                    return;
+
+                var existingWindow =
+                    Application.Current.Windows
+                        .OfType<DispatcherShellWindow>()
+                        .FirstOrDefault();
 
                 if (existingWindow != null)
                 {
+                    TrackModuleWindow(existingWindow);
                     BringExistingWindowForward(existingWindow);
-                    Close();
+                    Hide();
                     return;
                 }
 
-                if (!await CurrentUserHasRequiredRoleAsync("DISPATCH", "Dispatcher"))
+                if (!await CurrentUserHasRequiredRoleAsync(
+                        "DISPATCH",
+                        "Dispatcher"))
+                {
                     return;
+                }
 
-                /*
-                 * Recheck after the role lookup. This protects against a second launcher
-                 * window or another code path opening Dispatcher while access is loading.
-                 */
-                existingWindow = Application.Current.Windows
-                    .OfType<DispatcherShellWindow>()
-                    .FirstOrDefault();
+                existingWindow =
+                    Application.Current.Windows
+                        .OfType<DispatcherShellWindow>()
+                        .FirstOrDefault();
 
                 if (existingWindow != null)
                 {
+                    TrackModuleWindow(existingWindow);
                     BringExistingWindowForward(existingWindow);
-                    Close();
+                    Hide();
                     return;
                 }
 
-                var wnd = new DispatcherShellWindow();
-                wnd.Show();
+                var wnd =
+                    new DispatcherShellWindow();
 
-                Close();
+                OpenModuleWindow(wnd);
             }
             finally
             {
@@ -197,43 +220,75 @@ namespace SmartGridSuite.Client.Views
 
             try
             {
-                var existingWindow = Application.Current.Windows
-                    .OfType<AdministrationShellWindow>()
-                    .FirstOrDefault();
+                if (!await CanOpenModulesForCurrentVersionAsync())
+                    return;
+
+                var existingWindow =
+                    Application.Current.Windows
+                        .OfType<AdministrationShellWindow>()
+                        .FirstOrDefault();
 
                 if (existingWindow != null)
                 {
+                    TrackModuleWindow(existingWindow);
                     BringExistingWindowForward(existingWindow);
                     Hide();
                     return;
                 }
 
-                if (!await CurrentUserHasRequiredRoleAsync("ADMIN", "Administration"))
+                if (!await CurrentUserHasRequiredRoleAsync(
+                        "ADMIN",
+                        "Administration"))
+                {
                     return;
+                }
 
-                existingWindow = Application.Current.Windows
-                    .OfType<AdministrationShellWindow>()
-                    .FirstOrDefault();
+                existingWindow =
+                    Application.Current.Windows
+                        .OfType<AdministrationShellWindow>()
+                        .FirstOrDefault();
 
                 if (existingWindow != null)
                 {
+                    TrackModuleWindow(existingWindow);
                     BringExistingWindowForward(existingWindow);
                     Hide();
                     return;
                 }
 
-                var win = new AdministrationShellWindow
-                {
-                    Owner = this
-                };
+                var wnd =
+                    new AdministrationShellWindow();
 
-                win.Show();
-                Hide();
+                OpenModuleWindow(wnd);
             }
             finally
             {
                 EndModuleOpen();
             }
+        }
+
+        private async Task<bool> CanOpenModulesForCurrentVersionAsync()
+        {
+            var result =
+                await _clientVersionService.CheckAsync();
+
+            /*
+             * Failure to check the version must never block field use.
+             * Only a confirmed minimum-version violation blocks access.
+             */
+            if (result.State != ClientVersionState.Unsupported)
+                return true;
+
+            MessageBox.Show(
+                $"This version of Smart Grid Suite is no longer supported.\n\n" +
+                $"Installed version: {result.InstalledVersion}\n" +
+                $"Minimum required: {result.MinimumSupportedVersion}\n\n" +
+                "Close and reopen Smart Grid Suite to install the required update.",
+                "Smart Grid Suite Update Required",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+
+            return false;
         }
 
         private bool TryBeginModuleOpen()
@@ -281,6 +336,84 @@ namespace SmartGridSuite.Client.Views
             window.Topmost = false;
 
             window.Focus();
+        }
+
+        private void OpenModuleWindow(Window window)
+        {
+            TrackModuleWindow(window);
+
+            window.Show();
+
+            Hide();
+        }
+
+        private void TrackModuleWindow(Window window)
+        {
+            if (!_trackedModuleWindows.Add(window))
+                return;
+
+            window.Closed +=
+                ModuleWindow_Closed;
+        }
+
+        private void ModuleWindow_Closed(object? sender, EventArgs e)
+        {
+            if (sender is Window window)
+            {
+                window.Closed -=
+                    ModuleWindow_Closed;
+
+                _trackedModuleWindows.Remove(window);
+            }
+
+            /*
+             * Do not reopen the launcher while the application itself is shutting
+             * down or while another tracked module remains open.
+             */
+            if (_isClosingApplication ||
+                _trackedModuleWindows.Count > 0)
+            {
+                return;
+            }
+
+            /*
+             * A module may close from code running during another UI event.
+             * Queue the launcher restoration until that close operation finishes.
+             */
+            Dispatcher.BeginInvoke(
+                new Action(ReturnToLauncher));
+        }
+
+        private void ReturnToLauncher()
+        {
+            if (_isClosingApplication ||
+                !IsLoaded)
+            {
+                return;
+            }
+
+            if (WindowState == WindowState.Minimized)
+                WindowState = WindowState.Normal;
+
+            if (!IsVisible)
+                Show();
+
+            Activate();
+
+            /*
+             * Briefly raise the launcher in case the closing module left another
+             * application above it.
+             */
+            Topmost = true;
+            Topmost = false;
+
+            Focus();
+        }
+
+        private void ModuleLauncherWindow_Closing(object? sender, CancelEventArgs e)
+        {
+            if (!e.Cancel)
+                _isClosingApplication = true;
         }
 
         private async Task<bool> CurrentUserHasRequiredRoleAsync(string requiredRoleCode, string moduleName)
@@ -401,11 +534,6 @@ namespace SmartGridSuite.Client.Views
                 state == ConnectivityState.Degraded ||
                 state == ConnectivityState.Checking;
 
-            ConnectivityBanner.Visibility =
-                shouldShow
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-
             ConnectivityMessageText.Text =
                 string.IsNullOrWhiteSpace(message)
                     ? "Unable to determine server availability."
@@ -418,6 +546,37 @@ namespace SmartGridSuite.Client.Views
                 state == ConnectivityState.Checking
                     ? "Checking..."
                     : "Retry";
+
+            ConnectivityBanner.Visibility =
+                shouldShow
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+
+            ResizeForConnectivityBanner(shouldShow);
+        }
+
+        private void ResizeForConnectivityBanner(bool bannerIsVisible)
+        {
+            var targetHeight =
+                bannerIsVisible
+                    ? ConnectivityLauncherHeight
+                    : NormalLauncherHeight;
+
+            if (Math.Abs(Height - targetHeight) < 0.5)
+                return;
+
+            /*
+             * Before the window is initially displayed, WindowStartupLocation handles
+             * centering. After it is visible, adjust Top by half the height difference
+             * so the launcher grows and shrinks around its vertical center.
+             */
+            if (IsLoaded && !double.IsNaN(Top))
+            {
+                var heightDifference = targetHeight - Height;
+                Top -= heightDifference / 2;
+            }
+
+            Height = targetHeight;
         }
 
         // Calls the lightweight health endpoint and restores normal UI state once both
@@ -467,8 +626,22 @@ namespace SmartGridSuite.Client.Views
 
         private void ModuleLauncherWindow_Closed(object? sender, EventArgs e)
         {
+            _isClosingApplication = true;
+
             ConnectivityService.StateChanged -=
                 ConnectivityService_StateChanged;
+
+            Closing -=
+                ModuleLauncherWindow_Closing;
+
+            foreach (var moduleWindow in
+                     _trackedModuleWindows.ToList())
+            {
+                moduleWindow.Closed -=
+                    ModuleWindow_Closed;
+            }
+
+            _trackedModuleWindows.Clear();
         }
 
         private sealed class ApiHealthResponse

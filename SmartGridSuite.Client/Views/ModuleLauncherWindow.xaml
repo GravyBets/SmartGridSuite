@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Smart Grid Suite"
         Height="580"
+        MinHeight="580"
         Width="660"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"

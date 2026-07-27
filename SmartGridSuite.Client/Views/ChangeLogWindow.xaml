@@ -68,83 +68,60 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
 
-                <StackPanel>
+                <ItemsControl x:Name="ChangeLogItemsControl">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                    <!-- July 20 -->
-                    <TextBlock Text="July 20, 2026"
+                                    <TextBlock Grid.Column="0"
+                               Text="{Binding Date}"
                                FontSize="17"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimary}"/>
 
-                    <TextBlock Margin="0,4,0,12"
-                               Text="Launcher and support-window cleanup"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextSecondary}"/>
+                                    <Border Grid.Column="1"
+                            Padding="8,3"
+                            CornerRadius="8"
+                            Background="{DynamicResource AppBackground}">
 
-                    <StackPanel Margin="4,0,10,0">
-                        <TextBlock Text="• About and Bug / Feature Request were moved into dedicated XAML windows."
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,8"
-                                   Foreground="{DynamicResource TextPrimary}"/>
+                                        <TextBlock Text="{Binding Version, StringFormat=Version {0}}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                                    </Border>
+                                </Grid>
 
-                        <TextBlock Text="• About was redesigned with company branding and a more compact layout."
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,8"
-                                   Foreground="{DynamicResource TextPrimary}"/>
+                                <TextBlock Margin="0,4,0,12"
+                           Text="{Binding Title}"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondary}"/>
 
-                        <TextBlock Text="• Change Log was moved into its own dedicated window."
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,8"
-                                   Foreground="{DynamicResource TextPrimary}"/>
+                                <ItemsControl ItemsSource="{Binding Changes}"
+                              Margin="4,0,10,0">
 
-                        <TextBlock Text="• Bug / Feature Request now generates a structured clipboard template."
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextPrimary}"/>
-                    </StackPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding StringFormat=• {0}}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,8"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
 
-                    <Border Height="1"
-                            Margin="0,20"
-                            Background="{DynamicResource CardBorder}"/>
-
-                    <!-- July 16 -->
-                    <TextBlock Text="July 16, 2026"
-                               FontSize="17"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimary}"/>
-
-                    <TextBlock Margin="0,4,0,12"
-                               Text="Dispatch, General Settings, and Site Dashboard updates"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextSecondary}"/>
-
-                    <StackPanel Margin="4,0,10,0">
-                        <TextBlock Text="• Communication Device Types can now be added, edited, deleted, and managed from General Settings."
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,8"
-                                   Foreground="{DynamicResource TextPrimary}"/>
-
-                        <TextBlock Text="• Dispatch can copy selected Work Orders as a vertical list for Excel and time entry."
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,8"
-                                   Foreground="{DynamicResource TextPrimary}"/>
-
-                        <TextBlock Text="• Work Order length protection was added across the UI, API, and database."
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,8"
-                                   Foreground="{DynamicResource TextPrimary}"/>
-
-                        <TextBlock Text="• Dispatch can edit technician write-ups from the task details pane."
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,8"
-                                   Foreground="{DynamicResource TextPrimary}"/>
-
-                        <TextBlock Text="• Site Dashboard write-up typing performance was improved."
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextPrimary}"/>
-                    </StackPanel>
-                </StackPanel>
+                                <Border Height="1"
+                        Margin="0,16,0,20"
+                        Background="{DynamicResource CardBorder}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </ScrollViewer>
         </Border>
 

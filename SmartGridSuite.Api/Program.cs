@@ -30,6 +30,9 @@ namespace SmartGridSuite.Api
             builder.Services.Configure<EmailOptions>(
                 builder.Configuration.GetSection(EmailOptions.SectionName));
 
+            builder.Services.Configure<ClientVersionOptions>(
+                builder.Configuration.GetSection(ClientVersionOptions.SectionName));
+
             builder.Services.AddScoped<ParentSyncService>();
 
             builder.Services.AddScoped<SnmpPollingService>();

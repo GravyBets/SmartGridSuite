@@ -5,7 +5,7 @@ namespace SmartGridSuite.Client.Services
 {
     public static class ClientAppSettings
     {
-        public static string ApiBaseUrl { get; set; } = "http://localhost:7140/";
+        public static string ApiBaseUrl { get; set; } = "http://10.130.206.135:7140/";
 
         public static Uri ApiBaseUri =>
             new Uri(ApiBaseUrl.EndsWith("/")

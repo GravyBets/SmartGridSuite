@@ -6,7 +6,6 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using SmartGridSuite.Client.Views.Administration.DesignTest;
 
 namespace SmartGridSuite.Client.Views.Administration
 {
@@ -19,9 +18,7 @@ namespace SmartGridSuite.Client.Views.Administration
         private readonly TicketsAdminView _ticketsView;
         private readonly GeneralSettingsAdminView _generalSettingsView;
         private readonly SnmpAdminView _snmpView;
-
-        private readonly DesignTestPaneView _designTestView;
-
+        
         private bool _navCollapsed;
         private bool _syncingNav;
         private int _currentNavIndex;
@@ -43,8 +40,6 @@ namespace SmartGridSuite.Client.Views.Administration
             _ticketsView = new TicketsAdminView(_api);
             _generalSettingsView = new GeneralSettingsAdminView(_api);
             _snmpView = new SnmpAdminView(_api);
-
-            _designTestView = new DesignTestPaneView();
 
             _navCollapsed = true;
             ApplyNavState();
@@ -164,10 +159,6 @@ namespace SmartGridSuite.Client.Views.Administration
 
                 case "SNMP":
                     ShowView(_snmpView);
-                    break;
-
-                case "DesignTest":
-                    ShowView(_designTestView);
                     break;
 
                 default:

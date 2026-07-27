@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="About"
         Width="620"
-        Height="390"
+        Height="455"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
@@ -29,9 +29,11 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="0"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="4"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="12"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
@@ -73,8 +75,8 @@
                     </StackPanel>
 
                     <!-- Company logo -->
-                    <Image Grid.Column="4"
-                           Source="/Assets/Branding/CenterPoint Logo Color Transparent bkgrnd.png"
+                    <Image x:Name="CompanyLogoImage"
+                           Grid.Column="4"
                            Width="180"
                            Height="88"
                            VerticalAlignment="Center"
@@ -84,7 +86,7 @@
                 </Grid>
 
                 <!-- Developer -->
-                <StackPanel Grid.Row="2"
+                <StackPanel Grid.Row="4"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
 
@@ -109,7 +111,7 @@
                 </StackPanel>
 
                 <!-- Description -->
-                <TextBlock Grid.Row="4"
+                <TextBlock Grid.Row="6"
                            MaxWidth="545"
                            Text="Smart Grid Suite centralizes dispatcher, field technician, site diagnostics, history, and administration workflows for Smart Grid radio operations."
                            TextWrapping="Wrap"
@@ -117,8 +119,31 @@
                            FontSize="13"
                            Foreground="{DynamicResource TextSecondary}"/>
 
+                <!-- Version status -->
+                <Border Grid.Row="2"
+                        Padding="12,10"
+                        CornerRadius="10"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource CardBorder}"
+                        Background="{DynamicResource CardBackground}">
+
+                    <StackPanel>
+                        <TextBlock x:Name="VersionStatusTextBlock"
+                                   Text="Checking version status..."
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+
+                        <TextBlock x:Name="VersionDetailsTextBlock"
+                                   Margin="0,4,0,0"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- Bottom content -->
-                <Grid Grid.Row="6">
+                <Grid Grid.Row="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="18"/>

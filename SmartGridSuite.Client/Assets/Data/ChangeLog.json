@@ -1,0 +1,56 @@
+﻿[
+  {
+    "version": "1.0.0.4",
+    "date": "July 27, 2026",
+    "title": "Themes",
+    "changes": [
+      "Finished up themes.",
+      "Corrected Theme Controls",
+      "Got rid of the 'Design Test' in the admin window.",
+      "Flip-flopped CNP Logo Image depending on Theme.",
+      "Ensured application opens ModuleLauncherWindow after each module is closed and ensured app shuts down after exiting ModulesLauncher."
+    ]
+  },
+  {
+    "version": "1.0.0.3",
+    "date": "July 23, 2026",
+    "title": "Client -> API Connection Updates",
+    "changes": [
+      "Corrected Https:// to http:// in ClientAppSettings."
+    ]
+  },
+  {
+    "version": "1.0.0.2",
+    "date": "July 23, 2026",
+    "title": "Deployment and version management",
+    "changes": [
+      "Added automatic ClickOnce update support.",
+      "Added installed, latest, and minimum-supported version checking.",
+      "The launcher now expands when a connectivity warning is displayed.",
+      "Smart Grid Suite can now be installed and updated from the central server."
+    ]
+  },
+  {
+    "version": "1.0.0.1",
+    "date": "July 20, 2026",
+    "title": "Launcher and support-window cleanup",
+    "changes": [
+      "About and Bug / Feature Request were moved into dedicated XAML windows.",
+      "About was redesigned with company branding and a more compact layout.",
+      "Change Log was moved into its own dedicated window.",
+      "Bug / Feature Request now generates a structured clipboard template."
+    ]
+  },
+  {
+    "version": "1.0.0.0",
+    "date": "July 16, 2026",
+    "title": "Dispatch, General Settings, and Site Dashboard updates",
+    "changes": [
+      "Communication Device Types can now be added, edited, deleted, and managed from General Settings.",
+      "Dispatch can copy selected Work Orders as a vertical list for Excel and time entry.",
+      "Work Order length protection was added across the UI, API, and database.",
+      "Dispatch can edit technician write-ups from the task details pane.",
+      "Site Dashboard write-up typing performance was improved."
+    ]
+  }
+]

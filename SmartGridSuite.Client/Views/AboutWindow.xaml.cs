@@ -1,26 +1,96 @@
-﻿using System.Reflection;
+﻿using SmartGridSuite.Client.Services;
+using System;
 using System.Windows;
+using System.Windows.Media.Imaging;
 
 namespace SmartGridSuite.Client.Views
 {
     public partial class AboutWindow : Window
     {
+        private readonly ClientVersionService _versionService =
+            ClientVersionService.Current;
+
         public AboutWindow()
         {
             InitializeComponent();
 
             VersionTextBlock.Text =
-                $"Version {GetApplicationVersion()}";
+                $"Installed version " +
+                $"{ClientVersionService.GetInstalledVersionText()}";
+
+            ApplyCompanyLogo();
+
+            ThemeService.ThemeChanged +=
+                ThemeService_ThemeChanged;
+
+            Loaded +=
+                AboutWindow_Loaded;
+
+            Closed +=
+                AboutWindow_Closed;
         }
 
-        private void ChangeLogLink_Click(
+        private void ApplyCompanyLogo()
+        {
+            CompanyLogoImage.Source =
+                new BitmapImage(
+                    ThemeService.CurrentCompanyLogoUri);
+        }
+
+        private void ThemeService_ThemeChanged(
+            object? sender,
+            EventArgs e)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(
+                    new Action(ApplyCompanyLogo));
+
+                return;
+            }
+
+            ApplyCompanyLogo();
+        }
+
+        private async void AboutWindow_Loaded(
             object sender,
             RoutedEventArgs e)
         {
-            var window = new ChangeLogWindow
+            VersionStatusTextBlock.Text =
+                "Checking version status...";
+
+            VersionDetailsTextBlock.Text = "";
+
+            var result =
+                await _versionService.CheckAsync(
+                    forceRefresh: true);
+
+            VersionStatusTextBlock.Text =
+                result.Message;
+
+            if (result.State == ClientVersionState.Unknown)
             {
-                Owner = this
-            };
+                VersionDetailsTextBlock.Text =
+                    $"Installed: {result.InstalledVersion}. " +
+                    "The application can continue running.";
+
+                return;
+            }
+
+            VersionDetailsTextBlock.Text =
+                $"Installed: {result.InstalledVersion}   •   " +
+                $"Latest: {result.LatestVersion}   •   " +
+                $"Minimum supported: " +
+                $"{result.MinimumSupportedVersion}";
+        }
+
+        private void ChangeLogLink_Click(object sender, RoutedEventArgs e)
+        {
+            var window =
+                new ChangeLogWindow
+                {
+                    Owner = this
+                };
 
             window.ShowDialog();
         }
@@ -32,29 +102,18 @@ namespace SmartGridSuite.Client.Views
             Close();
         }
 
-        private static string GetApplicationVersion()
+        private void AboutWindow_Closed(
+            object? sender,
+            EventArgs e)
         {
-            var assembly = typeof(AboutWindow).Assembly;
+            ThemeService.ThemeChanged -=
+                ThemeService_ThemeChanged;
 
-            var informationalVersion = assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-                .InformationalVersion;
+            Loaded -=
+                AboutWindow_Loaded;
 
-            if (!string.IsNullOrWhiteSpace(informationalVersion))
-            {
-                var metadataSeparator =
-                    informationalVersion.IndexOf('+');
-
-                return metadataSeparator >= 0
-                    ? informationalVersion[..metadataSeparator]
-                    : informationalVersion;
-            }
-
-            return assembly
-                       .GetName()
-                       .Version?
-                       .ToString(3)
-                   ?? "Development";
+            Closed -=
+                AboutWindow_Closed;
         }
     }
 }
