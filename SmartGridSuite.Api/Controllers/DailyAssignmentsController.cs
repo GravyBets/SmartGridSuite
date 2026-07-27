@@ -17,18 +17,35 @@ namespace SmartGridSuite.Api.Controllers
         private readonly SmartGridDbContext _db;
         private readonly TruckBoardInitializationService _truckBoardInitialization;
         private readonly EmailService _emailService;
+
+        private readonly DailyAssignmentEmailSequenceService
+            _dailyAssignmentEmailSequence;
+
         private readonly ILogger<DailyAssignmentsController> _logger;
 
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
         private const string TechnicianRoleCode = "TECHNICIAN";
 
-        public DailyAssignmentsController(SmartGridDbContext db, TruckBoardInitializationService truckBoardInitialization,
-            EmailService emailService, ILogger<DailyAssignmentsController> logger)
+        public DailyAssignmentsController(
+            SmartGridDbContext db,
+            TruckBoardInitializationService truckBoardInitialization,
+            EmailService emailService,
+            DailyAssignmentEmailSequenceService dailyAssignmentEmailSequence,
+            ILogger<DailyAssignmentsController> logger)
         {
             _db = db;
-            _truckBoardInitialization = truckBoardInitialization;
-            _emailService = emailService;
-            _logger = logger;
+
+            _truckBoardInitialization =
+                truckBoardInitialization;
+
+            _emailService =
+                emailService;
+
+            _dailyAssignmentEmailSequence =
+                dailyAssignmentEmailSequence;
+
+            _logger =
+                logger;
         }
 
         [HttpGet("board")]
@@ -2159,27 +2176,36 @@ namespace SmartGridSuite.Api.Controllers
                     publishedBy,
                     ct);
 
-                var modificationNumber = isModifiedPublish
-                    ? await GetNextDailyAssignmentModificationNumberAsync(
+                /*
+                 * Route comparison and email sequencing are separate concerns.
+                 *
+                 * isModifiedPublish tells us whether a previous route snapshot exists,
+                 * which controls whether the Changes Since Previous Publish section appears.
+                 *
+                 * EmailSequence tells us whether an assignment email has already been
+                 * successfully sent to this target today.
+                 */
+                var emailSequence =
+                    await _dailyAssignmentEmailSequence.GetNextAsync(
                         targetDisplay,
                         workDate,
-                        ct)
-                    : 0;
+                        ct);
 
-                var emailTitle = isModifiedPublish
-                    ? $"Modified({modificationNumber}) Daily Assignments"
-                    : "Daily Assignments";
+                var emailTitle =
+                    emailSequence.Title;
 
-                var subject = isModifiedPublish
-                    ? $"{targetDisplay} - Modified({modificationNumber}) Daily Assignments - {workDate:MM/dd/yyyy}"
-                    : $"{targetDisplay} - Daily Assignments - {workDate:MM/dd/yyyy}";
+                var changeSummaryHtml =
+                    isModifiedPublish
+                        ? BuildDailyAssignmentChangeSummaryHtml(
+                            previousPublishedRows,
+                            currentPublishedRows,
+                            ticketsById)
+                        : "";
 
-                var changeSummaryHtml = isModifiedPublish
-                    ? BuildDailyAssignmentChangeSummaryHtml(
-                        previousPublishedRows,
-                        currentPublishedRows,
-                        ticketsById)
-                    : "";
+                var subject =
+                    $"{targetDisplay} - " +
+                    $"{emailTitle} - " +
+                    $"{workDate:MM/dd/yyyy}";
 
                 var body = BuildDailyAssignmentPublishedEmailBody(
                     workDate,
@@ -2891,32 +2917,6 @@ namespace SmartGridSuite.Api.Controllers
                 technician.FirstName,
                 technician.LastName,
                 technician.EmployeeId);
-        }
-
-        private async Task<int> GetNextDailyAssignmentModificationNumberAsync(
-            string targetDisplay, DateTime workDate, CancellationToken ct)
-        {
-            var cleanTarget = (targetDisplay ?? string.Empty).Trim();
-            var dateText = workDate.ToString("MM/dd/yyyy");
-
-            if (string.IsNullOrWhiteSpace(cleanTarget))
-                return 1;
-
-            var subjectPrefix =
-                $"{cleanTarget} - Modified(";
-
-            var subjectSuffix =
-                $") Daily Assignments - {dateText}";
-
-            var previousModifiedCount = await _db.EmailLogs
-                .AsNoTracking()
-                .Where(x =>
-                    x.EmailType == "DailyAssignment" &&
-                    x.Subject.StartsWith(subjectPrefix) &&
-                    x.Subject.Contains(subjectSuffix))
-                .CountAsync(ct);
-
-            return previousModifiedCount + 1;
         }
 
         private static string ResolveTruckNumberDisplay(uint? truckId, IReadOnlyDictionary<uint, TruckEntity> trucksById)

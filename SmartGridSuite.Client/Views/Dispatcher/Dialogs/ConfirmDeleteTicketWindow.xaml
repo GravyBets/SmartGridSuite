@@ -1,0 +1,164 @@
+﻿<Window x:Class="SmartGridSuite.Client.Views.Dispatcher.Dialogs.ConfirmDeleteTicketWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Confirm Permanent Delete"
+        Width="560"
+        Height="492"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
+        Background="{DynamicResource AppBackground}">
+
+    <Grid Margin="16">
+        <Border Padding="18"
+                CornerRadius="14"
+                BorderThickness="1"
+                BorderBrush="{DynamicResource DangerBorder}"
+                Background="{DynamicResource CardBackground}">
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="14"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="14"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="18"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Warning header -->
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="Are you sure?"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource DangerBorder}"/>
+
+                    <TextBlock Margin="0,6,0,0"
+                               Text="This ticket will be permanently deleted."
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <TextBlock Margin="0,4,0,0"
+                               Text="This action cannot be undone."
+                               FontSize="13"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+
+                <!-- Ticket identification -->
+                <Border Grid.Row="2"
+                        Padding="12"
+                        CornerRadius="10"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource SurfaceBorder}"
+                        Background="{DynamicResource SurfaceBg}">
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="0"
+                                   Text="Site"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+
+                        <TextBlock x:Name="SiteTextBlock"
+                                   Grid.Row="0"
+                                   Grid.Column="1"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+
+                        <TextBlock Grid.Row="2"
+                                   Grid.Column="0"
+                                   Text="Notification"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+
+                        <TextBlock x:Name="NotificationTextBlock"
+                                   Grid.Row="2"
+                                   Grid.Column="1"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+
+                        <TextBlock Grid.Row="4"
+                                   Grid.Column="0"
+                                   Text="Problem"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+
+                        <TextBlock x:Name="ProblemTextBlock"
+                                   Grid.Row="4"
+                                   Grid.Column="1"
+                                   MaxHeight="60"
+                                   TextWrapping="Wrap"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+                    </Grid>
+                </Border>
+
+                <!-- Deletion consequences -->
+                <Border Grid.Row="4"
+                        Padding="12"
+                        CornerRadius="10"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource DangerBorder}"
+                        Background="{DynamicResource MissingRefBg}">
+
+                    <StackPanel>
+                        <TextBlock Text="Deleting this ticket will also remove:"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+
+                        <TextBlock Margin="0,6,0,0"
+                                   Text="• Draft Daily Assignments&#x0a;• Published Daily Assignment records&#x0a;• Submitted write-up records&#x0a;• Technician History links"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+
+                        <TextBlock Margin="0,8,0,0"
+                                   Text="Existing Site History entries will remain as permanent site history."
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Buttons -->
+                <Grid Grid.Row="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="1"
+                            Content="Cancel"
+                            Width="110"
+                            Height="34"
+                            IsCancel="True"
+                            IsDefault="True"/>
+
+                    <Button Grid.Column="3"
+                            Content="Delete Permanently"
+                            MinWidth="150"
+                            Height="34"
+                            Style="{StaticResource DangerButtonStyle}"
+                            Click="ConfirmDeleteButton_Click"/>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

@@ -41,6 +41,8 @@ namespace SmartGridSuite.Api
 
             builder.Services.AddScoped<EmailService>();
 
+            builder.Services.AddScoped<DailyAssignmentEmailSequenceService>();
+
             var app = builder.Build();
 
             if (app.Environment.IsDevelopment() || app.Environment.IsStaging())

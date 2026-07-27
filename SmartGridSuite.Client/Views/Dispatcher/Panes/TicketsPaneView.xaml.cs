@@ -329,7 +329,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             InitializeComponent();
             _searchDebounceTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(250)
+                Interval = TimeSpan.FromMilliseconds(650)
             };
             _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
 
@@ -548,7 +548,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (!_filtersInitialized)
                 return;
 
-            await LoadTicketsFromApiAsync(resetPage: true);
+            /*
+             * A debounced search should not disable the search box or cover the
+             * pane with the blocking loading overlay.
+             */
+            var searchHadFocus =
+                SearchBox.IsKeyboardFocusWithin;
+
+            var caretIndex =
+                SearchBox.CaretIndex;
+
+            await LoadTicketsFromApiAsync(
+                resetPage: true,
+                showBusyOverlay: false);
+
+            /*
+             * Ordinarily focus never leaves because SearchBox was not disabled.
+             * Restore the caret only when the user is still typing there; do not
+             * steal focus if they clicked another control while the API was loading.
+             */
+            if (searchHadFocus &&
+                SearchBox.IsKeyboardFocusWithin)
+            {
+                SearchBox.CaretIndex =
+                    Math.Min(
+                        caretIndex,
+                        SearchBox.Text?.Length ?? 0);
+            }
         }
 
         private async void TicketsPaneView_Loaded(object sender, RoutedEventArgs e)
@@ -646,7 +672,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private async Task LoadTicketsFromApiAsync(bool resetPage = false, CancellationToken ct = default)
+        private async Task LoadTicketsFromApiAsync(bool resetPage = false, CancellationToken ct = default, bool showBusyOverlay = true)
         {
             if (!_filtersInitialized)
                 return;
@@ -659,7 +685,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             _ticketQueryCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var queryCt = _ticketQueryCts.Token;
-            ShowBusyOverlay("Loading tickets...");
+
+            if (showBusyOverlay)
+            {
+                ShowBusyOverlay(
+                    "Loading tickets...");
+            }
 
             try
             {
@@ -685,7 +716,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                     await LoadTicketsFromApiAsync(
                         resetPage: false,
-                        ct: ct);
+                        ct: ct,
+                        showBusyOverlay: showBusyOverlay);
 
                     return;
                 }
@@ -730,7 +762,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
             finally
             {
-                HideBusyOverlay();
+                if (showBusyOverlay)
+                {
+                    HideBusyOverlay();
+                }
             }
         }
 
@@ -1169,6 +1204,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
+            /*
+             * Do not start an extra search while filters are being initialized
+             * or while Clear Filters is changing SearchBox.Text in code.
+             */
+            if (_suppressFilterEvents ||
+                !_filtersInitialized)
+            {
+                return;
+            }
+
             _searchDebounceTimer.Stop();
             _searchDebounceTimer.Start();
         }
@@ -1666,10 +1711,36 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (win.ShowDialog() != true)
                 return;
 
+            if (win.WasDeleted)
+            {
+                _detailsOpen = false;
+
+                TicketsGrid.SelectedItems.Clear();
+
+                SelectedTicket = null;
+
+                _selectedTicketOriginalTechNotes = "";
+                _selectedTicketOriginalDispatchNotes = "";
+
+                _selectedTicketSiteNotes.Clear();
+
+                UpdateDetailsVisibility();
+                UpdateSaveDetailsButtonState();
+                UpdateTicketListUiState();
+
+                await LoadSummaryFromApiAsync();
+                await LoadTicketsFromApiAsync(
+                    resetPage: false);
+
+                return;
+            }
+
             await LoadSummaryFromApiAsync();
             await LoadTicketsFromApiAsync();
 
-            var targetId = win.CreatedTicketId ?? editingId;
+            var targetId =
+                win.CreatedTicketId ??
+                editingId;
 
             var found = _tickets.FirstOrDefault(t => t.Id == targetId);
 

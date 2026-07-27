@@ -20,19 +20,45 @@ namespace SmartGridSuite.Api.Controllers
         private readonly SmartGridDbContext _db;
         private readonly TruckBoardInitializationService _truckBoardInitialization;
         private readonly EmailService _emailService;
+
+        private readonly DailyAssignmentEmailSequenceService
+            _dailyAssignmentEmailSequence;
+
         private readonly ILogger<TicketsController> _logger;
 
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
         private const string TechnicianRoleCode = "TECHNICIAN";
 
+        private const string TicketSiteRequiredMessage =
+            "A Site Number is required before this ticket can be saved. " +
+            "You may enter the Problem / Issue first, but Smart Grid Suite " +
+            "cannot create or update the ticket until it is tied to a site. " +
+            "Enter the Site Number and save again. " +
+            "For TOP sites, enter only the TOP site, such as XX-MWB. " +
+            "Do not include the sector.";
+
         // Receives the shared roster initializer so field tasks can safely build today's crew route.
-        public TicketsController(SmartGridDbContext db, TruckBoardInitializationService truckBoardInitialization,
-        EmailService emailService, ILogger<TicketsController> logger)
+        public TicketsController(
+            SmartGridDbContext db,
+            TruckBoardInitializationService truckBoardInitialization,
+            EmailService emailService,
+            DailyAssignmentEmailSequenceService dailyAssignmentEmailSequence,
+            ILogger<TicketsController> logger)
         {
-            _db = db;
-            _truckBoardInitialization = truckBoardInitialization;
-            _emailService = emailService;
-            _logger = logger;
+            _db =
+                db;
+
+            _truckBoardInitialization =
+                truckBoardInitialization;
+
+            _emailService =
+                emailService;
+
+            _dailyAssignmentEmailSequence =
+                dailyAssignmentEmailSequence;
+
+            _logger =
+                logger;
         }
 
         [HttpGet]
@@ -1851,6 +1877,171 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(new UpdateTicketResponse(entity.Id));
         }
 
+        [HttpPost("{id:long}/delete")]
+        public async Task<ActionResult<DeleteTicketResponse>> DeleteTicket(long id,[FromBody] DeleteTicketRequest? req, CancellationToken ct)
+        {
+            req ??= new DeleteTicketRequest();
+
+            if (!req.ConfirmPermanentDelete)
+            {
+                return BadRequest(
+                    "Permanent-delete confirmation is required.");
+            }
+
+            var deletedBy =
+                string.IsNullOrWhiteSpace(req.DeletedBy)
+                    ? "Unknown"
+                    : req.DeletedBy.Trim();
+
+            await using var transaction =
+                await _db.Database.BeginTransactionAsync(ct);
+
+            try
+            {
+                var ticket = await _db.Tickets
+                    .FirstOrDefaultAsync(
+                        x => x.Id == id,
+                        ct);
+
+                if (ticket == null)
+                    return NotFound("Ticket was not found.");
+
+                var ticketSite =
+                    (ticket.Site ?? string.Empty).Trim();
+
+                var ticketNotification =
+                    (ticket.Notification ?? string.Empty).Trim();
+
+                /*
+                 * Site History is permanent operational history and is intentionally
+                 * preserved when its originating ticket is deleted.
+                 */
+                var submissionRows =
+                    await _db.TicketWriteUpSubmissions
+                        .AsNoTracking()
+                        .Where(x => x.TicketId == id)
+                        .Select(x => new
+                        {
+                            x.Id,
+                            x.SiteHistoryId
+                        })
+                        .ToListAsync(ct);
+
+                var submissionIds =
+                    submissionRows
+                        .Select(x => x.Id)
+                        .ToList();
+
+                var preservedSiteHistoryCount =
+                    submissionRows
+                        .Where(x => x.SiteHistoryId.HasValue)
+                        .Select(x => x.SiteHistoryId!.Value)
+                        .Distinct()
+                        .Count();
+
+                var writeUpParticipantCount = 0;
+
+                if (submissionIds.Count > 0)
+                {
+                    writeUpParticipantCount =
+                        await _db.TicketWriteUpSubmissionTechnicians
+                            .Where(x =>
+                                submissionIds.Contains(
+                                    x.SubmissionId))
+                            .ExecuteDeleteAsync(ct);
+                }
+
+                var writeUpSubmissionCount =
+                    await _db.TicketWriteUpSubmissions
+                        .Where(x => x.TicketId == id)
+                        .ExecuteDeleteAsync(ct);
+
+                /*
+                 * Published rows reference draft assignments through SourceAssignmentId,
+                 * so published rows are removed first.
+                 */
+                var publishedAssignmentCount =
+                    await _db.DailyTicketAssignmentPublished
+                        .Where(x => x.TicketId == id)
+                        .ExecuteDeleteAsync(ct);
+
+                var draftAssignmentCount =
+                    await _db.DailyTicketAssignments
+                        .Where(x => x.TicketId == id)
+                        .ExecuteDeleteAsync(ct);
+
+                _db.Tickets.Remove(ticket);
+
+                await _db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+
+                _logger.LogWarning(
+                    "Ticket {TicketId} for site {Site} was permanently deleted by {DeletedBy}. " +
+                    "Draft assignments: {DraftAssignments}; published assignments: {PublishedAssignments}; " +
+                    "write-up submissions: {WriteUpSubmissions}; participants: {Participants}; " +
+                    "preserved Site History rows: {SiteHistoryRows}.",
+                    id,
+                    ticketSite,
+                    deletedBy,
+                    draftAssignmentCount,
+                    publishedAssignmentCount,
+                    writeUpSubmissionCount,
+                    writeUpParticipantCount,
+                    preservedSiteHistoryCount);
+
+                return Ok(
+                    new DeleteTicketResponse
+                    {
+                        TicketId = id,
+                        Site = ticketSite,
+                        Notification = ticketNotification,
+
+                        DraftAssignmentCount =
+                            draftAssignmentCount,
+
+                        PublishedAssignmentCount =
+                            publishedAssignmentCount,
+
+                        WriteUpSubmissionCount =
+                            writeUpSubmissionCount,
+
+                        WriteUpParticipantCount =
+                            writeUpParticipantCount,
+
+                        PreservedSiteHistoryCount =
+                            preservedSiteHistoryCount
+                    });
+            }
+            catch (DbUpdateException ex)
+            {
+                await transaction.RollbackAsync(ct);
+
+                _logger.LogError(
+                    ex,
+                    "Ticket {TicketId} could not be permanently deleted by {DeletedBy}.",
+                    id,
+                    deletedBy);
+
+                return Conflict(
+                    "The ticket could not be deleted because another database record " +
+                    "still references it. No records were deleted.");
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync(ct);
+
+                _logger.LogError(
+                    ex,
+                    "Unexpected failure permanently deleting ticket {TicketId} by {DeletedBy}.",
+                    id,
+                    deletedBy);
+
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    "The ticket could not be deleted. No records were deleted.");
+            }
+        }
+
         [HttpPost("bulk-assign")]
         public async Task<ActionResult<BulkTicketUpdateResponse>> BulkAssignTickets([FromBody] BulkAssignTicketsRequest req,
             CancellationToken ct)
@@ -2466,12 +2657,7 @@ namespace SmartGridSuite.Api.Controllers
         private static string? ValidateCreateTicketRequest(CreateTicketRequest req)
         {
             if (string.IsNullOrWhiteSpace(req.Site))
-            {
-                return
-                    "Site is required before this ticket can be saved. " +
-                    "Enter the site number first, then set the problem/issue, work order, and dispatch notes. " +
-                    "For TOP sites, use the TOP site only, like XX-MWB. Do not include the sector.";
-            }
+                return TicketSiteRequiredMessage;
 
             return
                 ValidateTicketTextLength("Site", req.Site, TicketTextLimits.Site) ??
@@ -2491,12 +2677,7 @@ namespace SmartGridSuite.Api.Controllers
         private static string? ValidateUpdateTicketRequest(UpdateTicketRequest req)
         {
             if (string.IsNullOrWhiteSpace(req.Site))
-            {
-                return
-                    "Site is required before this ticket can be saved. " +
-                    "Enter the site number first, then set the problem/issue, work order, and dispatch notes. " +
-                    "For TOP sites, use the TOP site only, like XX-MWB. Do not include the sector.";
-            }
+                return TicketSiteRequiredMessage;
 
             return
                 ValidateTicketTextLength("Site", req.Site, TicketTextLimits.Site) ??
@@ -3109,8 +3290,7 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpGet("site-history/{siteId}")]
-        public async Task<ActionResult<List<SiteHistoryPreviewDto>>> GetSiteHistoryForSite(
-            string siteId, CancellationToken ct)
+        public async Task<ActionResult<List<SiteHistoryPreviewDto>>> GetSiteHistoryForSite(string siteId, CancellationToken ct)
         {
             siteId = (siteId ?? string.Empty).Trim();
 
@@ -3867,25 +4047,29 @@ namespace SmartGridSuite.Api.Controllers
                 if (string.IsNullOrWhiteSpace(targetDisplay))
                     targetDisplay = "Daily Assignment Target";
 
-                var modificationNumber = await GetNextDailyAssignmentModificationNumberAsync(
-                    targetDisplay,
-                    emailDate,
-                    ct);
+                var emailSequence =
+                    await _dailyAssignmentEmailSequence.GetNextAsync(
+                        targetDisplay,
+                        emailDate,
+                        ct);
 
                 var subject =
-                    $"{targetDisplay} - Modified({modificationNumber}) Daily Assignments - {emailDate:MM/dd/yyyy}";
+                    $"{targetDisplay} - " +
+                    $"{emailSequence.Title} - " +
+                    $"{emailDate:MM/dd/yyyy}";
 
-                var body = BuildPublishedAssignmentTicketModifiedEmailBody(
-                    emailDate,
-                    targetDisplay,
-                    truckNumberDisplay,
-                    changedAt,
-                    $"Modified({modificationNumber}) Daily Assignments",
-                    changeTitle,
-                    changeLines,
-                    changedTicket,
-                    currentRouteRows,
-                    ticketsById);
+                var body =
+                    BuildPublishedAssignmentTicketModifiedEmailBody(
+                        emailDate,
+                        targetDisplay,
+                        truckNumberDisplay,
+                        changedAt,
+                        emailSequence.Title,
+                        changeTitle,
+                        changeLines,
+                        changedTicket,
+                        currentRouteRows,
+                        ticketsById);
 
                 var allEmailsAddress = await GetAllEmailsAddressAsync(ct);
 
@@ -3919,7 +4103,7 @@ namespace SmartGridSuite.Api.Controllers
             {
                 _logger.LogError(
                     ex,
-                    "Modified Daily Assignment email failed for TicketId={TicketId}",
+                    "Daily Assignment update email failed for TicketId={TicketId}",
                     ticketId);
 
                 return new EmailSendResult
@@ -3929,36 +4113,6 @@ namespace SmartGridSuite.Api.Controllers
                 };
             }
         }
-
-        private async Task<int> GetNextDailyAssignmentModificationNumberAsync(
-            string targetDisplay,
-            DateTime workDate,
-            CancellationToken ct)
-        {
-            var cleanTarget = (targetDisplay ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(cleanTarget))
-                return 1;
-
-            var dateText = workDate.ToString("MM/dd/yyyy");
-
-            var subjectPrefix =
-                $"{cleanTarget} - Modified(";
-
-            var subjectSuffix =
-                $") Daily Assignments - {dateText}";
-
-            var previousModifiedCount = await _db.EmailLogs
-                .AsNoTracking()
-                .Where(x =>
-                    x.EmailType == "DailyAssignment" &&
-                    x.Subject.StartsWith(subjectPrefix) &&
-                    x.Subject.Contains(subjectSuffix))
-                .CountAsync(ct);
-
-            return previousModifiedCount + 1;
-        }
-
         private static string BuildPublishedAssignmentTicketModifiedEmailBody(
             DateTime workDate,
             string targetDisplay,

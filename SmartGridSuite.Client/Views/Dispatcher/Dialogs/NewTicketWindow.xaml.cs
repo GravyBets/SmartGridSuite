@@ -36,6 +36,8 @@ public partial class NewTicketWindow : Window
 
     public long? CreatedTicketId { get; private set; }
 
+    public bool WasDeleted { get; private set; }
+
     private bool IsEditMode => _editingTicketId.HasValue;
 
     private NewTicketDraft Draft => (NewTicketDraft)DataContext;
@@ -122,6 +124,9 @@ public partial class NewTicketWindow : Window
         {
             Title = "Edit Ticket";
             CreateBtn.Content = "Save Changes";
+
+            DeleteTicketButton.Visibility =
+                Visibility.Visible;
 
             PopulateDraftFromExistingTicket(existingTicket, createdBy);
 
@@ -514,6 +519,65 @@ public partial class NewTicketWindow : Window
         Close();
     }
 
+    private async void DeleteTicket_Click(object sender, RoutedEventArgs e)
+    {
+        if (!IsEditMode ||
+            !_editingTicketId.HasValue)
+        {
+            return;
+        }
+
+        var confirmationWindow =
+            new ConfirmDeleteTicketWindow(
+                Draft.Site,
+                Draft.NotificationNumber,
+                Draft.Problem)
+            {
+                Owner = this
+            };
+
+        if (confirmationWindow.ShowDialog() != true)
+            return;
+
+        SetBusy(true);
+
+        try
+        {
+            await _ticketsApi.DeleteTicketAsync(
+                _editingTicketId.Value,
+                string.IsNullOrWhiteSpace(Draft.CreatedBy)
+                    ? "Unknown"
+                    : Draft.CreatedBy.Trim());
+
+            WasDeleted = true;
+            CreatedTicketId = null;
+
+            DialogResult = true;
+            Close();
+        }
+        catch (ApiClient.ApiException ex)
+        {
+            MessageBox.Show(
+                ex.Body ?? ex.Message,
+                "Delete Ticket",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.Message,
+                "Delete Ticket",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            if (IsVisible)
+                SetBusy(false);
+        }
+    }
+
     private async void Create_Click(object sender, RoutedEventArgs e)
     {
         var site = (Draft.Site ?? "").Trim();
@@ -521,9 +585,12 @@ public partial class NewTicketWindow : Window
         if (string.IsNullOrWhiteSpace(site))
         {
             MessageBox.Show(
-                "Site is required before this ticket can be saved.\n\n" +
-                "Enter the site number first, then set the problem/issue, work order, and dispatch notes.\n\n" +
-                "For TOP sites, use the TOP site only, like XX-MWB. Do not include the sector.",
+                "A Site Number is required before this ticket can be saved.\n\n" +
+                "You may enter the Problem / Issue first, but Smart Grid Suite " +
+                "cannot create or update the ticket until it is tied to a site.\n\n" +
+                "Enter the Site Number and click Save again.\n\n" +
+                "For TOP sites, enter only the TOP site, such as XX-MWB. " +
+                "Do not include the sector. If no Site, enter 'No Site'",
                 Title,
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
@@ -769,6 +836,10 @@ public partial class NewTicketWindow : Window
     {
         CreateBtn.IsEnabled = !busy;
         CancelBtn.IsEnabled = !busy;
+
+        DeleteTicketButton.IsEnabled =
+            !busy &&
+            IsEditMode;
     }
 }
 

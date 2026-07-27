@@ -2,13 +2,17 @@
   {
     "version": "1.0.0.4",
     "date": "July 27, 2026",
-    "title": "Themes",
+    "title": "Tickets & Themes",
     "changes": [
-      "Finished up themes.",
+      "Finished up the colors on themes. You're welcome David",
       "Corrected Theme Controls",
       "Got rid of the 'Design Test' in the admin window.",
-      "Flip-flopped CNP Logo Image depending on Theme.",
-      "Ensured application opens ModuleLauncherWindow after each module is closed and ensured app shuts down after exiting ModulesLauncher."
+      "Flip-flopped CNP Logo Image depending on Theme (white font, black font).",
+      "Ensured application opens Landing Page after each module is closed and ensured app shuts down after exiting Landing Page.",
+      "Updated Dispatch -> Tickets Search Debounce from 250ms to 650ms.",
+      "Added Loading Overlay when searching Tickets.",
+      "Added option to delete ticket while holding onto Site History associated (API, Contracts & Client).",
+      "Corrected first Daily Assignment Email doesn't say 'Modified'. Every email after that in the same calendar day says 'Modified'."
     ]
   },
   {

@@ -177,8 +177,6 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
 
         private void HomeButton_Click(object sender, RoutedEventArgs e)
         {
-            var home = new ModuleLauncherWindow();
-            home.Show();
             Close();
         }
 

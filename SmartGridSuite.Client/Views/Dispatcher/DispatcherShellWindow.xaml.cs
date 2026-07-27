@@ -213,9 +213,6 @@ namespace SmartGridSuite.Client.Views
 
             _allowCloseWithoutPrompt = true;
 
-            var home = new ModuleLauncherWindow();
-            home.Show();
-
             Close();
         }
 

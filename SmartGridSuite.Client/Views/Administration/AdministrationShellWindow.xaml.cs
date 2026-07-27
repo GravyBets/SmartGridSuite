@@ -229,14 +229,8 @@ namespace SmartGridSuite.Client.Views.Administration
                 : "Collapse navigation";
         }
 
-        private async void HomeButton_Click(object sender, RoutedEventArgs e)
+        private void HomeButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!await CanLeaveCurrentViewAsync())
-                return;
-
-            var home = new ModuleLauncherWindow();
-            home.Show();
-
             Close();
         }
     }

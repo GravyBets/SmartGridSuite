@@ -89,6 +89,36 @@ namespace SmartGridSuite.Client.Services
             return res?.Id ?? 0;
         }
 
+        public async Task<DeleteTicketResponse> DeleteTicketAsync(long id, string deletedBy, CancellationToken ct = default)
+        {
+            if (id <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(id),
+                    "A valid ticket ID is required.");
+            }
+
+            var request =
+                new DeleteTicketRequest
+                {
+                    ConfirmPermanentDelete = true,
+
+                    DeletedBy =
+                        string.IsNullOrWhiteSpace(deletedBy)
+                            ? "Unknown"
+                            : deletedBy.Trim()
+                };
+
+            return await _api.PostAsync<
+                       DeleteTicketRequest,
+                       DeleteTicketResponse>(
+                           $"api/tickets/{id}/delete",
+                           request,
+                           ct)
+                   ?? throw new InvalidOperationException(
+                       "The API did not return a delete result.");
+        }
+
         public async Task<List<SapQueueImportPreviewResultRow>> PreviewSapQueueImportAsync(SapQueueImportPreviewRequest req, CancellationToken ct = default)
         {
             return await _api.PostAsync<SapQueueImportPreviewRequest, List<SapQueueImportPreviewResultRow>>(
