@@ -1,12 +1,29 @@
 ﻿[
   {
+    "version": "1.0.0.7",
+    "date": "July 28, 2026",
+    "title": "Update Corruption",
+    "changes": [
+      "Packaged and uploaded new version due to 1.0.0.6 update bug."
+    ]
+  },
+  {
+    "version": "1.0.0.6",
+    "date": "July 27, 2026",
+    "title": "Windows DPI Aware, sizing issues.",
+    "changes": [
+      "Allows WPF to react when window moves between monitors w/ different DPI settings.",
+      "Corrected sizing Dispatch->Technician Truck cards. Optimized for laptop screens."
+    ]
+  },
+  {
     "version": "1.0.0.5",
     "date": "July 27, 2026",
     "title": "Text Correction, Admin-> Tech-> Add Tech ",
     "changes": [
       "Correct Text color on Dispatch->Tickets Details and Dispatch->Tasks Details",
       "Corrected Admin->Tech-> Add Tech Window to be themed. Changed Border Color.",
-      "Corrected DataGrid in Admin->SNMP->Add OID to be themed."      
+      "Corrected DataGrid in Admin->SNMP->Add OID to be themed."
     ]
   },
   {

@@ -10,7 +10,7 @@
 
         <local:LeadStarBrushConverter x:Key="LeadStarBrushConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
-        
+
         <!-- Tech assigned to a truck card -->
         <DataTemplate x:Key="AssignedTechnicianTemplate">
             <Border Style="{StaticResource TechCardStyle}"
@@ -359,67 +359,78 @@
 
             <!-- Truck board -->
             <Border x:Name="TruckBoardCard"
-                    Grid.Column="2"
-                    Style="{StaticResource Card}"
-                    Padding="14">
-                <Grid>
+        Grid.Column="2"
+        Style="{StaticResource Card}"
+        Padding="10">
+
+                <Grid ClipToBounds="True">
                     <Grid.RowDefinitions>
+                        <!-- Header and buttons -->
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="12"/>
+
+                        <!-- Spacing -->
+                        <RowDefinition Height="8"/>
+
+                        <!-- Truck cards -->
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
+                    <!-- Truck-board header -->
                     <Grid Grid.Row="0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel>
+                        <StackPanel Grid.Column="0">
                             <TextBlock Text="Trucks"
-                                       Style="{StaticResource SectionHeaderTextStyle}"/>
+                           Style="{StaticResource SectionHeaderTextStyle}"/>
 
                             <TextBlock Text="Drag/drop technicians into trucks. Star sets Lead Tech."
-                                       Margin="0,3,0,0"
-                                       Style="{StaticResource PaneSubtitleTextStyle}"/>
+                           Margin="0,3,0,0"
+                           Style="{StaticResource PaneSubtitleTextStyle}"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1"
-                                    Orientation="Horizontal"
-                                    VerticalAlignment="Top">
+                        Orientation="Horizontal"
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Right">
 
                             <Button Content="Clear All"
-                                    Height="32"
-                                    MinWidth="90"
-                                    Margin="0,0,8,0"
-                                    IsEnabled="{Binding CanEditBoard}"
-                                    Click="ClearAll_Click"/>
+                        Height="32"
+                        MinWidth="90"
+                        Margin="0,0,8,0"
+                        IsEnabled="{Binding CanEditBoard}"
+                        Click="ClearAll_Click"/>
 
                             <Button Content="Set Home"
-                                    Height="32"
-                                    MinWidth="90"
-                                    Margin="0,0,8,0"
-                                    IsEnabled="{Binding CanEditBoard}"
-                                    Click="SetHome_Click"/>
+                        Height="32"
+                        MinWidth="90"
+                        Margin="0,0,8,0"
+                        IsEnabled="{Binding CanEditBoard}"
+                        Click="SetHome_Click"/>
 
                             <Button Content="Cancel"
-                                    Height="32"
-                                    MinWidth="90"
-                                    Margin="0,0,8,0"
-                                    IsEnabled="{Binding CanDiscardChanges}"
-                                    Click="DiscardChanges_Click"/>
+                        Height="32"
+                        MinWidth="90"
+                        Margin="0,0,8,0"
+                        IsEnabled="{Binding CanDiscardChanges}"
+                        Click="DiscardChanges_Click"/>
 
                             <Button Content="{Binding CommitButtonText}"
-                                    Height="32"
-                                    MinWidth="90"
-                                    Style="{StaticResource PrimaryButtonStyle}"
-                                    IsEnabled="{Binding CanCommitChanges}"
-                                    Click="CommitChanges_Click"/>
+                        Height="32"
+                        MinWidth="90"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        IsEnabled="{Binding CanCommitChanges}"
+                        Click="CommitChanges_Click"/>
                         </StackPanel>
                     </Grid>
 
+                    <!-- Truck cards -->
                     <ItemsControl Grid.Row="2"
-                                  ItemsSource="{Binding Board.Trucks}">
+                      ItemsSource="{Binding Board.Trucks}"
+                      MinHeight="0"
+                      ClipToBounds="True">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <UniformGrid Rows="3"
@@ -438,7 +449,6 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border Style="{StaticResource TruckCardStyle}"
-                                        MinHeight="220"
                                         HorizontalAlignment="Stretch"
                                         VerticalAlignment="Stretch"
                                         AllowDrop="True"
@@ -535,7 +545,7 @@
                             Background="#AAFFFFFF"
                             CornerRadius="14"
                             Visibility="{Binding IsCommitting, Converter={StaticResource BoolToVisibilityConverter}}"
-                            Panel.ZIndex="99">
+                            Panel.ZIndex="99" Grid.ColumnSpan="3">
                         <Border HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Background="{DynamicResource CardBackground}"
@@ -561,7 +571,7 @@
                 </Grid>
             </Border>
         </Grid>
-        
+
         <!-- Loading overlay -->
         <Border x:Name="BusyOverlay"
                 Grid.Row="0"
