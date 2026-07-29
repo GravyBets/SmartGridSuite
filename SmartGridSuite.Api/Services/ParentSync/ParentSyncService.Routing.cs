@@ -7,9 +7,6 @@ namespace SmartGridSuite.Api.Services.ParentSync
 {
     public sealed partial class ParentSyncService
     {
-
-        
-
         public async Task<SiteDashboardRouteInfo?> GetSiteDashboardRouteInfoAsync(
             string siteId, CancellationToken cancellationToken = default)
         {

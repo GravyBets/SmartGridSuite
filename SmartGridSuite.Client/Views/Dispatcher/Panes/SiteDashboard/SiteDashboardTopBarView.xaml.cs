@@ -44,14 +44,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         public string StatusText
         {
-            get => SearchWatermarkTextBlock?.Text ?? string.Empty;
-            set
-            {
-                if (SearchWatermarkTextBlock != null)
-                    SearchWatermarkTextBlock.Text = value ?? string.Empty;
+            get =>
+                TopBarStatusTextBlock.Text;
 
-                UpdateSearchWatermark();
-            }
+            set =>
+                TopBarStatusTextBlock.Text =
+                    value ?? string.Empty;
         }
 
         public void SetLoading(bool isLoading)

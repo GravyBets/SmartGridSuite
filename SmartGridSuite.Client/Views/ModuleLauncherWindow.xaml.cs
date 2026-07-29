@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Controls;
 using System.ComponentModel;
+using System.Collections.Generic;
 
 namespace SmartGridSuite.Client.Views
 {
@@ -16,11 +17,27 @@ namespace SmartGridSuite.Client.Views
 
             InitializeComponent();
 
-            ConnectivityService.StateChanged += ConnectivityService_StateChanged;
+            // Keep the Module Launcher at its original fixed size.
+            // Dispatcher, Field Technician, Administration, and other
+            // enabled windows will still use the interface scaling service.
+            InterfaceScaleService.SetIsEnabled(
+                this,
+                false);
 
-            Closing += ModuleLauncherWindow_Closing;
+            InterfaceScaleComboBox.ItemsSource =
+                InterfaceScaleChoices;
 
-            Closed += ModuleLauncherWindow_Closed;
+            InterfaceScaleComboBox.SelectedValue =
+                InterfaceScaleService.CurrentMode;
+
+            ConnectivityService.StateChanged +=
+                ConnectivityService_StateChanged;
+
+            Closing +=
+                ModuleLauncherWindow_Closing;
+
+            Closed +=
+                ModuleLauncherWindow_Closed;
 
             ApplyConnectivityState(
                 ConnectivityService.CurrentState,
@@ -42,6 +59,50 @@ namespace SmartGridSuite.Client.Views
         private readonly HashSet<Window> _trackedModuleWindows = new();
 
         private bool _isClosingApplication;
+
+        private sealed record InterfaceScaleChoice(string Label, InterfaceScaleMode Mode)
+        {
+            public override string ToString()
+            {
+                return Label;
+            }
+        }
+
+        private static readonly IReadOnlyList<InterfaceScaleChoice>
+            InterfaceScaleChoices =
+            [
+                new(
+                    "Auto",
+                    InterfaceScaleMode.Auto),
+
+                new(
+                    "Recommended - 100%",
+                    InterfaceScaleMode.Percent100),
+
+                new(
+                    "Comfortable — 110%",
+                    InterfaceScaleMode.Percent110),
+
+                new(
+                    "Large — 125%",
+                    InterfaceScaleMode.Percent125),
+
+                new(
+                    "Extra Large — 150%",
+                    InterfaceScaleMode.Percent150)
+            ];
+
+        private void InterfaceScaleComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (InterfaceScaleComboBox.SelectedValue
+                is not InterfaceScaleMode selectedMode)
+            {
+                return;
+            }
+
+            InterfaceScaleService.SetMode(
+                selectedMode);
+        }
 
         private void LoadThemeControl()
         {

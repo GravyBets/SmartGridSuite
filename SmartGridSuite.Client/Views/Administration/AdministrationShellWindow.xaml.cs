@@ -33,8 +33,6 @@ namespace SmartGridSuite.Client.Views.Administration
 
             _api = ClientAppSettings.CreateApiClient();
 
-            UiScaleService.ApplyToWindow(this);
-
             _techniciansView = new TechniciansAdminView(_api);
             _trucksView = new TrucksAdminView(_api);
             _ticketsView = new TicketsAdminView(_api);

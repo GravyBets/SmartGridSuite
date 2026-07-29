@@ -3,7 +3,7 @@ using SmartGridSuite.Api.Configuration;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Services;
 using SmartGridSuite.Api.Services.ParentSync;
-
+using SmartGridSuite.Api.Services.SiteDashboard;
 
 namespace SmartGridSuite.Api
 {
@@ -34,6 +34,18 @@ namespace SmartGridSuite.Api
                 builder.Configuration.GetSection(ClientVersionOptions.SectionName));
 
             builder.Services.AddScoped<ParentSyncService>();
+
+            builder.Services.AddScoped<SiteDashboardCacheService>();
+
+            builder.Services.AddScoped<SiteDashboardLookupService>();
+
+            builder.Services.AddScoped<SiteDashboardCacheRefreshService>();
+
+            builder.Services.Configure<SiteDashboardCacheRefreshOptions>(builder.Configuration.GetSection(
+                SiteDashboardCacheRefreshOptions.SectionName));
+
+            builder.Services.AddHostedService<
+                SiteDashboardCacheRefreshHostedService>();
 
             builder.Services.AddScoped<SnmpPollingService>();
 

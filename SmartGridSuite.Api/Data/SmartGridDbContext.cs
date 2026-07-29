@@ -35,6 +35,33 @@ namespace SmartGridSuite.Api.Data
 
         public DbSet<SiteHistoryEntity> SiteHistory => Set<SiteHistoryEntity>();
 
+        //CACHED SITE STUFF
+        public DbSet<CacheSiteEntity> CacheSites => Set<CacheSiteEntity>();
+
+        public DbSet<CacheSiteAmsEntity> CacheSiteAms => Set<CacheSiteAmsEntity>();
+
+        public DbSet<CacheSiteAddressEntity> CacheSiteAddresses => Set<CacheSiteAddressEntity>();
+
+        public DbSet<CacheSiteGpsEntity> CacheSiteGps => Set<CacheSiteGpsEntity>();
+
+        public DbSet<CacheSiteLteEntity> CacheSiteLte => Set<CacheSiteLteEntity>();
+
+        public DbSet<CacheSitePmrEntity> CacheSitePmr => Set<CacheSitePmrEntity>();
+
+        public DbSet<CacheSiteTopEntity> CacheSiteTop => Set<CacheSiteTopEntity>();
+
+        public DbSet<CacheSiteDacsEntity> CacheSiteDacs => Set<CacheSiteDacsEntity>();
+
+        public DbSet<CacheSiteIgsdEntity> CacheSiteIgsd => Set<CacheSiteIgsdEntity>();
+
+        public DbSet<CacheSiteRxEntity> CacheSiteRx => Set<CacheSiteRxEntity>();
+
+        public DbSet<CacheTowerEntity> CacheTowers => Set<CacheTowerEntity>();
+
+        public DbSet<CacheTowerSectorEntity> CacheTowerSectors => Set<CacheTowerSectorEntity>();
+
+        //END OF CACHED SITE STUFF
+
         public DbSet<TicketWriteUpSubmissionEntity> TicketWriteUpSubmissions => Set<TicketWriteUpSubmissionEntity>();
 
         public DbSet<TicketWriteUpSubmissionTechnicianEntity> TicketWriteUpSubmissionTechnicians
@@ -668,6 +695,1180 @@ namespace SmartGridSuite.Api.Data
                     .HasColumnName("deleted_by")
                     .HasMaxLength(100);
             });
+
+            //CACHED SITE STUFF
+            modelBuilder.Entity<CacheSiteEntity>(e =>
+            {
+                e.ToTable("cache_site");
+
+                e.HasKey(x => x.CacheSiteId);
+
+                e.Property(x => x.CacheSiteId)
+                    .HasColumnName("cache_site_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.SiteTypeCode)
+                    .HasColumnName("site_type_code")
+                    .HasMaxLength(50);
+
+                e.Property(x => x.SiteStatus)
+                    .HasColumnName("site_status")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SiteConfigName)
+                    .HasColumnName("site_config_name")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.PrimaryCommType)
+                    .HasColumnName("primary_comm_type")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SecondaryCommType)
+                    .HasColumnName("secondary_comm_type")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SiteConfigDescription)
+                    .HasColumnName("site_config_description")
+                    .HasMaxLength(500);
+
+                e.Property(x => x.SourceSiteRowId)
+                    .HasColumnName("source_site_row_id");
+
+                e.Property(x => x.SourceSiteTypeId)
+                    .HasColumnName("source_site_type_id");
+
+                e.Property(x => x.SourceConfigId)
+                    .HasColumnName("source_config_id");
+
+                e.Property(x => x.SourceSiteStatusId)
+                    .HasColumnName("source_site_status_id");
+
+                e.Property(x => x.SourceSiteStatus2Id)
+                    .HasColumnName("source_site_status2_id");
+
+                e.Property(x => x.SourceAddressRowId)
+                    .HasColumnName("source_address_row_id");
+
+                e.Property(x => x.SourceGpsRowId)
+                    .HasColumnName("source_gps_row_id");
+
+                e.Property(x => x.SourceTowerApId)
+                    .HasColumnName("source_tower_ap_id");
+
+                e.Property(x => x.SourceTowerApAlt1Id)
+                    .HasColumnName("source_tower_ap_alt1_id");
+
+                e.Property(x => x.SourceTowerApAlt2Id)
+                    .HasColumnName("source_tower_ap_alt2_id");
+
+                e.Property(x => x.MonitorEnabled)
+                    .HasColumnName("monitor_enabled")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.PreferredInterface)
+                    .HasColumnName("preferred_interface")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.ServiceCenter)
+                    .HasColumnName("service_center")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.Psec)
+                    .HasColumnName("psec")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.FunctionalLocationArea)
+                    .HasColumnName("functional_location_area")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SiteNotes)
+                    .HasColumnName("site_notes");
+
+                e.Property(x => x.SourceAddedAt)
+                    .HasColumnName("source_added_at");
+
+                e.Property(x => x.SourceAddedBy)
+                    .HasColumnName("source_added_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SourceModifiedAt)
+                    .HasColumnName("source_modified_at");
+
+                e.Property(x => x.SourceModifiedBy)
+                    .HasColumnName("source_modified_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.SiteId)
+                    .IsUnique()
+                    .HasDatabaseName("ux_cache_site_site_id");
+
+                e.HasIndex(x => x.SiteTypeCode)
+                    .HasDatabaseName("ix_cache_site_site_type_code");
+
+                e.HasIndex(x => x.SourceSiteRowId)
+                    .HasDatabaseName("ix_cache_site_source_site_row_id");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("ix_cache_site_last_synced_at");
+            });
+
+            modelBuilder.Entity<CacheSiteAmsEntity>(e =>
+            {
+                e.ToTable("cache_site_ams");
+
+                e.HasKey(x => x.CacheSiteAmsId);
+
+                e.Property(x => x.CacheSiteAmsId)
+                    .HasColumnName("cache_site_ams_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.SourceAmsRowId)
+                    .HasColumnName("source_ams_row_id");
+
+                e.Property(x => x.PrimaryCommsIdentifier)
+                    .HasColumnName("primary_comms_identifier")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.PrimaryCommsIp)
+                    .HasColumnName("primary_comms_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SecondaryLanIp)
+                    .HasColumnName("secondary_lan_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.AntennaSerialNumber)
+                    .HasColumnName("antenna_serial_number")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.EnclosureSerialNumber)
+                    .HasColumnName("enclosure_serial_number")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.EnclosureModel)
+                    .HasColumnName("enclosure_model")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.SourceAddedAt)
+                    .HasColumnName("source_added_at");
+
+                e.Property(x => x.SourceAddedBy)
+                    .HasColumnName("source_added_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SourceModifiedAt)
+                    .HasColumnName("source_modified_at");
+
+                e.Property(x => x.SourceModifiedBy)
+                    .HasColumnName("source_modified_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.SiteId)
+                    .IsUnique()
+                    .HasDatabaseName("ux_cache_site_ams_site_id");
+
+                e.HasIndex(x => x.SourceAmsRowId)
+                    .HasDatabaseName("ix_cache_site_ams_source_row_id");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("ix_cache_site_ams_last_synced_at");
+            });
+
+            modelBuilder.Entity<CacheSiteAddressEntity>(e =>
+            {
+                e.ToTable("cache_site_address");
+
+                e.HasKey(x => x.CacheSiteAddressId);
+
+                e.Property(x => x.CacheSiteAddressId)
+                    .HasColumnName("cache_site_address_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.SourceAddressRowId)
+                    .HasColumnName("source_address_row_id");
+
+                e.Property(x => x.StreetNumber)
+                    .HasColumnName("street_number")
+                    .HasMaxLength(50);
+
+                e.Property(x => x.StreetName)
+                    .HasColumnName("street_name")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.StreetSuffix)
+                    .HasColumnName("street_suffix")
+                    .HasMaxLength(50);
+
+                e.Property(x => x.StreetAddress)
+                    .HasColumnName("street_address")
+                    .HasMaxLength(255);
+
+                e.Property(x => x.City)
+                    .HasColumnName("city")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.County)
+                    .HasColumnName("county")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.StateCode)
+                    .HasColumnName("state_code")
+                    .HasMaxLength(20);
+
+                e.Property(x => x.ZipCode)
+                    .HasColumnName("zip_code")
+                    .HasMaxLength(20);
+
+                e.Property(x => x.SourceAddedAt)
+                    .HasColumnName("source_added_at");
+
+                e.Property(x => x.SourceAddedBy)
+                    .HasColumnName("source_added_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SourceModifiedAt)
+                    .HasColumnName("source_modified_at");
+
+                e.Property(x => x.SourceModifiedBy)
+                    .HasColumnName("source_modified_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.SiteId)
+                    .IsUnique()
+                    .HasDatabaseName("ux_cache_site_address_site_id");
+
+                e.HasIndex(x => x.SourceAddressRowId)
+                    .HasDatabaseName("ix_cache_site_address_source_row_id");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("ix_cache_site_address_last_synced_at");
+            });
+
+            modelBuilder.Entity<CacheSiteGpsEntity>(e =>
+            {
+                e.ToTable("cache_site_gps");
+
+                e.HasKey(x => x.CacheSiteGpsId);
+
+                e.Property(x => x.CacheSiteGpsId)
+                    .HasColumnName("cache_site_gps_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.SourceGpsRowId)
+                    .HasColumnName("source_gps_row_id");
+
+                e.Property(x => x.Latitude)
+                    .HasColumnName("latitude")
+                    .HasPrecision(10, 7);
+
+                e.Property(x => x.Longitude)
+                    .HasColumnName("longitude")
+                    .HasPrecision(10, 7);
+
+                e.Property(x => x.Elevation)
+                    .HasColumnName("elevation")
+                    .HasPrecision(10, 2);
+
+                e.Property(x => x.SourceAddedAt)
+                    .HasColumnName("source_added_at");
+
+                e.Property(x => x.SourceAddedBy)
+                    .HasColumnName("source_added_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SourceModifiedAt)
+                    .HasColumnName("source_modified_at");
+
+                e.Property(x => x.SourceModifiedBy)
+                    .HasColumnName("source_modified_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.SiteId)
+                    .IsUnique()
+                    .HasDatabaseName("ux_cache_site_gps_site_id");
+
+                e.HasIndex(x => x.SourceGpsRowId)
+                    .HasDatabaseName("ix_cache_site_gps_source_row_id");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("ix_cache_site_gps_last_synced_at");
+            });
+
+            modelBuilder.Entity<CacheSiteLteEntity>(e =>
+            {
+                e.ToTable("cache_site_lte");
+
+                e.HasKey(x => x.CacheSiteLteId);
+
+                e.Property(x => x.CacheSiteLteId)
+                    .HasColumnName("cache_site_lte_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.SourceLteRowId)
+                    .HasColumnName("source_lte_row_id");
+
+                e.Property(x => x.SimNumber)
+                    .HasColumnName("sim_number")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SecondaryWanIp)
+                    .HasColumnName("secondary_wan_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SecondaryWanIp2)
+                    .HasColumnName("secondary_wan_ip_2")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SourceAddedAt)
+                    .HasColumnName("source_added_at");
+
+                e.Property(x => x.SourceAddedBy)
+                    .HasColumnName("source_added_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SourceModifiedAt)
+                    .HasColumnName("source_modified_at");
+
+                e.Property(x => x.SourceModifiedBy)
+                    .HasColumnName("source_modified_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.SiteId)
+                    .IsUnique()
+                    .HasDatabaseName("ux_cache_site_lte_site_id");
+
+                e.HasIndex(x => x.SourceLteRowId)
+                    .HasDatabaseName("ix_cache_site_lte_source_row_id");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("ix_cache_site_lte_last_synced_at");
+            });
+
+            modelBuilder.Entity<CacheSitePmrEntity>(e =>
+            {
+                e.ToTable("cache_site_pmr");
+
+                e.HasKey(x => x.CacheSitePmrId);
+
+                e.Property(x => x.CacheSitePmrId)
+                    .HasColumnName("cache_site_pmr_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.SourcePmrRowId)
+                    .HasColumnName("source_pmr_row_id");
+
+                e.Property(x => x.SecondaryCommsIdentifier)
+                    .HasColumnName("secondary_comms_identifier")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SecondaryCommsUsername)
+                    .HasColumnName("secondary_comms_username")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SecondaryCommsSsid)
+                    .HasColumnName("secondary_comms_ssid")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.SecondaryCommsPassword)
+                    .HasColumnName("secondary_comms_password")
+                    .HasMaxLength(255);
+
+                e.Property(x => x.SourceAddedAt)
+                    .HasColumnName("source_added_at");
+
+                e.Property(x => x.SourceAddedBy)
+                    .HasColumnName("source_added_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SourceModifiedAt)
+                    .HasColumnName("source_modified_at");
+
+                e.Property(x => x.SourceModifiedBy)
+                    .HasColumnName("source_modified_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.SiteId)
+                    .IsUnique()
+                    .HasDatabaseName("ux_cache_site_pmr_site_id");
+
+                e.HasIndex(x => x.SourcePmrRowId)
+                    .HasDatabaseName("ix_cache_site_pmr_source_row_id");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("ix_cache_site_pmr_last_synced_at");
+            });
+
+            modelBuilder.Entity<CacheSiteTopEntity>(e =>
+            {
+                e.ToTable("cache_site_top");
+
+                e.HasKey(x => x.CacheSiteTopId);
+
+                e.Property(x => x.CacheSiteTopId)
+                    .HasColumnName("cache_site_top_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.SourceTopNameId)
+                    .HasColumnName("source_top_name_id");
+
+                e.Property(x => x.TopName)
+                    .HasColumnName("top_name")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.TopDescription)
+                    .HasColumnName("top_description")
+                    .HasMaxLength(255);
+
+                e.Property(x => x.TopSector)
+                    .HasColumnName("top_sector")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.TopVip)
+                    .HasColumnName("top_vip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.TopIpA)
+                    .HasColumnName("top_ip_a")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.TopIpB)
+                    .HasColumnName("top_ip_b")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.SiteId)
+                    .IsUnique()
+                    .HasDatabaseName("UX_cache_site_top_site_id");
+
+                e.HasIndex(x => x.TopName)
+                    .HasDatabaseName("IX_cache_site_top_top_name");
+
+                e.HasIndex(x => x.TopVip)
+                    .HasDatabaseName("IX_cache_site_top_vip");
+
+                e.HasIndex(x => x.TopIpA)
+                    .HasDatabaseName("IX_cache_site_top_ip_a");
+
+                e.HasIndex(x => x.TopIpB)
+                    .HasDatabaseName("IX_cache_site_top_ip_b");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("IX_cache_site_top_last_synced");
+            });
+
+            modelBuilder.Entity<CacheSiteDacsEntity>(e =>
+            {
+                e.ToTable("cache_site_dacs");
+
+                e.HasKey(x => x.CacheSiteDacsId);
+
+                e.Property(x => x.CacheSiteDacsId)
+                    .HasColumnName("cache_site_dacs_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.SourceDacsRowId)
+                    .HasColumnName("source_dacs_row_id");
+
+                e.Property(x => x.PrimaryCommsIp)
+                    .HasColumnName("primary_comms_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.TunnelIp)
+                    .HasColumnName("tunnel_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.RtuIp)
+                    .HasColumnName("rtu_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.SiteId)
+                    .IsUnique()
+                    .HasDatabaseName("UX_cache_site_dacs_site_id");
+
+                e.HasIndex(x => x.PrimaryCommsIp)
+                    .HasDatabaseName("IX_cache_site_dacs_primary_ip");
+
+                e.HasIndex(x => x.TunnelIp)
+                    .HasDatabaseName("IX_cache_site_dacs_tunnel_ip");
+
+                e.HasIndex(x => x.RtuIp)
+                    .HasDatabaseName("IX_cache_site_dacs_rtu_ip");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("IX_cache_site_dacs_last_synced");
+            });
+
+            modelBuilder.Entity<CacheSiteIgsdEntity>(e =>
+            {
+                e.ToTable("cache_site_igsd");
+
+                e.HasKey(x => x.CacheSiteIgsdId);
+
+                e.Property(x => x.CacheSiteIgsdId)
+                    .HasColumnName("cache_site_igsd_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.SourceIgsdRowId)
+                    .HasColumnName("source_igsd_row_id");
+
+                e.Property(x => x.PrimaryCommsIdentifier)
+                    .HasColumnName("primary_comms_identifier")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.PrimaryCommsIp)
+                    .HasColumnName("primary_comms_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.PrimaryLanIp)
+                    .HasColumnName("primary_lan_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.PrimaryWanIp)
+                    .HasColumnName("primary_wan_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.PrimaryTunnelIp)
+                    .HasColumnName("primary_tunnel_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.PrimaryRtuIp)
+                    .HasColumnName("primary_rtu_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SecondaryCommsIdentifier)
+                    .HasColumnName("secondary_comms_identifier")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.SecondaryWanIp)
+                    .HasColumnName("secondary_wan_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SecondaryLanIp)
+                    .HasColumnName("secondary_lan_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SecondaryTunnelIp)
+                    .HasColumnName("secondary_tunnel_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SecondaryRtuIp)
+                    .HasColumnName("secondary_rtu_ip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.AntennaSerialNumber)
+                    .HasColumnName("antenna_serial_number")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.EnclosureSerialNumber)
+                    .HasColumnName("enclosure_serial_number")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.EnclosureModel)
+                    .HasColumnName("enclosure_model")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.CyberlockSerialNumber)
+                    .HasColumnName("cyberlock_serial_number")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.TunnelPsk)
+                    .HasColumnName("tunnel_psk")
+                    .HasMaxLength(255);
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.SiteId)
+                    .IsUnique()
+                    .HasDatabaseName("UX_cache_site_igsd_site_id");
+
+                e.HasIndex(x => x.PrimaryCommsIp)
+                    .HasDatabaseName("IX_cache_site_igsd_primary_comms_ip");
+
+                e.HasIndex(x => x.PrimaryLanIp)
+                    .HasDatabaseName("IX_cache_site_igsd_primary_lan_ip");
+
+                e.HasIndex(x => x.PrimaryWanIp)
+                    .HasDatabaseName("IX_cache_site_igsd_primary_wan_ip");
+
+                e.HasIndex(x => x.PrimaryTunnelIp)
+                    .HasDatabaseName("IX_cache_site_igsd_primary_tunnel_ip");
+
+                e.HasIndex(x => x.PrimaryRtuIp)
+                    .HasDatabaseName("IX_cache_site_igsd_primary_rtu_ip");
+
+                e.HasIndex(x => x.SecondaryWanIp)
+                    .HasDatabaseName("IX_cache_site_igsd_secondary_wan_ip");
+
+                e.HasIndex(x => x.SecondaryLanIp)
+                    .HasDatabaseName("IX_cache_site_igsd_secondary_lan_ip");
+
+                e.HasIndex(x => x.SecondaryTunnelIp)
+                    .HasDatabaseName("IX_cache_site_igsd_secondary_tunnel_ip");
+
+                e.HasIndex(x => x.SecondaryRtuIp)
+                    .HasDatabaseName("IX_cache_site_igsd_secondary_rtu_ip");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("IX_cache_site_igsd_last_synced");
+            });
+
+            modelBuilder.Entity<CacheSiteRxEntity>(e =>
+            {
+                e.ToTable("cache_site_rx");
+
+                e.HasKey(x => x.CacheSiteRxId);
+
+                e.Property(x => x.CacheSiteRxId)
+                    .HasColumnName("cache_site_rx_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SiteId)
+                    .HasColumnName("site_id")
+                    .HasMaxLength(50)
+                    .IsRequired();
+
+                e.Property(x => x.SourceRxRowId)
+                    .HasColumnName("source_rx_row_id");
+
+                e.Property(x => x.MeterNumber)
+                    .HasColumnName("meter_number")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.MacAddress)
+                    .HasColumnName("mac_address")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.PolePoint)
+                    .HasColumnName("pole_point")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.TransformerGln)
+                    .HasColumnName("transformer_gln")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.SiteId)
+                    .IsUnique()
+                    .HasDatabaseName("UX_cache_site_rx_site_id");
+
+                e.HasIndex(x => x.MeterNumber)
+                    .HasDatabaseName("IX_cache_site_rx_meter_number");
+
+                e.HasIndex(x => x.MacAddress)
+                    .HasDatabaseName("IX_cache_site_rx_mac_address");
+
+                e.HasIndex(x => x.PolePoint)
+                    .HasDatabaseName("IX_cache_site_rx_pole_point");
+
+                e.HasIndex(x => x.TransformerGln)
+                    .HasDatabaseName("IX_cache_site_rx_transformer_gln");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("IX_cache_site_rx_last_synced");
+            });
+
+            modelBuilder.Entity<CacheTowerEntity>(e =>
+            {
+                e.ToTable("cache_tower");
+
+                e.HasKey(x => x.CacheTowerId);
+
+                e.Property(x => x.CacheTowerId)
+                    .HasColumnName("cache_tower_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.TopNameId)
+                    .HasColumnName("top_name_id")
+                    .IsRequired();
+
+                e.Property(x => x.TopName)
+                    .HasColumnName("top_name")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.TopType)
+                    .HasColumnName("top_type")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.TopDescription)
+                    .HasColumnName("top_description")
+                    .HasMaxLength(255);
+
+                e.Property(x => x.IpAssignment)
+                    .HasColumnName("ip_assignment")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.SourceGpsId)
+                    .HasColumnName("source_gps_id");
+
+                e.Property(x => x.SourceCnpAreaId)
+                    .HasColumnName("source_cnp_area_id");
+
+                e.Property(x => x.CustomerOwned)
+                    .HasColumnName("customer_owned")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.Note)
+                    .HasColumnName("note")
+                    .HasColumnType("longtext");
+
+                e.Property(x => x.Latitude)
+                    .HasColumnName("latitude")
+                    .HasPrecision(10, 7);
+
+                e.Property(x => x.Longitude)
+                    .HasColumnName("longitude")
+                    .HasPrecision(10, 7);
+
+                e.Property(x => x.StreetNumber)
+                    .HasColumnName("street_number")
+                    .HasMaxLength(50);
+
+                e.Property(x => x.StreetName)
+                    .HasColumnName("street_name")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.StreetAddress)
+                    .HasColumnName("street_address")
+                    .HasMaxLength(255);
+
+                e.Property(x => x.City)
+                    .HasColumnName("city")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.County)
+                    .HasColumnName("county")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.StateCode)
+                    .HasColumnName("state_code")
+                    .HasMaxLength(20);
+
+                e.Property(x => x.ZipCode)
+                    .HasColumnName("zip_code")
+                    .HasMaxLength(20);
+
+                e.Property(x => x.FullAddress)
+                    .HasColumnName("full_address")
+                    .HasMaxLength(500);
+
+                e.Property(x => x.HistorySiteId)
+                    .HasColumnName("history_site_id")
+                    .HasMaxLength(50);
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => x.TopNameId)
+                    .IsUnique()
+                    .HasDatabaseName("UX_cache_tower_top_name_id");
+
+                e.HasIndex(x => x.TopName)
+                    .HasDatabaseName("IX_cache_tower_top_name");
+
+                e.HasIndex(x => x.TopType)
+                    .HasDatabaseName("IX_cache_tower_top_type");
+
+                e.HasIndex(x => x.HistorySiteId)
+                    .HasDatabaseName("IX_cache_tower_history_site_id");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("IX_cache_tower_last_synced");
+            });
+
+            modelBuilder.Entity<CacheTowerSectorEntity>(e =>
+            {
+                e.ToTable("cache_tower_sector");
+
+                e.HasKey(x => x.CacheTowerSectorId);
+
+                e.Property(x => x.CacheTowerSectorId)
+                    .HasColumnName("cache_tower_sector_id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.TopNameId)
+                    .HasColumnName("top_name_id")
+                    .IsRequired();
+
+                e.Property(x => x.TopSiteId)
+                    .HasColumnName("top_site_id")
+                    .IsRequired();
+
+                e.Property(x => x.Sector)
+                    .HasColumnName("sector")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.TxDbm)
+                    .HasColumnName("tx_dbm")
+                    .HasPrecision(10, 3);
+
+                e.Property(x => x.Downtilt)
+                    .HasColumnName("downtilt")
+                    .HasPrecision(10, 3);
+
+                e.Property(x => x.ChannelNumber)
+                    .HasColumnName("channel_number");
+
+                e.Property(x => x.ChannelTxFrequency)
+                    .HasColumnName("channel_tx_frequency")
+                    .HasPrecision(18, 6);
+
+                e.Property(x => x.ChannelRxFrequency)
+                    .HasColumnName("channel_rx_frequency")
+                    .HasPrecision(18, 6);
+
+                e.Property(x => x.NetworkName)
+                    .HasColumnName("network_name")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.Vip)
+                    .HasColumnName("vip")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.IpA)
+                    .HasColumnName("ip_a")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.IpB)
+                    .HasColumnName("ip_b")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.Vlan)
+                    .HasColumnName("vlan")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.Bsid)
+                    .HasColumnName("bsid")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.AntennaSerialA)
+                    .HasColumnName("antenna_serial_a")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.AntennaSerialB)
+                    .HasColumnName("antenna_serial_b")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.Height)
+                    .HasColumnName("height")
+                    .HasPrecision(10, 2);
+
+                e.Property(x => x.TestedHeight)
+                    .HasColumnName("tested_height")
+                    .HasPrecision(10, 2);
+
+                e.Property(x => x.Bearing)
+                    .HasColumnName("bearing");
+
+                e.Property(x => x.HighMount)
+                    .HasColumnName("high_mount")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.LastSyncedAt)
+                    .HasColumnName("last_synced_at");
+
+                e.Property(x => x.SyncRunId)
+                    .HasColumnName("sync_run_id");
+
+                e.Property(x => x.SourceRowHash)
+                    .HasColumnName("source_row_hash")
+                    .HasColumnType("char(64)");
+
+                e.Property(x => x.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("bit(1)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at");
+
+                e.Property(x => x.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                e.HasIndex(x => new
+                {
+                    x.TopNameId,
+                    x.TopSiteId
+                })
+                    .IsUnique()
+                    .HasDatabaseName("UX_cache_tower_sector");
+
+                e.HasIndex(x => x.TopNameId)
+                    .HasDatabaseName("IX_cache_tower_sector_top_name_id");
+
+                e.HasIndex(x => x.Sector)
+                    .HasDatabaseName("IX_cache_tower_sector_sector");
+
+                e.HasIndex(x => x.Vip)
+                    .HasDatabaseName("IX_cache_tower_sector_vip");
+
+                e.HasIndex(x => x.IpA)
+                    .HasDatabaseName("IX_cache_tower_sector_ip_a");
+
+                e.HasIndex(x => x.IpB)
+                    .HasDatabaseName("IX_cache_tower_sector_ip_b");
+
+                e.HasIndex(x => x.LastSyncedAt)
+                    .HasDatabaseName("IX_cache_tower_sector_last_synced");
+            });
+
+            //END OF CACHED SITE STUFF
 
             // Stores technician write-up completion events for History date searches.
             // Work Orders intentionally remain sourced from the live TicketEntity record

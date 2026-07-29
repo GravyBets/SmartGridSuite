@@ -28,8 +28,6 @@ namespace SmartGridSuite.Client.Views
         {
             InitializeComponent();
 
-            UiScaleService.ApplyToWindow(this);
-
             Closing += DispatcherShellWindow_Closing;
 
             _navCollapsed = true;

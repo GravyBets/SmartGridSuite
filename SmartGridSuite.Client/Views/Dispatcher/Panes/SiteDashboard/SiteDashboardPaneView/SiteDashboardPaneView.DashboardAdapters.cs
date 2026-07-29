@@ -6,38 +6,74 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
     public partial class SiteDashboardPaneView
     {
         //Choose which Dashboard to Render
-        private void ApplyDashboardToSession(SiteDashboardTabSession session, SiteDashboardResponseDto? dashboard, string requestedSiteId)
+        private void ApplyDashboardToSession(SiteDashboardTabSession session, SiteDashboardResponseDto? dashboard,
+            string requestedSiteId)
         {
-            session.DashboardKind = dashboard?.DashboardKind ?? string.Empty;
+            session.DashboardKind =
+                dashboard?.DashboardKind
+                ?? string.Empty;
 
             switch (session.DashboardKind)
             {
                 case SiteDashboardKinds.AmsMr:
-                    ApplyAmsMrDashboard(session, dashboard, requestedSiteId);
+                    ApplyAmsMrDashboard(
+                        session,
+                        dashboard,
+                        requestedSiteId);
                     break;
 
                 case SiteDashboardKinds.Igsd:
-                    ApplyIgsdDashboard(session, dashboard, requestedSiteId);
+                    ApplyIgsdDashboard(
+                        session,
+                        dashboard,
+                        requestedSiteId);
                     break;
 
                 case SiteDashboardKinds.Dacs:
-                    ApplyDacsDashboard(session, dashboard, requestedSiteId);
+                    ApplyDacsDashboard(
+                        session,
+                        dashboard,
+                        requestedSiteId);
                     break;
 
                 case SiteDashboardKinds.Rx:
-                    ApplyRxDashboard(session, dashboard, requestedSiteId);
+                    ApplyRxDashboard(
+                        session,
+                        dashboard,
+                        requestedSiteId);
                     break;
 
                 case SiteDashboardKinds.Tower:
-                    ApplyTowerDashboard(session, dashboard, requestedSiteId);
+                    ApplyTowerDashboard(
+                        session,
+                        dashboard,
+                        requestedSiteId);
                     break;
 
                 default:
-                    ApplyFallbackDashboard(session, dashboard, requestedSiteId);
+                    ApplyFallbackDashboard(
+                        session,
+                        dashboard,
+                        requestedSiteId);
                     break;
             }
 
-            session.SnmpPrimaryCommType = dashboard?.Route?.PrimaryCommType?.Trim() ?? string.Empty;
+            session.SnmpPrimaryCommType =
+                dashboard?.Route?.PrimaryCommType?.Trim()
+                ?? string.Empty;
+
+            if (dashboard?.IsCached == true)
+            {
+                var existingStatus =
+                    (session.SiteStatusText ?? string.Empty)
+                    .Trim();
+
+                session.SiteStatusText =
+                    string.IsNullOrWhiteSpace(existingStatus) ||
+                    existingStatus == "—"
+                        ? "Cached"
+                        : $"{existingStatus} • Cached";
+            }
         }
 
         //AMS Adapter
@@ -150,13 +186,25 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.IgsdPortalUrl = string.Empty;
         }
         //Portal Helper
-        private async Task ApplyPingScreenPortalUrlAsync(SiteDashboardTabSession session, SiteDashboardResponseDto? dashboard, CancellationToken ct)
+        private async Task ApplyPingScreenPortalUrlAsync(
+            SiteDashboardTabSession session,
+            SiteDashboardResponseDto? dashboard,
+            CancellationToken ct)
         {
-            var dashboardKind = dashboard?.DashboardKind ?? string.Empty;
+            var dashboardKind =
+                !string.IsNullOrWhiteSpace(dashboard?.DashboardKind)
+                    ? dashboard.DashboardKind
+                    : session.DashboardKind;
 
             var showPingScreen =
-                string.Equals(dashboardKind, SiteDashboardKinds.Igsd, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(dashboardKind, SiteDashboardKinds.Dacs, StringComparison.OrdinalIgnoreCase);
+                string.Equals(
+                    dashboardKind,
+                    SiteDashboardKinds.Igsd,
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(
+                    dashboardKind,
+                    SiteDashboardKinds.Dacs,
+                    StringComparison.OrdinalIgnoreCase);
 
             if (!showPingScreen)
             {
@@ -165,10 +213,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
             }
 
-            var dto = await _api.GetIgsdPortalUrlAsync(ct);
-            var url = (dto?.Url ?? string.Empty).Trim();
+            var dto =
+                await _api.GetIgsdPortalUrlAsync(ct);
 
-            session.ShowIgsdPortalTab = !string.IsNullOrWhiteSpace(url);
+            var url =
+                (dto?.Url ?? string.Empty).Trim();
+
+            session.ShowIgsdPortalTab =
+                !string.IsNullOrWhiteSpace(url);
+
             session.IgsdPortalUrl = url;
         }
 

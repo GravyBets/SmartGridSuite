@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using SmartGridSuite.Client.Services;
+using System.IO;
 using System.Text.Json;
 using System.Windows;
 
@@ -9,6 +10,10 @@ namespace SmartGridSuite.Client.Views
         public ChangeLogWindow()
         {
             InitializeComponent();
+
+            InterfaceScaleService.SetIsEnabled(
+                this,
+                false);
 
             Loaded += ChangeLogWindow_Loaded;
         }

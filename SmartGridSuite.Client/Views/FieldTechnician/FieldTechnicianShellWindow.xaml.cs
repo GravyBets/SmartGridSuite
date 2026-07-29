@@ -31,8 +31,6 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
         {
             InitializeComponent();
 
-            UiScaleService.ApplyToWindow(this);
-
             ConnectivityService.StateChanged += ConnectivityService_StateChanged;
 
             Closed += FieldTechnicianShellWindow_Closed;

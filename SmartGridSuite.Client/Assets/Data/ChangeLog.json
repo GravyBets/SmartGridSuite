@@ -1,10 +1,50 @@
 ﻿[
   {
+    "version": "2.0.0.0",
+    "date": "July 29, 2026",
+    "title": "Parent database resilience and complete offline fallback",
+    "changes": [
+      "Added complete last-known Parent database caching for AMS/MR, DACS, IGSD, Range Extender, tower, and tower-sector data.",
+      "Added automatic live-to-cache fallback when the Parent database is unavailable.",
+      "Added Limited Mode when the Parent database is unavailable and no cached site data exists.",
+      "Added cached tower searching and complete cached tower dashboards.",
+      "Added a transactional cache refresh process that preserves the previous cache if a refresh fails.",
+      "Added an automatic weekly cache refresh scheduled for Sunday at 2:00 AM.",
+      "Kept ping diagnostics, SNMP tools, tickets, notes, Site History, and write-up submission available during Parent database outages.",
+      "Added the correct AMS/MR, IG, DACS, and Range Extender layouts in Limited Mode.",
+      "Restored the Portal tab for IG and DACS dashboards in Limited Mode.",
+      "Moved Site Dashboard status messages above the Pop-Out button.",
+      "Improved cached-data status messages and timestamps.",
+      "Changed the default Interface Size setting to 100%."
+    ]
+  },
+
+  {
+    "version": "1.0.0.9",
+    "date": "July 28, 2026",
+    "title": "Display scaling improvements",
+    "changes": [
+      "Added automatic interface scaling for docked external monitors.",
+      "Added an Interface Size selector with automatic and manual sizing options.",
+      "Kept the Module Launcher, About App, and Bug / Feature Request windows at their original sizes.",
+      "Improved Smart Grid Suite readability on monitors configured at 100% Windows scaling."
+    ]
+  },
+
+  {
+    "version": "1.0.0.8",
+    "date": "July 28, 2026",
+    "title": "Update Corruption",
+    "changes": [
+      "Removed Duplicate App Manifest asInvoker privileges."
+    ]
+  },
+  {
     "version": "1.0.0.7",
     "date": "July 28, 2026",
     "title": "Update Corruption",
     "changes": [
-      "Packaged and uploaded new version due to 1.0.0.6 update bug."
+      "Packaged and uploaded new version due to 1.0.0.6 update file corruption."
     ]
   },
   {

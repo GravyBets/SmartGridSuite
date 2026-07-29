@@ -22,6 +22,10 @@ namespace SmartGridSuite.Client.Views
         public BugFeatureRequestWindow()
         {
             InitializeComponent();
+
+            InterfaceScaleService.SetIsEnabled(
+                this,
+                false);
         }
 
         private void Window_ContentRendered(

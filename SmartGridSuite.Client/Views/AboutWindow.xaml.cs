@@ -14,6 +14,10 @@ namespace SmartGridSuite.Client.Views
         {
             InitializeComponent();
 
+            InterfaceScaleService.SetIsEnabled(
+                this,
+                false);
+
             VersionTextBlock.Text =
                 $"Installed version " +
                 $"{ClientVersionService.GetInstalledVersionText()}";

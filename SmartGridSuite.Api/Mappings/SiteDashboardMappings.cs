@@ -29,7 +29,14 @@ namespace SmartGridSuite.Api.Mappings
                 SiteId = source.SiteId,
                 DashboardKind = source.DashboardKind,
                 Route = source.Route.ToDto(),
-                Data = MapSiteDashboardData(source.DashboardKind, source.Data)
+
+                Data = MapSiteDashboardData(
+                    source.DashboardKind,
+                    source.Data),
+
+                IsCached = source.IsCached,
+                CachedAtUtc = source.CachedAtUtc,
+                DataWarning = source.DataWarning
             };
         }
 

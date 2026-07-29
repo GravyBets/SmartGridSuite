@@ -36,14 +36,17 @@ namespace SmartGridSuite.Client
 
             _ownsSingleInstanceMutex = true;
 
-            UiScaleService.Load();
+            // Register global interface-scaling handlers
+            // before any application windows are created.
+            InterfaceScaleService.Initialize();
 
             base.OnStartup(e);
         }
 
         protected override void OnExit(ExitEventArgs e)
         {
-            if (_ownsSingleInstanceMutex && _singleInstanceMutex != null)
+            if (_ownsSingleInstanceMutex &&
+                _singleInstanceMutex != null)
             {
                 _singleInstanceMutex.ReleaseMutex();
                 _ownsSingleInstanceMutex = false;

@@ -16,37 +16,79 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             await LoadAsync(TopBarView.SearchText);
         }
 
-        private async Task<SiteDashboardResponseDto?> GetSiteOrTowerDashboardAsync(string searchText, CancellationToken ct)
+        private async Task<SiteDashboardResponseDto?>GetSiteOrTowerDashboardAsync(
+            string searchText, CancellationToken ct)
         {
-            var cleanSearch = (searchText ?? string.Empty).Trim();
+            var cleanSearch =
+                (searchText ?? string.Empty).Trim();
 
             Exception? lastNotFoundException = null;
 
-            foreach (var candidate in BuildSiteDashboardSearchCandidates(cleanSearch))
+            Exception? lastParentDatabaseUnavailableException =
+                null;
+
+            foreach (var candidate
+                     in BuildSiteDashboardSearchCandidates(cleanSearch))
             {
                 try
                 {
-                    return await _api.GetSiteDashboardAsync(candidate, ct);
+                    return await _api.GetSiteDashboardAsync(
+                        candidate,
+                        ct);
                 }
-                catch (ApiClient.ApiException ex) when (ex.StatusCode == 404)
+                catch (ApiClient.ApiException ex)
+                    when (ex.StatusCode == 404)
                 {
                     lastNotFoundException = ex;
                 }
-                catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+                catch (HttpRequestException ex)
+                    when (ex.StatusCode ==
+                          HttpStatusCode.NotFound)
                 {
                     lastNotFoundException = ex;
+                }
+                catch (Exception ex)
+                    when (IsParentDatabaseUnavailableException(ex))
+                {
+                    /*
+                     * Keep trying the remaining search candidates.
+                     *
+                     * Example:
+                     *   Tech enters 2837
+                     *   2837 has no cache
+                     *   2837MR may still have cached site data
+                     */
+                    lastParentDatabaseUnavailableException = ex;
                 }
             }
 
-            var tower = await TryFindTowerDashboardAsync(cleanSearch, ct);
+            /*
+             * Do not attempt the live Parent DB tower search when the
+             * Parent DB has already reported that it is unavailable.
+             */
+            if (lastParentDatabaseUnavailableException is not null)
+            {
+                throw lastParentDatabaseUnavailableException;
+            }
+
+            var tower =
+                await TryFindTowerDashboardAsync(
+                    cleanSearch,
+                    ct);
 
             if (tower is not null)
+            {
                 return tower;
+            }
 
             if (lastNotFoundException is not null)
+            {
                 throw lastNotFoundException;
+            }
 
-            return await _api.GetSiteDashboardAsync(cleanSearch, ct);
+            return await _api.GetSiteDashboardAsync(
+                cleanSearch,
+                ct);
         }
 
         private static IEnumerable<string> BuildSiteDashboardSearchCandidates(string searchText)
@@ -71,6 +113,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 || ex is HttpRequestException httpEx && httpEx.StatusCode == HttpStatusCode.NotFound;
         }
 
+        private static bool IsParentDatabaseUnavailableException(Exception ex)
+        {
+            return ex is ApiClient.ApiException apiException
+                && apiException.StatusCode == 503
+                && !string.IsNullOrWhiteSpace(
+                    apiException.Body)
+                && apiException.Body.Contains(
+                    "PARENT_DB_UNAVAILABLE",
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
         private static string ResolveBlankDashboardSiteId(string searchText)
         {
             var cleanSearch = (searchText ?? string.Empty).Trim();
@@ -87,11 +140,62 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return cleanSearch;
         }
 
+        private static string ResolveLimitedModeSiteId(string searchText)
+        {
+            var cleanSearch =
+                (searchText ?? string.Empty)
+                .Trim()
+                .ToUpperInvariant();
+
+            return string.IsNullOrWhiteSpace(cleanSearch)
+                ? "New Site"
+                : cleanSearch;
+        }
+
+        private static string ResolveLimitedDashboardKind(string siteId)
+        {
+            var normalized =
+                (siteId ?? string.Empty)
+                .Trim()
+                .ToUpperInvariant();
+
+            if (normalized.EndsWith(
+                    "MR",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return SiteDashboardKinds.AmsMr;
+            }
+
+            if (normalized.StartsWith(
+                    "RX",
+                    StringComparison.OrdinalIgnoreCase) ||
+                normalized.StartsWith(
+                    "RE",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return SiteDashboardKinds.Rx;
+            }
+
+            if (normalized.StartsWith(
+                    "G",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return SiteDashboardKinds.Igsd;
+            }
+
+            /*
+             * DACS sites commonly use numeric IDs.
+             * During Limited Mode, a numeric-only search is therefore
+             * treated as DACS. AMS searches must include the MR suffix.
+             */
+            return SiteDashboardKinds.Dacs;
+        }
+
         private static void ApplyBlankDashboardToSession(SiteDashboardTabSession session, string siteId)
         {
             ResetSessionForNewSiteLoad(session);
 
-            session.DashboardKind = string.Empty;
+            session.DashboardKind = ResolveLimitedDashboardKind(siteId);
 
             session.HeaderText = siteId;
             session.SearchText = siteId;
@@ -311,6 +415,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 ApplyDashboardToSession(selectedSession, dashboard, loadedSiteId);
                 await ApplyPingScreenPortalUrlAsync(selectedSession, dashboard, _loadCts.Token);
 
+                UpdateSiteLoadOverlayMessage($"Loading site history for {loadedSiteId}...");
+
+                await LoadSiteHistoryForSessionAsync(
+                    selectedSession,
+                    _loadCts.Token);
+
                 if (shouldClearForSiteLoad)
                 {
                     selectedSession.SelectedWorkspaceTabKey = "TopWriteUp";
@@ -356,11 +466,143 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     selectedSession.NetworkPingState = NetworkView.GetPingSessionState();
                 }
 
-                TopBarView.StatusText = $"Loaded {loadedSiteId}.";
+                if (dashboard?.IsCached == true)
+                {
+                    var cachedAtText =
+                        dashboard.CachedAtUtc.HasValue
+                            ? dashboard.CachedAtUtc.Value
+                                .ToLocalTime()
+                                .ToString("MMM d, yyyy h:mm tt")
+                            : "an earlier synchronization";
+
+                    TopBarView.StatusText =
+                        $"Loaded {loadedSiteId} using cached Parent DB data from {cachedAtText}.";
+                }
+                else
+                {
+                    TopBarView.StatusText =
+                        $"Loaded {loadedSiteId}.";
+                }
             }
             catch (OperationCanceledException)
             {
             }
+            catch (Exception ex)
+                when (IsParentDatabaseUnavailableException(ex))
+                {
+                var limitedSiteId = ResolveLimitedModeSiteId(siteId);
+
+                TopBarView.StatusText =
+                        $"Parent database unavailable. " +
+                        $"Opening Limited Mode for {limitedSiteId}...";
+
+                    /*
+                     * Start with the existing blank-dashboard setup.
+                     * This leaves all IP fields editable and keeps the
+                     * write-up workspace available.
+                     */
+                    ApplyBlankDashboardToSession(
+                        selectedSession,
+                        limitedSiteId);
+
+                    selectedSession.SiteStatusText =
+                        "Limited Mode";
+
+                    selectedSession.TicketInfoText =
+                        "Loading Smart Grid Suite ticket data...";
+
+                    selectedSession.SnmpSupportMessage =
+                        "Limited Mode — enter an IP address manually, " +
+                        "then select an SNMP profile.";
+
+                    _selectedSessionKey =
+                        selectedSession.SessionKey;
+
+                    RenderSelectedSession();
+
+                    var limitedModeToken =
+                        _loadCts?.Token
+                        ?? CancellationToken.None;
+
+                    try
+                    {
+                        await ApplyPingScreenPortalUrlAsync(
+                            selectedSession,
+                            dashboard: null,
+                            ct: limitedModeToken);
+                    }
+                    catch
+                    {
+                        selectedSession.ShowIgsdPortalTab = false;
+                        selectedSession.IgsdPortalUrl = string.Empty;
+                    }
+
+                /*
+                 * These features use the SmartGridSuite database,
+                 * not the unavailable Parent DB.
+                 */
+                try
+                    {
+                        await LoadSiteNotesForSessionAsync(
+                            selectedSession,
+                            limitedModeToken);
+                    }
+                    catch
+                    {
+                        // Keep Limited Mode usable when notes cannot load.
+                    }
+
+                try
+                {
+                    await LoadSiteHistoryForSessionAsync(
+                        selectedSession,
+                        limitedModeToken);
+                }
+                catch
+                {
+                    selectedSession.HistoryRows =
+                        new List<SiteDashboardHistoryRowViewModel>();
+                }
+
+                try
+                    {
+                        await RefreshTicketInfoAsync(
+                            selectedSession,
+                            limitedModeToken);
+                    }
+                    catch
+                    {
+                        selectedSession.TicketInfoText =
+                            "Ticket data is temporarily unavailable.";
+                    }
+
+                    try
+                    {
+                        await RefreshSnmpConfigAsync(
+                            selectedSession,
+                            limitedModeToken);
+                    }
+                    catch
+                    {
+                        selectedSession.SnmpSupported =
+                            false;
+
+                        selectedSession.SnmpSupportMessage =
+                            "Limited Mode — enter an IP address manually " +
+                            "to run ping diagnostics. " +
+                            "SNMP configuration could not be loaded.";
+                    }
+
+                    if (selectedSession.SessionKey ==
+                        _selectedSessionKey)
+                    {
+                        RenderSelectedSession();
+                    }
+
+                    TopBarView.StatusText =
+                        $"Limited dashboard ready for {limitedSiteId}. " +
+                        "Parent site data is unavailable.";
+                }
             catch (Exception ex) when (IsDashboardNotFoundException(ex))
             {
                 var blankSiteId = ResolveBlankDashboardSiteId(siteId);
@@ -375,6 +617,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 await LoadSiteNotesForSessionAsync(
                     selectedSession,
                     _loadCts?.Token ?? CancellationToken.None);
+
+                try
+                {
+                    await LoadSiteHistoryForSessionAsync(
+                        selectedSession,
+                        _loadCts?.Token ?? CancellationToken.None);
+                }
+                catch
+                {
+                    selectedSession.HistoryRows =
+                        new List<SiteDashboardHistoryRowViewModel>();
+                }
 
                 // Optional but useful: still allow existing tickets/SNMP profiles to load
 
@@ -448,6 +702,42 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.SnmpProfiles = new List<SnmpProfileListItemDto>();
             session.SnmpProfileId = null;
             session.SnmpOidResults = new Dictionary<ulong, string>();
+        }
+
+        private async Task LoadSiteHistoryForSessionAsync(SiteDashboardTabSession? session, CancellationToken ct = default)
+        {
+            if (session is null)
+            {
+                return;
+            }
+
+            var siteId =
+                ResolveSiteNotesSiteId(session);
+
+            if (string.IsNullOrWhiteSpace(siteId))
+            {
+                session.HistoryRows =
+                    new List<SiteDashboardHistoryRowViewModel>();
+
+                return;
+            }
+
+            var history =
+                await _api.GetAsync<List<SiteHistoryPreviewDto>>(
+                    $"api/tickets/site-history/{Uri.EscapeDataString(siteId)}",
+                    ct)
+                ?? new List<SiteHistoryPreviewDto>();
+
+            /*
+             * BuildHistoryRows already understands an object with a
+             * History collection, matching the normal dashboard shape.
+             */
+            session.HistoryRows =
+                BuildHistoryRows(
+                    new
+                    {
+                        History = history
+                    });
         }
 
         private async Task LoadSiteNotesForSessionAsync(SiteDashboardTabSession? session, CancellationToken ct = default)

@@ -208,6 +208,20 @@
                     Click="AddTabButton_Click" />
         </DockPanel>
 
+        <!-- Site Dashboard status -->
+        <TextBlock x:Name="TopBarStatusTextBlock"
+                   Grid.Row="0"
+                   Margin="0,0,12,6"
+                   MaxWidth="520"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Bottom"
+                   Foreground="{DynamicResource TextPrimary}"
+                   FontSize="11"
+                   FontWeight="SemiBold"
+                   TextAlignment="Right"
+                   TextTrimming="CharacterEllipsis"
+                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+        
         <!-- Card -->
         <Border Grid.Row="1"
                 Padding="12"

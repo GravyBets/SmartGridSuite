@@ -49,22 +49,40 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Theme picker -->
+                <!-- Display controls -->
                 <StackPanel Grid.Column="1"
-                            VerticalAlignment="Top"
-                            Margin="12,3,0,0">
+                            Width="210"
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center">
 
+                    <!-- Theme -->
                     <TextBlock Text="Theme"
+                               Margin="6,0,0,4"
                                FontSize="11"
                                FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextSecondary}"
-                               Margin="2,0,0,4"/>
+                               Foreground="{DynamicResource TextSecondary}"/>
 
                     <ComboBox x:Name="ThemeComboBox"
-                              Width="190"
-                              Height="34"
+                              Width="210"
+                              Height="32"
                               Style="{StaticResource ModernComboBox}"
                               SelectionChanged="ThemeComboBox_SelectionChanged"/>
+
+                    <!-- Interface size -->
+                    <TextBlock Text="Interface size"
+                               Margin="6,4,0,4"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondary}"/>
+
+                    <ComboBox x:Name="InterfaceScaleComboBox"
+                              Width="210"
+                              Height="32"
+                              Style="{StaticResource ModernComboBox}"
+                              DisplayMemberPath="Label"
+                              SelectedValuePath="Mode"
+                              SelectionChanged="InterfaceScaleComboBox_SelectionChanged"
+                              ToolTip="Controls Smart Grid Suite sizing independently of Windows display scaling."/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -121,23 +139,17 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="24"/>
+                    <RowDefinition Height="6"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <!-- Card label -->
-                <StackPanel Grid.Row="0">
-                    <TextBlock Text="Workspaces"
-                       FontSize="18"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextPrimary}"/>
-
-                    <TextBlock Text="Open the module you need for today’s work."
-                               Margin="0,3,0,0"
-                               FontSize="12"
-                               Foreground="{DynamicResource TextSecondary}"/>
-                </StackPanel>
-
+                <!-- Card label -->                
+                    <TextBlock Grid.Row="0"
+                               Text="Workspaces"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+                
                 <!-- Centered vertical module stack -->
                 <Grid Grid.Row="2"
                       Width="560"
