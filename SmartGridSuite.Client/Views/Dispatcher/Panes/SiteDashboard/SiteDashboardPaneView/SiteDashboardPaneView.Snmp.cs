@@ -1,11 +1,14 @@
 ﻿using SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard;
 using SmartGridSuite.Contracts.SiteDashboard;
 using SmartGridSuite.Contracts.Snmp;
+using SmartGridSuite.Client.Services;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
     public partial class SiteDashboardPaneView
     {
+        private readonly LocalSnmpService _localSnmpService = new();
+
         private async void WorkspaceView_RefreshSnmpRequested(object? sender, EventArgs e)
         {
             var session = GetSelectedSession();
@@ -90,15 +93,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 TopBarView.StatusText = $"Setting {selectedOid.Label} to {setStatusValueText}...";
 
-                var setResult = await _api.PostAsync<SnmpSetSelectedRequestDto, SnmpSetResultDto>(
-                    "api/snmp-profiles/set-selected",
-                    new SnmpSetSelectedRequestDto
-                    {
-                        ProfileId = session.SnmpProfileId.Value,
-                        OidId = selectedOid.Id,
-                        TargetIp = targetIp,
-                        Value = setValue
-                    });
+                if (session.SnmpProfile is null)
+                {
+                    TopBarView.StatusText =
+                        "The selected SNMP profile details are not loaded.";
+                    return;
+                }
+
+                var setResult =
+                    await _localSnmpService.SetSelectedAsync(
+                        session.SnmpProfile,
+                        selectedOid,
+                        targetIp,
+                        setValue,
+                        CancellationToken.None);
 
                 session.SnmpTargetIp = targetIp;
                 WorkspaceView.ShowSnmpSetResult(setResult);
@@ -143,7 +151,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private async Task<SnmpRunResultDto> RefreshSelectedSnmpOidAfterSetAsync(SiteDashboardTabSession session,
             SnmpOidConfigDto selectedOid, string targetIp, CancellationToken ct)
         {
-            if (!session.SnmpProfileId.HasValue || session.SnmpProfileId.Value == 0)
+            if (session.SnmpProfile is null)
             {
                 return new SnmpRunResultDto
                 {
@@ -156,14 +164,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 WorkspaceView.SetSnmpOidResult(selectedOid.Id, "Refreshing...");
 
-                var refreshResult = await _api.PostAsync<SnmpRunSelectedRequestDto, SnmpRunResultDto>(
-                    "api/snmp-profiles/run-selected",
-                    new SnmpRunSelectedRequestDto
-                    {
-                        ProfileId = session.SnmpProfileId.Value,
-                        OidId = selectedOid.Id,
-                        TargetIp = targetIp
-                    });
+                var refreshResult =
+                    await _localSnmpService.RunSelectedAsync(
+                        session.SnmpProfile,
+                        selectedOid,
+                        targetIp,
+                        ct);
 
                 var display = refreshResult?.Success == true
                     ? refreshResult.DisplayValue
@@ -193,15 +199,29 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private async Task RefreshSnmpConfigAsync(SiteDashboardTabSession session, CancellationToken ct)
+        private async Task RefreshSnmpConfigAsync(
+            SiteDashboardTabSession session,
+            CancellationToken ct)
         {
-            if (string.IsNullOrWhiteSpace(session.SnmpTargetIp) || session.SnmpTargetIp == "—")
-                session.SnmpTargetIp = GetDefaultSnmpTargetIp(session);
+            if (string.IsNullOrWhiteSpace(session.SnmpTargetIp) ||
+                session.SnmpTargetIp == "—")
+            {
+                session.SnmpTargetIp =
+                    GetDefaultSnmpTargetIp(session);
+            }
+
+            var previousProfileId =
+                session.SnmpProfileId;
+
+            var primaryCommType =
+                (session.SnmpPrimaryCommType ?? string.Empty)
+                .Trim();
 
             session.SnmpSupported = false;
             session.SnmpDeviceFamily = string.Empty;
             session.SnmpProfileName = string.Empty;
             session.SnmpProfileId = null;
+            session.SnmpProfile = null;
             session.SnmpSupportMessage = string.Empty;
             session.SnmpProfiles = new List<SnmpProfileListItemDto>();
             session.SnmpOids = new List<SnmpOidConfigDto>();
@@ -226,21 +246,38 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             ulong selectedProfileId;
 
-            if (session.SnmpProfileId.HasValue &&
-                session.SnmpProfiles.Any(x => x.Id == session.SnmpProfileId.Value))
-            {
-                selectedProfileId = session.SnmpProfileId.Value;
-            }
-            else if (string.Equals(session.DashboardKind, SiteDashboardKinds.Tower, StringComparison.OrdinalIgnoreCase))
+            if (previousProfileId.HasValue &&
+                session.SnmpProfiles.Any(
+                    x => x.Id == previousProfileId.Value))
             {
                 selectedProfileId =
-                    session.SnmpProfiles.FirstOrDefault(x =>
-                        x.Name.Contains("Tower", StringComparison.OrdinalIgnoreCase))?.Id
+                    previousProfileId.Value;
+            }
+            else if (string.Equals(
+                         session.DashboardKind,
+                         SiteDashboardKinds.Tower,
+                         StringComparison.OrdinalIgnoreCase))
+            {
+                selectedProfileId =
+                    session.SnmpProfiles.FirstOrDefault(
+                        x => x.Name.Contains(
+                            "Tower",
+                            StringComparison.OrdinalIgnoreCase))?.Id
                     ?? session.SnmpProfiles.First().Id;
             }
             else
             {
-                selectedProfileId = session.SnmpProfiles.First().Id;
+                var matchingProfile =
+                    string.IsNullOrWhiteSpace(primaryCommType)
+                        ? null
+                        : session.SnmpProfiles.FirstOrDefault(
+                            x => x.Name.Contains(
+                                primaryCommType,
+                                StringComparison.OrdinalIgnoreCase));
+
+                selectedProfileId =
+                    matchingProfile?.Id
+                    ?? session.SnmpProfiles.First().Id;
             }
 
             await LoadSnmpProfileIntoSessionAsync(session, selectedProfileId, ct);
@@ -326,6 +363,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 session.SnmpSupported = false;
                 session.SnmpProfileId = null;
+                session.SnmpProfile = null;
                 session.SnmpProfileName = string.Empty;
                 session.SnmpOids = new List<SnmpOidConfigDto>();
                 session.SnmpSupportMessage = "Selected SNMP profile could not be loaded.";
@@ -334,6 +372,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             session.SnmpSupported = true;
             session.SnmpProfileId = profile.Id;
+            session.SnmpProfile = profile;
             session.SnmpProfileName = profile.Name;
             session.SnmpOids = profile.Oids
                 .Where(x => x.ShowInWorkspace)
@@ -380,7 +419,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (session is null)
                 return;
 
-            if (!session.SnmpProfileId.HasValue || session.SnmpProfileId.Value == 0)
+            if (session.SnmpProfile is null)
             {
                 TopBarView.StatusText = "No active SNMP profile is loaded for this site.";
                 return;
@@ -398,14 +437,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 session.SnmpTargetIp = targetIp;
                 WorkspaceView.SetSnmpOidResult(e.Oid.Id, "Running...");
 
-                var result = await _api.PostAsync<SnmpRunSelectedRequestDto, SnmpRunResultDto>(
-                    "api/snmp-profiles/run-selected",
-                    new SnmpRunSelectedRequestDto
-                    {
-                        ProfileId = session.SnmpProfileId.Value,
-                        OidId = e.Oid.Id,
-                        TargetIp = targetIp
-                    });
+                var result =
+                    await _localSnmpService.RunSelectedAsync(
+                        session.SnmpProfile,
+                        e.Oid,
+                        targetIp,
+                        CancellationToken.None);
 
                 var display = result?.Success == true
                     ? result.DisplayValue
@@ -433,7 +470,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (session is null)
                 return;
 
-            if (!session.SnmpProfileId.HasValue || session.SnmpProfileId.Value == 0)
+            if (session.SnmpProfile is null)
             {
                 TopBarView.StatusText = "No active SNMP profile is loaded for this site.";
                 return;
@@ -456,14 +493,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                     try
                     {
-                        var result = await _api.PostAsync<SnmpRunSelectedRequestDto, SnmpRunResultDto>(
-                            "api/snmp-profiles/run-selected",
-                            new SnmpRunSelectedRequestDto
-                            {
-                                ProfileId = session.SnmpProfileId.Value,
-                                OidId = oid.Id,
-                                TargetIp = targetIp
-                            });
+                        var result =
+                            await _localSnmpService.RunSelectedAsync(
+                                session.SnmpProfile,
+                                oid,
+                                targetIp,
+                                CancellationToken.None);
 
                         var display = result?.Success == true
                             ? result.DisplayValue

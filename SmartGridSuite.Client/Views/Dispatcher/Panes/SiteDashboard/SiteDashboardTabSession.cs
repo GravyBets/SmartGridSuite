@@ -57,6 +57,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public List<SnmpOidConfigDto> SnmpOids { get; set; } = new();
         public List<SnmpProfileListItemDto> SnmpProfiles { get; set; } = new();
         public ulong? SnmpProfileId { get; set; }
+
+        public SnmpProfileDetailDto? SnmpProfile { get; set; }
         public Dictionary<ulong, string> SnmpOidResults { get; set; } = new();
 
         //Towers

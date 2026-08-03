@@ -10,10 +10,10 @@
 
 	<ApplicationIcon>Assets\Branding\SmartGridSuite_Icon.ico</ApplicationIcon>
 
-	<Version>2.0.0.0</Version>
-	<AssemblyVersion>2.0.0.0</AssemblyVersion>
-	<FileVersion>2.0.0.0</FileVersion>
-	<InformationalVersion>2.0.0.0</InformationalVersion>
+	<Version>2.0.0.3</Version>
+	<AssemblyVersion>2.0.0.3</AssemblyVersion>
+	<FileVersion>2.0.0.3</FileVersion>
+	<InformationalVersion>2.0.0.3</InformationalVersion>
 	<ApplicationManifest>app.manifest</ApplicationManifest>
 </PropertyGroup>
 
@@ -32,6 +32,7 @@
     <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Fluent.Ribbon" Version="11.0.2" />
+    <PackageReference Include="Lextm.SharpSnmpLib" Version="12.5.7" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
   </ItemGroup>
 

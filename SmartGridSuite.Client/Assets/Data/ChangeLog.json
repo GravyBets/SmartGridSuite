@@ -1,5 +1,39 @@
 ﻿[
   {
+    "version": "2.0.0.3",
+    "date": "July 29, 2026",
+    "title": "Write-up and request dialog fixes",
+    "changes": [
+      "Improved the Request Ticket, Request Capital, and Request Maintenance dialog layout.",
+      "Added all assigned technicians to the submitted write-up technician footer.",
+      "Ensured completed work appears in each participating technician's History.",
+      "Added all participating technicians as write-up email recipients."
+    ]
+  },
+
+  {
+    "version": "2.0.0.2",
+    "date": "July 29, 2026",
+    "title": "Site History Edit/Delete Button",
+    "changes": [
+      "Found left over Edit and Delete buttons on Site History. Removed them."
+    ]
+  },
+
+  {
+    "version": "2.0.0.1",
+    "date": "July 29, 2026",
+    "title": "Local SNMP polling fix",
+    "changes": [
+      "Changed SNMP GET and SET operations to run directly from the client laptop instead of the API server.",
+      "Kept SNMP profiles, credentials, OIDs, formulas, and decode mappings centrally managed by the API.",
+      "Restored SNMP polling for cached dashboards when the API server cannot directly reach field radio networks.",
+      "Fixed SNMP profile selection so the current profile is preserved and matched to the site's communication type.",
+      "Verified single OID polling, Poll All, and SNMP SET operations from cached site dashboards."
+    ]
+  },
+
+  {
     "version": "2.0.0.0",
     "date": "July 29, 2026",
     "title": "Parent database resilience and complete offline fallback",

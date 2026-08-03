@@ -701,6 +701,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.SnmpOids = new List<SnmpOidConfigDto>();
             session.SnmpProfiles = new List<SnmpProfileListItemDto>();
             session.SnmpProfileId = null;
+            session.SnmpProfile = null;
             session.SnmpOidResults = new Dictionary<ulong, string>();
         }
 

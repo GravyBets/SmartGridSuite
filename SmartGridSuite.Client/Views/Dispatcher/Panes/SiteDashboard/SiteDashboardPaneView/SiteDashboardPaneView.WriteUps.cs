@@ -84,6 +84,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             WriteUpDraftRecord? pendingDraft = null;
 
             var isPendingRetry = false;
+            var submissionConfirmed = false;
 
             var clientSubmissionId =
                 Guid.Empty;
@@ -105,14 +106,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 _writeUpSubmitInProgress = true;
 
-                ShowSiteLoadOverlay("Submitting write-up...");
+                ShowSiteLoadOverlay(
+                    "Submitting write-up...");
+
                 TopBarView.StatusText =
                     "Submitting write-up...";
 
                 await Task.Yield();
 
                 /*
-                 * First check the draft already restored into this dashboard tab.
+                 * First check for a pending draft already restored into this
+                 * dashboard session.
                  */
                 if (!string.IsNullOrWhiteSpace(sessionKey))
                 {
@@ -122,8 +126,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 }
 
                 /*
-                 * Also check the JSON directly. This makes Retry work even when the
-                 * site was never closed and reopened after the original failure.
+                 * Also check the local JSON directly. This allows Retry to work
+                 * even when the dashboard tab was never closed and reopened.
                  */
                 if (pendingDraft?.IsPendingSubmission != true)
                 {
@@ -153,9 +157,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 if (isPendingRetry)
                 {
                     /*
-                     * Retry the exact previously confirmed submission. Reusing the same
-                     * ClientSubmissionId prevents duplicate Site History records when
-                     * the original API request succeeded but its response was lost.
+                     * Retry the exact previously confirmed payload using the same
+                     * ClientSubmissionId. This prevents duplicate Site History
+                     * records when the original request succeeded but its response
+                     * was lost.
                      */
                     if (pendingDraft!.ClientSubmissionId == Guid.Empty)
                     {
@@ -181,14 +186,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                             pendingDraft.TicketId;
                     }
 
-                    UpdateSiteLoadOverlayMessage("Retrying pending write-up...");
+                    UpdateSiteLoadOverlayMessage(
+                        "Retrying pending write-up...");
+
                     TopBarView.StatusText =
                         "Retrying pending write-up...";
                 }
                 else
                 {
                     /*
-                     * This is a brand-new submission, so generate a new idempotency key.
+                     * Brand-new submissions receive a new idempotency key.
                      */
                     clientSubmissionId =
                         Guid.NewGuid();
@@ -202,7 +209,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                         ? pendingTicketId
                         : session.CurrentTicketId;
 
-                UpdateSiteLoadOverlayMessage("Finding or creating ticket for write-up...");
+                UpdateSiteLoadOverlayMessage(
+                    "Finding or creating ticket for write-up...");
 
                 if (targetTicketId <= 0)
                 {
@@ -225,7 +233,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     return;
                 }
 
-                UpdateSiteLoadOverlayMessage("Submitting write-up to server...");
+                UpdateSiteLoadOverlayMessage(
+                    "Submitting write-up to server...");
 
                 await _ticketsApi.SubmitWriteUpAsync(
                     targetTicketId,
@@ -235,13 +244,25 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     submittedBy: employeeId,
                     CancellationToken.None);
 
+                /*
+                 * The API has now committed the write-up and changed the ticket
+                 * status. No later local cleanup or UI refresh problem may be
+                 * treated as a failed submission.
+                 */
+                submissionConfirmed = true;
+
+                session.CurrentTicketId =
+                    targetTicketId;
+
                 submittedTicketId =
                     targetTicketId;
 
-                UpdateSiteLoadOverlayMessage("Cleaning up local pending write-up backup...");
+                UpdateSiteLoadOverlayMessage(
+                    "Cleaning up local pending write-up backup...");
 
                 /*
-                 * Only remove the JSON after the API positively confirms success.
+                 * Remove local JSON only after the API positively confirms success.
+                 * This helper already treats local deletion failures as non-fatal.
                  */
                 await DeletePendingWriteUpDraftsAfterSuccessAsync(
                     employeeId,
@@ -250,29 +271,91 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     submittedTicketId);
 
                 /*
-                 * Remove the restored in-memory draft and recovery flags so the
-                 * successful submission is not shown as pending again.
+                 * Remove restored in-memory draft state so the successful
+                 * submission cannot be offered as pending again.
                  */
                 ResetPendingWriteUpRecoveryCheck(
                     session);
 
-                UpdateSiteLoadOverlayMessage("Refreshing site history after submit...");
+                /*
+                 * Clear the submitted write-up from both the saved dashboard session
+                 * and the currently visible TextBox.
+                 */
+                session.WriteUpText =
+                    string.Empty;
+
+                if (session.SessionKey ==
+                    _selectedSessionKey)
+                {
+                    WorkspaceView.WriteUpText =
+                        string.Empty;
+                }
+
+                /*
+                 * Refresh only SmartGridSuite-owned information. Do not reload the
+                 * full dashboard because that can invoke Parent DB lookup logic.
+                 */
+                UpdateSiteLoadOverlayMessage(
+                    "Refreshing ticket status and site history...");
 
                 TopBarView.StatusText =
-                    "Refreshing site after write-up submit...";
+                    "Refreshing ticket status and site history...";
 
-                await RefreshDashboardAfterWriteUpSubmitAsync(
-                    session,
-                    CancellationToken.None);
+                try
+                {
+                    await RefreshTicketInfoAsync(
+                        session,
+                        CancellationToken.None);
 
-                TopBarView.StatusText =
-                    isPendingRetry
-                        ? "Pending write-up submitted successfully. Site history refreshed."
-                        : "Write-up submitted. Site history refreshed.";
+                    await LoadSiteHistoryForSessionAsync(
+                        session,
+                        CancellationToken.None);
+
+                    session.SelectedWorkspaceTabKey =
+                        "SiteHistory";
+
+                    if (session.SessionKey ==
+                        _selectedSessionKey)
+                    {
+                        RenderSelectedSession();
+                    }
+
+                    TopBarView.StatusText =
+                        isPendingRetry
+                            ? "Pending write-up submitted successfully."
+                            : "Write-up submitted successfully.";
+                }
+                catch
+                {
+                    /*
+                     * The API already committed the write-up. Failure to reload ticket
+                     * information or Site History must not recreate a pending draft.
+                     */
+                    session.SelectedWorkspaceTabKey =
+                        "SiteHistory";
+
+                    if (session.SessionKey ==
+                        _selectedSessionKey)
+                    {
+                        RenderSelectedSession();
+                    }
+
+                    TopBarView.StatusText =
+                        "Write-up submitted successfully. Ticket status or Site History will refresh when the screen is reloaded.";
+                }
             }
             catch (ApiClient.ApiConnectionException)
             {
-                UpdateSiteLoadOverlayMessage("Connection failed. Saving write-up locally...");
+                if (submissionConfirmed)
+                {
+                    TopBarView.StatusText =
+                        "Write-up submitted successfully. Ticket status will refresh when the screen is reloaded.";
+
+                    return;
+                }
+
+                UpdateSiteLoadOverlayMessage(
+                    "Connection failed. Saving write-up locally...");
 
                 bool savedLocally;
 
@@ -280,8 +363,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     pendingDraft is not null)
                 {
                     /*
-                     * The retry also failed because connectivity is still unavailable.
-                     * Save the same draft again without changing its GUID or payload.
+                     * Connectivity is still unavailable. Preserve the same pending
+                     * payload and idempotency key for another retry.
                      */
                     try
                     {
@@ -299,8 +382,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 else
                 {
                     /*
-                     * This was a brand-new submission. Store its exact confirmed
-                     * payload and the same GUID used during the failed API attempt.
+                     * This was a new submission that never received API
+                     * confirmation. Save its exact payload and submission ID.
                      */
                     savedLocally =
                         await TrySavePendingWriteUpDraftAsync(
@@ -356,9 +439,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
             catch (ApiClient.ApiException ex)
             {
+                if (submissionConfirmed)
+                {
+                    TopBarView.StatusText =
+                        "Write-up submitted successfully. Ticket status will refresh when the screen is reloaded.";
+
+                    return;
+                }
+
                 /*
-                 * The server was reachable but rejected the request. Keep any pending
-                 * JSON so the technician can retry or the issue can be investigated.
+                 * The API was reachable but rejected the submission itself.
+                 * Preserve any existing pending JSON for investigation or retry.
                  */
                 TopBarView.StatusText =
                     $"Write-up submit failed: server error {ex.StatusCode}. " +
@@ -366,6 +457,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
             catch (Exception ex)
             {
+                if (submissionConfirmed)
+                {
+                    TopBarView.StatusText =
+                        "Write-up submitted successfully. A local screen refresh or cleanup operation failed.";
+
+                    return;
+                }
+
                 TopBarView.StatusText =
                     $"Write-up submit failed: {ex.Message}";
             }
@@ -698,93 +797,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 sessionKey);
         }
 
-        // Reloads the current dashboard and Site History after the API confirms
-        // that a write-up was successfully submitted.
+        // Refreshes only SmartGridSuite-owned ticket data after a confirmed write-up.
+        // Parent database/dashboard data is intentionally not reloaded here.
         private async Task RefreshDashboardAfterWriteUpSubmitAsync(
             SiteDashboardTabSession session,
             CancellationToken ct)
         {
-            var reloadId =
-                (session.SearchText ??
-                 session.HeaderText ??
-                 string.Empty)
-                .Trim();
-
-            if (string.IsNullOrWhiteSpace(reloadId) ||
-                reloadId.StartsWith(
-                    "Blank",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                await RefreshTicketInfoAsync(
-                    session,
-                    ct);
-
-                session.SelectedWorkspaceTabKey =
-                    "SiteHistory";
-
-                if (session.SessionKey ==
-                    _selectedSessionKey)
-                {
-                    RenderSelectedSession();
-                }
-
-                return;
-            }
-
-            WorkspaceView.StopTowerPings();
-
-            ClearSessionTemporaryDashboardState(
-                session);
-
-            try
-            {
-                var dashboard =
-                    await GetSiteOrTowerDashboardAsync(
-                        reloadId,
-                        ct);
-
-                var loadedSiteId =
-                    GetObjectPropertyText(
-                        dashboard,
-                        "SiteId")
-                    ?? reloadId;
-
-                ApplyDashboardToSession(
-                    session,
-                    dashboard,
-                    loadedSiteId);
-
-                if (ShouldLoadSnmpForDashboard(session))
-                {
-                    await RefreshSnmpConfigAsync(
-                        session,
-                        ct);
-                }
-                else
-                {
-                    ClearSnmpForUnsupportedDashboard(
-                        session);
-                }
-            }
-            catch (Exception ex)
-                when (IsDashboardNotFoundException(ex))
-            {
-                /*
-                 * Handles new or blank sites that do not exist in the parent
-                 * database yet.
-                 */
-                var blankSiteId =
-                    ResolveBlankDashboardSiteId(
-                        reloadId);
-
-                ApplyBlankDashboardToSession(
-                    session,
-                    blankSiteId);
-
-                session.SelectedWorkspaceTabKey =
-                    "SiteHistory";
-            }
-
             await RefreshTicketInfoAsync(
                 session,
                 ct);

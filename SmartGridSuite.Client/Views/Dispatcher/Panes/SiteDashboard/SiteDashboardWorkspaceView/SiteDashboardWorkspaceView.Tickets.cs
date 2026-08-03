@@ -339,6 +339,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 AcceptsReturn = true,
                 TextWrapping = TextWrapping.Wrap,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalContentAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 0, 0, -2),
                 Padding = new Thickness(8),
                 MinHeight = 110
             };

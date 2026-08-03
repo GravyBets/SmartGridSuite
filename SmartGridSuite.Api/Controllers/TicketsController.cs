@@ -2803,20 +2803,41 @@ namespace SmartGridSuite.Api.Controllers
 
             try
             {
+                var submittedWork = await ResolveSubmittedWorkAsync(
+                    entity,
+                    req.SubmittedBy,
+                    submittedAt.Date,
+                    ct);
+
+                /*
+                 * The API owns the final technician footer. This ensures Ticket Notes,
+                 * the structured submission, Site History, Field Tech History, and email
+                 * all use the same authoritative participant list.
+                 */
+                var canonicalFinalWriteUp = ApplyCnpTechFooter(
+                    finalWriteUp,
+                    submittedWork);
+
+                var canonicalSiteHistoryWriteUp = ApplyCnpTechFooter(
+                    siteHistoryWriteUp,
+                    submittedWork);
+
                 entity.Notes = AppendTicketNote(
                     entity.Notes,
                     "Write-up submitted",
-                    finalWriteUp,
+                    canonicalFinalWriteUp,
                     req.SubmittedBy);
 
-                entity.ActionRequiredOverride = "Review submitted site write-up";
+                entity.ActionRequiredOverride =
+                    "Review submitted site write-up";
+
                 entity.LastActivityAt = submittedAt;
                 entity.Status = writeUpSubmitStatus.Name;
 
                 await CreateSubmittedWriteUpRecordsAsync(
                     entity,
-                    siteHistoryWriteUp,
-                    req.SubmittedBy,
+                    canonicalSiteHistoryWriteUp,
+                    submittedWork,
                     clientSubmissionId,
                     submittedAt,
                     ct);
@@ -2826,9 +2847,9 @@ namespace SmartGridSuite.Api.Controllers
 
                 await TrySendWriteUpSubmittedEmailAsync(
                     entity.Id,
-                    req.SubmittedBy,
-                    finalWriteUp,
+                    canonicalFinalWriteUp,
                     submittedAt,
+                    submittedWork,
                     ct);
 
                 return Ok(new UpdateTicketResponse(entity.Id));
@@ -2873,15 +2894,14 @@ namespace SmartGridSuite.Api.Controllers
 
         // Creates Site History, the structured write-up submission, and permanent
         // participant rows using the client idempotency key for duplicate protection.
-        private async Task CreateSubmittedWriteUpRecordsAsync(TicketEntity ticket, string siteHistoryWriteUp,
-            string? submittedByEmployeeId, Guid clientSubmissionId, DateTime submittedAt, CancellationToken ct)
+        private async Task CreateSubmittedWriteUpRecordsAsync(
+            TicketEntity ticket,
+            string siteHistoryWriteUp,
+            SubmittedWorkInfo submittedWork,
+            Guid clientSubmissionId,
+            DateTime submittedAt,
+            CancellationToken ct)
         {
-            var submittedWork = await ResolveSubmittedWorkAsync(
-                ticket,
-                submittedByEmployeeId,
-                submittedAt.Date,
-                ct);
-
             long? siteHistoryId = null;
 
             var siteId = (ticket.Site ?? string.Empty).Trim();
@@ -3202,8 +3222,12 @@ namespace SmartGridSuite.Api.Controllers
 
         // Adds a technician to the participant snapshot while preventing duplicate
         // employee entries and preserving the submitter flag.
-        private static void AddSubmittedParticipant(IDictionary<string, SubmittedParticipantInfo> participants,
-            TechnicianEntity technician, bool isSubmitter)
+        // Adds a technician to the participant snapshot while preventing duplicate
+        // employee entries and preserving the submitter flag.
+        private static void AddSubmittedParticipant(
+            IDictionary<string, SubmittedParticipantInfo> participants,
+            TechnicianEntity technician,
+            bool isSubmitter)
         {
             var employeeId =
                 string.IsNullOrWhiteSpace(technician.EmployeeId)
@@ -3220,12 +3244,18 @@ namespace SmartGridSuite.Api.Controllers
                 technician.Id,
                 employeeId,
                 technicianName,
-                isSubmitter);
+                isSubmitter,
+                technician.EmailAddress);
         }
 
         // Adds or updates one participant using employee ID as the stable snapshot key.
-        private static void AddSubmittedParticipant(IDictionary<string, SubmittedParticipantInfo> participants,
-            uint? technicianId, string employeeId, string technicianName, bool isSubmitter)
+        private static void AddSubmittedParticipant(
+            IDictionary<string, SubmittedParticipantInfo> participants,
+            uint? technicianId,
+            string employeeId,
+            string technicianName,
+            bool isSubmitter,
+            string? emailAddress = null)
         {
             var cleanEmployeeId =
                 string.IsNullOrWhiteSpace(employeeId)
@@ -3237,6 +3267,9 @@ namespace SmartGridSuite.Api.Controllers
                     ? cleanEmployeeId
                     : technicianName.Trim();
 
+            var cleanEmailAddress =
+                (emailAddress ?? string.Empty).Trim();
+
             if (participants.TryGetValue(
                     cleanEmployeeId,
                     out var existing))
@@ -3245,6 +3278,12 @@ namespace SmartGridSuite.Api.Controllers
                     technicianId.HasValue)
                 {
                     existing.TechnicianId = technicianId;
+                }
+
+                if (string.IsNullOrWhiteSpace(existing.EmailAddress) &&
+                    !string.IsNullOrWhiteSpace(cleanEmailAddress))
+                {
+                    existing.EmailAddress = cleanEmailAddress;
                 }
 
                 if (isSubmitter)
@@ -3259,6 +3298,7 @@ namespace SmartGridSuite.Api.Controllers
                     TechnicianId = technicianId,
                     EmployeeId = cleanEmployeeId,
                     TechnicianName = cleanTechnicianName,
+                    EmailAddress = cleanEmailAddress,
                     IsSubmitter = isSubmitter
                 };
         }
@@ -3635,6 +3675,8 @@ namespace SmartGridSuite.Api.Controllers
 
             public string TechnicianName { get; set; } = "";
 
+            public string EmailAddress { get; set; } = "";
+
             public bool IsSubmitter { get; set; }
         }
 
@@ -3646,6 +3688,48 @@ namespace SmartGridSuite.Api.Controllers
             public uint? TruckId { get; set; }
 
             public uint? TechnicianId { get; set; }
+        }
+
+        private static string ApplyCnpTechFooter(
+            string? writeUp,
+            SubmittedWorkInfo submittedWork)
+        {
+            var technicianNames = submittedWork.Participants
+                .OrderByDescending(x => x.IsSubmitter)
+                .ThenBy(x => x.TechnicianName)
+                .Select(x => (x.TechnicianName ?? string.Empty).Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var crewDisplayText = FormatCrewDisplayText(technicianNames);
+            var cleanWriteUp = (writeUp ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(crewDisplayText))
+                return cleanWriteUp;
+
+            /*
+             * Remove the client-generated CNP Techs footer so the API can replace it
+             * with the authoritative participant list resolved at submission time.
+             */
+            cleanWriteUp = Regex.Replace(
+                    cleanWriteUp,
+                    @"(?:\r?\n){0,2}-{10,}\r?\nCNP Techs:\s*[^\r\n]*\s*$",
+                    string.Empty,
+                    RegexOptions.IgnoreCase)
+                .TrimEnd();
+
+            var footer =
+                "----------------------------" +
+                Environment.NewLine +
+                $"CNP Techs: {crewDisplayText}";
+
+            return string.IsNullOrWhiteSpace(cleanWriteUp)
+                ? footer
+                : cleanWriteUp +
+                  Environment.NewLine +
+                  Environment.NewLine +
+                  footer;
         }
 
         private static string FormatTechnicianName(string? firstName, string? lastName, string? fallbackEmployeeId)
@@ -4287,76 +4371,102 @@ namespace SmartGridSuite.Api.Controllers
             return sb.ToString();
         }
 
-        private async Task<EmailSendResult> TrySendWriteUpSubmittedEmailAsync(long ticketId, string? submittedByEmployeeId,
-            string submittedWriteUp, DateTime submittedAt, CancellationToken ct)
+        private async Task<EmailSendResult> TrySendWriteUpSubmittedEmailAsync(
+            long ticketId,
+            string submittedWriteUp,
+            DateTime submittedAt,
+            SubmittedWorkInfo submittedWork,
+            CancellationToken ct)
         {
             try
             {
                 var ticket = await _db.Tickets
                     .AsNoTracking()
                     .Include(x => x.TaskCategory)
-                    .FirstOrDefaultAsync(x => x.Id == ticketId, ct);
+                    .FirstOrDefaultAsync(
+                        x => x.Id == ticketId,
+                        ct);
 
                 if (ticket == null)
                 {
                     return new EmailSendResult
                     {
                         Status = "Skipped",
-                        Message = $"Ticket {ticketId} was not found after write-up submission."
+                        Message =
+                            $"Ticket {ticketId} was not found after write-up submission."
                     };
                 }
 
-                var submitterEmployeeId = (submittedByEmployeeId ?? string.Empty).Trim();
+                var submittedByName =
+                    string.IsNullOrWhiteSpace(submittedWork.SubmittedByName)
+                        ? "Unknown"
+                        : submittedWork.SubmittedByName.Trim();
 
-                var submitter = string.IsNullOrWhiteSpace(submitterEmployeeId)
-                    ? null
-                    : await _db.Technicians
-                        .AsNoTracking()
-                        .Where(x => x.EmployeeId == submitterEmployeeId)
-                        .Select(x => new
+                var submitterParticipant =
+                    submittedWork.Participants
+                        .FirstOrDefault(x => x.IsSubmitter);
+
+                var submitterEmail =
+                    (submitterParticipant?.EmailAddress ?? string.Empty)
+                    .Trim();
+
+                var allEmailsAddress =
+                    await GetAllEmailsAddressAsync(ct);
+
+                var recipients =
+                    string.IsNullOrWhiteSpace(allEmailsAddress)
+                        ? await LoadWriteUpEmailRecipientsAsync(ct)
+                        : new List<WriteUpEmailRecipientInfo>
                         {
-                            x.EmployeeId,
-                            x.FirstName,
-                            x.LastName,
-                            x.EmailAddress
-                        })
-                        .FirstOrDefaultAsync(ct);
-
-                var submittedByName = submitter == null
-                    ? string.IsNullOrWhiteSpace(submitterEmployeeId) ? "Unknown" : submitterEmployeeId
-                    : FormatTechnicianName(
-                        submitter.FirstName,
-                        submitter.LastName,
-                        submitter.EmployeeId);
-
-                var submitterEmail = (submitter?.EmailAddress ?? string.Empty).Trim();
-
-                var allEmailsAddress = await GetAllEmailsAddressAsync(ct);
-
-                var recipients = string.IsNullOrWhiteSpace(allEmailsAddress)
-                    ? await LoadWriteUpEmailRecipientsAsync(ct)
-                    : new List<WriteUpEmailRecipientInfo>
+                    new()
                     {
-                        new()
-                        {
-                            Name = "SmartGridSuite Write-Ups",
-                            EmailAddress = allEmailsAddress
-                        }
-                    };
+                        Name = "SmartGridSuite Write-Ups",
+                        EmailAddress = allEmailsAddress
+                    }
+                        };
 
-                var truckNumberDisplay = await ResolveTicketTruckNumberDisplayAsync(
-                    ticket.Id,
-                    submittedAt.Date,
-                    ct);
+                /*
+                 * In normal production delivery, send the write-up to every
+                 * technician snapshotted as a participant, in addition to the
+                 * configured Dispatch/Admin recipients.
+                 *
+                 * When AllEmailsAddress is configured, it remains an intentional
+                 * testing override and all delivery is redirected there.
+                 */
+                if (string.IsNullOrWhiteSpace(allEmailsAddress))
+                {
+                    recipients.AddRange(
+                        submittedWork.Participants
+                            .Where(x =>
+                                !string.IsNullOrWhiteSpace(
+                                    x.EmailAddress))
+                            .Select(x =>
+                                new WriteUpEmailRecipientInfo
+                                {
+                                    Name =
+                                        x.TechnicianName,
 
-                var subject = $"{ticket.Site} - {submittedByName} - Write-Up Submitted";
+                                    EmailAddress =
+                                        x.EmailAddress.Trim()
+                                }));
+                }
 
-                var body = BuildWriteUpSubmittedEmailBody(
-                    ticket,
-                    submittedByName,
-                    submittedAt,
-                    truckNumberDisplay,
-                    submittedWriteUp);
+                var truckNumberDisplay =
+                    await ResolveTicketTruckNumberDisplayAsync(
+                        ticket.Id,
+                        submittedAt.Date,
+                        ct);
+
+                var subject =
+                    $"{ticket.Site} - {submittedByName} - Write-Up Submitted";
+
+                var body =
+                    BuildWriteUpSubmittedEmailBody(
+                        ticket,
+                        submittedByName,
+                        submittedAt,
+                        truckNumberDisplay,
+                        submittedWriteUp);
 
                 return await _emailService.SendAsync(
                     new EmailSendRequest
@@ -4365,13 +4475,16 @@ namespace SmartGridSuite.Api.Controllers
 
                         ToAddresses = recipients
                             .Select(x => x.EmailAddress)
-                            .Where(x => !string.IsNullOrWhiteSpace(x))
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .Where(x =>
+                                !string.IsNullOrWhiteSpace(x))
+                            .Distinct(
+                                StringComparer.OrdinalIgnoreCase)
                             .ToList(),
 
-                        ReplyToAddresses = string.IsNullOrWhiteSpace(submitterEmail)
-                            ? Array.Empty<string>()
-                            : new[] { submitterEmail },
+                        ReplyToAddresses =
+                            string.IsNullOrWhiteSpace(submitterEmail)
+                                ? Array.Empty<string>()
+                                : new[] { submitterEmail },
 
                         FromAddress = submitterEmail,
                         FromDisplayName = submittedByName,
