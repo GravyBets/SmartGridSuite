@@ -1,33 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-<PropertyGroup>
-	<OutputType>WinExe</OutputType>
-	<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
-	<Nullable>enable</Nullable>
-	<ImplicitUsings>enable</ImplicitUsings>
-	<UseWPF>true</UseWPF>
-	<SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
-
-	<ApplicationIcon>Assets\Branding\SmartGridSuite_Icon.ico</ApplicationIcon>
-
-	<Version>2.0.0.4</Version>
-	<AssemblyVersion>2.0.0.4</AssemblyVersion>
-	<FileVersion>2.0.0.4</FileVersion>
-	<InformationalVersion>2.0.0.4</InformationalVersion>
-	<ApplicationManifest>app.manifest</ApplicationManifest>
-</PropertyGroup>
-
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <ApplicationIcon>Assets\Branding\SmartGridSuite_Icon.ico</ApplicationIcon>
+    <Version>2.0.0.5</Version>
+    <AssemblyVersion>2.0.0.5</AssemblyVersion>
+    <FileVersion>2.0.0.5</FileVersion>
+    <InformationalVersion>2.0.0.5</InformationalVersion>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
   <ItemGroup>
     <None Remove="Assets\Branding\CenterPoint Logo Black Transparent bkgrnd.png" />
     <None Remove="Assets\Branding\CenterPoint Logo Color Transparent bkgrnd.png" />
     <None Remove="Assets\Branding\CenterPoint Logo Color White text Transparent bkgrnd.png" />
     <None Remove="Assets\Branding\CenterPoint Logo White Transparent bkgrnd.png" />
   </ItemGroup>
-
-	<ItemGroup>
-		<Resource Include="Assets\Data\ChangeLog.json" />
-	</ItemGroup>
-	
+  <ItemGroup>
+    <Resource Include="Assets\Data\ChangeLog.json" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
@@ -35,11 +29,9 @@
     <PackageReference Include="Lextm.SharpSnmpLib" Version="12.5.7" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
   </ItemGroup>
-
-  <ItemGroup>   
-    <ProjectReference Include="..\..\SmartGridSuite\SmartGridSuite.Contracts\SmartGridSuite.Contracts.csproj" />	
+  <ItemGroup>
+    <ProjectReference Include="..\..\SmartGridSuite\SmartGridSuite.Contracts\SmartGridSuite.Contracts.csproj" />
   </ItemGroup>
-
   <ItemGroup>
     <Resource Include="Assets\Branding\CenterPoint Logo Black Transparent bkgrnd.png">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
@@ -60,5 +52,4 @@
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
   </ItemGroup>
-
 </Project>

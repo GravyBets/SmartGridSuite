@@ -13,11 +13,15 @@ namespace SmartGridSuite.Client.Views
         private bool _navCollapsed;
         private bool _syncingNav;
         private SiteDashboardPaneView? _siteDashboardPaneView;
-        private DailyAssignmentsPaneView? _dailyAssignmentsPaneView; 
+        private TaskPaneView? _taskPaneView;
+        private TicketsPaneView? _ticketsPaneView;
+        private TechniciansPaneView? _techniciansPaneView;
+        private DailyAssignmentsPaneView? _dailyAssignmentsPaneView;
+        private SiteHistoryPaneView? _siteHistoryPaneView;
+
         private int _currentNavIndex;
         private bool _allowCloseWithoutPrompt;
         private bool _closePromptRunning;
-        private SiteHistoryPaneView? _siteHistoryPaneView;
 
         private const double NavExpandedWidth = 260;
         private const double NavCollapsedWidth = 58;
@@ -29,6 +33,7 @@ namespace SmartGridSuite.Client.Views
             InitializeComponent();
 
             Closing += DispatcherShellWindow_Closing;
+            Closed += DispatcherShellWindow_Closed;
 
             _navCollapsed = true;
             ApplyNavState();
@@ -117,15 +122,18 @@ namespace SmartGridSuite.Client.Views
                     break;
 
                 case "Tasks":
-                    MainPaneHost.Content = new TaskPaneView();
+                    _taskPaneView ??= new TaskPaneView();
+                    MainPaneHost.Content = _taskPaneView;
                     break;
 
                 case "Tickets":
-                    MainPaneHost.Content = new TicketsPaneView();
+                    _ticketsPaneView ??= new TicketsPaneView();
+                    MainPaneHost.Content = _ticketsPaneView;
                     break;
 
                 case "Truck Assignments":
-                    MainPaneHost.Content = new TechniciansPaneView();
+                    _techniciansPaneView ??= new TechniciansPaneView();
+                    MainPaneHost.Content = _techniciansPaneView;
                     break;
 
                 case "Daily Assignments":
@@ -212,6 +220,25 @@ namespace SmartGridSuite.Client.Views
             _allowCloseWithoutPrompt = true;
 
             Close();
+        }
+
+        private void DispatcherShellWindow_Closed(
+            object? sender,
+            EventArgs e)
+        {
+            Closing -= DispatcherShellWindow_Closing;
+            Closed -= DispatcherShellWindow_Closed;
+
+            _siteDashboardPaneView?.Shutdown();
+
+            MainPaneHost.Content = null;
+
+            _siteDashboardPaneView = null;
+            _taskPaneView = null;
+            _ticketsPaneView = null;
+            _techniciansPaneView = null;
+            _dailyAssignmentsPaneView = null;
+            _siteHistoryPaneView = null;
         }
 
         private async void DispatcherShellWindow_Closing(object? sender, CancelEventArgs e)

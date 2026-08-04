@@ -1,5 +1,21 @@
 [
   {
+    "version": "2.0.0.5",
+    "date": "August 4, 2026",
+    "title": "Reliability and performance improvements",
+    "changes": [
+      "Added Site Dashboard parent-database timeout handling with automatic cached-data fallback.",
+      "Updated RX reverse-IP lookup to return all matching sites and prioritize MR sites.",
+      "Fixed the Dispatch Tickets details Edit button and disabled Bulk Set controls while details are open.",
+      "Replaced the Ready to Assign quick filter with Missing WO Type.",
+      "Fixed active-theme styling in the Add/Edit Site Notes window.",
+      "Improved submitted write-up formatting and technician-name resolution.",
+      "Released WebView2 browser resources when the Dispatcher closes.",
+      "Improved Dispatcher navigation performance by reusing pane instances."
+    ]
+  },
+
+  {
     "version": "2.0.0.4",
     "date": "August 3, 2026",
     "title": "Site Dashboard and Field History refinements",
@@ -11,7 +27,7 @@
       "Added smooth scrolling for long submitted write-ups in Field Technician History."
     ]
   },
-{
+  {
     "version": "2.0.0.3",
     "date": "July 29, 2026",
     "title": "Write-up and request dialog fixes",

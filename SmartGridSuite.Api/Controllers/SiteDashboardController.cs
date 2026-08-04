@@ -157,7 +157,7 @@ namespace SmartGridSuite.Api.Controllers
                 return BadRequest("Enter a valid IPv4 address.");
             }
 
-            var result = await _parentSyncService.FindAssociatedSiteByIpAsync(
+            var result = await _siteDashboardLookupService.FindAssociatedSiteByIpAsync(
                 normalizedIp,
                 cancellationToken);
 

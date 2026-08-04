@@ -73,8 +73,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         {
             None,
             MissingProblems,
+            MissingWorkOrderType,
             Unassigned,
-            ReadyToAssign,
             Assigned
         }
 
@@ -349,8 +349,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 {
                     "All Tickets",
                     "Missing Problems",
+                    "Missing WO Type",
                     "Unassigned",
-                    "Ready to Assign",
                     "Assigned"
                 };
                 QuickFilterComboBox.SelectedIndex = 0;
@@ -414,8 +414,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _activeQuickFilter = selected switch
             {
                 "Missing Problems" => TicketQuickFilter.MissingProblems,
+                "Missing WO Type" => TicketQuickFilter.MissingWorkOrderType,
                 "Unassigned" => TicketQuickFilter.Unassigned,
-                "Ready to Assign" => TicketQuickFilter.ReadyToAssign,
                 "Assigned" => TicketQuickFilter.Assigned,
                 _ => TicketQuickFilter.None
             };
@@ -810,8 +810,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return _activeQuickFilter switch
             {
                 TicketQuickFilter.MissingProblems => "MissingProblems",
+                TicketQuickFilter.MissingWorkOrderType => "MissingWorkOrderType",
                 TicketQuickFilter.Unassigned => "Unassigned",
-                TicketQuickFilter.ReadyToAssign => "ReadyToAssign",
                 TicketQuickFilter.Assigned => "Assigned",
                 _ => null
             };
@@ -1031,14 +1031,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 HeaderSelectAllCheckBox.IsChecked = allShowingSelected;
             }
 
+            var bulkSetEnabled = selectedCount > 0 && !_detailsOpen;
+
             if (BulkSetProblemButton != null)
-                BulkSetProblemButton.IsEnabled = selectedCount > 0;
+                BulkSetProblemButton.IsEnabled = bulkSetEnabled;
 
             if (BulkSetWorkOrderTypeButton != null)
-                BulkSetWorkOrderTypeButton.IsEnabled = selectedCount > 0;
+                BulkSetWorkOrderTypeButton.IsEnabled = bulkSetEnabled;
 
             if (BulkSetStatusButton != null)
-                BulkSetStatusButton.IsEnabled = selectedCount > 0;
+                BulkSetStatusButton.IsEnabled = bulkSetEnabled;
 
             if (AssignSelectedButton != null)
                 AssignSelectedButton.IsEnabled = selectedCount > 0;
@@ -1053,6 +1055,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             if (OpenDetailsButton != null)
                 OpenDetailsButton.IsEnabled = selectedCount > 0;
+
+            if (EditTicketButton != null)
+            {
+                EditTicketButton.IsEnabled =
+                    SelectedTicket is not null &&
+                    !IsSelectedTicketClosed;
+            }
 
             if (SelectedCountTextBlock != null)
             {
@@ -1083,8 +1092,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 var expectedText = _activeQuickFilter switch
                 {
                     TicketQuickFilter.MissingProblems => "Missing Problems",
+                    TicketQuickFilter.MissingWorkOrderType => "Missing WO Type",
                     TicketQuickFilter.Unassigned => "Unassigned",
-                    TicketQuickFilter.ReadyToAssign => "Ready to Assign",
                     TicketQuickFilter.Assigned => "Assigned",
                     _ => "All Tickets"
                 };
@@ -1111,8 +1120,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return _activeQuickFilter switch
             {
                 TicketQuickFilter.MissingProblems => "Missing Problems",
+                TicketQuickFilter.MissingWorkOrderType => "Missing WO Type",
                 TicketQuickFilter.Unassigned => "Unassigned",
-                TicketQuickFilter.ReadyToAssign => "Ready to Assign",
                 TicketQuickFilter.Assigned => "Assigned",
                 _ => ""
             };
@@ -1445,6 +1454,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             _detailsOpen = true;
             UpdateDetailsVisibility();
+            UpdateTicketListUiState();
         }
 
         private void OpenDetails_Click(object sender, RoutedEventArgs e)
@@ -1459,6 +1469,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             _detailsOpen = true;
             UpdateDetailsVisibility();
+            UpdateTicketListUiState();
 
             TicketsGrid.ScrollIntoView(ticketToOpen);
         }
@@ -1681,12 +1692,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             await OpenTicketEditorAsync(ticketToEdit);
         }
 
-        private async void EditTicket_Click(object sender, RoutedEventArgs e)
+        private async void EditTicket_Click(
+            object sender,
+            RoutedEventArgs e)
         {
-            if (SelectedTicket == null)
+            var ticketToEdit =
+                GetTopVisibleSelectedTicket() ??
+                SelectedTicket;
+
+            if (ticketToEdit == null)
                 return;
 
-            await OpenTicketEditorAsync(SelectedTicket);
+            await OpenTicketEditorAsync(ticketToEdit);
         }
 
         private async Task OpenTicketEditorAsync(DispatchTicket ticketToEdit)
@@ -2541,9 +2558,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             NextTicketPageButton.IsEnabled = enabled && CanGoToNextTicketPage;
 
             AssignSelectedButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
-            BulkSetProblemButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
-            BulkSetWorkOrderTypeButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
-            BulkSetStatusButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
+
+            BulkSetProblemButton.IsEnabled = enabled && !_detailsOpen && TicketsGrid.SelectedItems.Count > 0;
+            BulkSetWorkOrderTypeButton.IsEnabled = enabled && !_detailsOpen && TicketsGrid.SelectedItems.Count > 0;
+            BulkSetStatusButton.IsEnabled = enabled && !_detailsOpen && TicketsGrid.SelectedItems.Count > 0;
+
             EditSelectedTicketButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
             OpenDetailsButton.IsEnabled = enabled && TicketsGrid.SelectedItems.Count > 0;
 

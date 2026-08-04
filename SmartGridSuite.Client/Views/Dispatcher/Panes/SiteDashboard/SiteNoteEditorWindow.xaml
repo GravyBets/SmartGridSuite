@@ -5,7 +5,9 @@
         Width="480"
         Height="330"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Background="{DynamicResource AppBackground}"
+        Foreground="{DynamicResource TextPrimary}">
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
@@ -31,7 +33,8 @@
         <StackPanel Grid.Row="2">
             <TextBlock Text="Note"
                        FontWeight="SemiBold"
-                       Margin="0,0,0,4"/>
+                       Margin="0,0,0,4"
+                       Foreground="{DynamicResource TextPrimary}"/>
 
             <TextBox x:Name="NoteTextBox"
                      AcceptsReturn="True"
@@ -39,7 +42,11 @@
                      VerticalScrollBarVisibility="Auto"
                      VerticalContentAlignment="Top"
                      MinHeight="140"
-                     Padding="6"/>
+                     Padding="8"
+                     Background="{DynamicResource ControlInputBg}"
+                     Foreground="{DynamicResource ControlInputText}"
+                     CaretBrush="{DynamicResource ControlInputCaret}"
+                     BorderBrush="{DynamicResource ControlInputBorder}"/>
         </StackPanel>
 
         <StackPanel Grid.Row="4"

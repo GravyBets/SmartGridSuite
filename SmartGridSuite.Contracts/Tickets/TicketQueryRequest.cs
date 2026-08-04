@@ -18,7 +18,7 @@ public sealed class TicketQueryRequest
     public DateTime? To { get; set; }
 
     public string? QuickFilter { get; set; }
-    // None, MissingProblems, Unassigned, ReadyToAssign, Assigned
+    // None, MissingProblems, MissingWorkOrderType, Unassigned, Assigned
 
     public int Skip { get; set; } = 0;
 

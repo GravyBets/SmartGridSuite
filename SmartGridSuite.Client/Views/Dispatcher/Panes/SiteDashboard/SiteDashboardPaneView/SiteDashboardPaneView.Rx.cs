@@ -17,11 +17,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 if (result is null || !result.Found)
                 {
-                    WorkspaceView.ShowRxIpLookupResults(
-                        Array.Empty<SiteDashboardWorkspaceView.RxAssociatedSiteLookupResult>(),
-                        $"No associated site found for {ip}.");
+                    var noMatchMessage =
+                        result?.IsCached == true
+                            ? $"No associated site found for {ip} in cached site data."
+                            : $"No associated site found for {ip}.";
 
-                    TopBarView.StatusText = "No associated site found.";
+                    WorkspaceView.ShowRxIpLookupResults(
+                        Array.Empty<
+                            SiteDashboardWorkspaceView
+                                .RxAssociatedSiteLookupResult>(),
+                        noMatchMessage);
+
+                    TopBarView.StatusText =
+                        result?.IsCached == true
+                            ? "No associated site found in cached data."
+                            : "No associated site found.";
+
                     return;
                 }
 
@@ -41,14 +52,30 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 }
 
                 var message = matches.Count == 1
-                    ? $"Found 1 associated site."
-                    : $"Found {matches.Count} possible matches. MR sites are listed first.";
+                    ? "Found 1 associated site."
+                    : $"Found {matches.Count} possible matches. " +
+                      "MR sites are listed first.";
 
-                WorkspaceView.ShowRxIpLookupResults(matches, message);
+                if (result.IsCached)
+                {
+                    var cacheNotice =
+                        string.IsNullOrWhiteSpace(result.Warning)
+                            ? "Cached site data was used."
+                            : result.Warning.Trim();
 
-                TopBarView.StatusText = matches.Count == 1
-                    ? $"Associated site found: {matches[0].SiteId}."
-                    : $"Found {matches.Count} associated site matches.";
+                    message += $" {cacheNotice}";
+                }
+
+                WorkspaceView.ShowRxIpLookupResults(
+                    matches,
+                    message);
+
+                TopBarView.StatusText =
+                    matches.Count == 1
+                        ? $"Associated site found: {matches[0].SiteId}" +
+                          (result.IsCached ? " using cached data." : ".")
+                        : $"Found {matches.Count} associated site matches" +
+                          (result.IsCached ? " using cached data." : ".");
             }
             catch (Exception ex)
             {
@@ -113,10 +140,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             var siteId = (result.SiteId ?? string.Empty).Trim();
             var kind = (result.DashboardKind ?? string.Empty).Trim();
 
-            return kind.Equals("AMS/MR", StringComparison.OrdinalIgnoreCase) ||
-                   kind.Equals("AmsMr", StringComparison.OrdinalIgnoreCase) ||
-                   kind.Equals("MR", StringComparison.OrdinalIgnoreCase) ||
-                   siteId.StartsWith("MR", StringComparison.OrdinalIgnoreCase);
+            return kind.Equals(SiteDashboardKinds.AmsMr,
+                        StringComparison.OrdinalIgnoreCase) ||
+                   kind.Equals(
+                       "AMS/MR",
+                       StringComparison.OrdinalIgnoreCase) ||
+                   kind.Equals(
+                       "AmsMr",
+                       StringComparison.OrdinalIgnoreCase) ||
+                   kind.Equals(
+                       "MR",
+                       StringComparison.OrdinalIgnoreCase) ||
+                   siteId.StartsWith(
+                       "MR",
+                       StringComparison.OrdinalIgnoreCase) ||
+                   siteId.EndsWith(
+                       "MR",
+                       StringComparison.OrdinalIgnoreCase);
         }
 
         private async void WorkspaceView_OpenAssociatedSiteRequested(object? sender, string siteId)

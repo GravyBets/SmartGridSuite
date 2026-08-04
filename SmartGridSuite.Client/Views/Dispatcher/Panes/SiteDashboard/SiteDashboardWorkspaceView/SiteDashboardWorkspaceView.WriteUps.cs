@@ -153,11 +153,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
 
             finalWriteUpText = string.Join(
-                Environment.NewLine + Environment.NewLine,
+                Environment.NewLine,
                 dispatcherSections.Where(x => !string.IsNullOrWhiteSpace(x)));
 
             siteHistoryWriteUpText = string.Join(
-                Environment.NewLine + Environment.NewLine,
+                Environment.NewLine,
                 siteHistorySections.Where(x => !string.IsNullOrWhiteSpace(x)));
 
             if (string.IsNullOrWhiteSpace(finalWriteUpText))
@@ -532,7 +532,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 if (!groupedLines.TryGetValue(categoryName, out var lines) || lines.Count == 0)
                     continue;
 
-                output.Add(string.Empty);
                 output.Add($"{categoryName}-");
                 output.AddRange(lines);
             }

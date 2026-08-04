@@ -7,6 +7,10 @@ namespace SmartGridSuite.Contracts.SiteDashboard
         public string IpAddress { get; set; } = "";
         public bool Found { get; set; }
 
+        public bool IsCached { get; set; }
+
+        public string Warning { get; set; } = "";
+
         // Backward-compatible first/best match fields
         public string SiteId { get; set; } = "";
         public string MatchSource { get; set; } = "";

@@ -137,5 +137,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 ? "Loading site data..."
                 : message;
         }
+
+        public void Shutdown()
+        {
+            _loadCts?.Cancel();
+            _loadCts?.Dispose();
+            _loadCts = null;
+
+            WorkspaceView.DisposePortal();
+        }
     }
 }

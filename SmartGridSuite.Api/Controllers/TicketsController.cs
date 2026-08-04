@@ -180,13 +180,11 @@ namespace SmartGridSuite.Api.Controllers
                     string.IsNullOrWhiteSpace(t.AssignedTech) ||
                     t.AssignedTech == "(Unassigned)");
             }
-            else if (quickFilter.Equals("ReadyToAssign", StringComparison.OrdinalIgnoreCase))
+            else if (quickFilter.Equals("MissingWorkOrderType", StringComparison.OrdinalIgnoreCase))
             {
                 query = query.Where(t =>
-                    t.Status == "Open" &&
-                    !string.IsNullOrWhiteSpace(t.Site) &&
-                    (string.IsNullOrWhiteSpace(t.AssignedTech) ||
-                     t.AssignedTech == "(Unassigned)"));
+                    !string.IsNullOrWhiteSpace(t.CurrentWorkOrder) &&
+                    string.IsNullOrWhiteSpace(t.WorkOrderClass));
             }
             else if (quickFilter.Equals("Assigned", StringComparison.OrdinalIgnoreCase))
             {
@@ -1588,7 +1586,8 @@ namespace SmartGridSuite.Api.Controllers
                     : submittedByName.Trim();
 
             var entry =
-                $"[{submittedAt:MM-dd-yyyy HH:mm}] " +
+                $"[{submittedAt:MM-dd-yyyy HH:mm}]" +
+                Environment.NewLine +
                 $"Write-up submitted by {cleanSubmittedBy}" +
                 Environment.NewLine +
                 cleanWriteUp;
@@ -3187,10 +3186,10 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             /*
-             * The submitter is always included even if assignment data is incomplete.
-             * If already present as a crew member, the existing participant is marked
-             * as the submitter rather than inserted twice.
-             */
+ * The submitter is always included even if assignment data is incomplete.
+ * If the direct employee-ID lookup fails, prefer an already-resolved
+ * assignment participant before falling back to the raw employee ID.
+ */
             if (submitter != null)
             {
                 AddSubmittedParticipant(
@@ -3200,17 +3199,41 @@ namespace SmartGridSuite.Api.Controllers
             }
             else
             {
-                var fallbackEmployeeId =
-                    string.IsNullOrWhiteSpace(submittedEmployeeId)
-                        ? "Unknown"
-                        : submittedEmployeeId;
+                var existingSubmitter = participants.Values
+                    .FirstOrDefault(x =>
+                        EmployeeIdsMatch(
+                            x.EmployeeId,
+                            submittedEmployeeId));
 
-                AddSubmittedParticipant(
-                    participants,
-                    technicianId: null,
-                    employeeId: fallbackEmployeeId,
-                    technicianName: fallbackEmployeeId,
-                    isSubmitter: true);
+                /*
+                 * A single resolved assignment participant is also a safe fallback.
+                 * Do not guess when multiple crew members exist.
+                 */
+                if (existingSubmitter == null &&
+                    participants.Count == 1)
+                {
+                    existingSubmitter =
+                        participants.Values.Single();
+                }
+
+                if (existingSubmitter != null)
+                {
+                    existingSubmitter.IsSubmitter = true;
+                }
+                else
+                {
+                    var fallbackEmployeeId =
+                        string.IsNullOrWhiteSpace(submittedEmployeeId)
+                            ? "Unknown"
+                            : submittedEmployeeId;
+
+                    AddSubmittedParticipant(
+                        participants,
+                        technicianId: null,
+                        employeeId: fallbackEmployeeId,
+                        technicianName: fallbackEmployeeId,
+                        isSubmitter: true);
+                }
             }
 
             var submitterParticipant = participants.Values
@@ -3252,12 +3275,62 @@ namespace SmartGridSuite.Api.Controllers
             };
         }
 
-        // Adds a technician to the participant snapshot while preventing duplicate
-        // employee entries and preserving the submitter flag.
+        private static bool EmployeeIdsMatch(
+            string? firstEmployeeId,
+            string? secondEmployeeId)
+        {
+            var first =
+                (firstEmployeeId ?? string.Empty).Trim();
+
+            var second =
+                (secondEmployeeId ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(first) ||
+                string.IsNullOrWhiteSpace(second))
+            {
+                return false;
+            }
+
+            if (string.Equals(
+                    first,
+                    second,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            /*
+             * Windows usernames may contain leading zeroes while the technician
+             * database stores the same numeric employee ID without them.
+             */
+            if (!first.All(char.IsDigit) ||
+                !second.All(char.IsDigit))
+            {
+                return false;
+            }
+
+            var normalizedFirst =
+                first.TrimStart('0');
+
+            var normalizedSecond =
+                second.TrimStart('0');
+
+            if (normalizedFirst.Length == 0)
+                normalizedFirst = "0";
+
+            if (normalizedSecond.Length == 0)
+                normalizedSecond = "0";
+
+            return string.Equals(
+                normalizedFirst,
+                normalizedSecond,
+                StringComparison.Ordinal);
+        }
+
         // Adds a technician to the participant snapshot while preventing duplicate
         // employee entries and preserving the submitter flag.
         private static void AddSubmittedParticipant(
-            IDictionary<string, SubmittedParticipantInfo> participants,
+                    IDictionary<string, SubmittedParticipantInfo> participants,
             TechnicianEntity technician,
             bool isSubmitter)
         {
