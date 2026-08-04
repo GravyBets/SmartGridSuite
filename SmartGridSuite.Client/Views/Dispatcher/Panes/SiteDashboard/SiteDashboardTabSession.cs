@@ -1,6 +1,7 @@
 ﻿using SmartGridSuite.Contracts.SiteDashboard;
 using SmartGridSuite.Contracts.Snmp;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 {
@@ -108,10 +109,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
     public sealed class NetworkPingTargetState
     {
         public string Ip { get; set; } = "";
+
         public string Results { get; set; } = "";
+
         public string Summary { get; set; } = "Ready.";
 
         public bool? TestSuccessful { get; set; }
+
+        /*
+         * Runtime-only state. Each Site Dashboard tab owns its own
+         * cancellation token, allowing pings to continue while another
+         * dashboard tab is selected.
+         */
+        public CancellationTokenSource? PingCts { get; set; }
     }
 
     public sealed class TowerPingSessionState

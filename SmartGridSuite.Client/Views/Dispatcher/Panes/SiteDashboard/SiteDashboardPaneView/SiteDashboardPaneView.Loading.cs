@@ -331,91 +331,173 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         }
 
         //Load Async
-        private async Task LoadAsync(string rawSiteId, bool runAutoQuickTest = true, bool useSiteLoadOverlay = true)
+        private async Task LoadAsync(
+            string rawSiteId,
+            bool runAutoQuickTest = true,
+            bool useSiteLoadOverlay = true)
         {
+            /*
+             * Tower pings still belong to the shared WorkspaceView.
+             * Leave this in place until tower pings receive the same
+             * per-dashboard-session treatment as network pings.
+             */
             WorkspaceView.StopTowerPings();
-            var siteId = (rawSiteId ?? string.Empty).Trim();
+
+            var siteId =
+                (rawSiteId ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(siteId))
             {
-                TopBarView.StatusText = "Enter a site ID first.";
+                TopBarView.StatusText =
+                    "Enter a site ID first.";
+
                 return;
             }
 
-            var siteSearchCandidates = BuildSiteDashboardSearchCandidates(siteId).ToList();
+            var siteSearchCandidates =
+                BuildSiteDashboardSearchCandidates(siteId)
+                    .ToList();
 
-            var existingSession = _sessions.FirstOrDefault(x =>
-                !string.IsNullOrWhiteSpace(x.HeaderText) &&
-                !x.HeaderText.StartsWith("Blank", StringComparison.OrdinalIgnoreCase) &&
-                siteSearchCandidates.Any(candidate =>
-                    string.Equals(x.HeaderText, candidate, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(x.SearchText, candidate, StringComparison.OrdinalIgnoreCase)));
+            var existingSession =
+                _sessions.FirstOrDefault(x =>
+                    !string.IsNullOrWhiteSpace(x.HeaderText) &&
+                    !x.HeaderText.StartsWith(
+                        "Blank",
+                        StringComparison.OrdinalIgnoreCase) &&
+                    siteSearchCandidates.Any(candidate =>
+                        string.Equals(
+                            x.HeaderText,
+                            candidate,
+                            StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(
+                            x.SearchText,
+                            candidate,
+                            StringComparison.OrdinalIgnoreCase)));
 
             if (existingSession is not null)
             {
+                /*
+                 * Save the currently visible dashboard state before changing tabs.
+                 * NetworkPingState now contains the live per-tab ping processes.
+                 */
                 SaveCurrentTabUiState();
 
-                _selectedSessionKey = existingSession.SessionKey;
+                _selectedSessionKey =
+                    existingSession.SessionKey;
+
                 RenderSelectedSession();
 
-                await LoadSiteNotesForSessionAsync(existingSession, CancellationToken.None);
+                await LoadSiteNotesForSessionAsync(
+                    existingSession,
+                    CancellationToken.None);
 
-                TopBarView.StatusText = $"Switched to {existingSession.HeaderText}.";
+                TopBarView.StatusText =
+                    $"Switched to {existingSession.HeaderText}.";
+
                 return;
             }
 
-            var selectedSession = GetSelectedSession();
+            var selectedSession =
+                GetSelectedSession();
+
             if (selectedSession is null)
             {
-                CreateBlankTab(selectNewTab: true);
-                selectedSession = GetSelectedSession();
+                CreateBlankTab(
+                    selectNewTab: true);
+
+                selectedSession =
+                    GetSelectedSession();
             }
 
             if (selectedSession is null)
                 return;
 
-            var previousLoadedSite = (selectedSession.SearchText ?? string.Empty).Trim();
+            var previousLoadedSite =
+                (selectedSession.SearchText ?? string.Empty).Trim();
 
             var isBlankSessionLoad =
                 string.IsNullOrWhiteSpace(previousLoadedSite) ||
-                previousLoadedSite.StartsWith("Blank", StringComparison.OrdinalIgnoreCase);
+                previousLoadedSite.StartsWith(
+                    "Blank",
+                    StringComparison.OrdinalIgnoreCase);
 
             var isDifferentSiteLoad =
                 !isBlankSessionLoad &&
-                !string.Equals(previousLoadedSite, siteId, StringComparison.OrdinalIgnoreCase);
+                !string.Equals(
+                    previousLoadedSite,
+                    siteId,
+                    StringComparison.OrdinalIgnoreCase);
 
-            var shouldClearForSiteLoad = isBlankSessionLoad || isDifferentSiteLoad;
+            var shouldClearForSiteLoad =
+                isBlankSessionLoad ||
+                isDifferentSiteLoad;
 
             if (shouldClearForSiteLoad)
             {
-                ResetSessionForNewSiteLoad(selectedSession);
+                /*
+                 * This dashboard tab is being reused for another site.
+                 * Stop only the network pings owned by this tab.
+                 *
+                 * Pings running in other dashboard tabs remain active.
+                 */
+                NetworkView.StopPingSession(
+                    selectedSession.NetworkPingState);
+
+                ResetSessionForNewSiteLoad(
+                    selectedSession);
             }
 
             _loadCts?.Cancel();
             _loadCts?.Dispose();
-            _loadCts = new CancellationTokenSource();
+
+            _loadCts =
+                new CancellationTokenSource();
 
             try
             {
                 if (useSiteLoadOverlay)
-                    ShowSiteLoadOverlay($"Loading {siteId}...");
+                {
+                    ShowSiteLoadOverlay(
+                        $"Loading {siteId}...");
+                }
 
                 TopBarView.SetLoading(true);
-                TopBarView.StatusText = $"Loading {siteId}...";
 
-                UpdateSiteLoadOverlayMessage($"Loading dashboard data for {siteId}...");
+                TopBarView.StatusText =
+                    $"Loading {siteId}...";
 
-                var dashboard = await GetSiteOrTowerDashboardAsync(siteId, _loadCts.Token);
-                var loadedSiteId = GetObjectPropertyText(dashboard, "SiteId") ?? siteId;
+                UpdateSiteLoadOverlayMessage(
+                    $"Loading dashboard data for {siteId}...");
 
-                selectedSession.TicketInfoText = "Loading ticket data...";
+                var dashboard =
+                    await GetSiteOrTowerDashboardAsync(
+                        siteId,
+                        _loadCts.Token);
 
-                UpdateSiteLoadOverlayMessage($"Loading ticket data for {siteId}...");
+                var loadedSiteId =
+                    GetObjectPropertyText(
+                        dashboard,
+                        "SiteId")
+                    ?? siteId;
 
-                ApplyDashboardToSession(selectedSession, dashboard, loadedSiteId);
-                await ApplyPingScreenPortalUrlAsync(selectedSession, dashboard, _loadCts.Token);
+                selectedSession.TicketInfoText =
+                    "Loading ticket data...";
 
-                UpdateSiteLoadOverlayMessage($"Loading site history for {loadedSiteId}...");
+                UpdateSiteLoadOverlayMessage(
+                    $"Loading ticket data for {siteId}...");
+
+                ApplyDashboardToSession(
+                    selectedSession,
+                    dashboard,
+                    loadedSiteId);
+
+                await ApplyPingScreenPortalUrlAsync(
+                    selectedSession,
+                    dashboard,
+                    _loadCts.Token);
+
+                UpdateSiteLoadOverlayMessage(
+                    $"Loading site history for {loadedSiteId}...");
 
                 await LoadSiteHistoryForSessionAsync(
                     selectedSession,
@@ -423,47 +505,71 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 if (shouldClearForSiteLoad)
                 {
-                    selectedSession.SelectedWorkspaceTabKey = "TopWriteUp";
+                    selectedSession.SelectedWorkspaceTabKey =
+                        "TopWriteUp";
                 }
 
                 selectedSession.SnmpTargetIp =
-                    shouldClearForSiteLoad || string.IsNullOrWhiteSpace(selectedSession.SnmpTargetIp)
+                    shouldClearForSiteLoad ||
+                    string.IsNullOrWhiteSpace(
+                        selectedSession.SnmpTargetIp)
                         ? selectedSession.PrimaryIp
                         : selectedSession.SnmpTargetIp;
 
-                selectedSession.SnmpSupportMessage = "Loading SNMP configuration...";
+                selectedSession.SnmpSupportMessage =
+                    "Loading SNMP configuration...";
 
-                _selectedSessionKey = selectedSession.SessionKey;
+                _selectedSessionKey =
+                    selectedSession.SessionKey;
+
                 RenderSelectedSession();
 
-                UpdateSiteLoadOverlayMessage($"Refreshing tickets for {loadedSiteId}...");
+                UpdateSiteLoadOverlayMessage(
+                    $"Refreshing tickets for {loadedSiteId}...");
 
-                await RefreshTicketInfoAsync(selectedSession, _loadCts.Token);
+                await RefreshTicketInfoAsync(
+                    selectedSession,
+                    _loadCts.Token);
 
-                if (ShouldLoadSnmpForDashboard(selectedSession))
+                if (ShouldLoadSnmpForDashboard(
+                        selectedSession))
                 {
-                    UpdateSiteLoadOverlayMessage($"Loading SNMP configuration for {loadedSiteId}...");
-                    await RefreshSnmpConfigAsync(selectedSession, _loadCts.Token);
+                    UpdateSiteLoadOverlayMessage(
+                        $"Loading SNMP configuration for {loadedSiteId}...");
+
+                    await RefreshSnmpConfigAsync(
+                        selectedSession,
+                        _loadCts.Token);
                 }
                 else
                 {
-                    ClearSnmpForUnsupportedDashboard(selectedSession);
+                    ClearSnmpForUnsupportedDashboard(
+                        selectedSession);
                 }
 
-                if (selectedSession.SessionKey == _selectedSessionKey)
+                if (selectedSession.SessionKey ==
+                    _selectedSessionKey)
+                {
                     RenderSelectedSession();
+                }
 
-                if (runAutoQuickTest && shouldClearForSiteLoad && ShouldRunNetworkAutoQuickTest(selectedSession))
+                if (runAutoQuickTest &&
+                    shouldClearForSiteLoad &&
+                    ShouldRunNetworkAutoQuickTest(
+                        selectedSession))
                 {
                     await Dispatcher.InvokeAsync(
                         () => { },
                         System.Windows.Threading.DispatcherPriority.Loaded);
 
-                    UpdateSiteLoadOverlayMessage($"Running quick network test for {loadedSiteId}...");
+                    UpdateSiteLoadOverlayMessage(
+                        $"Running quick network test for {loadedSiteId}...");
 
-                    await NetworkView.RunQuickReachabilityTestForAllAsync();
+                    await NetworkView
+                        .RunQuickReachabilityTestForAllAsync();
 
-                    selectedSession.NetworkPingState = NetworkView.GetPingSessionState();
+                    selectedSession.NetworkPingState =
+                        NetworkView.GetPingSessionState();
                 }
 
                 if (dashboard?.IsCached == true)
@@ -472,7 +578,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                         dashboard.CachedAtUtc.HasValue
                             ? dashboard.CachedAtUtc.Value
                                 .ToLocalTime()
-                                .ToString("MMM d, yyyy h:mm tt")
+                                .ToString(
+                                    "MMM d, yyyy h:mm tt")
                             : "an earlier synchronization";
 
                     TopBarView.StatusText =
@@ -486,71 +593,78 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
             catch (OperationCanceledException)
             {
+                /*
+                 * A newer dashboard load replaced this request.
+                 */
             }
             catch (Exception ex)
                 when (IsParentDatabaseUnavailableException(ex))
-                {
-                var limitedSiteId = ResolveLimitedModeSiteId(siteId);
+            {
+                var limitedSiteId =
+                    ResolveLimitedModeSiteId(siteId);
 
                 TopBarView.StatusText =
-                        $"Parent database unavailable. " +
-                        $"Opening Limited Mode for {limitedSiteId}...";
+                    "Parent database unavailable. " +
+                    $"Opening Limited Mode for {limitedSiteId}...";
 
-                    /*
-                     * Start with the existing blank-dashboard setup.
-                     * This leaves all IP fields editable and keeps the
-                     * write-up workspace available.
-                     */
-                    ApplyBlankDashboardToSession(
+                /*
+                 * Start with the existing blank-dashboard setup.
+                 * This leaves all IP fields editable and keeps the
+                 * write-up workspace available.
+                 */
+                ApplyBlankDashboardToSession(
+                    selectedSession,
+                    limitedSiteId);
+
+                selectedSession.SiteStatusText =
+                    "Limited Mode";
+
+                selectedSession.TicketInfoText =
+                    "Loading Smart Grid Suite ticket data...";
+
+                selectedSession.SnmpSupportMessage =
+                    "Limited Mode — enter an IP address manually, " +
+                    "then select an SNMP profile.";
+
+                _selectedSessionKey =
+                    selectedSession.SessionKey;
+
+                RenderSelectedSession();
+
+                var limitedModeToken =
+                    _loadCts?.Token
+                    ?? CancellationToken.None;
+
+                try
+                {
+                    await ApplyPingScreenPortalUrlAsync(
                         selectedSession,
-                        limitedSiteId);
+                        dashboard: null,
+                        ct: limitedModeToken);
+                }
+                catch
+                {
+                    selectedSession.ShowIgsdPortalTab =
+                        false;
 
-                    selectedSession.SiteStatusText =
-                        "Limited Mode";
-
-                    selectedSession.TicketInfoText =
-                        "Loading Smart Grid Suite ticket data...";
-
-                    selectedSession.SnmpSupportMessage =
-                        "Limited Mode — enter an IP address manually, " +
-                        "then select an SNMP profile.";
-
-                    _selectedSessionKey =
-                        selectedSession.SessionKey;
-
-                    RenderSelectedSession();
-
-                    var limitedModeToken =
-                        _loadCts?.Token
-                        ?? CancellationToken.None;
-
-                    try
-                    {
-                        await ApplyPingScreenPortalUrlAsync(
-                            selectedSession,
-                            dashboard: null,
-                            ct: limitedModeToken);
-                    }
-                    catch
-                    {
-                        selectedSession.ShowIgsdPortalTab = false;
-                        selectedSession.IgsdPortalUrl = string.Empty;
-                    }
+                    selectedSession.IgsdPortalUrl =
+                        string.Empty;
+                }
 
                 /*
                  * These features use the SmartGridSuite database,
                  * not the unavailable Parent DB.
                  */
                 try
-                    {
-                        await LoadSiteNotesForSessionAsync(
-                            selectedSession,
-                            limitedModeToken);
-                    }
-                    catch
-                    {
-                        // Keep Limited Mode usable when notes cannot load.
-                    }
+                {
+                    await LoadSiteNotesForSessionAsync(
+                        selectedSession,
+                        limitedModeToken);
+                }
+                catch
+                {
+                    // Keep Limited Mode usable when notes cannot load.
+                }
 
                 try
                 {
@@ -565,64 +679,74 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 }
 
                 try
-                    {
-                        await RefreshTicketInfoAsync(
-                            selectedSession,
-                            limitedModeToken);
-                    }
-                    catch
-                    {
-                        selectedSession.TicketInfoText =
-                            "Ticket data is temporarily unavailable.";
-                    }
-
-                    try
-                    {
-                        await RefreshSnmpConfigAsync(
-                            selectedSession,
-                            limitedModeToken);
-                    }
-                    catch
-                    {
-                        selectedSession.SnmpSupported =
-                            false;
-
-                        selectedSession.SnmpSupportMessage =
-                            "Limited Mode — enter an IP address manually " +
-                            "to run ping diagnostics. " +
-                            "SNMP configuration could not be loaded.";
-                    }
-
-                    if (selectedSession.SessionKey ==
-                        _selectedSessionKey)
-                    {
-                        RenderSelectedSession();
-                    }
-
-                    TopBarView.StatusText =
-                        $"Limited dashboard ready for {limitedSiteId}. " +
-                        "Parent site data is unavailable.";
+                {
+                    await RefreshTicketInfoAsync(
+                        selectedSession,
+                        limitedModeToken);
                 }
-            catch (Exception ex) when (IsDashboardNotFoundException(ex))
+                catch
+                {
+                    selectedSession.TicketInfoText =
+                        "Ticket data is temporarily unavailable.";
+                }
+
+                try
+                {
+                    await RefreshSnmpConfigAsync(
+                        selectedSession,
+                        limitedModeToken);
+                }
+                catch
+                {
+                    selectedSession.SnmpSupported =
+                        false;
+
+                    selectedSession.SnmpSupportMessage =
+                        "Limited Mode — enter an IP address manually " +
+                        "to run ping diagnostics. " +
+                        "SNMP configuration could not be loaded.";
+                }
+
+                if (selectedSession.SessionKey ==
+                    _selectedSessionKey)
+                {
+                    RenderSelectedSession();
+                }
+
+                TopBarView.StatusText =
+                    $"Limited dashboard ready for {limitedSiteId}. " +
+                    "Parent site data is unavailable.";
+            }
+            catch (Exception ex)
+                when (IsDashboardNotFoundException(ex))
             {
-                var blankSiteId = ResolveBlankDashboardSiteId(siteId);
+                var blankSiteId =
+                    ResolveBlankDashboardSiteId(siteId);
 
-                TopBarView.StatusText = $"No existing site found. Opening blank dashboard for {blankSiteId}...";
+                TopBarView.StatusText =
+                    "No existing site found. " +
+                    $"Opening blank dashboard for {blankSiteId}...";
 
-                ApplyBlankDashboardToSession(selectedSession, blankSiteId);
+                ApplyBlankDashboardToSession(
+                    selectedSession,
+                    blankSiteId);
 
-                _selectedSessionKey = selectedSession.SessionKey;
+                _selectedSessionKey =
+                    selectedSession.SessionKey;
+
                 RenderSelectedSession();
 
                 await LoadSiteNotesForSessionAsync(
                     selectedSession,
-                    _loadCts?.Token ?? CancellationToken.None);
+                    _loadCts?.Token
+                    ?? CancellationToken.None);
 
                 try
                 {
                     await LoadSiteHistoryForSessionAsync(
                         selectedSession,
-                        _loadCts?.Token ?? CancellationToken.None);
+                        _loadCts?.Token
+                        ?? CancellationToken.None);
                 }
                 catch
                 {
@@ -630,34 +754,52 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                         new List<SiteDashboardHistoryRowViewModel>();
                 }
 
-                // Optional but useful: still allow existing tickets/SNMP profiles to load
-
-                // Optional but useful: still allow existing tickets/SNMP profiles to load
-                // even though the site itself was not found.
+                /*
+                 * Tickets and SNMP profiles can still load even when
+                 * no matching Parent DB dashboard record exists.
+                 */
                 try
                 {
-                    await RefreshTicketInfoAsync(selectedSession, _loadCts?.Token ?? CancellationToken.None);
-                    await RefreshSnmpConfigAsync(selectedSession, _loadCts?.Token ?? CancellationToken.None);
+                    await RefreshTicketInfoAsync(
+                        selectedSession,
+                        _loadCts?.Token
+                        ?? CancellationToken.None);
 
-                    if (selectedSession.SessionKey == _selectedSessionKey)
+                    await RefreshSnmpConfigAsync(
+                        selectedSession,
+                        _loadCts?.Token
+                        ?? CancellationToken.None);
+
+                    if (selectedSession.SessionKey ==
+                        _selectedSessionKey)
+                    {
                         RenderSelectedSession();
+                    }
                 }
                 catch
                 {
-                    // Keep the blank dashboard usable even if ticket/SNMP refresh fails.
+                    /*
+                     * Keep the blank dashboard usable even if ticket
+                     * or SNMP configuration loading fails.
+                     */
                 }
 
-                TopBarView.StatusText = $"Blank dashboard ready for {blankSiteId}.";
+                TopBarView.StatusText =
+                    $"Blank dashboard ready for {blankSiteId}.";
             }
             catch (Exception ex)
             {
-                TopBarView.StatusText = $"Load failed: {ex.Message}";
+                TopBarView.StatusText =
+                    $"Load failed: {ex.Message}";
             }
             finally
             {
                 TopBarView.SetLoading(false);
+
                 if (useSiteLoadOverlay)
+                {
                     HideSiteLoadOverlay();
+                }
             }
         }
 

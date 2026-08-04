@@ -111,7 +111,27 @@
     <!-- Issue/Return "Return Text"-->
     <SolidColorBrush x:Key="ReturnText" Color="#ECEFF4"/>
 
+    <!-- Network diagnostic status -->
+    <SolidColorBrush x:Key="NetworkPingSuccessBg"
+                 Color="#E8F5E9"/>
 
+    <SolidColorBrush x:Key="NetworkPingSuccessBorder"
+                 Color="#4CAF50"/>
+
+    <SolidColorBrush x:Key="NetworkPingSuccessText"
+                 Color="#12381E"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureBg"
+                 Color="#FDECEA"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureBorder"
+                 Color="#DC5050"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureText"
+                 Color="#5A1717"/>
+
+    <SolidColorBrush x:Key="NetworkPingOutputText"
+                 Color="#0F172A"/>
 
     <!-- Overlays / Misc -->
     <SolidColorBrush x:Key="HoverOverlay" Color="#14000000"/>

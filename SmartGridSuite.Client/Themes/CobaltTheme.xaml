@@ -29,6 +29,28 @@
     <SolidColorBrush x:Key="DataGridRowSelectedBg"
                      Color="#242563EB"/>
 
+    <!-- Network diagnostic status -->
+    <SolidColorBrush x:Key="NetworkPingSuccessBg"
+                 Color="#173A2B"/>
+
+    <SolidColorBrush x:Key="NetworkPingSuccessBorder"
+                 Color="#4ADE80"/>
+
+    <SolidColorBrush x:Key="NetworkPingSuccessText"
+                 Color="#DDFBE8"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureBg"
+                 Color="#3A1D29"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureBorder"
+                 Color="#FB7185"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureText"
+                 Color="#FFE4E8"/>
+
+    <SolidColorBrush x:Key="NetworkPingOutputText"
+                 Color="#EAF2FF"/>
+
     <!-- Card depth -->
     <DropShadowEffect x:Key="CardShadow"
                       Color="#000000"

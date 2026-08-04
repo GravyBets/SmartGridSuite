@@ -125,55 +125,61 @@
         <!-- Borderless expanded content for the submitted write-up. -->
         <DataTemplate x:Key="HistoryRowDetailsTemplate">
             <Grid Margin="76,4,10,12">
-                <StackPanel>
-                    <TextBlock Text="Submitted Write-Up"
+                <ScrollViewer MaxHeight="380"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="False"
+                      PanningMode="VerticalOnly">
+                    <StackPanel Margin="0,0,6,0">
+                        <TextBlock Text="Submitted Write-Up"
                        FontSize="11"
                        FontWeight="Bold"
                        Foreground="{DynamicResource TextSecondary}"
                        Margin="0,0,0,5"/>
 
-                    <TextBlock Text="{Binding SubmittedNarrative}"
+                        <TextBlock Text="{Binding SubmittedNarrative}"
                        FontSize="13"
                        Foreground="{DynamicResource TextPrimary}"
                        TextWrapping="Wrap">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Visibility" Value="Visible"/>
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible"/>
 
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding SubmittedNarrative}" Value="">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                    </DataTrigger>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SubmittedNarrative}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
 
-                                    <DataTrigger Binding="{Binding SubmittedNarrative}" Value="{x:Null}">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                                        <DataTrigger Binding="{Binding SubmittedNarrative}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
 
-                    <TextBlock Text="No submitted write-up text was found for this history row."
+                        <TextBlock Text="No submitted write-up text was found for this history row."
                        FontSize="12"
                        FontStyle="Italic"
                        Foreground="{DynamicResource TextSecondary}">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Visibility" Value="Collapsed"/>
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
 
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding SubmittedNarrative}" Value="">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SubmittedNarrative}" Value="">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
 
-                                    <DataTrigger Binding="{Binding SubmittedNarrative}" Value="{x:Null}">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                </StackPanel>
+                                        <DataTrigger Binding="{Binding SubmittedNarrative}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </ScrollViewer>
             </Grid>
         </DataTemplate>
 
@@ -471,18 +477,19 @@
                           HeadersVisibility="Column"
                           IsReadOnly="True"
                           SelectionMode="Extended"
-                        SelectionUnit="FullRow"
-                        MinRowHeight="34"
-                        CanUserAddRows="False"
-                        CanUserDeleteRows="False"
-                        CanUserResizeRows="False"
-                        GridLinesVisibility="Horizontal"
-                        HorizontalGridLinesBrush="{DynamicResource SurfaceBorder}"
-                        ColumnHeaderStyle="{StaticResource HistoryGridColumnHeaderStyle}"
-                        RowDetailsVisibilityMode="Collapsed"
-                        RowDetailsTemplate="{StaticResource HistoryRowDetailsTemplate}"
-                        LoadingRow="HistoryGrid_LoadingRow"
-                        SelectionChanged="HistoryGrid_SelectionChanged">
+                          SelectionUnit="FullRow"
+                          MinRowHeight="34"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          CanUserResizeRows="False"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="{DynamicResource SurfaceBorder}"
+                          ColumnHeaderStyle="{StaticResource HistoryGridColumnHeaderStyle}"
+                          RowDetailsVisibilityMode="Collapsed"
+                          RowDetailsTemplate="{StaticResource HistoryRowDetailsTemplate}"
+                          LoadingRow="HistoryGrid_LoadingRow"
+                          HorizontalScrollBarVisibility="Disabled"
+                          SelectionChanged="HistoryGrid_SelectionChanged">
 
                     <DataGrid.Columns>
 

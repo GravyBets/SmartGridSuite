@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 {
@@ -455,18 +456,37 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             removeButton.MouseEnter += (_, _) =>
             {
-                removeButton.Background = new SolidColorBrush(Color.FromArgb(24, 220, 80, 80));
+                removeButton.Background =
+                    TryFindResource("DangerBgHover") as Brush
+                    ?? new SolidColorBrush(
+                        Color.FromArgb(
+                            24,
+                            220,
+                            80,
+                            80));
 
-                if (removeButton.Content is TextBlock icon)
-                    icon.Foreground = new SolidColorBrush(Color.FromRgb(220, 80, 80));
+                if (removeButton.Content is Path icon)
+                {
+                    icon.Stroke =
+                        TryFindResource("DangerText") as Brush
+                        ?? new SolidColorBrush(
+                            Color.FromRgb(
+                                220,
+                                80,
+                                80));
+                }
             };
 
             removeButton.MouseLeave += (_, _) =>
             {
-                removeButton.Background = Brushes.Transparent;
+                removeButton.Background =
+                    Brushes.Transparent;
 
-                if (removeButton.Content is TextBlock icon)
-                    icon.Foreground = TryFindResource("TextSecondary") as Brush;
+                if (removeButton.Content is Path icon)
+                {
+                    icon.Stroke =
+                        TryFindResource("TextSecondary") as Brush;
+                }
             };
 
             removeButton.Click += (_, _) =>
@@ -489,12 +509,66 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             root.Children.Add(headerGrid);
 
             // Fields
-            var fieldsGrid = new Grid();
-            fieldsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Auto) });
-            fieldsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-            fieldsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            fieldsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-            fieldsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var fieldsGrid = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            /*
+             * Swap rows:
+             * Device Type, Old Serial, and New Serial share the width evenly.
+             *
+             * Blank/manual rows:
+             * Item is slightly narrower, giving Old/New Serial more room.
+             *
+             * Every column remains proportional, so all three controls shrink
+             * together on laptop screens instead of being cut off.
+             */
+            var firstFieldWeight =
+                usesCommunicationDeviceTypePicker
+                    ? 1.0
+                    : 0.75;
+
+            var serialFieldWeight =
+                usesCommunicationDeviceTypePicker
+                    ? 1.0
+                    : 1.125;
+
+            fieldsGrid.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(
+                        firstFieldWeight,
+                        GridUnitType.Star)
+                });
+
+            fieldsGrid.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(8)
+                });
+
+            fieldsGrid.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(
+                        serialFieldWeight,
+                        GridUnitType.Star)
+                });
+
+            fieldsGrid.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(8)
+                });
+
+            fieldsGrid.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(
+                        serialFieldWeight,
+                        GridUnitType.Star)
+                });
 
             var firstField = usesCommunicationDeviceTypePicker
                 ? CreateCommunicationDeviceTypePicker("Device Type")
@@ -529,75 +603,132 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             ReplacementEntriesPanel.Children.Add(outerBorder);
         }
 
-        private FrameworkElement CreateReplacementField(string label, string value, bool isReadOnly, string? fieldKey = null)
+        private FrameworkElement CreateReplacementField(
+            string label,
+            string value,
+            bool isReadOnly,
+            string? fieldKey = null)
         {
-            var stack = new StackPanel();
-
-            stack.Children.Add(new TextBlock
+            var stack = new StackPanel
             {
-                Text = label,
-                FontSize = 11,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = TryFindResource("TextSecondary") as Brush,
-                Margin = new Thickness(0, 0, 0, 4)
-            });
+                MinWidth = 0,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
 
-            stack.Children.Add(new TextBox
+            stack.Children.Add(
+                new TextBlock
+                {
+                    Text = label,
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground =
+                        TryFindResource("TextSecondary") as Brush,
+                    Margin = new Thickness(0, 0, 0, 4)
+                });
+
+            var textBox = new TextBox
             {
                 Text = value,
                 Tag = fieldKey,
                 IsReadOnly = isReadOnly,
                 Style = (Style)FindResource("ModernWatermarkTextBox"),
                 Height = 30,
-                MinWidth = 180,
+                Width = double.NaN,
+                MinWidth = 0,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
                 Padding = new Thickness(10, 0, 10, 0),
                 VerticalContentAlignment = VerticalAlignment.Center
-            });
+            };
+
+            if (string.Equals(
+                    fieldKey,
+                    "ReplacementItem",
+                    StringComparison.Ordinal))
+            {
+                textBox.TextChanged += (_, _) =>
+                {
+                    ClearRequiredFieldWarning(textBox);
+                };
+            }
+
+            stack.Children.Add(textBox);
 
             return stack;
         }
 
         private FrameworkElement CreateCommunicationDeviceTypePicker(string label)
         {
-            var stack = new StackPanel();
-
-            stack.Children.Add(new TextBlock
+            var stack = new StackPanel
             {
-                Text = label,
-                FontSize = 11,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = TryFindResource("TextSecondary") as Brush,
-                Margin = new Thickness(0, 0, 0, 4)
-            });
+                MinWidth = 0,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            stack.Children.Add(
+                new TextBlock
+                {
+                    Text = label,
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground =
+                        TryFindResource("TextSecondary") as Brush,
+                    Margin = new Thickness(0, 0, 0, 4)
+                });
 
             var comboBox = new ComboBox
             {
                 Height = 30,
-                MinWidth = 180,
-                VerticalContentAlignment = VerticalAlignment.Center,
+
+                /*
+                 * Force the ComboBox to fill its entire proportional
+                 * Grid column instead of retaining the narrow width
+                 * supplied by the shared style.
+                 */
+                Width = double.NaN,
+                MinWidth = 0,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+
+                VerticalContentAlignment =
+                    VerticalAlignment.Center,
+
                 IsEditable = false,
                 Tag = "ReplacementDeviceType",
-                ToolTip = "Select a device type before submitting this replacement."
+
+                ToolTip =
+                    "Select a device type before submitting this replacement."
             };
 
             if (TryFindResource("ModernComboBoxStyle") is Style comboStyle)
+            {
                 comboBox.Style = comboStyle;
+            }
 
             var names = _communicationDeviceTypes
-                .Where(x => x.IsActive && !string.IsNullOrWhiteSpace(x.DisplayName))
+                .Where(
+                    x =>
+                        x.IsActive &&
+                        !string.IsNullOrWhiteSpace(
+                            x.DisplayName))
                 .OrderBy(x => x.SortOrder)
                 .ThenBy(x => x.DisplayName)
                 .Select(x => x.DisplayName.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(
+                    StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             if (names.Count == 0)
-                names = FallbackCommunicationDeviceTypes.ToList();
+            {
+                names =
+                    FallbackCommunicationDeviceTypes
+                        .ToList();
+            }
 
             foreach (var name in names)
+            {
                 comboBox.Items.Add(name);
+            }
 
-            // Important: blank by default. The tech/dispatcher must choose.
+            // Required selection remains blank until the user chooses.
             comboBox.SelectedIndex = -1;
 
             comboBox.SelectionChanged += (_, _) =>
@@ -778,15 +909,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private object CreateTrashButtonContent()
         {
-            return new TextBlock
+            return new Path
             {
-                Text = "\uE107",
-                FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 15,
-                Foreground = TryFindResource("TextSecondary") as Brush,
+                Width = 16,
+                Height = 16,
+
+                Data = Geometry.Parse(
+                    "M4,6 L20,6 " +
+                    "M9,6 L9,4 " +
+                    "C9,2.9 9.9,2 11,2 " +
+                    "L13,2 " +
+                    "C14.1,2 15,2.9 15,4 " +
+                    "L15,6 " +
+                    "M6,6 L7,21 L17,21 L18,6 " +
+                    "M10,10 L10,17 " +
+                    "M14,10 L14,17"),
+
+                Fill = Brushes.Transparent,
+                Stroke = TryFindResource("TextSecondary") as Brush,
+                StrokeThickness = 1.8,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                StrokeLineJoin = PenLineJoin.Round,
+                Stretch = Stretch.Uniform,
+
                 HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                TextAlignment = TextAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center
             };
         }
 
@@ -805,44 +953,77 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             var rowNumber = 0;
 
-            foreach (var rowBorder in ReplacementEntriesPanel.Children.OfType<Border>())
+            foreach (var rowBorder in
+                     ReplacementEntriesPanel.Children.OfType<Border>())
             {
                 rowNumber++;
 
                 if (rowBorder.Tag is not ReplacementEntryRowTag rowTag)
                     continue;
 
-                if (!rowTag.UsesCommunicationDeviceTypePicker)
-                    continue;
-
-                var comboBox = FindVisualChildByTag<ComboBox>(
-                    rowBorder,
-                    "ReplacementDeviceType");
-
-                if (comboBox is null)
-                    continue;
-
-                var selectedDeviceType = GetComboBoxSelectedText(comboBox);
-
-                if (!string.IsNullOrWhiteSpace(selectedDeviceType))
+                if (rowTag.UsesCommunicationDeviceTypePicker)
                 {
-                    ClearRequiredFieldWarning(comboBox);
+                    var comboBox =
+                        FindVisualChildByTag<ComboBox>(
+                            rowBorder,
+                            "ReplacementDeviceType");
+
+                    if (comboBox is null)
+                        continue;
+
+                    var selectedDeviceType =
+                        GetComboBoxSelectedText(comboBox);
+
+                    if (!string.IsNullOrWhiteSpace(selectedDeviceType))
+                    {
+                        ClearRequiredFieldWarning(comboBox);
+                        continue;
+                    }
+
+                    MarkRequiredFieldWarning(comboBox);
+
+                    var rowLabel =
+                        string.IsNullOrWhiteSpace(rowTag.Label)
+                            ? $"replacement row {rowNumber}"
+                            : $"{rowTag.Label} replacement";
+
+                    MessageBox.Show(
+                        $"Select a Device Type for the {rowLabel} before submitting the write-up.",
+                        "Equipment Replacement Required",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    comboBox.Focus();
+                    return false;
+                }
+
+                /*
+                 * Manually added replacement rows require an Item description.
+                 * Old Serial and New Serial remain optional.
+                 */
+                var itemTextBox =
+                    FindVisualChildByTag<TextBox>(
+                        rowBorder,
+                        "ReplacementItem");
+
+                if (itemTextBox is null)
+                    continue;
+
+                if (!string.IsNullOrWhiteSpace(itemTextBox.Text))
+                {
+                    ClearRequiredFieldWarning(itemTextBox);
                     continue;
                 }
 
-                MarkRequiredFieldWarning(comboBox);
-
-                var rowLabel = string.IsNullOrWhiteSpace(rowTag.Label)
-                    ? $"replacement row {rowNumber}"
-                    : $"{rowTag.Label} replacement";
+                MarkRequiredFieldWarning(itemTextBox);
 
                 MessageBox.Show(
-                    $"Select a Device Type for the {rowLabel} before submitting the write-up.",
+                    $"Enter an Item for replacement row {rowNumber} before submitting the write-up.",
                     "Equipment Replacement Required",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
 
-                comboBox.Focus();
+                itemTextBox.Focus();
                 return false;
             }
 

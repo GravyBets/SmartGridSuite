@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net.NetworkInformation;
 using System.Threading;
@@ -13,9 +13,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 {
     public partial class SiteDashboardNetworkView : UserControl
     {
-        private CancellationTokenSource? _primaryPingCts;
-        private CancellationTokenSource? _lanPingCts;
-        private CancellationTokenSource? _secondaryPingCts;
+        private NetworkPingSessionState _pingState = new();
 
         private bool? _primaryTestSuccessful;
         private bool? _lanTestSuccessful;
@@ -111,88 +109,179 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         public void Reset()
         {
-            StopAllPings();
+            StopPingSession(_pingState);
 
+            _pingState =
+                new NetworkPingSessionState();
+
+            ResetDisplay();
+        }
+
+        public void ResetDisplay()
+        {
             IsIgsdMode = false;
-            PrimaryPingLabel = "Primary";
-            LanPingLabel = "LAN";
-            SecondaryPingLabel = "Secondary";
 
+            PrimaryPingLabel =
+                "Primary";
 
-            PrimaryIp = string.Empty;
-            LanIp = string.Empty;
-            SecondaryIp = string.Empty;
+            LanPingLabel =
+                "LAN";
 
-            IgsdPrimaryRtuIp = string.Empty;
-            IgsdPrimaryCommsEthernetIp = string.Empty;
-            IgsdSecondaryCommsEthernetIp = string.Empty;
-            IgsdSecondaryRtuIp = string.Empty;
+            SecondaryPingLabel =
+                "Secondary";
 
-            PingCountTextBox.Text = string.Empty;
+            PrimaryIp =
+                string.Empty;
 
-            PrimarySummaryTextBlock.Text = "Ready.";
-            LanSummaryTextBlock.Text = "Ready.";
-            SecondarySummaryTextBlock.Text = "Ready.";
+            LanIp =
+                string.Empty;
 
-            PrimaryResultsTextBox.Text = string.Empty;
-            LanResultsTextBox.Text = string.Empty;
-            SecondaryResultsTextBox.Text = string.Empty;
-            SiteHeader = string.Empty;
+            SecondaryIp =
+                string.Empty;
 
-            ClearIpTestState(PrimaryIpTextBox);
-            ClearIpTestState(LanIpTextBox);
-            ClearIpTestState(SecondaryIpTextBox);
+            IgsdPrimaryRtuIp =
+                string.Empty;
 
-            _primaryTestSuccessful = null;
-            _lanTestSuccessful = null;
-            _secondaryTestSuccessful = null;
+            IgsdPrimaryCommsEthernetIp =
+                string.Empty;
+
+            IgsdSecondaryCommsEthernetIp =
+                string.Empty;
+
+            IgsdSecondaryRtuIp =
+                string.Empty;
+
+            PingCountTextBox.Text =
+                string.Empty;
+
+            PrimarySummaryTextBlock.Text =
+                "Ready.";
+
+            LanSummaryTextBlock.Text =
+                "Ready.";
+
+            SecondarySummaryTextBlock.Text =
+                "Ready.";
+
+            PrimaryResultsTextBox.Text =
+                string.Empty;
+
+            LanResultsTextBox.Text =
+                string.Empty;
+
+            SecondaryResultsTextBox.Text =
+                string.Empty;
+
+            SiteHeader =
+                string.Empty;
+
+            ClearIpTestState(
+                PrimaryIpTextBox);
+
+            ClearIpTestState(
+                LanIpTextBox);
+
+            ClearIpTestState(
+                SecondaryIpTextBox);
+
+            _primaryTestSuccessful =
+                null;
+
+            _lanTestSuccessful =
+                null;
+
+            _secondaryTestSuccessful =
+                null;
 
             ApplyLayoutMode();
+
+            RefreshPingButtonStates();
         }
 
         public NetworkPingSessionState GetPingSessionState()
         {
-            return new NetworkPingSessionState
-            {
-                PingCount = PingCountTextBox.Text ?? string.Empty,
+            _pingState.PingCount =
+                PingCountTextBox.Text ??
+                string.Empty;
 
-                Primary = new NetworkPingTargetState
-                {
-                    Ip = SnapshotIp(PrimaryIpTextBox.Text),
-                    Results = PrimaryResultsTextBox.Text ?? string.Empty,
-                    Summary = PrimarySummaryTextBlock.Text ?? "Ready.",
-                    TestSuccessful = _primaryTestSuccessful
-                },
+            CapturePingTargetState(
+                _pingState.Primary,
+                PrimaryIpTextBox,
+                PrimaryResultsTextBox,
+                PrimarySummaryTextBlock,
+                _primaryTestSuccessful);
 
-                Lan = new NetworkPingTargetState
-                {
-                    Ip = SnapshotIp(LanIpTextBox.Text),
-                    Results = LanResultsTextBox.Text ?? string.Empty,
-                    Summary = LanSummaryTextBlock.Text ?? "Ready.",
-                    TestSuccessful = _lanTestSuccessful
-                },
+            CapturePingTargetState(
+                _pingState.Lan,
+                LanIpTextBox,
+                LanResultsTextBox,
+                LanSummaryTextBlock,
+                _lanTestSuccessful);
 
-                Secondary = new NetworkPingTargetState
-                {
-                    Ip = SnapshotIp(SecondaryIpTextBox.Text),
-                    Results = SecondaryResultsTextBox.Text ?? string.Empty,
-                    Summary = SecondarySummaryTextBlock.Text ?? "Ready.",
-                    TestSuccessful = _secondaryTestSuccessful
-                },
+            CapturePingTargetState(
+                _pingState.Secondary,
+                SecondaryIpTextBox,
+                SecondaryResultsTextBox,
+                SecondarySummaryTextBlock,
+                _secondaryTestSuccessful);
 
-                IgsdPrimaryRtuIp = IgsdPrimaryRtuIpTextBox.Text ?? string.Empty,
-                IgsdPrimaryCommsEthernetIp = IgsdPrimaryCommsEthernetIpTextBox.Text ?? string.Empty,
-                IgsdSecondaryCommsEthernetIp = IgsdSecondaryCommsEthernetIpTextBox.Text ?? string.Empty,
-                IgsdSecondaryRtuIp = IgsdSecondaryRtuIpTextBox.Text ?? string.Empty
-            };
+            _pingState.IgsdPrimaryRtuIp =
+                IgsdPrimaryRtuIpTextBox.Text ??
+                string.Empty;
+
+            _pingState.IgsdPrimaryCommsEthernetIp =
+                IgsdPrimaryCommsEthernetIpTextBox.Text ??
+                string.Empty;
+
+            _pingState.IgsdSecondaryCommsEthernetIp =
+                IgsdSecondaryCommsEthernetIpTextBox.Text ??
+                string.Empty;
+
+            _pingState.IgsdSecondaryRtuIp =
+                IgsdSecondaryRtuIpTextBox.Text ??
+                string.Empty;
+
+            return _pingState;
+        }
+
+        private static void CapturePingTargetState(
+            NetworkPingTargetState state,
+            TextBox ipTextBox,
+            TextBox resultsTextBox,
+            TextBlock summaryTextBlock,
+            bool? testSuccessful)
+        {
+            state.Ip =
+                SnapshotIp(
+                    ipTextBox.Text);
+
+            state.Results =
+                resultsTextBox.Text ??
+                string.Empty;
+
+            state.Summary =
+                summaryTextBlock.Text ??
+                "Ready.";
+
+            state.TestSuccessful =
+                testSuccessful;
         }
 
         public void RestorePingSessionState(NetworkPingSessionState? state)
         {
-            if (state is null)
-                return;
+            _pingState =
+                state ??
+                new NetworkPingSessionState();
 
-            PingCountTextBox.Text = state.PingCount ?? string.Empty;
+            if (state is null)
+            {
+                RefreshPingButtonStates();
+                return;
+            }
+
+            PingCountTextBox.Text =
+                state.PingCount ??
+                string.Empty;
 
             RestorePingTargetState(
                 state.Primary,
@@ -215,17 +304,35 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 SecondarySummaryTextBlock,
                 ref _secondaryTestSuccessful);
 
-            if (!string.IsNullOrWhiteSpace(state.IgsdPrimaryRtuIp))
-                IgsdPrimaryRtuIpTextBox.Text = state.IgsdPrimaryRtuIp;
+            if (!string.IsNullOrWhiteSpace(
+                    state.IgsdPrimaryRtuIp))
+            {
+                IgsdPrimaryRtuIpTextBox.Text =
+                    state.IgsdPrimaryRtuIp;
+            }
 
-            if (!string.IsNullOrWhiteSpace(state.IgsdPrimaryCommsEthernetIp))
-                IgsdPrimaryCommsEthernetIpTextBox.Text = state.IgsdPrimaryCommsEthernetIp;
+            if (!string.IsNullOrWhiteSpace(
+                    state.IgsdPrimaryCommsEthernetIp))
+            {
+                IgsdPrimaryCommsEthernetIpTextBox.Text =
+                    state.IgsdPrimaryCommsEthernetIp;
+            }
 
-            if (!string.IsNullOrWhiteSpace(state.IgsdSecondaryCommsEthernetIp))
-                IgsdSecondaryCommsEthernetIpTextBox.Text = state.IgsdSecondaryCommsEthernetIp;
+            if (!string.IsNullOrWhiteSpace(
+                    state.IgsdSecondaryCommsEthernetIp))
+            {
+                IgsdSecondaryCommsEthernetIpTextBox.Text =
+                    state.IgsdSecondaryCommsEthernetIp;
+            }
 
-            if (!string.IsNullOrWhiteSpace(state.IgsdSecondaryRtuIp))
-                IgsdSecondaryRtuIpTextBox.Text = state.IgsdSecondaryRtuIp;
+            if (!string.IsNullOrWhiteSpace(
+                    state.IgsdSecondaryRtuIp))
+            {
+                IgsdSecondaryRtuIpTextBox.Text =
+                    state.IgsdSecondaryRtuIp;
+            }
+
+            RefreshPingButtonStates();
         }
 
         private static void RestorePingTargetState(NetworkPingTargetState? state, TextBox ipTextBox, TextBox resultsTextBox,
@@ -263,154 +370,154 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 : text;
         }
 
-        private async void PingPrimaryButton_Click(object sender, RoutedEventArgs e)
+        private async void PingPrimaryButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
-            if (_primaryPingCts is not null)
-            {
-                CancelAndDispose(ref _primaryPingCts);
-                RefreshPingButtonStates();
-                return;
-            }
-
-            await RunSinglePingAsync(
-                () => PrimaryIp,
-                PrimarySummaryTextBlock,
-                PrimaryResultsTextBox,
-                cts => _primaryPingCts = cts,
-                () => _primaryPingCts,
-                () => CancelAndDispose(ref _primaryPingCts));
+            await ToggleSinglePingAsync(
+                _pingState.Primary,
+                PrimaryIp);
         }
 
-        private async void PingLanButton_Click(object sender, RoutedEventArgs e)
+        private async void PingLanButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
-            if (_lanPingCts is not null)
-            {
-                CancelAndDispose(ref _lanPingCts);
-                RefreshPingButtonStates();
-                return;
-            }
-
-            await RunSinglePingAsync(
-                () => LanIp,
-                LanSummaryTextBlock,
-                LanResultsTextBox,
-                cts => _lanPingCts = cts,
-                () => _lanPingCts,
-                () => CancelAndDispose(ref _lanPingCts));
+            await ToggleSinglePingAsync(
+                _pingState.Lan,
+                LanIp);
         }
 
-        private async void PingSecondaryButton_Click(object sender, RoutedEventArgs e)
+        private async void PingSecondaryButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
-            if (_secondaryPingCts is not null)
+            await ToggleSinglePingAsync(
+                _pingState.Secondary,
+                SecondaryIp);
+        }
+
+        private async Task ToggleSinglePingAsync(
+            NetworkPingTargetState target, string ipAddress)
+        {
+            var ownerState =
+                _pingState;
+
+            if (target.PingCts is not null)
             {
-                CancelAndDispose(ref _secondaryPingCts);
-                RefreshPingButtonStates();
+                CancelAndDispose(
+                    target);
+
+                RefreshActivePingUi(
+                    ownerState);
+
                 return;
             }
 
+            GetPingSessionState();
+
+            target.Ip =
+                SnapshotIp(
+                    ipAddress);
+
             await RunSinglePingAsync(
-                () => SecondaryIp,
-                SecondarySummaryTextBlock,
-                SecondaryResultsTextBox,
-                cts => _secondaryPingCts = cts,
-                () => _secondaryPingCts,
-                () => CancelAndDispose(ref _secondaryPingCts));
+                ownerState,
+                target);
         }
 
         private async Task RunSinglePingAsync(
-            Func<string> ipProvider,
-            TextBlock summaryTextBlock,
-            TextBox resultsTextBox,
-            Action<CancellationTokenSource> setCts,
-            Func<CancellationTokenSource?> getCurrentCts,
-            Action clearCurrentCts)
+            NetworkPingSessionState ownerState, NetworkPingTargetState target)
         {
-            var cts = new CancellationTokenSource();
+            if (target.PingCts is not null)
+                return;
 
-            setCts(cts);
-            RefreshPingButtonStates();
+            var cts =
+                new CancellationTokenSource();
+
+            target.PingCts =
+                cts;
+
+            RefreshActivePingUi(
+                ownerState);
 
             try
             {
-                await PingTargetAsync(
-                    ipProvider(),
-                    summaryTextBlock,
-                    resultsTextBox,
+                await PingTargetForSessionAsync(
+                    ownerState,
+                    target,
                     cts.Token);
             }
             finally
             {
-                if (ReferenceEquals(getCurrentCts(), cts))
-                    clearCurrentCts();
+                if (ReferenceEquals(
+                        target.PingCts,
+                        cts))
+                {
+                    target.PingCts =
+                        null;
 
-                RefreshPingButtonStates();
+                    cts.Dispose();
+                }
+
+                RefreshActivePingUi(
+                    ownerState);
             }
         }
 
         private async void PingAllButton_Click(object sender, RoutedEventArgs e)
         {
-            if (IsAnyPingRunning())
+            var ownerState =
+                _pingState;
+
+            if (IsAnyPingRunning(
+                    ownerState))
             {
-                StopAllPings();
+                StopPingSession(
+                    ownerState);
+
                 return;
             }
 
-            StopAllPings();
+            GetPingSessionState();
 
-            var primaryCts = new CancellationTokenSource();
-            var secondaryCts = new CancellationTokenSource();
+            ownerState.Primary.Ip =
+                SnapshotIp(
+                    PrimaryIp);
 
-            _primaryPingCts = primaryCts;
-            _secondaryPingCts = secondaryCts;
+            ownerState.Lan.Ip =
+                SnapshotIp(
+                    LanIp);
 
-            CancellationTokenSource? lanCts = null;
+            ownerState.Secondary.Ip =
+                SnapshotIp(
+                    SecondaryIp);
 
-            var tasks = new List<Task>
-    {
-        PingTargetAsync(
-            PrimaryIp,
-            PrimarySummaryTextBlock,
-            PrimaryResultsTextBox,
-            primaryCts.Token),
+            var includeLan =
+                !IsIgsdMode;
 
-        PingTargetAsync(
-            SecondaryIp,
-            SecondarySummaryTextBlock,
-            SecondaryResultsTextBox,
-            secondaryCts.Token)
-    };
+            var tasks =
+                new List<Task>
+                {
+            RunSinglePingAsync(
+                ownerState,
+                ownerState.Primary),
 
-            if (!IsIgsdMode)
+            RunSinglePingAsync(
+                ownerState,
+                ownerState.Secondary)
+                };
+
+            if (includeLan)
             {
-                lanCts = new CancellationTokenSource();
-                _lanPingCts = lanCts;
-
-                tasks.Insert(1, PingTargetAsync(
-                    LanIp,
-                    LanSummaryTextBlock,
-                    LanResultsTextBox,
-                    lanCts.Token));
+                tasks.Insert(
+                    1,
+                    RunSinglePingAsync(
+                        ownerState,
+                        ownerState.Lan));
             }
 
-            RefreshPingButtonStates();
-
-            try
-            {
-                await Task.WhenAll(tasks);
-            }
-            finally
-            {
-                if (ReferenceEquals(_primaryPingCts, primaryCts))
-                    CancelAndDispose(ref _primaryPingCts);
-
-                if (ReferenceEquals(_lanPingCts, lanCts))
-                    CancelAndDispose(ref _lanPingCts);
-
-                if (ReferenceEquals(_secondaryPingCts, secondaryCts))
-                    CancelAndDispose(ref _secondaryPingCts);
-
-                RefreshPingButtonStates();
-            }
+            await Task.WhenAll(
+                tasks);
         }
 
         private void ClearAllButton_Click(object sender, RoutedEventArgs e)
@@ -434,74 +541,271 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private static void ClearIpTestState(TextBox ipTextBox)
         {
-            ipTextBox.ClearValue(Control.BackgroundProperty);
-            ipTextBox.ClearValue(Control.BorderBrushProperty);
+            ipTextBox.ClearValue(
+                Control.BackgroundProperty);
+
+            ipTextBox.ClearValue(
+                Control.BorderBrushProperty);
+
+            ipTextBox.ClearValue(
+                Control.ForegroundProperty);
+
+            ipTextBox.ClearValue(
+                TextBox.CaretBrushProperty);
+
+            ipTextBox.ClearValue(
+                Control.BorderThicknessProperty);
         }
 
-        private async Task PingTargetAsync(string ipText, TextBlock summaryTextBlock, 
-            TextBox resultsTextBox, CancellationToken cancellationToken)
+        /*
+         * Compatibility wrapper for existing quick-test callers.
+         */
+        private async Task PingTargetAsync(
+            string ipText,
+            TextBlock summaryTextBlock,
+            TextBox resultsTextBox,
+            CancellationToken cancellationToken)
         {
-            resultsTextBox.Text = string.Empty;
+            var ownerState =
+                GetPingSessionState();
 
-            var ip = (ipText ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(ip) || ip == "—")
+            var target =
+                ResolvePingTargetState(
+                    resultsTextBox);
+
+            target.Ip =
+                SnapshotIp(
+                    ipText);
+
+            await PingTargetForSessionAsync(
+                ownerState,
+                target,
+                cancellationToken);
+        }
+
+        private async Task PingTargetForSessionAsync(
+            NetworkPingSessionState ownerState,
+            NetworkPingTargetState target,
+            CancellationToken cancellationToken)
+        {
+            target.Results =
+                string.Empty;
+
+            var ip =
+                (target.Ip ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(ip) ||
+                ip == "—")
             {
-                summaryTextBlock.Text = "No IP available.";
+                target.Summary =
+                    "No IP available.";
+
+                RenderPingTargetIfActive(
+                    ownerState,
+                    target);
+
                 return;
             }
 
-            var requestedCount = ParsePingCount();
-            var sent = 0;
-            var lost = 0;
+            var requestedCount =
+                ParsePingCount(
+                    ownerState.PingCount);
 
-            using var ping = new Ping();
+            var sent =
+                0;
+
+            var lost =
+                0;
+
+            using var ping =
+                new Ping();
 
             try
             {
                 while (!cancellationToken.IsCancellationRequested &&
-                       (requestedCount is null || sent < requestedCount.Value))
+                       (requestedCount is null ||
+                        sent < requestedCount.Value))
                 {
-                    PingReply? reply = null;
                     string line;
 
                     try
                     {
-                        reply = await ping.SendPingAsync(ip, 1500);
+                        var reply =
+                            await ping.SendPingAsync(
+                                ip,
+                                1500);
+
                         sent++;
 
-                        if (reply.Status == IPStatus.Success)
+                        if (reply.Status ==
+                            IPStatus.Success)
                         {
-                            line = $"{DateTime.Now:HH:mm:ss} {ip}: Time={reply.RoundtripTime} ms";
+                            line =
+                                $"{DateTime.Now:HH:mm:ss} {ip}: Time={reply.RoundtripTime} ms";
                         }
                         else
                         {
                             lost++;
-                            line = $"{DateTime.Now:HH:mm:ss} {ip}: {reply.Status}";
+
+                            line =
+                                $"{DateTime.Now:HH:mm:ss} {ip}: {reply.Status}";
                         }
                     }
                     catch (Exception ex)
                     {
                         sent++;
                         lost++;
-                        line = $"{DateTime.Now:HH:mm:ss} {ip}: {ex.Message}";
+
+                        line =
+                            $"{DateTime.Now:HH:mm:ss} {ip}: {ex.Message}";
                     }
 
-                    AppendResult(resultsTextBox, line);
+                    target.Results =
+                        string.IsNullOrWhiteSpace(
+                            target.Results)
+                            ? line
+                            : target.Results +
+                              Environment.NewLine +
+                              line;
 
-                    var lossPercent = sent == 0 ? 0 : (int)Math.Round((double)lost * 100 / sent);
-                    summaryTextBlock.Text = $"Sent = {sent}, Lost = {lost} ({lossPercent}% loss).";
+                    var lossPercent =
+                        sent == 0
+                            ? 0
+                            : (int)Math.Round(
+                                (double)lost * 100 /
+                                sent);
+
+                    target.Summary =
+                        $"Sent = {sent}, Lost = {lost} ({lossPercent}% loss).";
+
+                    RenderPingTargetIfActive(
+                        ownerState,
+                        target);
 
                     if (requestedCount is null)
                     {
-                        await Task.Delay(1000, cancellationToken);
+                        await Task.Delay(
+                            1000,
+                            cancellationToken);
                     }
                 }
             }
             catch (OperationCanceledException)
             {
                 if (sent == 0)
-                    summaryTextBlock.Text = "Stopped.";
+                {
+                    target.Summary =
+                        "Stopped.";
+
+                    RenderPingTargetIfActive(
+                        ownerState,
+                        target);
+                }
             }
+        }
+
+        private NetworkPingTargetState ResolvePingTargetState(
+            TextBox resultsTextBox)
+        {
+            if (ReferenceEquals(
+                    resultsTextBox,
+                    PrimaryResultsTextBox))
+            {
+                return _pingState.Primary;
+            }
+
+            if (ReferenceEquals(
+                    resultsTextBox,
+                    LanResultsTextBox))
+            {
+                return _pingState.Lan;
+            }
+
+            return _pingState.Secondary;
+        }
+
+        private void RenderPingTargetIfActive(
+            NetworkPingSessionState ownerState,
+            NetworkPingTargetState target)
+        {
+            /*
+             * The ping continues updating its original tab state while that tab
+             * is hidden. Only update visible controls when that same state is
+             * currently selected.
+             */
+            if (!ReferenceEquals(
+                    _pingState,
+                    ownerState))
+            {
+                return;
+            }
+
+            TextBox resultsTextBox;
+            TextBlock summaryTextBlock;
+
+            if (ReferenceEquals(
+                    ownerState.Primary,
+                    target))
+            {
+                resultsTextBox =
+                    PrimaryResultsTextBox;
+
+                summaryTextBlock =
+                    PrimarySummaryTextBlock;
+            }
+            else if (ReferenceEquals(
+                         ownerState.Lan,
+                         target))
+            {
+                resultsTextBox =
+                    LanResultsTextBox;
+
+                summaryTextBlock =
+                    LanSummaryTextBlock;
+            }
+            else
+            {
+                resultsTextBox =
+                    SecondaryResultsTextBox;
+
+                summaryTextBlock =
+                    SecondarySummaryTextBlock;
+            }
+
+            resultsTextBox.Text =
+                target.Results ??
+                string.Empty;
+
+            summaryTextBlock.Text =
+                target.Summary ??
+                "Ready.";
+
+            resultsTextBox.ScrollToEnd();
+        }
+
+        private void RefreshActivePingUi(
+            NetworkPingSessionState ownerState)
+        {
+            if (!ReferenceEquals(
+                    _pingState,
+                    ownerState))
+            {
+                return;
+            }
+
+            RenderPingTargetIfActive(
+                ownerState,
+                ownerState.Primary);
+
+            RenderPingTargetIfActive(
+                ownerState,
+                ownerState.Lan);
+
+            RenderPingTargetIfActive(
+                ownerState,
+                ownerState.Secondary);
+
+            RefreshPingButtonStates();
         }
 
         //IGSD View Mode
@@ -540,16 +844,31 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private int? ParsePingCount()
         {
-            var raw = PingCountTextBox.Text?.Trim();
+            return ParsePingCount(
+                PingCountTextBox.Text);
+        }
+
+        private static int? ParsePingCount(
+            string? rawValue)
+        {
+            var raw =
+                rawValue?.Trim();
 
             if (string.IsNullOrWhiteSpace(raw))
                 return null;
 
-            if (!int.TryParse(raw, out var count))
+            if (!int.TryParse(
+                    raw,
+                    out var count))
+            {
                 return 3;
+            }
 
-            if (count <= 0 || count >= 999999)
+            if (count <= 0 ||
+                count >= 999999)
+            {
                 return 3;
+            }
 
             return count;
         }
@@ -604,15 +923,42 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private void StopAllPings()
         {
-            CancelAndDispose(ref _primaryPingCts);
-            CancelAndDispose(ref _lanPingCts);
-            CancelAndDispose(ref _secondaryPingCts);
-
-            RefreshPingButtonStates();
+            StopPingSession(
+                _pingState);
         }
 
-        private static void CancelAndDispose(ref CancellationTokenSource? cts)
+        public void StopPingSession(
+            NetworkPingSessionState? state)
         {
+            if (state is null)
+                return;
+
+            CancelAndDispose(
+                state.Primary);
+
+            CancelAndDispose(
+                state.Lan);
+
+            CancelAndDispose(
+                state.Secondary);
+
+            if (ReferenceEquals(
+                    _pingState,
+                    state))
+            {
+                RefreshPingButtonStates();
+            }
+        }
+
+        private static void CancelAndDispose(
+            NetworkPingTargetState target)
+        {
+            var cts =
+                target.PingCts;
+
+            target.PingCts =
+                null;
+
             if (cts is null)
                 return;
 
@@ -625,7 +971,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
 
             cts.Dispose();
-            cts = null;
+        }
+
+        private bool IsAnyPingRunning()
+        {
+            return IsAnyPingRunning(
+                _pingState);
+        }
+
+        private static bool IsAnyPingRunning(
+            NetworkPingSessionState state)
+        {
+            return state.Primary.PingCts is not null ||
+                   state.Lan.PingCts is not null ||
+                   state.Secondary.PingCts is not null;
         }
 
         private static string NormalizeDisplay(string? value)
@@ -643,30 +1002,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             textBox.ScrollToEnd();
         }
 
-        private bool IsAnyPingRunning()
-        {
-            return _primaryPingCts is not null ||
-                   _lanPingCts is not null ||
-                   _secondaryPingCts is not null;
-        }
-
         private void RefreshPingButtonStates()
         {
             SetPingButtonState(
                 PrimaryPingButton,
-                _primaryPingCts is not null,
+                _pingState.Primary.PingCts is not null,
                 normalText: "Ping",
                 normalStyleKey: "NetworkMiniButtonStyle");
 
             SetPingButtonState(
                 LanPingButton,
-                _lanPingCts is not null,
+                _pingState.Lan.PingCts is not null,
                 normalText: "Ping",
                 normalStyleKey: "NetworkMiniButtonStyle");
 
             SetPingButtonState(
                 SecondaryPingButton,
-                _secondaryPingCts is not null,
+                _pingState.Secondary.PingCts is not null,
                 normalText: "Ping",
                 normalStyleKey: "NetworkMiniButtonStyle");
 
@@ -741,28 +1093,34 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private static void SetIpTestState(TextBox ipTextBox, bool? isSuccessful)
         {
+            ClearIpTestState(ipTextBox);
+
             if (isSuccessful is null)
-            {
-                ClearIpTestState(ipTextBox);
                 return;
-            }
 
-            Color background;
-            Color border;
+            var resourcePrefix =
+                isSuccessful.Value
+                    ? "NetworkPingSuccess"
+                    : "NetworkPingFailure";
 
-            if (isSuccessful.Value)
-            {
-                background = Color.FromRgb(232, 245, 233);   // green
-                border = Color.FromRgb(76, 175, 80);
-            }
-            else
-            {
-                background = Color.FromRgb(253, 236, 234);   // red
-                border = Color.FromRgb(220, 80, 80);
-            }
+            ipTextBox.SetResourceReference(
+                Control.BackgroundProperty,
+                $"{resourcePrefix}Bg");
 
-            ipTextBox.Background = new SolidColorBrush(background);
-            ipTextBox.BorderBrush = new SolidColorBrush(border);
+            ipTextBox.SetResourceReference(
+                Control.BorderBrushProperty,
+                $"{resourcePrefix}Border");
+
+            ipTextBox.SetResourceReference(
+                Control.ForegroundProperty,
+                $"{resourcePrefix}Text");
+
+            ipTextBox.SetResourceReference(
+                TextBox.CaretBrushProperty,
+                $"{resourcePrefix}Text");
+
+            ipTextBox.BorderThickness =
+                new Thickness(1.5);
         }
 
         private void RememberIpTestState(TextBox ipTextBox, bool? isSuccessful)
@@ -843,9 +1201,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 return false;
 
             var cleanSummary = CleanPingSummaryForWriteUp(summary);
-
-            if (lines.Count > 1)
-                lines.Add(string.Empty);
 
             if (string.IsNullOrWhiteSpace(cleanSummary))
                 lines.Add($"{label} ({cleanIp})");

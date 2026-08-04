@@ -1570,6 +1570,37 @@ namespace SmartGridSuite.Api.Controllers
             return cleanExisting + Environment.NewLine + Environment.NewLine + entry;
         }
 
+        private static string AppendSubmittedWriteUpNote(
+            string? existingNotes,
+            string writeUpText,
+            string? submittedByName,
+            DateTime submittedAt)
+        {
+            var cleanExisting =
+                (existingNotes ?? string.Empty).Trim();
+
+            var cleanWriteUp =
+                (writeUpText ?? string.Empty).Trim();
+
+            var cleanSubmittedBy =
+                string.IsNullOrWhiteSpace(submittedByName)
+                    ? "Unknown"
+                    : submittedByName.Trim();
+
+            var entry =
+                $"[{submittedAt:MM-dd-yyyy HH:mm}] " +
+                $"Write-up submitted by {cleanSubmittedBy}" +
+                Environment.NewLine +
+                cleanWriteUp;
+
+            return string.IsNullOrWhiteSpace(cleanExisting)
+                ? entry
+                : cleanExisting +
+                  Environment.NewLine +
+                  Environment.NewLine +
+                  entry;
+        }
+
         private static string AppendDispatchRequestNote(string? existingNotes, string requestType, string reason, string? requestedBy)
         {
             var cleanExisting = (existingNotes ?? string.Empty).Trim();
@@ -2822,11 +2853,11 @@ namespace SmartGridSuite.Api.Controllers
                     siteHistoryWriteUp,
                     submittedWork);
 
-                entity.Notes = AppendTicketNote(
+                entity.Notes = AppendSubmittedWriteUpNote(
                     entity.Notes,
-                    "Write-up submitted",
                     canonicalFinalWriteUp,
-                    req.SubmittedBy);
+                    submittedWork.SubmittedByName,
+                    submittedAt);
 
                 entity.ActionRequiredOverride =
                     "Review submitted site write-up";
@@ -2854,6 +2885,7 @@ namespace SmartGridSuite.Api.Controllers
 
                 return Ok(new UpdateTicketResponse(entity.Id));
             }
+            
             catch (DbUpdateException ex)
                 when (IsDuplicateClientSubmissionIdException(ex))
             {

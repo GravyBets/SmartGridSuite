@@ -132,7 +132,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 {
                     HidePoppedOutOverlay();
                     TopBarView.ResetHeader();
-                    NetworkView.Reset();
+                    NetworkView.ResetDisplay();
                     WorkspaceView.Reset();
                 }
                 finally
@@ -169,13 +169,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 if (!ShouldShowDashboardBody(session))
                 {
-                    NetworkView.Reset();
+                    NetworkView.ResetDisplay();
                     WorkspaceView.Reset();
                     return;
                 }
 
-                //Networking
-                NetworkView.Reset();
+                // Networking
+                // Clear only the visible controls. Do not cancel the ping session
+                // owned by the dashboard tab being switched away from.
+                NetworkView.ResetDisplay();
                 ApplyNetworkLabels(session);
                 NetworkView.SiteHeader = BuildNetworkHeader(session.SiteStatusText, session.HeaderText);
 

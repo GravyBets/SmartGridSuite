@@ -1,5 +1,17 @@
-﻿[
+[
   {
+    "version": "2.0.0.4",
+    "date": "August 3, 2026",
+    "title": "Site Dashboard and Field History refinements",
+    "changes": [
+      "Improved Site Dashboard network presentation and theme readability.",
+      "Improved equipment replacement entry sizing and validation while keeping serial numbers optional.",
+      "Cleaned up submitted write-up formatting, including Ping Stats, equipment replacements, and VSWR ratios.",
+      "Improved the New Ticket Assigned To dropdown across application themes.",
+      "Added smooth scrolling for long submitted write-ups in Field Technician History."
+    ]
+  },
+{
     "version": "2.0.0.3",
     "date": "July 29, 2026",
     "title": "Write-up and request dialog fixes",

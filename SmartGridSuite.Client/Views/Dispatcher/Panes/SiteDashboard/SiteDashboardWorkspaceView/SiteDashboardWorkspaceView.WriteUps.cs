@@ -3,6 +3,7 @@ using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Text.RegularExpressions;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 {
@@ -51,9 +52,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             siteHistoryWriteUpText = string.Empty;
 
             var sections = new List<string>();
-
-            var timestampSection = $"[{DateTime.Now:MM-dd-yyyy HH:mm}]";
-            sections.Add(timestampSection);
 
             var reasonText = BuildWriteUpReasonText();
 
@@ -344,17 +342,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     return false;
                 }
 
-                if (string.IsNullOrWhiteSpace(entry.NewSerial))
-                {
-                    MessageBox.Show(
-                        $"Enter the new serial number for {entry.Item}.",
-                        "Equipment Replacement",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-
-                    return false;
-                }
-
                 lines.Add(BuildEquipmentReplacementLine(entry));
             }
 
@@ -363,21 +350,42 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private static string BuildEquipmentReplacementLine(EquipmentReplacementWriteUpEntry entry)
         {
-            var item = entry.UsesCommunicationDeviceTypePicker
-                ? FriendlyReplacementItemLabel(entry.Item)
-                : FriendlyReplacementItemLabel(entry.Item);
+            var item =
+                FriendlyReplacementItemLabel(entry.Item);
 
-            var oldSerial = entry.OldSerial.Trim();
-            var newSerial = entry.NewSerial.Trim();
+            var oldSerial =
+                entry.OldSerial.Trim();
+
+            var newSerial =
+                entry.NewSerial.Trim();
 
             var lines = new List<string>();
 
             if (!string.IsNullOrWhiteSpace(oldSerial))
-                lines.Add($"Found {item} SN: {oldSerial}");
+            {
+                lines.Add(
+                    $"Found {item} SN: {oldSerial}");
+            }
 
-            lines.Add($"Left {item} SN: {newSerial}");
+            if (!string.IsNullOrWhiteSpace(newSerial))
+            {
+                lines.Add(
+                    $"Left {item} SN: {newSerial}");
+            }
 
-            return string.Join(Environment.NewLine, lines);
+            /*
+             * Item is required, but serial numbers are optional.
+             * Preserve an item-only replacement instead of silently dropping it.
+             */
+            if (lines.Count == 0)
+            {
+                lines.Add(
+                    $"Equipment replacement: {item}");
+            }
+
+            return string.Join(
+                Environment.NewLine,
+                lines);
         }
 
         private EquipmentReplacementWriteUpEntry GetEquipmentReplacementEntry(Border rowBorder, ReplacementEntryRowTag rowTag)
@@ -490,6 +498,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
                     var result = NormalizeSnmpResultForWriteUp(rawResult);
 
+                    result = RemoveSpaceBeforeSnmpRatioSuffix(result);
+
                     if (string.IsNullOrWhiteSpace(result))
                         continue;
 
@@ -560,9 +570,30 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
 
             return pingStats.TrimEnd() +
-                   Environment.NewLine +
-                   Environment.NewLine +
-                   $"Associated TOP: {top}";
+               Environment.NewLine +
+               $"Database says Associated TOP: {top}. Please update if incorrect.";
+        }
+
+        private static string RemoveSpaceBeforeSnmpRatioSuffix(string? value)
+        {
+            var cleanValue =
+                (value ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(cleanValue))
+                return string.Empty;
+
+            /*
+             * Removes whitespace only when it occurs between a numeric
+             * value and a ratio suffix.
+             *
+             * 1.2 :1     -> 1.2:1
+             * -70.0 dBm  -> -70.0 dBm
+             * 38.4 dB    -> 38.4 dB
+             */
+            return System.Text.RegularExpressions.Regex.Replace(
+                cleanValue,
+                @"(?<=\d)\s+(?=:\s*\d)",
+                string.Empty);
         }
 
         private bool ShowWriteUpPreviewWindow(string finalWriteUpText)

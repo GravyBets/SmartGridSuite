@@ -36,6 +36,28 @@
                       ShadowDepth="2"
                       Opacity="0.36"/>
 
+    <!-- Network diagnostic status -->
+    <SolidColorBrush x:Key="NetworkPingSuccessBg"
+                 Color="#163326"/>
+
+    <SolidColorBrush x:Key="NetworkPingSuccessBorder"
+                 Color="#4ADE80"/>
+
+    <SolidColorBrush x:Key="NetworkPingSuccessText"
+                 Color="#E8FFF2"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureBg"
+                 Color="#3B211F"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureBorder"
+                 Color="#F87171"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureText"
+                 Color="#FFECEC"/>
+
+    <SolidColorBrush x:Key="NetworkPingOutputText"
+                 Color="#F5FBF8"/>
+
     <!-- Surfaces -->
     <SolidColorBrush x:Key="SurfaceBg"
                      Color="#1A2B24"/>

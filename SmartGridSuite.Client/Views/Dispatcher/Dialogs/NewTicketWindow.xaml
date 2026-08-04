@@ -111,7 +111,8 @@
                                         CornerRadius="10"
                                         BorderThickness="1"
                                         BorderBrush="{DynamicResource SurfaceBorder}"
-                                        Background="{DynamicResource CardBackground}">
+                                        Background="{DynamicResource CardBackground}"
+                                        TextElement.Foreground="{DynamicResource TextPrimary}">
 
                                     <Grid>
                                         <Grid.RowDefinitions>
@@ -126,6 +127,7 @@
                                                   Grid.Row="0"
                                                   Content="(Unassigned)"
                                                   FontWeight="SemiBold"
+                                                  Foreground="{DynamicResource TextPrimary}"
                                                   Checked="AssignedToUnassignedCheckBox_Checked"
                                                   Unchecked="AssignedToUnassignedCheckBox_Unchecked"/>
 
@@ -140,6 +142,7 @@
                                             <TextBlock Grid.Column="0"
                                                        Text="Technicians"
                                                        FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextPrimary}"
                                                        VerticalAlignment="Center"/>
 
                                             <Button Grid.Column="1"
@@ -165,7 +168,10 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <CheckBox Content="{Binding Name}"
-                                                                  IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  IsChecked="{Binding IsSelected,
+                                                                                      Mode=TwoWay,
+                                                                                      UpdateSourceTrigger=PropertyChanged}"
+                                                                  Foreground="{DynamicResource TextPrimary}"
                                                                   Margin="0,3"
                                                                   Checked="AssignedTechOption_Changed"
                                                                   Unchecked="AssignedTechOption_Changed"/>

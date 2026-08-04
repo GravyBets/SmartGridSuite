@@ -26,6 +26,28 @@
 
     <!-- Semantic control colors for Bright Blue -->
 
+    <!-- Network diagnostic status -->
+    <SolidColorBrush x:Key="NetworkPingSuccessBg"
+                 Color="#E4F7EC"/>
+
+    <SolidColorBrush x:Key="NetworkPingSuccessBorder"
+                 Color="#2E9E62"/>
+
+    <SolidColorBrush x:Key="NetworkPingSuccessText"
+                 Color="#123D27"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureBg"
+                 Color="#FCE8EA"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureBorder"
+                 Color="#D64B5C"/>
+
+    <SolidColorBrush x:Key="NetworkPingFailureText"
+                 Color="#5A1720"/>
+
+    <SolidColorBrush x:Key="NetworkPingOutputText"
+                 Color="#0F172A"/>
+
     <!-- Control semantic keys -->
     <SolidColorBrush x:Key="ControlInputBg" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="ControlInputText" Color="#0F172A"/>

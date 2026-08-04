@@ -53,6 +53,9 @@
         <Style x:Key="NetworkOutputTextBoxStyle" TargetType="TextBox">
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource NetworkPingOutputText}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource NetworkPingOutputText}"/>
+            <Setter Property="SelectionBrush" Value="{DynamicResource PrimaryBg}"/>
             <Setter Property="Padding" Value="8"/>
             <Setter Property="IsReadOnly" Value="True"/>
             <Setter Property="AcceptsReturn" Value="True"/>
@@ -116,11 +119,11 @@
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-            <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ControlInputText}"/>
+            <Setter Property="Background" Value="{DynamicResource ControlInputBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlInputBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CaretBrush" Value="{DynamicResource TextPrimary}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource ControlInputCaret}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
