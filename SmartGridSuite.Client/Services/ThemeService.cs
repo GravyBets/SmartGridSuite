@@ -202,6 +202,17 @@ namespace SmartGridSuite.Client.Services
         public static AppTheme Current { get; private set; } =
             AppTheme.Light;
 
+        public static bool IsDarkTheme => NormalizeTheme(Current) 
+            switch
+            {
+                AppTheme.Graphite => true,
+                AppTheme.Cobalt => true,
+                AppTheme.Evergreen => true,
+                AppTheme.Ember => true,
+                AppTheme.Kuipers => true,
+                _ => false
+            };
+
         public static Uri CurrentCompanyLogoUri =>
             NormalizeTheme(Current) switch
             {

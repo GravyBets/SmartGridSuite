@@ -256,4 +256,37 @@
         x:Key="Fluent.Ribbon.Brushes.RibbonTabItemSelectedForegroundBrush"
         Color="#F7F9FB"/>
 
+    <!-- Fluent RibbonWindow title bar and caption buttons -->
+    <StaticResource
+        x:Key="Fluent.Ribbon.Brushes.RibbonWindow.TitleBackground"
+        ResourceKey="Fluent.Ribbon.Brushes.RibbonBackgroundBrush"/>
+
+    <StaticResource
+        x:Key="Fluent.Ribbon.Brushes.RibbonWindow.TitleForeground"
+        ResourceKey="TextPrimary"/>
+
+    <StaticResource
+        x:Key="Fluent.Ribbon.Brushes.WindowCommands.CaptionButton.Foreground"
+        ResourceKey="TextPrimary"/>
+
+    <SolidColorBrush
+        x:Key="Fluent.Ribbon.Brushes.WindowCommands.CaptionButton.Background"
+        Color="Transparent"/>
+
+    <StaticResource
+        x:Key="Fluent.Ribbon.Brushes.WindowCommands.CaptionButton.MouseOver.Background"
+        ResourceKey="HoverOverlay"/>
+
+    <StaticResource
+        x:Key="Fluent.Ribbon.Brushes.WindowCommands.CaptionButton.Pressed.Background"
+        ResourceKey="PressedOverlay"/>
+
+    <SolidColorBrush
+        x:Key="Fluent.Ribbon.Brushes.WindowCommands.CloseButton.MouseOver.Background"
+        Color="#E81123"/>
+
+    <SolidColorBrush
+        x:Key="Fluent.Ribbon.Brushes.WindowCommands.CloseButton.Pressed.Background"
+        Color="#A92831"/>
+
 </ResourceDictionary>

@@ -3833,7 +3833,6 @@ namespace SmartGridSuite.Api.Controllers
                 ? footer
                 : cleanWriteUp +
                   Environment.NewLine +
-                  Environment.NewLine +
                   footer;
         }
 

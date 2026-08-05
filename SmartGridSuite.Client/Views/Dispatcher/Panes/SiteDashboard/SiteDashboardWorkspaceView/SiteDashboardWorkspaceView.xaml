@@ -1271,7 +1271,7 @@
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0"
-                                        Text="Find Associated Site by IP"
+                                        Text="Find Associated Site by ANY IP, PMR Serial Number, or RX Serial Number"
                                         Style="{StaticResource WorkspaceSectionHeaderStyle}" />
 
                             <Grid Grid.Row="2">
@@ -1282,12 +1282,13 @@
                                 </Grid.ColumnDefinitions>
 
                                 <TextBox x:Name="RxIpLookupTextBox"
-                                            Grid.Column="0"
-                                            Style="{StaticResource WorkspaceEditorBoxStyle}"
-                                            Height="32"
-                                            Padding="10,0"
-                                            VerticalContentAlignment="Center"
-                                            Tag="Enter IP address" />
+                                         Grid.Column="0"
+                                         Style="{StaticResource WorkspaceEditorBoxStyle}"
+                                         Height="32"
+                                         Padding="10,0"
+                                         VerticalContentAlignment="Center"
+                                         Tag="Enter IP, PMR SN, or RX SN"
+                                         KeyDown="RxIpLookupTextBox_KeyDown" />
 
                                 <Button Grid.Column="2"
                                         Style="{StaticResource PrimaryButtonStyle}"
@@ -1313,7 +1314,7 @@
 
                                     <TextBlock x:Name="RxIpLookupStatusTextBlock"
                                                Grid.Row="0"
-                                               Text="Enter an IP address to look up the associated site."
+                                               Text="Enter an IP address, PMR SN, or RX SN to look up the associated site."
                                                Foreground="{DynamicResource TextSecondary}"
                                                TextWrapping="Wrap" />
 
@@ -1816,7 +1817,7 @@
 
                             <Button x:Name="RefreshSnmpButton"
                                     Grid.Column="4"
-                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
                                     Content="Refresh SNMP Config"
                                     Height="28"
                                     Padding="12,0"
@@ -1946,6 +1947,7 @@
                                                                     <Button Grid.Row="0"
                                                                             Grid.Column="1"
                                                                             Style="{StaticResource MiniIconButton}"
+                                                                            Foreground="{DynamicResource TextSecondary}"
                                                                             FontFamily="Segoe MDL2 Assets"
                                                                             Content="&#xE72C;"
                                                                             Height="22"

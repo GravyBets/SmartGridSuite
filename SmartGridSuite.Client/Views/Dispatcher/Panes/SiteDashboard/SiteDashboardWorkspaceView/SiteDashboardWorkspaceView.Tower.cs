@@ -406,9 +406,25 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             if (endpoint.IpTextBox is null)
                 return;
 
-            endpoint.IpTextBox.BorderBrush = endpoint.DefaultIpBorderBrush;
-            endpoint.IpTextBox.Background = endpoint.DefaultIpBackground;
-            endpoint.IpTextBox.Foreground = endpoint.DefaultIpForeground;
+            /*
+             * Remove the local success/failure brush references so the
+             * TextBox returns to its theme-controlled style.
+             */
+            endpoint.IpTextBox.ClearValue(
+                Control.BackgroundProperty);
+
+            endpoint.IpTextBox.ClearValue(
+                Control.BorderBrushProperty);
+
+            endpoint.IpTextBox.ClearValue(
+                Control.ForegroundProperty);
+
+            endpoint.IpTextBox.ClearValue(
+                TextBox.CaretBrushProperty);
+
+            endpoint.IpTextBox.ClearValue(
+                Control.BorderThicknessProperty);
+
             endpoint.TestSuccessful = null;
         }
 
@@ -417,16 +433,30 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             if (endpoint.IpTextBox is null)
                 return;
 
-            var border = success
-                ? new SolidColorBrush(Color.FromRgb(76, 175, 80))
-                : new SolidColorBrush(Color.FromRgb(244, 67, 54));
+            var resourcePrefix =
+                success
+                    ? "NetworkPingSuccess"
+                    : "NetworkPingFailure";
 
-            var background = success
-                ? new SolidColorBrush(Color.FromRgb(232, 245, 233))
-                : new SolidColorBrush(Color.FromRgb(253, 236, 234));
+            endpoint.IpTextBox.SetResourceReference(
+                Control.BackgroundProperty,
+                $"{resourcePrefix}Bg");
 
-            endpoint.IpTextBox.BorderBrush = border;
-            endpoint.IpTextBox.Background = background;
+            endpoint.IpTextBox.SetResourceReference(
+                Control.BorderBrushProperty,
+                $"{resourcePrefix}Border");
+
+            endpoint.IpTextBox.SetResourceReference(
+                Control.ForegroundProperty,
+                $"{resourcePrefix}Text");
+
+            endpoint.IpTextBox.SetResourceReference(
+                TextBox.CaretBrushProperty,
+                $"{resourcePrefix}Text");
+
+            endpoint.IpTextBox.BorderThickness =
+                new Thickness(1.5);
+
             endpoint.TestSuccessful = success;
         }
 

@@ -46,6 +46,53 @@
             </Style.Triggers>
         </Style>
 
+        <!-- Reused by both task grids for direct Site Number copying. -->
+        <DataTemplate x:Key="FieldTechSiteCopyCellTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="28"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                   Text="{Binding Site}"
+                   Style="{StaticResource FieldTechTrimCellText}"/>
+
+                <Button Grid.Column="1"
+                Width="24"
+                Height="24"
+                Margin="4,0,0,0"
+                Tag="{Binding Site}"
+                ToolTip="Copy site number"
+                Click="CopyGridValue_Click">
+
+                    <Button.Style>
+                        <Style TargetType="Button"
+                       BasedOn="{StaticResource FlatCopyIconButton}">
+                            <Setter Property="Visibility"
+                            Value="Visible"/>
+
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Site}"
+                                     Value="">
+                                    <Setter Property="Visibility"
+                                    Value="Collapsed"/>
+                                </DataTrigger>
+
+                                <DataTrigger Binding="{Binding Site}"
+                                     Value="{x:Null}">
+                                    <Setter Property="Visibility"
+                                    Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+
+                    <TextBlock Style="{StaticResource CopyGlyph}"/>
+                </Button>
+            </Grid>
+        </DataTemplate>
+
         <!-- Reused by both task grids for direct Notification copying. -->
         <DataTemplate x:Key="FieldTechNotificationCopyCellTemplate">
             <Grid>
@@ -526,10 +573,9 @@
                                             Binding="{Binding RouteOrder}"
                                             ElementStyle="{StaticResource FieldTechRouteOrderTextStyle}"/>
 
-                        <DataGridTextColumn Header="Site"
-                                            Width="80"
-                                            Binding="{Binding Site}"
-                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
+                        <DataGridTemplateColumn Header="Site"
+                                                Width="108"
+                                                CellTemplate="{StaticResource FieldTechSiteCopyCellTemplate}"/>
 
                         <DataGridTextColumn Header="Notification Name"
                                             Width="3*"
@@ -632,10 +678,9 @@
                                                 CanUserSort="False"
                                                 CellTemplate="{StaticResource FieldTechExpandRowCellTemplate}"/>
 
-                        <DataGridTextColumn Header="Site"
-                                            Width="105"
-                                            Binding="{Binding Site}"
-                                            ElementStyle="{StaticResource FieldTechTrimCellText}"/>
+                        <DataGridTemplateColumn Header="Site"
+                                                Width="133"
+                                                CellTemplate="{StaticResource FieldTechSiteCopyCellTemplate}"/>
 
                         <DataGridTextColumn Header="Notification Name"
                                             Width="2*"

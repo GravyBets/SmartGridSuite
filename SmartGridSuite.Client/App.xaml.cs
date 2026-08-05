@@ -40,6 +40,12 @@ namespace SmartGridSuite.Client
             // before any application windows are created.
             InterfaceScaleService.Initialize();
 
+            /*
+             * Keep native minimize, maximize, restore, and close controls
+             * readable whenever the application theme changes.
+             */
+            WindowTitleBarThemeService.Initialize();
+
             base.OnStartup(e);
         }
 

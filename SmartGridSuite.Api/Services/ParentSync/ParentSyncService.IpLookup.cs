@@ -545,6 +545,231 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 warning);
         }
 
+        public async Task<AssociatedSiteByIpLookupDto>FindAssociatedSiteBySerialAsync(
+            string serialNumber,
+            CancellationToken cancellationToken = default)
+        {
+            serialNumber =
+                (serialNumber ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(serialNumber))
+            {
+                return new AssociatedSiteByIpLookupDto
+                {
+                    IpAddress = serialNumber,
+                    Found = false
+                };
+            }
+
+            await using var conn =
+                new SqlConnection(_connectionString);
+
+            await conn.OpenAsync(cancellationToken);
+
+            const string sql = """
+        WITH RawMatches AS
+        (
+            -- PMR serial number attached to an AMS / MR site.
+            SELECT
+                a.SiteId,
+                'AMS/MR' AS MatchSource,
+                'PMR SN' AS MatchField,
+                10 AS MatchPriority
+            FROM [sgc_comm].[AMS] a
+            WHERE LTRIM(RTRIM(
+                CONVERT(nvarchar(150), a.iTron_CR_Num))) = @SerialNumber
+
+            UNION ALL
+
+            -- RX serial number is stored as RE.MeterNumber.
+            SELECT
+                r.SiteId,
+                'RX' AS MatchSource,
+                'RX SN' AS MatchField,
+                20 AS MatchPriority
+            FROM [sgc_comm].[RE] r
+            WHERE LTRIM(RTRIM(
+                CONVERT(nvarchar(150), r.MeterNumber))) = @SerialNumber
+        ),
+        CleanMatches AS
+        (
+            SELECT
+                SiteId,
+                MatchSource,
+                MatchField,
+                MatchPriority,
+                ROW_NUMBER() OVER
+                (
+                    PARTITION BY SiteId
+                    ORDER BY MatchPriority
+                ) AS SiteRank
+            FROM RawMatches
+            WHERE SiteId IS NOT NULL
+              AND LTRIM(RTRIM(
+                    ISNULL(SiteId, ''))) <> ''
+        )
+        SELECT
+            SiteId,
+            MatchSource,
+            MatchField
+        FROM CleanMatches
+        WHERE SiteRank = 1
+        ORDER BY MatchPriority, SiteId;
+        """;
+
+            await using var cmd =
+                new SqlCommand(sql, conn);
+
+            cmd.Parameters.Add(
+                new SqlParameter(
+                    "@SerialNumber",
+                    SqlDbType.NVarChar,
+                    150)
+                {
+                    Value = serialNumber
+                });
+
+            await using var reader =
+                await cmd.ExecuteReaderAsync(
+                    cancellationToken);
+
+            var matches =
+                new List<AssociatedSiteByIpMatchDto>();
+
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var siteId =
+                    GetString(reader, "SiteId") ?? "";
+
+                var matchSource =
+                    GetString(reader, "MatchSource") ?? "";
+
+                var matchField =
+                    GetString(reader, "MatchField") ?? "";
+
+                if (string.IsNullOrWhiteSpace(siteId))
+                    continue;
+
+                matches.Add(
+                    new AssociatedSiteByIpMatchDto
+                    {
+                        SiteId = siteId,
+
+                        DashboardKind =
+                            string.Equals(
+                                matchSource,
+                                "AMS/MR",
+                                StringComparison.OrdinalIgnoreCase)
+                                ? SiteDashboardKinds.AmsMr
+                                : "RX",
+
+                        MatchSource = matchSource,
+                        MatchField = matchField
+                    });
+            }
+
+            // IpAddress remains populated for backward compatibility with
+            // the existing lookup response contract.
+            return BuildAssociatedSiteByIpLookupResult(
+                serialNumber,
+                matches,
+                isCached: false,
+                warning: "");
+        }
+
+        public async Task<AssociatedSiteByIpLookupDto>FindAssociatedSiteBySerialFromCacheAsync(
+                string serialNumber,
+                CancellationToken cancellationToken = default)
+        {
+            serialNumber =
+                (serialNumber ?? string.Empty).Trim();
+
+            const string warning =
+                "The parent database lookup was unavailable. " +
+                "Results are from cached SmartGridSuite site data.";
+
+            if (string.IsNullOrWhiteSpace(serialNumber))
+            {
+                return new AssociatedSiteByIpLookupDto
+                {
+                    IpAddress = serialNumber,
+                    Found = false,
+                    IsCached = true,
+                    Warning = warning
+                };
+            }
+
+            var candidates =
+                new List<(
+                    AssociatedSiteByIpMatchDto Match,
+                    int Priority)>();
+
+            var pmrRows =
+                await _appDb.CacheSitePmr
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.IsActive &&
+                        x.SecondaryCommsIdentifier ==
+                            serialNumber)
+                    .ToListAsync(cancellationToken);
+
+            foreach (var row in pmrRows)
+            {
+                AddAssociatedIpCandidate(
+                    candidates,
+                    row.SecondaryCommsIdentifier,
+                    serialNumber,
+                    row.SiteId,
+                    SiteDashboardKinds.AmsMr,
+                    "AMS/MR",
+                    "PMR SN",
+                    10);
+            }
+
+            var rxRows =
+                await _appDb.CacheSiteRx
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.IsActive &&
+                        x.MeterNumber == serialNumber)
+                    .ToListAsync(cancellationToken);
+
+            foreach (var row in rxRows)
+            {
+                AddAssociatedIpCandidate(
+                    candidates,
+                    row.MeterNumber,
+                    serialNumber,
+                    row.SiteId,
+                    "RX",
+                    "RX",
+                    "RX SN",
+                    20);
+            }
+
+            var matches =
+                candidates
+                    .GroupBy(
+                        x => x.Match.SiteId,
+                        StringComparer.OrdinalIgnoreCase)
+                    .Select(group =>
+                        group
+                            .OrderBy(x => x.Priority)
+                            .First())
+                    .OrderBy(x => x.Priority)
+                    .ThenBy(
+                        x => x.Match.SiteId,
+                        StringComparer.OrdinalIgnoreCase)
+                    .Select(x => x.Match)
+                    .ToList();
+
+            return BuildAssociatedSiteByIpLookupResult(
+                serialNumber,
+                matches,
+                isCached: true,
+                warning);
+        }
+
         private static void AddAssociatedIpCandidate(ICollection<(AssociatedSiteByIpMatchDto Match, int Priority)> 
             candidates,
             string? cachedIp,

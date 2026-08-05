@@ -2,6 +2,8 @@
 using SmartGridSuite.Api.Services.ParentSync;
 using SmartGridSuite.Api.Services.ParentSync.Models;
 using SmartGridSuite.Contracts.SiteDashboard;
+using System.Net;
+using System.Net.Sockets;
 
 namespace SmartGridSuite.Api.Services.SiteDashboard
 {
@@ -133,6 +135,74 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
             };
         }
 
+        public async Task<AssociatedSiteByIpLookupDto>FindAssociatedSiteAsync(
+            string query,
+            CancellationToken cancellationToken = default)
+        {
+            query = (query ?? string.Empty).Trim();
+
+            var isIpv4 =
+                query.Split('.').Length == 4 &&
+                IPAddress.TryParse(
+                    query,
+                    out var parsedAddress) &&
+                parsedAddress.AddressFamily ==
+                    AddressFamily.InterNetwork;
+
+            if (isIpv4)
+            {
+                return await FindAssociatedSiteByIpAsync(
+                    query,
+                    cancellationToken);
+            }
+
+            using var liveLookupCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken);
+
+            liveLookupCancellation.CancelAfter(
+                LiveLookupTimeout);
+
+            try
+            {
+                return await _parentSyncService
+                    .FindAssociatedSiteBySerialAsync(
+                        query,
+                        liveLookupCancellation.Token);
+            }
+            catch (OperationCanceledException ex)
+                when (!cancellationToken.IsCancellationRequested &&
+                      liveLookupCancellation.IsCancellationRequested)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Parent database serial lookup timed out after " +
+                    "{TimeoutSeconds} seconds for {SearchValue}. " +
+                    "Attempting cached site lookup.",
+                    LiveLookupTimeout.TotalSeconds,
+                    query);
+
+                return await _parentSyncService
+                    .FindAssociatedSiteBySerialFromCacheAsync(
+                        query,
+                        cancellationToken);
+            }
+            catch (SqlException ex)
+                when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Parent database serial lookup failed for " +
+                    "{SearchValue}. Attempting cached site lookup.",
+                    query);
+
+                return await _parentSyncService
+                    .FindAssociatedSiteBySerialFromCacheAsync(
+                        query,
+                        cancellationToken);
+            }
+        }
+
         public async Task<AssociatedSiteByIpLookupDto> FindAssociatedSiteByIpAsync(
         string ip,
         CancellationToken cancellationToken = default)
@@ -184,14 +254,22 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
             }
         }
 
-        public async Task<SiteDashboardLookupResult> GetTowerAsync(int topNameId, CancellationToken cancellationToken = default)
+        public async Task<SiteDashboardLookupResult> GetTowerAsync(
+            int topNameId,
+            CancellationToken cancellationToken = default)
         {
+            using var liveLookupCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken);
+
+            liveLookupCancellation.CancelAfter(LiveLookupTimeout);
+
             try
             {
                 var liveDashboard =
                     await _parentSyncService.GetTowerDashboardAsync(
                         topNameId,
-                        cancellationToken);
+                        liveLookupCancellation.Token);
 
                 if (liveDashboard is null)
                 {
@@ -207,6 +285,22 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                     Dashboard = liveDashboard
                 };
             }
+            catch (OperationCanceledException ex)
+                when (!cancellationToken.IsCancellationRequested &&
+                      liveLookupCancellation.IsCancellationRequested)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Parent database tower lookup timed out after " +
+                    "{TimeoutSeconds} seconds for tower {TopNameId}. " +
+                    "Attempting to use cached tower information.",
+                    LiveLookupTimeout.TotalSeconds,
+                    topNameId);
+
+                return await GetCachedTowerAsync(
+                    topNameId,
+                    cancellationToken);
+            }
             catch (SqlException ex)
                 when (!cancellationToken.IsCancellationRequested)
             {
@@ -216,44 +310,79 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                     "Attempting to use cached tower information.",
                     topNameId);
 
-                var cachedDashboard =
-                    await _cacheService.GetTowerDashboardAsync(
-                        topNameId,
-                        cancellationToken);
-
-                if (cachedDashboard is not null)
-                {
-                    return new SiteDashboardLookupResult
-                    {
-                        State = SiteDashboardLookupState.Cached,
-                        Dashboard = cachedDashboard
-                    };
-                }
-
-                return new SiteDashboardLookupResult
-                {
-                    State =
-                        SiteDashboardLookupState
-                            .ParentDatabaseUnavailable
-                };
+                return await GetCachedTowerAsync(
+                    topNameId,
+                    cancellationToken);
             }
         }
 
-        public async Task<TowerSearchLookupResult> SearchTowersAsync(string term, int take = 25, CancellationToken cancellationToken = default)
+        private async Task<SiteDashboardLookupResult> GetCachedTowerAsync(
+            int topNameId,
+            CancellationToken cancellationToken)
         {
+            var cachedDashboard =
+                await _cacheService.GetTowerDashboardAsync(
+                    topNameId,
+                    cancellationToken);
+
+            if (cachedDashboard is not null)
+            {
+                return new SiteDashboardLookupResult
+                {
+                    State = SiteDashboardLookupState.Cached,
+                    Dashboard = cachedDashboard
+                };
+            }
+
+            return new SiteDashboardLookupResult
+            {
+                State =
+                    SiteDashboardLookupState
+                        .ParentDatabaseUnavailable
+            };
+        }
+
+        public async Task<TowerSearchLookupResult> SearchTowersAsync(
+            string term,
+            int take = 25,
+            CancellationToken cancellationToken = default)
+        {
+            using var liveLookupCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken);
+
+            liveLookupCancellation.CancelAfter(LiveLookupTimeout);
+
             try
             {
                 var liveRows =
                     await _parentSyncService.SearchTowersAsync(
                         term,
                         take,
-                        cancellationToken);
+                        liveLookupCancellation.Token);
 
                 return new TowerSearchLookupResult
                 {
                     State = SiteDashboardLookupState.Live,
                     Rows = liveRows
                 };
+            }
+            catch (OperationCanceledException ex)
+                when (!cancellationToken.IsCancellationRequested &&
+                      liveLookupCancellation.IsCancellationRequested)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Parent database tower search timed out after " +
+                    "{TimeoutSeconds} seconds for {SearchTerm}. " +
+                    "Attempting to use cached tower information.",
+                    LiveLookupTimeout.TotalSeconds,
+                    term);
+
+                return await SearchCachedTowersAsync(
+                    term,
+                    take,
+                    cancellationToken);
             }
             catch (SqlException ex)
                 when (!cancellationToken.IsCancellationRequested)
@@ -264,18 +393,29 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                     "Attempting to use cached tower information.",
                     term);
 
-                var cachedRows =
-                    await _cacheService.SearchTowersAsync(
-                        term,
-                        take,
-                        cancellationToken);
-
-                return new TowerSearchLookupResult
-                {
-                    State = SiteDashboardLookupState.Cached,
-                    Rows = cachedRows
-                };
+                return await SearchCachedTowersAsync(
+                    term,
+                    take,
+                    cancellationToken);
             }
+        }
+
+        private async Task<TowerSearchLookupResult> SearchCachedTowersAsync(
+            string term,
+            int take,
+            CancellationToken cancellationToken)
+        {
+            var cachedRows =
+                await _cacheService.SearchTowersAsync(
+                    term,
+                    take,
+                    cancellationToken);
+
+            return new TowerSearchLookupResult
+            {
+                State = SiteDashboardLookupState.Cached,
+                Rows = cachedRows
+            };
         }
     }
 }

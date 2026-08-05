@@ -12,7 +12,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 TopBarView.StatusText = $"Looking up associated site for {ip}...";
 
                 var result = await _api.GetAsync<AssociatedSiteByIpLookupDto>(
-                    $"api/site-dashboard/associated-site-by-ip?ip={Uri.EscapeDataString(ip)}",
+                    $"api/site-dashboard/associated-site-search?query={Uri.EscapeDataString(ip)}",
                     CancellationToken.None);
 
                 if (result is null || !result.Found)
@@ -83,7 +83,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     Array.Empty<SiteDashboardWorkspaceView.RxAssociatedSiteLookupResult>(),
                     $"Lookup failed: {ex.Message}");
 
-                TopBarView.StatusText = $"RX IP lookup failed: {ex.Message}";
+                TopBarView.StatusText = $"RX lookup failed: {ex.Message}";
             }
         }
 

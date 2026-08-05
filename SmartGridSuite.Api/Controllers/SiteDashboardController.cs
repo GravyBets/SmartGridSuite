@@ -140,6 +140,32 @@ namespace SmartGridSuite.Api.Controllers
             }
         }
 
+        // General RX/PMR lookup by IP address, PMR serial number,
+        // or RX serial number.
+        [HttpGet("associated-site-search")]
+        public async Task<ActionResult<AssociatedSiteByIpLookupDto>>SearchAssociatedSite(
+                [FromQuery] string query,
+                CancellationToken cancellationToken = default)
+        {
+            var normalizedQuery =
+                NormalizeRequiredText(query);
+
+            if (normalizedQuery is null)
+            {
+                return BadRequest(
+                    "Enter an IP address, PMR serial number, " +
+                    "or RX serial number.");
+            }
+
+            var result =
+                await _siteDashboardLookupService
+                    .FindAssociatedSiteAsync(
+                        normalizedQuery,
+                        cancellationToken);
+
+            return Ok(result);
+        }
+
         //IP Look Up
         [HttpGet("associated-site-by-ip")]
         public async Task<ActionResult<AssociatedSiteByIpLookupDto>> GetAssociatedSiteByIp(

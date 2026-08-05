@@ -96,20 +96,28 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
         }
 
+        private void RxIpLookupTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key != System.Windows.Input.Key.Enter)
+                return;
+
+            e.Handled = true;
+
+            SearchRxIpButton_Click(
+                sender,
+                e);
+        }
+
         private void SearchRxIpButton_Click(object sender, RoutedEventArgs e)
         {
-            var ip = (RxIpLookupTextBox.Text ?? string.Empty).Trim();
+            var query =
+                (RxIpLookupTextBox.Text ?? string.Empty).Trim();
 
-            if (string.IsNullOrWhiteSpace(ip))
+            if (string.IsNullOrWhiteSpace(query))
             {
-                RxIpLookupStatusTextBlock.Text = "Enter an IP address first.";
-                ClearRxAssociatedSiteResults();
-                return;
-            }
+                RxIpLookupStatusTextBlock.Text =
+                    "Enter an IP address, PMR serial number, or RX serial number.";
 
-            if (!IpRegex.IsMatch(ip))
-            {
-                RxIpLookupStatusTextBlock.Text = "Enter a valid IPv4 address.";
                 ClearRxAssociatedSiteResults();
                 return;
             }
@@ -117,7 +125,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             RxIpLookupStatusTextBlock.Text = "Searching...";
             ClearRxAssociatedSiteResults();
 
-            RxIpLookupRequested?.Invoke(this, ip);
+            RxIpLookupRequested?.Invoke(this, query);
         }
 
         private void ClearRxAssociatedSiteResults()
@@ -167,7 +175,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 _rxAssociatedSiteId = string.Empty;
 
                 RxIpLookupStatusTextBlock.Text = string.IsNullOrWhiteSpace(message)
-                    ? "No associated site found for that IP."
+                    ? "No associated site found for that search value."
                     : message.Trim();
 
                 return;
