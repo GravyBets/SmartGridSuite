@@ -167,6 +167,37 @@ namespace SmartGridSuite.Client.Services
             return res?.Id ?? 0;
         }
 
+        public async Task<DispatchCloseoutChecklistItemDto?> UpdateDispatchCloseoutChecklistItemAsync(
+            long ticketId,
+            long itemId,
+            bool isCompleted,
+            string updatedBy,
+            CancellationToken ct = default)
+        {
+            if (ticketId <= 0 || itemId <= 0)
+                return null;
+
+            var request =
+                new UpdateDispatchCloseoutChecklistItemRequest
+                {
+                    IsCompleted =
+                        isCompleted,
+
+                    UpdatedBy =
+                        string.IsNullOrWhiteSpace(updatedBy)
+                            ? "Dispatcher"
+                            : updatedBy.Trim()
+                };
+
+            return await _api.PutAsync<
+                UpdateDispatchCloseoutChecklistItemRequest,
+                DispatchCloseoutChecklistItemDto>(
+                    $"api/tickets/{ticketId}/" +
+                    $"dispatch-closeout-items/{itemId}",
+                    request,
+                    ct);
+        }
+
         // Request Capital
         public async Task RequestCapitalAsync(long id, string reason, string requestedBy = "Unknown", CancellationToken ct = default)
         {
@@ -242,8 +273,17 @@ namespace SmartGridSuite.Client.Services
 
         // Submits one confirmed write-up using a client-generated idempotency key so
         // retrying an uncertain request cannot create duplicate History records.
-        public async Task SubmitWriteUpAsync(long ticketId, Guid clientSubmissionId, string finalWriteUpText,
-            string siteHistoryWriteUpText, string submittedBy = "Unknown", CancellationToken ct = default)
+        public async Task SubmitWriteUpAsync(
+            long ticketId,
+            Guid clientSubmissionId,
+            string finalWriteUpText,
+            string siteHistoryWriteUpText,
+            string submittedBy = "Unknown",
+            IReadOnlyCollection<uint>? writeUpFlagIds = null,
+            IReadOnlyCollection<uint>? referToOptionIds = null,
+            bool equipmentWasSwapped = false,
+            bool ipAddressWasChanged = false,
+            CancellationToken ct = default)
         {
             if (clientSubmissionId == Guid.Empty)
             {
@@ -261,7 +301,20 @@ namespace SmartGridSuite.Client.Services
                         ClientSubmissionId = clientSubmissionId,
                         FinalWriteUpText = finalWriteUpText ?? string.Empty,
                         SiteHistoryWriteUpText = siteHistoryWriteUpText ?? string.Empty,
-                        SubmittedBy = submittedBy ?? "Unknown"
+                        SubmittedBy = submittedBy ?? "Unknown",
+
+                        WriteUpFlagIds =
+                            new List<uint>(
+                                writeUpFlagIds ??
+                                Array.Empty<uint>()),
+
+                        ReferToOptionIds =
+                            new List<uint>(
+                                referToOptionIds ??
+                                Array.Empty<uint>()),
+
+                        EquipmentWasSwapped = equipmentWasSwapped,
+                        IpAddressWasChanged = ipAddressWasChanged
                     },
                     ct);
         }

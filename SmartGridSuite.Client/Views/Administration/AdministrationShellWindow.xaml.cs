@@ -2,6 +2,7 @@
 using SmartGridSuite.Client.Views.Administration.GeneralSettings;
 using SmartGridSuite.Client.Views.Administration.SNMP;
 using SmartGridSuite.Client.Views.Administration.Tickets;
+using SmartGridSuite.Client.Views.Administration.WriteUpWorkflow;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -17,8 +18,9 @@ namespace SmartGridSuite.Client.Views.Administration
         private readonly TrucksAdminView _trucksView;
         private readonly TicketsAdminView _ticketsView;
         private readonly GeneralSettingsAdminView _generalSettingsView;
+        private readonly WriteUpWorkflowAdminView _writeUpWorkflowView;
         private readonly SnmpAdminView _snmpView;
-        
+
         private bool _navCollapsed;
         private bool _syncingNav;
         private int _currentNavIndex;
@@ -37,6 +39,7 @@ namespace SmartGridSuite.Client.Views.Administration
             _trucksView = new TrucksAdminView(_api);
             _ticketsView = new TicketsAdminView(_api);
             _generalSettingsView = new GeneralSettingsAdminView(_api);
+            _writeUpWorkflowView = new WriteUpWorkflowAdminView(_api);
             _snmpView = new SnmpAdminView(_api);
 
             _navCollapsed = true;
@@ -149,6 +152,10 @@ namespace SmartGridSuite.Client.Views.Administration
 
                 case "Tickets":
                     ShowView(_ticketsView);
+                    break;
+
+                case "WriteUpWorkflow":
+                    ShowView(_writeUpWorkflowView);
                     break;
 
                 case "GeneralSettings":

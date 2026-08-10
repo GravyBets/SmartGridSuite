@@ -5,11 +5,12 @@ using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Api.Services;
 using SmartGridSuite.Contracts.Dispatcher;
 using SmartGridSuite.Contracts.FieldTechnician;
+using SmartGridSuite.Contracts.Settings;
 using SmartGridSuite.Contracts.SiteDashboard;
 using SmartGridSuite.Contracts.Tickets;
-using System.Text.RegularExpressions;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SmartGridSuite.Api.Controllers
 {
@@ -491,8 +492,242 @@ namespace SmartGridSuite.Api.Controllers
                 .ToListAsync(ct);
 
             var items = rows
-                .Select(MapToDispatchTaskQueryItem)
+                 .Select(MapToDispatchTaskQueryItem)
+                 .ToList();
+
+            /*
+             * Attach metadata from each ticket's latest non-deleted write-up
+             * submission. This is deliberately batched for the current page so
+             * the client does not issue a separate request for every task.
+             */
+            var ticketIds = items
+                .Select(x => x.TicketId)
+                .Where(x => x > 0)
+                .Distinct()
                 .ToList();
+
+            if (ticketIds.Count > 0)
+            {
+                var submissionCandidates =
+                    await _db.TicketWriteUpSubmissions
+                        .AsNoTracking()
+                        .Where(x =>
+                            ticketIds.Contains(x.TicketId) &&
+                            !x.IsDeleted)
+                        .OrderByDescending(x => x.SubmittedAt)
+                        .ThenByDescending(x => x.Id)
+                        .Select(x => new
+                        {
+                            x.Id,
+                            x.TicketId,
+                            x.SubmittedAt,
+                            x.SubmittedByName,
+                            x.SubmittedNarrative
+                        })
+                        .ToListAsync(ct);
+
+                var latestSubmissionByTicket =
+                    submissionCandidates
+                        .GroupBy(x => x.TicketId)
+                        .ToDictionary(
+                            group => group.Key,
+                            group => group.First());
+
+                var latestSubmissionIds =
+                    latestSubmissionByTicket
+                        .Values
+                        .Select(x => x.Id)
+                        .Distinct()
+                        .ToList();
+
+                if (latestSubmissionIds.Count > 0)
+                {
+                    var submittedFlags =
+                        await _db.TicketWriteUpSubmissionFlags
+                            .AsNoTracking()
+                            .Where(x =>
+                                latestSubmissionIds.Contains(
+                                    x.SubmissionId))
+                            .OrderBy(x => x.WriteUpFlagId)
+                            .Select(x => new
+                            {
+                                x.SubmissionId,
+                                x.DisplayNameSnapshot,
+                                x.AutomaticReason
+                            })
+                            .ToListAsync(ct);
+
+                    var submittedReferToOptions =
+                        await _db
+                            .TicketWriteUpSubmissionReferToOptions
+                            .AsNoTracking()
+                            .Where(x =>
+                                latestSubmissionIds.Contains(
+                                    x.SubmissionId))
+                            .OrderBy(x => x.ReferToOptionId)
+                            .Select(x => new
+                            {
+                                x.SubmissionId,
+                                x.DisplayNameSnapshot
+                            })
+                            .ToListAsync(ct);
+
+                    var submittedCloseoutItems =
+                        await _db
+                            .TicketWriteUpSubmissionCloseoutItems
+                            .AsNoTracking()
+                            .Where(x =>
+                                latestSubmissionIds.Contains(
+                                    x.SubmissionId))
+                            .OrderBy(x => x.SortOrderSnapshot)
+                            .ThenBy(x => x.DisplayNameSnapshot)
+                            .ThenBy(x => x.Id)
+                            .Select(x =>
+                                new DispatchCloseoutChecklistItemDto
+                                {
+                                    Id = x.Id,
+
+                                    SubmissionId =
+                                        x.SubmissionId,
+
+                                    DefinitionId =
+                                        x.DefinitionId,
+
+                                    DisplayName =
+                                        x.DisplayNameSnapshot,
+
+                                    SortOrder =
+                                        x.SortOrderSnapshot,
+
+                                    IsRequired =
+                                        x.IsRequired,
+
+                                    ConditionType =
+                                        x.ConditionTypeSnapshot,
+
+                                    WriteUpFlagId =
+                                        x.WriteUpFlagId,
+
+                                    ReferToOptionId =
+                                        x.ReferToOptionId,
+
+                                    IsCompleted =
+                                        x.IsCompleted,
+
+                                    CompletedBy =
+                                        x.CompletedBy ?? "",
+
+                                    CompletedAt =
+                                        x.CompletedAt
+                                })
+                            .ToListAsync(ct);
+
+                    var flagsBySubmission =
+                        submittedFlags
+                            .GroupBy(x => x.SubmissionId)
+                            .ToDictionary(
+                                group => group.Key,
+                                group => group
+                                    .Select(x =>
+                                        string.IsNullOrWhiteSpace(
+                                            x.AutomaticReason)
+                                            ? x.DisplayNameSnapshot
+                                            : $"{x.DisplayNameSnapshot} " +
+                                              $"({x.AutomaticReason})")
+                                    .Where(x =>
+                                        !string.IsNullOrWhiteSpace(x))
+                                    .Distinct(
+                                        StringComparer.OrdinalIgnoreCase)
+                                    .ToList());
+
+                    var referToBySubmission =
+                        submittedReferToOptions
+                            .GroupBy(x => x.SubmissionId)
+                            .ToDictionary(
+                                group => group.Key,
+                                group => group
+                                    .Select(x =>
+                                        x.DisplayNameSnapshot)
+                                    .Where(x =>
+                                        !string.IsNullOrWhiteSpace(x))
+                                    .Distinct(
+                                        StringComparer.OrdinalIgnoreCase)
+                                    .ToList());
+
+                    var closeoutItemsBySubmission =
+                        submittedCloseoutItems
+                            .GroupBy(x => x.SubmissionId)
+                            .ToDictionary(
+                                group => group.Key,
+                                group => group
+                                    .OrderBy(x => x.SortOrder)
+                                    .ThenBy(x => x.DisplayName)
+                                    .ThenBy(x => x.Id)
+                                    .ToList());
+
+                    foreach (var item in items)
+                    {
+                        if (!latestSubmissionByTicket.TryGetValue(
+                                item.TicketId,
+                                out var submission))
+                        {
+                            continue;
+                        }
+
+                        item.SubmissionId =
+                            submission.Id;
+
+                        item.SubmittedAt =
+                            submission.SubmittedAt;
+
+                        item.SubmittedByName =
+                            submission.SubmittedByName ?? "";
+
+                        item.SubmittedWriteUp =
+                            submission.SubmittedNarrative ?? "";
+
+                        if (flagsBySubmission.TryGetValue(
+                                submission.Id,
+                                out var flags))
+                        {
+                            item.WriteUpFlags = flags;
+                        }
+
+                        if (referToBySubmission.TryGetValue(
+                                submission.Id,
+                                out var referToOptions))
+                        {
+                            item.ReferToOptions =
+                                referToOptions;
+                        }
+
+                        if (closeoutItemsBySubmission.TryGetValue(
+                                submission.Id,
+                                out var closeoutItems))
+                        {
+                            item.CloseoutChecklistItems =
+                                closeoutItems;
+
+                            item.RequiredChecklistRemaining =
+                                closeoutItems.Count(x =>
+                                    x.IsRequired &&
+                                    !x.IsCompleted);
+
+                            item.CanMarkClosed =
+                                item.RequiredChecklistRemaining == 0;
+                        }
+                        else
+                        {
+                            item.CloseoutChecklistItems =
+                                new List<
+                                    DispatchCloseoutChecklistItemDto>();
+
+                            item.RequiredChecklistRemaining = 0;
+                            item.CanMarkClosed = true;
+                        }
+                    }
+                }
+            }
 
             return Ok(new DispatchTaskQueryResponse
             {
@@ -1347,6 +1582,100 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(new UpdateTicketResponse(entity.Id));
         }
 
+        [HttpPut("{ticketId:long}/dispatch-closeout-items/{itemId:long}")]
+        public async Task<ActionResult<DispatchCloseoutChecklistItemDto>>UpdateDispatchCloseoutChecklistItem(
+            long ticketId,
+            long itemId,
+            [FromBody]
+            UpdateDispatchCloseoutChecklistItemRequest req,
+            CancellationToken ct)
+        {
+            var ticketExists =
+                await _db.Tickets
+                    .AsNoTracking()
+                    .AnyAsync(
+                        x => x.Id == ticketId,
+                        ct);
+
+            if (!ticketExists)
+                return NotFound("Ticket was not found.");
+
+            var latestSubmissionId =
+                await _db.TicketWriteUpSubmissions
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.TicketId == ticketId &&
+                        !x.IsDeleted)
+                    .OrderByDescending(x => x.SubmittedAt)
+                    .ThenByDescending(x => x.Id)
+                    .Select(x => (long?)x.Id)
+                    .FirstOrDefaultAsync(ct);
+
+            if (!latestSubmissionId.HasValue)
+            {
+                return BadRequest(
+                    "This ticket does not have an active submitted write-up.");
+            }
+
+            var item =
+                await _db.TicketWriteUpSubmissionCloseoutItems
+                    .FirstOrDefaultAsync(
+                        x =>
+                            x.Id == itemId &&
+                            x.SubmissionId ==
+                                latestSubmissionId.Value,
+                        ct);
+
+            if (item is null)
+            {
+                return NotFound(
+                    "The checklist item was not found for the " +
+                    "latest submitted write-up.");
+            }
+
+            var updatedBy =
+                TrimForColumn(
+                    string.IsNullOrWhiteSpace(req.UpdatedBy)
+                        ? "Dispatcher"
+                        : req.UpdatedBy.Trim(),
+                    150)
+                ?? "Dispatcher";
+
+            if (req.IsCompleted)
+            {
+                item.IsCompleted = true;
+                item.CompletedBy = updatedBy;
+                item.CompletedAt = DateTime.Now;
+            }
+            else
+            {
+                item.IsCompleted = false;
+                item.CompletedBy = null;
+                item.CompletedAt = null;
+            }
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(
+                new DispatchCloseoutChecklistItemDto
+                {
+                    Id = item.Id,
+                    SubmissionId = item.SubmissionId,
+                    DefinitionId = item.DefinitionId,
+                    DisplayName = item.DisplayNameSnapshot,
+                    SortOrder = item.SortOrderSnapshot,
+                    IsRequired = item.IsRequired,
+                    ConditionType =
+                        item.ConditionTypeSnapshot,
+                    WriteUpFlagId = item.WriteUpFlagId,
+                    ReferToOptionId = item.ReferToOptionId,
+                    IsCompleted = item.IsCompleted,
+                    CompletedBy =
+                        item.CompletedBy ?? "",
+                    CompletedAt = item.CompletedAt
+                });
+        }
+
         [HttpPost("{id:long}/close-dispatch-task")]
         public async Task<ActionResult<UpdateTicketResponse>> CloseDispatchTask(long id, CancellationToken ct)
         {
@@ -1356,8 +1685,46 @@ namespace SmartGridSuite.Api.Controllers
             if (entity == null)
                 return NotFound();
 
+            var latestSubmissionId =
+                await _db.TicketWriteUpSubmissions
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.TicketId == id &&
+                        !x.IsDeleted)
+                    .OrderByDescending(x => x.SubmittedAt)
+                    .ThenByDescending(x => x.Id)
+                    .Select(x => (long?)x.Id)
+                    .FirstOrDefaultAsync(ct);
+
+            if (latestSubmissionId.HasValue)
+            {
+                var incompleteRequiredItems =
+                    await _db
+                        .TicketWriteUpSubmissionCloseoutItems
+                        .AsNoTracking()
+                        .Where(x =>
+                            x.SubmissionId ==
+                                latestSubmissionId.Value &&
+                            x.IsRequired &&
+                            !x.IsCompleted)
+                        .OrderBy(x => x.SortOrderSnapshot)
+                        .ThenBy(x => x.DisplayNameSnapshot)
+                        .Select(x => x.DisplayNameSnapshot)
+                        .ToListAsync(ct);
+
+                if (incompleteRequiredItems.Count > 0)
+                {
+                    return BadRequest(
+                        "Complete all required Dispatch closeout " +
+                        "checklist items before closing this ticket: " +
+                        string.Join(
+                            ", ",
+                            incompleteRequiredItems));
+                }
+            }
+
             var closedStatuses = await _db.TicketStatuses
-                .AsNoTracking()
+                 .AsNoTracking()
                 .Where(x => x.IsActive && x.IsClosed)
                 .OrderBy(x => x.SortOrder)
                 .ThenBy(x => x.Name)
@@ -2813,8 +3180,124 @@ namespace SmartGridSuite.Api.Controllers
                 ? finalWriteUp
                 : req.SiteHistoryWriteUpText.Trim();
 
+            /*
+             * Write-up flags and Refer To selections are structured metadata.
+             * They are intentionally not appended to either write-up narrative.
+             */
+            var requestedWriteUpFlagIds =
+                (req.WriteUpFlagIds ?? new List<uint>())
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            var selectedWriteUpFlags =
+                new List<WriteUpFlagEntity>();
+
+            string? automaticDbCorrectionReason = null;
+
+            if (requestedWriteUpFlagIds.Count > 0)
+            {
+                selectedWriteUpFlags = await _db.WriteUpFlags
+                    .AsNoTracking()
+                    .Where(x =>
+                        requestedWriteUpFlagIds.Contains(x.Id) &&
+                        x.IsActive &&
+                        x.IsTechnicianVisible)
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.DisplayName)
+                    .ToListAsync(ct);
+
+                if (selectedWriteUpFlags.Count != requestedWriteUpFlagIds.Count)
+                {
+                    return BadRequest(
+                        "One or more selected write-up flags are inactive, hidden, or no longer available.");
+                }
+            }
+
+            /*
+             * DB Correction Needed may be selected manually, added automatically,
+             * or both. Automatic detection takes precedence for source and reason.
+             */
+            var automaticDbCorrectionReasons =
+                new List<string>();
+
+            if (req.EquipmentWasSwapped)
+            {
+                automaticDbCorrectionReasons.Add(
+                    "Equipment Swapped");
+            }
+
+            if (req.IpAddressWasChanged)
+            {
+                automaticDbCorrectionReasons.Add(
+                    "IP Address Changed");
+            }
+
+            automaticDbCorrectionReason =
+                automaticDbCorrectionReasons.Count > 0
+                    ? string.Join(
+                        "; ",
+                        automaticDbCorrectionReasons)
+                    : null;
+
+            if (!string.IsNullOrWhiteSpace(
+                    automaticDbCorrectionReason))
+            {
+                var automaticDbCorrectionFlag =
+                    await _db.WriteUpFlags
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(
+                            x =>
+                                x.IsActive &&
+                                x.IsSystem &&
+                                x.SystemKey ==
+                                    "DB_CORRECTION_NEEDED",
+                            ct);
+
+                if (automaticDbCorrectionFlag is not null &&
+                    selectedWriteUpFlags.All(
+                        x => x.Id != automaticDbCorrectionFlag.Id))
+                {
+                    selectedWriteUpFlags.Add(
+                        automaticDbCorrectionFlag);
+                }
+
+                selectedWriteUpFlags =
+                    selectedWriteUpFlags
+                        .OrderBy(x => x.SortOrder)
+                        .ThenBy(x => x.DisplayName)
+                        .ToList();
+            }
+
+            var requestedReferToOptionIds =
+                (req.ReferToOptionIds ?? new List<uint>())
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            var selectedReferToOptions =
+                new List<ReferToOptionEntity>();
+
+            if (requestedReferToOptionIds.Count > 0)
+            {
+                selectedReferToOptions = await _db.ReferToOptions
+                    .AsNoTracking()
+                    .Where(x =>
+                        requestedReferToOptionIds.Contains(x.Id) &&
+                        x.IsActive)
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.DisplayName)
+                    .ToListAsync(ct);
+
+                if (selectedReferToOptions.Count != requestedReferToOptionIds.Count)
+                {
+                    return BadRequest(
+                        "One or more selected Refer To destinations are inactive or no longer available.");
+                }
+            }
+
             var writeUpSubmitStatus = await _db.TicketStatuses
-                .AsNoTracking()
+                            .AsNoTracking()
                 .FirstOrDefaultAsync(
                     x => x.IsActive && x.IsWriteUpSubmitTarget,
                     ct);
@@ -2870,6 +3353,9 @@ namespace SmartGridSuite.Api.Controllers
                     submittedWork,
                     clientSubmissionId,
                     submittedAt,
+                    selectedWriteUpFlags,
+                    selectedReferToOptions,
+                    automaticDbCorrectionReason,
                     ct);
 
                 await _db.SaveChangesAsync(ct);
@@ -2931,6 +3417,9 @@ namespace SmartGridSuite.Api.Controllers
             SubmittedWorkInfo submittedWork,
             Guid clientSubmissionId,
             DateTime submittedAt,
+            IReadOnlyCollection<WriteUpFlagEntity> selectedWriteUpFlags,
+            IReadOnlyCollection<ReferToOptionEntity> selectedReferToOptions,
+            string? automaticDbCorrectionReason,
             CancellationToken ct)
         {
             long? siteHistoryId = null;
@@ -3032,8 +3521,199 @@ namespace SmartGridSuite.Api.Controllers
                     })
                 .ToList();
 
-            _db.TicketWriteUpSubmissionTechnicians.AddRange(
-                participantRows);
+            _db.TicketWriteUpSubmissionTechnicians.AddRange(participantRows);
+
+            var flagRows = selectedWriteUpFlags
+                .Select(flag =>
+                {
+                    var isAutomaticDbCorrection =
+                        !string.IsNullOrWhiteSpace(
+                            automaticDbCorrectionReason) &&
+                        string.Equals(
+                            flag.SystemKey,
+                            "DB_CORRECTION_NEEDED",
+                            StringComparison.OrdinalIgnoreCase);
+
+                    return new TicketWriteUpSubmissionFlagEntity
+                    {
+                        SubmissionId = submission.Id,
+                        WriteUpFlagId = flag.Id,
+
+                        DisplayNameSnapshot =
+                            TrimForColumn(
+                                flag.DisplayName,
+                                100)
+                            ?? "Unknown",
+
+                        SelectionSource =
+                            isAutomaticDbCorrection
+                                ? "Automatic"
+                                : "Manual",
+
+                        AutomaticReason =
+                            isAutomaticDbCorrection
+                                ? TrimForColumn(
+                                    automaticDbCorrectionReason,
+                                    255)
+                                : null,
+
+                        CreatedAt = submittedAt
+                    };
+                })
+                .ToList();
+
+            if (flagRows.Count > 0)
+            {
+                _db.TicketWriteUpSubmissionFlags.AddRange(
+                    flagRows);
+            }
+
+            var referToRows = selectedReferToOptions
+                .Select(option =>
+                    new TicketWriteUpSubmissionReferToOptionEntity
+                    {
+                        SubmissionId = submission.Id,
+                        ReferToOptionId = option.Id,
+
+                        DisplayNameSnapshot =
+                            TrimForColumn(option.DisplayName, 100)
+                            ?? "Unknown",
+
+                        CreatedAt = submittedAt
+                    })
+                .ToList();
+
+            if (referToRows.Count > 0)
+            {
+                _db.TicketWriteUpSubmissionReferToOptions.AddRange(
+                    referToRows);
+            }
+            await CreateDispatchCloseoutChecklistItemsAsync(
+                submission.Id,
+                selectedWriteUpFlags,
+                selectedReferToOptions,
+                submittedAt,
+                ct);
+        }
+
+        // Generates the permanent Dispatch closeout checklist for one
+        // specific write-up submission. Definition values are snapshotted
+        // so later Administration changes do not alter historical work.
+        private async Task CreateDispatchCloseoutChecklistItemsAsync(
+            long submissionId,
+            IReadOnlyCollection<WriteUpFlagEntity> selectedWriteUpFlags,
+            IReadOnlyCollection<ReferToOptionEntity> selectedReferToOptions,
+            DateTime createdAt,
+            CancellationToken ct)
+        {
+            var selectedWriteUpFlagIds =
+                selectedWriteUpFlags
+                    .Select(x => x.Id)
+                    .Distinct()
+                    .ToList();
+
+            var selectedReferToOptionIds =
+                selectedReferToOptions
+                    .Select(x => x.Id)
+                    .Distinct()
+                    .ToList();
+
+            var definitions =
+                await _db.DispatchCloseoutChecklistDefinitions
+                    .AsNoTracking()
+                    .Where(definition =>
+                        definition.IsActive &&
+                        (
+                            definition.ConditionType ==
+                                DispatchCloseoutConditionTypes.Always ||
+
+                            (
+                                definition.ConditionType ==
+                                    DispatchCloseoutConditionTypes.WriteUpFlag &&
+                                definition.WriteUpFlagId.HasValue &&
+                                selectedWriteUpFlagIds.Contains(
+                                    definition.WriteUpFlagId.Value)
+                            ) ||
+
+                            (
+                                definition.ConditionType ==
+                                    DispatchCloseoutConditionTypes
+                                        .ReferToSelection &&
+                                definition.ReferToOptionId.HasValue &&
+                                selectedReferToOptionIds.Contains(
+                                    definition.ReferToOptionId.Value)
+                            )
+                        ))
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.DisplayName)
+                    .ThenBy(x => x.Id)
+                    .ToListAsync(ct);
+
+            if (definitions.Count == 0)
+                return;
+
+            var checklistRows =
+                definitions
+                    .Select(definition =>
+                    {
+                        var conditionType =
+                            DispatchCloseoutConditionTypes.Normalize(
+                                definition.ConditionType);
+
+                        return new
+                            TicketWriteUpSubmissionCloseoutItemEntity
+                        {
+                            SubmissionId =
+                                submissionId,
+
+                            DefinitionId =
+                                definition.Id,
+
+                            DisplayNameSnapshot =
+                                TrimForColumn(
+                                    definition.DisplayName,
+                                    150)
+                                ?? "Unnamed Checklist Item",
+
+                            SortOrderSnapshot =
+                                definition.SortOrder,
+
+                            IsRequired =
+                                definition.IsRequired,
+
+                            ConditionTypeSnapshot =
+                                conditionType,
+
+                            WriteUpFlagId =
+                                conditionType ==
+                                DispatchCloseoutConditionTypes.WriteUpFlag
+                                    ? definition.WriteUpFlagId
+                                    : null,
+
+                            ReferToOptionId =
+                                conditionType ==
+                                DispatchCloseoutConditionTypes
+                                    .ReferToSelection
+                                    ? definition.ReferToOptionId
+                                    : null,
+
+                            IsCompleted =
+                                false,
+
+                            CompletedBy =
+                                null,
+
+                            CompletedAt =
+                                null,
+
+                            CreatedAt =
+                                createdAt
+                        };
+                    })
+                    .ToList();
+
+            _db.TicketWriteUpSubmissionCloseoutItems.AddRange(
+                checklistRows);
         }
 
         // Resolves everyone assigned to the ticket at submission time. Published

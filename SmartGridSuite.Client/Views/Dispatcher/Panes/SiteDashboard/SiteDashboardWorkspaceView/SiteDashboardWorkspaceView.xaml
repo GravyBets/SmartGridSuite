@@ -943,6 +943,47 @@
                                             HorizontalAlignment="Stretch"
                                             Click="RequestCapitalButton_Click" />
 
+                                    <StackPanel x:Name="WriteUpFlagsSection"
+                                                Visibility="Collapsed">
+
+                                        <Border Height="1"
+                                                Margin="0,14,0,12"
+                                                Background="{DynamicResource SurfaceBorder}" />
+
+                                        <TextBlock Text="Write-Up Flags"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimary}" />
+
+                                        <TextBlock Text="Select any flags that apply to this write-up."
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,5,0,0"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextSecondary}" />
+
+                                        <!--
+                                            Administrator-configured Write-Up Flags are inserted here.
+                                            Refer To remains below them so future flags always appear first.
+                                        -->
+                                        <StackPanel x:Name="WriteUpFlagsOptionsPanel"
+                                                    Margin="0,8,0,0" />
+
+                                        <StackPanel x:Name="ReferToOptionsSection"
+                                                    Visibility="Collapsed">
+
+                                            <CheckBox x:Name="IncludeReferToCheckBox"
+                                                      Content="Refer To"
+                                                      IsChecked="False"
+                                                      Margin="0,1,0,0"
+                                                      Foreground="{DynamicResource TextPrimary}"
+                                                      Checked="IncludeReferToCheckBox_CheckedChanged"
+                                                      Unchecked="IncludeReferToCheckBox_CheckedChanged" />
+
+                                            <StackPanel x:Name="ReferToOptionsPanel"
+                                                        Visibility="Collapsed"
+                                                        Margin="18,6,0,0" />
+                                        </StackPanel>
+                                    </StackPanel>
+
                                     <Border Height="1"
                                             Margin="0,14,0,12"
                                             Background="{DynamicResource SurfaceBorder}" />

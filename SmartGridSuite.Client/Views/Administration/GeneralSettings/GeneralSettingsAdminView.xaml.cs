@@ -69,6 +69,7 @@ namespace SmartGridSuite.Client.Views.Administration.GeneralSettings
             DeleteSelectedDeviceTypeButton.IsEnabled = !isBusy && DeviceTypesDataGrid.SelectedItem is CommunicationDeviceTypeDto;
             ReloadDeviceTypesButton.IsEnabled = !isBusy;
             DeviceTypesDataGrid.IsEnabled = !isBusy;
+
         }
 
         // -------------------------

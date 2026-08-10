@@ -38,6 +38,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         {
             InitializeComponent();
 
+            Loaded += SiteDashboardWorkspaceView_Loaded;
+
             _writeUpTextChangedDebounceTimer.Tick += WriteUpTextChangedDebounceTimer_Tick;
 
             SiteNotesItemsControl.ItemsSource = _siteNotes;
@@ -252,6 +254,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             IncludeSnmpConfigCheckBox.IsChecked = true;
             IncludeSnmpStatsCategoryCheckBox.IsChecked = true;
             SnmpCategoryOptionsPanel.Visibility = Visibility.Collapsed;
+
+            ClearWriteUpWorkflowSelections();
 
             //Tower
             TowerSummaryText = string.Empty;
@@ -524,7 +528,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 IncludeSnmpStats = IncludeSnmpStatsCheckBox.IsChecked == true,
                 IncludeSnmpAdmin = IncludeSnmpAdminCheckBox.IsChecked == true,
                 IncludeSnmpConfig = IncludeSnmpConfigCheckBox.IsChecked == true,
-                IncludeSnmpStatsCategory = IncludeSnmpStatsCategoryCheckBox.IsChecked == true
+                IncludeSnmpStatsCategory = IncludeSnmpStatsCategoryCheckBox.IsChecked == true,
+
+                IncludeReferTo = IncludeReferToCheckBox.IsChecked == true,
+
+                WriteUpFlagIds =
+                    GetSelectedWriteUpFlagIds()
+                        .ToList(),
+
+                ReferToOptionIds =
+                    GetSelectedReferToOptionIds()
+                        .ToList()
             };
         }
 
@@ -542,6 +556,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             SnmpCategoryOptionsPanel.Visibility = state.IncludeSnmpStats
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+
+            IncludeReferToCheckBox.IsChecked =
+                state.IncludeReferTo ||
+                state.ReferToOptionIds?.Count > 0;
+
+            RestoreWriteUpWorkflowSelections(
+                state.WriteUpFlagIds,
+                state.ReferToOptionIds);
         }
     }
 }

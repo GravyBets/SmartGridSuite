@@ -244,6 +244,55 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             return _pingState;
         }
 
+        public bool HasIpAddressChanges(
+            string? originalPrimaryIp,
+            string? originalLanIp,
+            string? originalSecondaryIp,
+            string? originalIgsdPrimaryRtuIp,
+            string? originalIgsdPrimaryCommsEthernetIp,
+            string? originalIgsdSecondaryCommsEthernetIp,
+            string? originalIgsdSecondaryRtuIp)
+        {
+            return
+                !IpValuesMatch(
+                    PrimaryIpTextBox.Text,
+                    originalPrimaryIp) ||
+
+                !IpValuesMatch(
+                    LanIpTextBox.Text,
+                    originalLanIp) ||
+
+                !IpValuesMatch(
+                    SecondaryIpTextBox.Text,
+                    originalSecondaryIp) ||
+
+                !IpValuesMatch(
+                    IgsdPrimaryRtuIpTextBox.Text,
+                    originalIgsdPrimaryRtuIp) ||
+
+                !IpValuesMatch(
+                    IgsdPrimaryCommsEthernetIpTextBox.Text,
+                    originalIgsdPrimaryCommsEthernetIp) ||
+
+                !IpValuesMatch(
+                    IgsdSecondaryCommsEthernetIpTextBox.Text,
+                    originalIgsdSecondaryCommsEthernetIp) ||
+
+                !IpValuesMatch(
+                    IgsdSecondaryRtuIpTextBox.Text,
+                    originalIgsdSecondaryRtuIp);
+        }
+
+        private static bool IpValuesMatch(
+            string? currentValue,
+            string? originalValue)
+        {
+            return string.Equals(
+                SnapshotIp(currentValue),
+                SnapshotIp(originalValue),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
         private static void CapturePingTargetState(
             NetworkPingTargetState state,
             TextBox ipTextBox,

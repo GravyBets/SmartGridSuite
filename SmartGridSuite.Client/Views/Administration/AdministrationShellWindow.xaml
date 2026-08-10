@@ -228,6 +228,31 @@
                         </Grid>
                     </ListBoxItem>
 
+                    <ListBoxItem Tag="WriteUpWorkflow">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="36"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <Path Style="{StaticResource NavRailPathIconStyle}"
+                  Data="M4 4H20V20H4V4ZM6 6V18H18V6H6ZM8 9L9.5 10.5L12 8L13 9L9.5 12.5L7 10L8 9ZM14 9H17V11H14V9ZM8 14L9.5 15.5L12 13L13 14L9.5 17.5L7 15L8 14ZM14 14H17V16H14V14Z"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1"
+                    Margin="10,0,0,0"
+                    VerticalAlignment="Center">
+
+                                <TextBlock Text="Write-Up Workflow"
+                       Style="{StaticResource NavRailItemTitleTextStyle}"/>
+
+                                <TextBlock Text="Flags, referrals, and closeout"
+                       Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
+                            </StackPanel>
+                        </Grid>
+                    </ListBoxItem>
+
                     <ListBoxItem Tag="GeneralSettings">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -337,6 +362,14 @@
                         <Border Style="{StaticResource NavBadgeStyle}">
                             <Path Style="{StaticResource NavRailPathIconStyle}"
                                   Data="M12 4C8.7 4 5.8 5.3 3.6 7.4L5 8.8C6.8 7.1 9.2 6 12 6S17.2 7.1 19 8.8L20.4 7.4C18.2 5.3 15.3 4 12 4ZM12 8C9.8 8 7.8 8.9 6.4 10.3L7.8 11.7C8.9 10.6 10.3 10 12 10S15.1 10.6 16.2 11.7L17.6 10.3C16.2 8.9 14.2 8 12 8ZM12 12C10.9 12 9.9 12.4 9.2 13.2L12 16L14.8 13.2C14.1 12.4 13.1 12 12 12ZM11 18H13V20H11V18Z"/>
+                        </Border>
+                    </ListBoxItem>
+
+                    <ListBoxItem Tag="WriteUpWorkflow"
+                                  ToolTip="Write-Up Workflow">
+                        <Border Style="{StaticResource NavBadgeStyle}">
+                            <Path Style="{StaticResource NavRailPathIconStyle}"
+                                  Data="M4 4H20V20H4V4ZM6 6V18H18V6H6ZM8 9L9.5 10.5L12 8L13 9L9.5 12.5L7 10L8 9ZM14 9H17V11H14V9ZM8 14L9.5 15.5L12 13L13 14L9.5 17.5L7 15L8 14ZM14 14H17V16H14V14Z"/>
                         </Border>
                     </ListBoxItem>
 

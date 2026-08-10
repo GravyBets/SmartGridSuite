@@ -95,8 +95,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             var siteHistoryWriteUpText =
                 e.SiteHistoryWriteUpText ?? string.Empty;
 
-            long? originalTicketId =
-                session.CurrentTicketId > 0
+            var writeUpFlagIds =
+                new List<uint>(
+                    e.WriteUpFlagIds ??
+                    Array.Empty<uint>());
+
+            var referToOptionIds =
+                new List<uint>(
+                    e.ReferToOptionIds ??
+                    Array.Empty<uint>());
+
+            var equipmentWasSwapped =
+                WorkspaceView
+                    .GetEquipmentReplacementSessionEntries()
+                    .Count > 0;
+
+            var ipAddressWasChanged =
+                NetworkView.HasIpAddressChanges(
+                    session.PrimaryIp,
+                    session.LanIp,
+                    session.SecondaryIp,
+                    session.IgsdPrimaryRtuIp,
+                    session.IgsdPrimaryCommsEthernetIp,
+                    session.IgsdSecondaryCommsEthernetIp,
+                    session.IgsdSecondaryRtuIp);
+
+            long? originalTicketId = session.CurrentTicketId > 0
                     ? session.CurrentTicketId
                     : null;
 
@@ -179,8 +203,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                         pendingDraft.SiteHistoryWriteUpText ??
                         string.Empty;
 
-                    if (pendingDraft.TicketId.HasValue &&
-                        pendingDraft.TicketId.Value > 0)
+                    writeUpFlagIds =
+                        new List<uint>(
+                            pendingDraft.WriteUpFlagIds ??
+                            new List<uint>());
+
+                    referToOptionIds =
+                         new List<uint>(
+                             pendingDraft.ReferToOptionIds ??
+                             new List<uint>());
+
+                    equipmentWasSwapped =
+                        pendingDraft.EquipmentWasSwapped;
+
+                    ipAddressWasChanged =
+                        pendingDraft.IpAddressWasChanged;
+
+                    if (pendingDraft.TicketId.HasValue && pendingDraft.TicketId.Value > 0)
                     {
                         originalTicketId =
                             pendingDraft.TicketId;
@@ -242,7 +281,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     finalWriteUpText,
                     siteHistoryWriteUpText,
                     submittedBy: employeeId,
-                    CancellationToken.None);
+                    writeUpFlagIds: writeUpFlagIds,
+                    referToOptionIds: referToOptionIds,
+                    equipmentWasSwapped: equipmentWasSwapped,
+                    ipAddressWasChanged: ipAddressWasChanged,
+                    ct: CancellationToken.None);
 
                 /*
                  * The API has now committed the write-up and changed the ticket
@@ -284,11 +327,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 session.WriteUpText =
                     string.Empty;
 
+                session.WriteUpText =
+                    string.Empty;
+
+                /*
+                 * The submitted flags and Refer To destinations belong only to this
+                 * completed write-up. Do not restore them on the next render.
+                 */
+                session.SubmitOptions.WriteUpFlagIds.Clear();
+                session.SubmitOptions.ReferToOptionIds.Clear();
+
                 if (session.SessionKey ==
                     _selectedSessionKey)
                 {
                     WorkspaceView.WriteUpText =
                         string.Empty;
+
+                    WorkspaceView.ClearWriteUpWorkflowSelections();
                 }
 
                 /*
@@ -391,7 +446,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                             e,
                             employeeId,
                             siteKey,
-                            clientSubmissionId);
+                            clientSubmissionId,
+                            equipmentWasSwapped,
+                            ipAddressWasChanged);
 
                     if (savedLocally)
                     {
@@ -482,7 +539,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             WriteUpSubmitRequestedEventArgs submission,
             string employeeId,
             string siteKey,
-            Guid clientSubmissionId)
+            Guid clientSubmissionId,
+            bool equipmentWasSwapped,
+            bool ipAddressWasChanged)
         {
             try
             {
@@ -520,6 +579,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 draft.SiteHistoryWriteUpText =
                     submission.SiteHistoryWriteUpText ?? string.Empty;
+
+                draft.WriteUpFlagIds =
+                    new List<uint>(
+                        submission.WriteUpFlagIds ??
+                        Array.Empty<uint>());
+
+                draft.ReferToOptionIds =
+                    new List<uint>(
+                        submission.ReferToOptionIds ??
+                        Array.Empty<uint>());
+
+                draft.EquipmentWasSwapped =
+                    equipmentWasSwapped;
+
+                draft.IpAddressWasChanged =
+                    ipAddressWasChanged;
 
                 draft.IsPendingSubmission = true;
 

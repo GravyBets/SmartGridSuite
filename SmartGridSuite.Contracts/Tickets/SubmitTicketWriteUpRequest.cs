@@ -1,5 +1,6 @@
 ﻿#nullable enable
 using System;
+using System.Collections.Generic;
 
 namespace SmartGridSuite.Contracts.Tickets
 {
@@ -16,5 +17,13 @@ namespace SmartGridSuite.Contracts.Tickets
         public string SiteHistoryWriteUpText { get; set; } = "";
 
         public string SubmittedBy { get; set; } = "";
+
+        public List<uint> WriteUpFlagIds { get; set; } = new();
+
+        public List<uint> ReferToOptionIds { get; set; } = new();
+
+        public bool EquipmentWasSwapped { get; set; }
+
+        public bool IpAddressWasChanged { get; set; }
     }
 }

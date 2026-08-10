@@ -81,6 +81,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public bool IncludeSnmpAdmin { get; set; } = true;
         public bool IncludeSnmpConfig { get; set; } = true;
         public bool IncludeSnmpStatsCategory { get; set; } = true;
+
+        public bool IncludeReferTo { get; set; }
+
+        public List<uint> WriteUpFlagIds { get; set; } = new();
+        public List<uint> ReferToOptionIds { get; set; } = new();
     }
     public sealed class EquipmentReplacementSessionEntry
     {

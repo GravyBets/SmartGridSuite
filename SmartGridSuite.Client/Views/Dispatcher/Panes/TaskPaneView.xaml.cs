@@ -1,4 +1,4 @@
-﻿using SmartGridSuite.Client.Models.Dispatcher;
+using SmartGridSuite.Client.Models.Dispatcher;
 using SmartGridSuite.Client.Services;
 using SmartGridSuite.Client.Views.Dispatcher.Dialogs;
 using SmartGridSuite.Contracts.Dispatcher;
@@ -32,9 +32,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private bool _hasLoadedOnce;
 
         private readonly DispatcherTimer _searchDebounceTimer;
+        private readonly DispatcherTimer _idleRefreshTimer;
+
         private CancellationTokenSource? _taskQueryCts;
 
-        private bool _suppressTaskSelectionChange;
+        private static readonly TimeSpan TaskIdleRefreshThreshold = TimeSpan.FromSeconds(60);
+
+        private static readonly TimeSpan MinimumTaskRefreshSpacing = TimeSpan.FromSeconds(5);
+
+        private DateTime _lastTaskActivityUtc = DateTime.UtcNow;
+
+        private DateTime _lastTaskRefreshUtc = DateTime.MinValue;
+
+        private bool _silentRefreshInProgress;
+        private int _activeTaskLoadCount;
 
         private string _lastAppliedTaskSearch = "";
         private string _lastAppliedTaskStatus = "All";
@@ -43,16 +54,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         public bool HasSelectedTask => SelectedTask != null;
 
-        private bool _detailsOpen;
+        private readonly HashSet<long> _expandedTaskTicketIds = new();
 
-        private readonly SiteNotesApi _siteNotesApi;
-        private readonly TechniciansApi _techniciansApi;
-        private readonly ObservableCollection<SiteNoteDto> _selectedTaskSiteNotes = new();
-        private readonly Dictionary<string, string> _createdByDisplayByUserId = new(StringComparer.OrdinalIgnoreCase);
-
-        private DispatchTicket? _selectedTaskTicket;
-        private string _selectedTaskOriginalDispatchNotes = "";
-        private string _selectedTaskOriginalTechNotes = "";
+        private readonly HashSet<long> _updatingCloseoutItemIds = new();
 
         public ICollectionView TasksView { get; }
 
@@ -74,114 +78,26 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        public DispatchTicket? SelectedTaskTicket
-        {
-            get => _selectedTaskTicket;
-            private set
-            {
-                if (ReferenceEquals(_selectedTaskTicket, value))
-                    return;
-
-                _selectedTaskTicket = value;
-
-                OnPropertyChanged(nameof(SelectedTaskTicket));
-                OnPropertyChanged(nameof(SelectedTaskCreatedByDisplay));
-                OnPropertyChanged(nameof(SelectedTaskActionRequiredDisplay));
-                OnPropertyChanged(nameof(IsSelectedTaskTicketClosed));
-                OnPropertyChanged(nameof(CanEditSelectedTaskTicket));
-
-                UpdateTaskSaveButtonState();
-            }
-        }
-
-        public ObservableCollection<SiteNoteDto> SelectedTaskSiteNotes => _selectedTaskSiteNotes;
-
-        public int SelectedTaskSiteNotesCount => _selectedTaskSiteNotes.Count;
-
-        public string SelectedTaskCreatedByDisplay
-            => ResolveCreatedByDisplay(SelectedTaskTicket?.CreatedBy);
-
-        public string SelectedTaskActionRequiredDisplay
+        public bool IsSelectedTaskClosed
         {
             get
             {
-                if (!string.IsNullOrWhiteSpace(SelectedTaskTicket?.ActionRequiredOverride))
-                    return SelectedTaskTicket.ActionRequiredOverride;
+                var status = SelectedTask?.Status ?? "";
 
-                return SelectedTask?.ActionRequired ?? "";
+                return status.Equals(
+                           "Closed",
+                           StringComparison.OrdinalIgnoreCase)
+                    || status.Equals(
+                           "Completed",
+                           StringComparison.OrdinalIgnoreCase)
+                    || status.Equals(
+                           "Cancelled",
+                           StringComparison.OrdinalIgnoreCase)
+                    || status.Equals(
+                           "Canceled",
+                           StringComparison.OrdinalIgnoreCase);
             }
         }
-
-        public bool IsSelectedTaskTicketClosed
-        {
-            get
-            {
-                var status = SelectedTaskTicket?.Status ?? SelectedTask?.Status ?? "";
-
-                return status.Equals("Closed", StringComparison.OrdinalIgnoreCase)
-                    || status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
-                    || status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase)
-                    || status.Equals("Canceled", StringComparison.OrdinalIgnoreCase);
-            }
-        }
-
-        public bool CanEditSelectedTaskTicket => SelectedTaskTicket != null && !IsSelectedTaskTicketClosed;
-
-        private bool HasUnsavedSelectedTaskDispatchNotes
-        {
-            get
-            {
-                if (SelectedTaskTicket == null || IsSelectedTaskTicketClosed)
-                    return false;
-
-                var dispatchNotesChanged =
-                    !string.Equals(
-                        SelectedTaskTicket.DispatchNotes ?? "",
-                        _selectedTaskOriginalDispatchNotes,
-                        StringComparison.Ordinal);
-
-                var techWriteUpsChanged =
-                    !string.Equals(
-                        SelectedTaskTicket.Notes ?? "",
-                        _selectedTaskOriginalTechNotes,
-                        StringComparison.Ordinal);
-
-                return dispatchNotesChanged || techWriteUpsChanged;
-            }
-        }
-
-        private bool ConfirmDiscardUnsavedSelectedTaskDispatchNotes()
-        {
-            if (!HasUnsavedSelectedTaskDispatchNotes)
-                return true;
-
-            var result = MessageBox.Show(
-                "You have unsaved note changes.\n\n" +
-                "Discard changes to Dispatch Notes / Tech Write-Ups and continue?",
-                "Unsaved Notes",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (result != MessageBoxResult.Yes)
-                return false;
-
-            if (SelectedTaskTicket != null)
-            {
-                SelectedTaskTicket.DispatchNotes = _selectedTaskOriginalDispatchNotes;
-                SelectedTaskTicket.Notes = _selectedTaskOriginalTechNotes;
-
-                if (TaskDispatchNotesTextBox != null)
-                    TaskDispatchNotesTextBox.Text = _selectedTaskOriginalDispatchNotes;
-
-                if (TaskTechWriteUpsTextBox != null)
-                    TaskTechWriteUpsTextBox.Text = _selectedTaskOriginalTechNotes;
-
-                UpdateTaskSaveButtonState();
-            }
-
-            return true;
-        }
-
         private void RestoreLastAppliedTaskFilters()
         {
             _searchDebounceTimer.Stop();
@@ -208,17 +124,34 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             DataContext = this;
 
             var api = ClientAppSettings.CreateApiClient();
-                
+
             _ticketsApi = new TicketsApi(api);
             _ticketAdminApi = new TicketAdminApi(api);
-            _siteNotesApi = new SiteNotesApi(api);
-            _techniciansApi = new TechniciansApi(api);
 
             _searchDebounceTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(250)
             };
             _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
+
+            _idleRefreshTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(10)
+            };
+
+            _idleRefreshTimer.Tick += IdleRefreshTimer_Tick;
+
+            /*
+             * Mouse/key activity resets the idle window.
+             * We intentionally do not use MouseMove because simply moving
+             * the pointer across the pane should not prevent refreshing forever.
+             */
+            PreviewMouseDown += TaskPaneView_PreviewMouseDown;
+            PreviewMouseWheel += TaskPaneView_PreviewMouseWheel;
+            PreviewKeyDown += TaskPaneView_PreviewKeyDown;
+
+            IsVisibleChanged += TaskPaneView_IsVisibleChanged;
+            Unloaded += TaskPaneView_Unloaded;
 
             TasksView = CollectionViewSource.GetDefaultView(_tasks);
 
@@ -238,19 +171,31 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 _suppressFilterEvents = false;
             }
-
-            UpdateDetailsVisibility();
             UpdateTaskToolbarButtons();
         }
 
         private async void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
+            RecordTaskActivity();
+
+            _idleRefreshTimer.Start();
+
+            /*
+             * Cached/reloaded Tasks panes should immediately pick up
+             * changes made by another dispatcher.
+             */
             if (_hasLoadedOnce)
+            {
+                await TrySilentTaskRefreshAsync(
+                    force: true);
+
                 return;
+            }
 
             _hasLoadedOnce = true;
 
-            ShowBusyOverlay("Loading dispatch task filters and task list...");
+            ShowBusyOverlay(
+                "Loading dispatch task filters and task list...");
 
             try
             {
@@ -264,6 +209,161 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 HideBusyOverlay();
             }
+        }
+
+        private void RecordTaskActivity()
+        {
+            _lastTaskActivityUtc =
+                DateTime.UtcNow;
+
+            /*
+             * This is important:
+             *
+             * If a silent refresh is waiting on the API and the dispatcher
+             * starts working again, cancel that request. This prevents its
+             * eventual response from clearing/rebuilding the grid underneath
+             * an active dispatcher.
+             */
+            if (_silentRefreshInProgress)
+            {
+                _taskQueryCts?.Cancel();
+            }
+        }
+
+        private void TaskPaneView_PreviewMouseDown(
+            object sender,
+            MouseButtonEventArgs e)
+        {
+            RecordTaskActivity();
+        }
+
+        private void TaskPaneView_PreviewMouseWheel(
+            object sender,
+            MouseWheelEventArgs e)
+        {
+            RecordTaskActivity();
+        }
+
+        private void TaskPaneView_PreviewKeyDown(
+            object sender,
+            KeyEventArgs e)
+        {
+            RecordTaskActivity();
+        }
+
+        private async void IdleRefreshTimer_Tick(object? sender, EventArgs e)
+        {
+            await TrySilentTaskRefreshAsync(
+                force: false);
+        }
+
+        private async Task TrySilentTaskRefreshAsync(bool force)
+        {
+            if (!_filtersInitialized ||
+                !IsVisible ||
+                _busyOverlayDepth > 0 ||
+                _activeTaskLoadCount > 0 ||
+                _silentRefreshInProgress ||
+                _updatingCloseoutItemIds.Count > 0)
+            {
+                return;
+            }
+
+            /*
+             * Never rebuild the grid while a dispatcher has a task expanded.
+             * They may simply be reading a long write-up and therefore would
+             * otherwise look "idle" even though they are actively using it.
+             */
+            if (_expandedTaskTicketIds.Count > 0)
+                return;
+
+            var now =
+                DateTime.UtcNow;
+
+            if (force)
+            {
+                /*
+                 * Avoid duplicate refreshes caused by Loaded and
+                 * IsVisibleChanged firing close together.
+                 */
+                if (now - _lastTaskRefreshUtc <
+                    MinimumTaskRefreshSpacing)
+                {
+                    return;
+                }
+            }
+            else
+            {
+                if (now - _lastTaskActivityUtc <
+                    TaskIdleRefreshThreshold)
+                {
+                    return;
+                }
+
+                /*
+                 * Once someone has been idle for a long period, refresh
+                 * at most once per idle threshold rather than every
+                 * 10-second timer tick.
+                 */
+                if (now - _lastTaskRefreshUtc <
+                    TaskIdleRefreshThreshold)
+                {
+                    return;
+                }
+            }
+
+            _silentRefreshInProgress =
+                true;
+
+            try
+            {
+                await LoadTasksAsync(
+                    showBusyOverlay: false,
+                    showErrors: false,
+                    abandonIfUserBecomesActive: true);
+            }
+            finally
+            {
+                _silentRefreshInProgress =
+                    false;
+            }
+        }
+
+        private async void TaskPaneView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (!IsVisible)
+            {
+                _idleRefreshTimer.Stop();
+                _searchDebounceTimer.Stop();
+
+                /*
+                 * Only cancel automatically when leaving the pane.
+                 * The next visible load will create a fresh query token.
+                 */
+                _taskQueryCts?.Cancel();
+
+                return;
+            }
+
+            RecordTaskActivity();
+
+            _idleRefreshTimer.Start();
+
+            if (_hasLoadedOnce &&
+                _filtersInitialized &&
+                IsLoaded)
+            {
+                await TrySilentTaskRefreshAsync(
+                    force: true);
+            }
+        }
+
+        private void TaskPaneView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _idleRefreshTimer.Stop();
+            _searchDebounceTimer.Stop();
+
+            _taskQueryCts?.Cancel();
         }
 
         private async Task LoadFilterOptionsAsync(CancellationToken ct = default)
@@ -344,10 +444,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             };
         }
 
-        private async Task LoadTasksAsync(CancellationToken ct = default)
+        private async Task LoadTasksAsync(
+            CancellationToken ct = default,
+            bool showBusyOverlay = true,
+            bool showErrors = true,
+            bool abandonIfUserBecomesActive = false)
         {
             if (!_filtersInitialized)
                 return;
+
+            _activeTaskLoadCount++;
+
+            var activityAtQueryStart =
+                _lastTaskActivityUtc;
 
             _taskQueryCts?.Cancel();
             _taskQueryCts?.Dispose();
@@ -355,18 +464,29 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _taskQueryCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var queryCt = _taskQueryCts.Token;
 
-            ShowBusyOverlay("Loading dispatch tasks...");
+            if (showBusyOverlay)
+            {
+                ShowBusyOverlay(
+                    "Loading dispatch tasks...");
+            }
 
             var selectedTicketId = SelectedTask?.TicketId;
 
             try
             {
                 var request = BuildDispatchTaskQueryRequest();
-                var response = await _ticketsApi.QueryDispatchTasksAsync(request, queryCt);
+                var response =
+                    await _ticketsApi.QueryDispatchTasksAsync(
+                        request,
+                        queryCt);
 
-                if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
+                /*
+                 * A dispatcher became active while this silent request was in flight.
+                 * Throw the response away instead of rebuilding the UI underneath them.
+                 */
+                if (abandonIfUserBecomesActive &&
+                    _lastTaskActivityUtc != activityAtQueryStart)
                 {
-                    RestoreLastAppliedTaskFilters();
                     return;
                 }
 
@@ -379,8 +499,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     _tasks.Add(item);
                 }
 
+                var currentTicketIds = _tasks
+                    .Select(x => x.TicketId)
+                    .ToHashSet();
+
+                _expandedTaskTicketIds.RemoveWhere(
+                    ticketId =>
+                        !currentTicketIds.Contains(ticketId));
+
                 TasksView.Refresh();
                 RestoreSelection(selectedTicketId);
+
+                _lastTaskRefreshUtc =
+                    DateTime.UtcNow;
 
                 _lastAppliedTaskSearch = SearchBox?.Text?.Trim() ?? "";
                 _lastAppliedTaskStatus = StatusFilter?.SelectedItem as string ?? "All";
@@ -391,15 +522,26 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Failed to load dispatch tasks.\n\n{ex.Message}",
-                    "Task Load Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                if (showErrors)
+                {
+                    MessageBox.Show(
+                        $"Failed to load dispatch tasks.\n\n{ex.Message}",
+                        "Task Load Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
             }
             finally
             {
-                HideBusyOverlay();
+                if (showBusyOverlay)
+                {
+                    HideBusyOverlay();
+                }
+
+                if (_activeTaskLoadCount > 0)
+                {
+                    _activeTaskLoadCount--;
+                }
             }
         }
 
@@ -444,6 +586,64 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 Status = dto.Status ?? "",
 
+                SubmissionId = dto.SubmissionId,
+
+                SubmittedAt = dto.SubmittedAt,
+
+                SubmittedByName = dto.SubmittedByName ?? "",
+
+                SubmittedWriteUp = dto.SubmittedWriteUp ?? "",
+
+                WriteUpFlags = dto.WriteUpFlags ??
+                    new List<string>(),
+
+                ReferToOptions = dto.ReferToOptions ??
+                    new List<string>(),
+
+                CloseoutChecklistItems = (dto.CloseoutChecklistItems ??
+                    new List<SmartGridSuite.Contracts.Tickets.DispatchCloseoutChecklistItemDto>())
+                        .Select(x => new DispatchCloseoutChecklistItem{
+                            Id = x.Id,
+
+                            SubmissionId =
+                                x.SubmissionId,
+
+                            DefinitionId =
+                                x.DefinitionId,
+
+                            DisplayName =
+                                x.DisplayName ?? "",
+
+                            SortOrder =
+                                x.SortOrder,
+
+                            IsRequired =
+                                x.IsRequired,
+
+                            ConditionType =
+                                x.ConditionType ?? "",
+
+                            WriteUpFlagId =
+                                x.WriteUpFlagId,
+
+                            ReferToOptionId =
+                                x.ReferToOptionId,
+
+                            IsCompleted =
+                                x.IsCompleted,
+
+                            CompletedBy =
+                                x.CompletedBy ?? "",
+
+                            CompletedAt =
+                                x.CompletedAt
+                            })
+                        .ToList(),
+
+                RequiredChecklistRemaining = dto.RequiredChecklistRemaining,
+
+                CanMarkClosed = dto.CanMarkClosed,
+
                 // Legacy compatibility only. No longer shown in the new Tasks UI.
                 Category = dto.Category ?? ""
             };
@@ -482,33 +682,29 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private void RestoreSelection(long? ticketId)
         {
             if (!ticketId.HasValue || ticketId.Value <= 0)
-            {
-                UpdateDetailsVisibility();
                 return;
-            }
 
-            var found = _tasks.FirstOrDefault(x => x.TicketId == ticketId.Value);
+            var found =
+                _tasks.FirstOrDefault(
+                    x => x.TicketId == ticketId.Value);
 
             if (found != null)
             {
                 TasksGrid.SelectedItem = found;
                 TasksGrid.ScrollIntoView(found);
+                return;
             }
-            else
-            {
-                TasksGrid.SelectedItem = null;
-                SelectedTask = null;
-                SelectedTaskTicket = null;
 
-                _detailsOpen = false;
-                UpdateDetailsVisibility();
-            }
+            TasksGrid.SelectedItem = null;
+            SelectedTask = null;
         }
 
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (_suppressFilterEvents || !_filtersInitialized)
                 return;
+
+            RecordTaskActivity();
 
             _searchDebounceTimer.Stop();
             _searchDebounceTimer.Start();
@@ -521,11 +717,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (!_filtersInitialized)
                 return;
 
-            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
-            {
-                RestoreLastAppliedTaskFilters();
-                return;
-            }
 
             await LoadTasksAsync();
         }
@@ -535,19 +726,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (_suppressFilterEvents || !_filtersInitialized)
                 return;
 
-            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
-            {
-                RestoreLastAppliedTaskFilters();
-                return;
-            }
+            RecordTaskActivity();
 
             await LoadTasksAsync();
         }
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)
         {
-            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
-                return;
 
             ShowBusyOverlay("Refreshing dispatch tasks...");
 
@@ -564,8 +749,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void ClearTaskFilters_Click(object sender, RoutedEventArgs e)
         {
-            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
-                return;
 
             _searchDebounceTimer.Stop();
 
@@ -584,149 +767,84 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             await LoadTasksAsync();
         }
 
-        private async void TasksGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void TasksGrid_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e)
         {
-            if (_suppressTaskSelectionChange)
-                return;
-
-            var newlySelectedTask = TasksGrid.SelectedItem as DispatchTask;
-
-            var isChangingOpenTask =
-                _detailsOpen &&
-                SelectedTask != null &&
-                newlySelectedTask?.TicketId != SelectedTask.TicketId;
-
-            if (isChangingOpenTask &&
-                !ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
-            {
-                _suppressTaskSelectionChange = true;
-
-                try
-                {
-                    TasksGrid.SelectedItem = SelectedTask;
-
-                    if (SelectedTask != null)
-                        TasksGrid.ScrollIntoView(SelectedTask);
-                }
-                finally
-                {
-                    _suppressTaskSelectionChange = false;
-                }
-
-                return;
-            }
-
-            SelectedTask = newlySelectedTask;
-
-            if (!_detailsOpen)
-            {
-                SelectedTaskTicket = null;
-                _selectedTaskSiteNotes.Clear();
-                OnPropertyChanged(nameof(SelectedTaskSiteNotesCount));
-                UpdateDetailsVisibility();
-                return;
-            }
-
-            UpdateDetailsVisibility();
-
-            if (SelectedTask != null)
-                await LoadTaskDetailsForSelectedTaskAsync();
+            SelectedTask =
+                TasksGrid.SelectedItem as DispatchTask;
         }
 
-        private async void TasksGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private void TasksGrid_LoadingRow(
+            object sender,
+            DataGridRowEventArgs e)
         {
-            if (IsInsideButton(e.OriginalSource as DependencyObject))
+            if (e.Row.Item is not DispatchTask task)
                 return;
 
-            var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+            e.Row.DetailsVisibility =
+                _expandedTaskTicketIds.Contains(task.TicketId)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+        }
 
-            if (row?.Item is not DispatchTask task)
-                return;
-
-            // SelectionChanged handles the unsaved-notes decision first.
-            // If changing rows was cancelled, do not reopen the clicked row here.
-            if (SelectedTask?.TicketId != task.TicketId ||
-                (TasksGrid.SelectedItem as DispatchTask)?.TicketId != task.TicketId)
+        private void ToggleTaskRowDetails_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (sender is not Button button ||
+                FindVisualParent<DataGridRow>(button)
+                    is not DataGridRow row ||
+                row.Item is not DispatchTask task)
             {
                 return;
             }
 
-            _detailsOpen = true;
-            UpdateDetailsVisibility();
+            TasksGrid.SelectedItem =
+                task;
 
-            await LoadTaskDetailsForSelectedTaskAsync();
-        }
-
-        private async void OpenTaskDetails_Click(object sender, RoutedEventArgs e)
-        {
-            if (SelectedTask == null)
-                return;
-
-            _detailsOpen = true;
-            UpdateDetailsVisibility();
-
-            await LoadTaskDetailsForSelectedTaskAsync();
-        }
-
-        private void CloseDetails_Click(object sender, RoutedEventArgs e)
-        {
-            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
-                return;
-
-            _detailsOpen = false;
-            SelectedTask = null;
-            SelectedTaskTicket = null;
-            TasksGrid.SelectedItem = null;
-
-            _selectedTaskOriginalDispatchNotes = "";
-            _selectedTaskOriginalTechNotes = "";
-            _selectedTaskSiteNotes.Clear();
-            OnPropertyChanged(nameof(SelectedTaskSiteNotesCount));
-
-            CollapseTaskDetailExpanders();
-            UpdateDetailsVisibility();
-            UpdateTaskSaveButtonState();
-        }
-
-        private void UpdateDetailsVisibility()
-        {
-            if (!_detailsOpen || SelectedTask == null)
+            if (row.DetailsVisibility ==
+                Visibility.Visible)
             {
-                DetailsPanel.Visibility = Visibility.Collapsed;
-                DetailsCol.Width = new GridLength(0);
+                row.DetailsVisibility =
+                    Visibility.Collapsed;
 
-                if (DetailsSplitter != null)
-                    DetailsSplitter.Visibility = Visibility.Collapsed;
+                _expandedTaskTicketIds.Remove(
+                    task.TicketId);
 
                 return;
             }
 
-            DetailsCol.Width = new GridLength(500);
-            DetailsPanel.Visibility = Visibility.Visible;
+            row.DetailsVisibility =
+                Visibility.Visible;
 
-            if (DetailsSplitter != null)
-                DetailsSplitter.Visibility = Visibility.Visible;
+            _expandedTaskTicketIds.Add(
+                task.TicketId);
         }
 
         private void UpdateTaskToolbarButtons()
         {
-            var hasSelection = SelectedTask != null;
-            var canCloseSelectedTask =
-                hasSelection &&
-                !HasUnsavedSelectedTaskDispatchNotes &&
-                !IsSelectedTaskTicketClosed;
-
-            if (OpenTaskDetailsButton != null)
-                OpenTaskDetailsButton.IsEnabled = hasSelection;
+            var hasSelection =
+                SelectedTask != null;
 
             if (OpenTaskTicketButton != null)
                 OpenTaskTicketButton.IsEnabled = hasSelection;
 
             if (MarkTaskClosedButton != null)
-                MarkTaskClosedButton.IsEnabled = canCloseSelectedTask;
+            {
+                MarkTaskClosedButton.IsEnabled =
+                    hasSelection &&
+                    !IsSelectedTaskClosed &&
+                    (SelectedTask?.CanMarkClosed ?? false);
+            }
+        }
 
-            if (MarkDetailsClosedButton != null)
-                MarkDetailsClosedButton.IsEnabled = canCloseSelectedTask;
+        private async void CopySubmittedWriteUp_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            await CopyGridValueAsync(
+                sender as Button);
         }
 
         private async void CopyNotification_Click(object sender, RoutedEventArgs e)
@@ -739,70 +857,143 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             await CopyGridValueAsync(sender as Button);
         }
 
-        private async Task CopyGridValueAsync(Button? button)
+        private async Task CopyGridValueAsync(
+            Button? button)
         {
-            if (button?.Tag is not string value || string.IsNullOrWhiteSpace(value))
+            if (button?.Tag is not string value ||
+                string.IsNullOrWhiteSpace(value))
+            {
                 return;
+            }
 
             Clipboard.SetText(value);
 
-            var originalContent = button.Content;
+            var originalContent =
+                button.Content;
 
-            button.Content = new TextBlock
+            button.Content =
+                new TextBlock
+                {
+                    Style =
+                        TryFindResource("CheckGlyph")
+                            as Style
+                };
+
+            button.IsEnabled =
+                false;
+
+            try
             {
-                Text = "✓",
-                FontSize = 14,
-                FontWeight = FontWeights.Bold,
-                Foreground = TryFindResource("TextSecondary") as Brush ?? Brushes.Gray,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+                await Task.Delay(3000);
+            }
+            finally
+            {
+                button.Content =
+                    originalContent;
 
-            button.IsEnabled = false;
-
-            await Task.Delay(3000);
-
-            button.Content = originalContent;
-            button.IsEnabled = true;
+                button.IsEnabled =
+                    true;
+            }
         }
 
-        private async void CopySummary_Click(object sender, RoutedEventArgs e)
+        private async void DispatchCloseoutItem_Click(
+            object sender,
+            RoutedEventArgs e)
         {
-            if (SelectedTaskTicket == null)
+            if (sender is not CheckBox checkBox ||
+                checkBox.DataContext
+                    is not DispatchCloseoutChecklistItem checklistItem ||
+                FindVisualParent<DataGridRow>(checkBox)
+                    is not DataGridRow row ||
+                row.Item is not DispatchTask task)
             {
-                MessageBox.Show(
-                    "Ticket details are still loading. Try again in a moment.",
-                    "Copy Write-Up",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
                 return;
             }
 
-            var writeUp = (SelectedTaskTicket.Notes ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(writeUp))
+            if (task.TicketId <= 0 ||
+                checklistItem.Id <= 0)
             {
-                MessageBox.Show(
-                    "There is no tech write-up to copy for this ticket.",
-                    "Copy Write-Up",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                checklistItem.IsCompleted =
+                    !checklistItem.IsCompleted;
+
                 return;
             }
 
-            Clipboard.SetText(writeUp);
-
-            if (sender is Button button)
+            if (!_updatingCloseoutItemIds.Add(
+                    checklistItem.Id))
             {
-                var originalContent = button.Content;
+                return;
+            }
 
-                button.Content = "Copied!";
-                button.IsEnabled = false;
+            var requestedState =
+                checkBox.IsChecked == true;
 
-                await Task.Delay(900);
+            checkBox.IsEnabled =
+                false;
 
-                button.Content = originalContent;
-                button.IsEnabled = true;
+            try
+            {
+                var result =
+                    await _ticketsApi
+                        .UpdateDispatchCloseoutChecklistItemAsync(
+                            task.TicketId,
+                            checklistItem.Id,
+                            requestedState,
+                            Environment.UserName);
+
+                if (result == null)
+                {
+                    throw new InvalidOperationException(
+                        "The server did not return the updated checklist item.");
+                }
+
+                checklistItem.IsCompleted =
+                    result.IsCompleted;
+
+                checklistItem.CompletedBy =
+                    result.CompletedBy ?? "";
+
+                checklistItem.CompletedAt =
+                    result.CompletedAt;
+
+                task.RequiredChecklistRemaining =
+                    task.CloseoutChecklistItems.Count(
+                        x =>
+                            x.IsRequired &&
+                            !x.IsCompleted);
+
+                task.CanMarkClosed =
+                    task.RequiredChecklistRemaining == 0;
+
+                if (ReferenceEquals(
+                        SelectedTask,
+                        task))
+                {
+                    UpdateTaskToolbarButtons();
+                }
+            }
+            catch (Exception ex)
+            {
+                /*
+                 * The checkbox has already visually toggled by the time Click fires.
+                 * Restore the last persisted state when the API update fails.
+                 */
+                checklistItem.IsCompleted =
+                    !requestedState;
+
+                MessageBox.Show(
+                    $"Failed to update the Dispatch closeout checklist.\n\n{ex.Message}",
+                    "Dispatch Closeout Checklist",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                _updatingCloseoutItemIds.Remove(
+                    checklistItem.Id);
+
+                checkBox.IsEnabled =
+                    true;
             }
         }
 
@@ -820,9 +1011,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     MessageBoxImage.Warning);
                 return;
             }
-
-            if (!ConfirmDiscardUnsavedSelectedTaskDispatchNotes())
-                return;
 
             try
             {
@@ -851,10 +1039,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 await LoadFilterOptionsAsync();
                 await LoadTasksAsync();
 
-                _detailsOpen = false;
                 SelectedTask = null;
                 TasksGrid.SelectedItem = null;
-                UpdateDetailsVisibility();
             }
             catch (Exception ex)
             {
@@ -871,17 +1057,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (SelectedTask == null)
                 return;
 
-            if (HasUnsavedSelectedTaskDispatchNotes)
-            {
-                MessageBox.Show(
-                    "You have unsaved Dispatch Notes.\n\nSave your notes before marking this ticket closed.",
-                    "Save Dispatch Notes First",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-
-                return;
-            }
-
             if (SelectedTask.TicketId <= 0)
             {
                 MessageBox.Show(
@@ -889,6 +1064,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     "Mark Closed",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
+
+                return;
+            }
+
+            if (!SelectedTask.CanMarkClosed)
+            {
+                MessageBox.Show(
+                    SelectedTask.RequiredChecklistRemaining == 1
+                        ? "Complete the remaining required Dispatch closeout checklist item before closing this ticket."
+                        : $"Complete the {SelectedTask.RequiredChecklistRemaining} remaining required Dispatch closeout checklist items before closing this ticket.",
+                    "Mark Closed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
 
                 return;
             }
@@ -907,14 +1095,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 await _ticketsApi.CloseDispatchTaskAsync(SelectedTask.TicketId);
 
-                _detailsOpen = false;
                 SelectedTask = null;
-                SelectedTaskTicket = null;
                 TasksGrid.SelectedItem = null;
 
                 await LoadTasksAsync();
-
-                UpdateDetailsVisibility();
                 UpdateTaskToolbarButtons();
             }
             catch (Exception ex)
@@ -927,502 +1111,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private static bool IsInsideButton(DependencyObject? source)
-        {
-            return FindVisualParent<Button>(source) != null;
-        }
-
-        private static T? FindVisualParent<T>(DependencyObject? source)
+        private static T? FindVisualParent<T>(
+            DependencyObject? child)
             where T : DependencyObject
         {
-            while (source != null)
+            var current = child;
+
+            while (current != null)
             {
-                if (source is T match)
+                if (current is T match)
                     return match;
 
-                source = VisualTreeHelper.GetParent(source);
+                current =
+                    VisualTreeHelper.GetParent(current);
             }
 
             return null;
-        }
-
-        private async Task LoadTaskDetailsForSelectedTaskAsync()
-        {
-            var task = SelectedTask;
-
-            SelectedTaskTicket = null;
-            _selectedTaskSiteNotes.Clear();
-            OnPropertyChanged(nameof(SelectedTaskSiteNotesCount));
-
-            _selectedTaskOriginalDispatchNotes = "";
-            _selectedTaskOriginalTechNotes = "";
-
-            CollapseTaskDetailExpanders();
-
-            if (task == null || task.TicketId <= 0)
-                return;
-
-            try
-            {
-                await LoadKnownTechAliasesAsync();
-
-                var dto = await _ticketsApi.GetTicketByIdAsync(task.TicketId);
-
-                if (dto == null)
-                    return;
-
-                var ticket = MapTicketDtoToModel(dto);
-
-                SelectedTaskTicket = ticket;
-
-                _selectedTaskOriginalDispatchNotes = ticket.DispatchNotes ?? "";
-                _selectedTaskOriginalTechNotes = ticket.Notes ?? "";
-
-                await LoadSiteNotesForSelectedTaskAsync(ticket.Site);
-
-                UpdateTaskSaveButtonState();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"Failed to load task details.\n\n{ex.Message}",
-                    "Task Details",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-        }
-
-        private async Task LoadSiteNotesForSelectedTaskAsync(string? site)
-        {
-            _selectedTaskSiteNotes.Clear();
-            OnPropertyChanged(nameof(SelectedTaskSiteNotesCount));
-
-            site = (site ?? "").Trim();
-
-            if (string.IsNullOrWhiteSpace(site))
-                return;
-
-            try
-            {
-                var notes = await _siteNotesApi.GetBySiteAsync(site);
-
-                foreach (var note in notes)
-                    _selectedTaskSiteNotes.Add(note);
-
-                OnPropertyChanged(nameof(SelectedTaskSiteNotesCount));
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"Failed to load site notes.\n\n{ex.Message}",
-                    "Site Notes",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-            }
-        }
-
-        private async Task LoadKnownTechAliasesAsync()
-        {
-            try
-            {
-                var techs = await _techniciansApi.GetTechniciansAsync();
-
-                _createdByDisplayByUserId.Clear();
-
-                foreach (var tech in techs)
-                {
-                    var displayName =
-                        TryReadStringProperty(tech, "Name", "DisplayName", "FullName")?.Trim();
-
-                    var userId =
-                        TryReadStringProperty(tech, "UserId", "UserName", "Username", "WindowsUserName", "NetworkUserId", "Login", "SamAccountName")?.Trim();
-
-                    var employeeId =
-                        TryReadStringProperty(tech, "EmployeeId", "EmployeeID", "EmpId", "BadgeNumber")?.Trim();
-
-                    if (!string.IsNullOrWhiteSpace(displayName))
-                    {
-                        AddCreatedByDisplayAlias(displayName, displayName);
-                        AddCreatedByDisplayAlias(userId, displayName);
-                        AddCreatedByDisplayAlias(employeeId, displayName);
-                    }
-                }
-
-                OnPropertyChanged(nameof(SelectedTaskCreatedByDisplay));
-            }
-            catch
-            {
-                // Do not block task details if technician alias lookup fails.
-            }
-        }
-
-        private static string? TryReadStringProperty(object obj, params string[] propertyNames)
-        {
-            var type = obj.GetType();
-
-            foreach (var propertyName in propertyNames)
-            {
-                var prop = type.GetProperty(propertyName);
-                if (prop == null)
-                    continue;
-
-                var value = prop.GetValue(obj) as string;
-                if (!string.IsNullOrWhiteSpace(value))
-                    return value;
-            }
-
-            return null;
-        }
-
-        private static string NormalizeUserLookupKey(string? value)
-        {
-            var clean = (value ?? string.Empty).Trim();
-
-            if (string.IsNullOrWhiteSpace(clean))
-                return "";
-
-            clean = clean.Replace("/", "\\");
-
-            var slashIndex = clean.LastIndexOf('\\');
-            if (slashIndex >= 0 && slashIndex < clean.Length - 1)
-                clean = clean[(slashIndex + 1)..];
-
-            return clean.Trim();
-        }
-
-        private void AddCreatedByDisplayAlias(string? key, string? displayName)
-        {
-            var cleanDisplay = (displayName ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(cleanDisplay))
-                return;
-
-            var cleanKey = (key ?? string.Empty).Trim();
-            if (!string.IsNullOrWhiteSpace(cleanKey))
-                _createdByDisplayByUserId[cleanKey] = cleanDisplay;
-
-            var normalizedKey = NormalizeUserLookupKey(key);
-            if (!string.IsNullOrWhiteSpace(normalizedKey))
-                _createdByDisplayByUserId[normalizedKey] = cleanDisplay;
-        }
-
-        private string ResolveCreatedByDisplay(string? createdBy)
-        {
-            if (string.IsNullOrWhiteSpace(createdBy))
-                return "";
-
-            var key = createdBy.Trim();
-
-            if (_createdByDisplayByUserId.TryGetValue(key, out var display) &&
-                !string.IsNullOrWhiteSpace(display))
-            {
-                return display;
-            }
-
-            var normalizedKey = NormalizeUserLookupKey(key);
-
-            if (_createdByDisplayByUserId.TryGetValue(normalizedKey, out display) &&
-                !string.IsNullOrWhiteSpace(display))
-            {
-                return display;
-            }
-
-            return key;
-        }
-
-        private string GetCurrentUserDisplayName()
-        {
-            var candidates = new[]
-            {
-                Environment.GetEnvironmentVariable("FULLNAME"),
-                WindowsIdentity.GetCurrent()?.Name,
-                Environment.UserName
-            };
-
-            foreach (var candidate in candidates)
-            {
-                var clean = (candidate ?? string.Empty).Trim();
-
-                if (string.IsNullOrWhiteSpace(clean))
-                    continue;
-
-                var resolved = ResolveCreatedByDisplay(clean);
-
-                if (!string.IsNullOrWhiteSpace(resolved) &&
-                    !string.Equals(resolved, clean, StringComparison.OrdinalIgnoreCase))
-                {
-                    return resolved;
-                }
-            }
-
-            var fullName = Environment.GetEnvironmentVariable("FULLNAME")?.Trim();
-            if (!string.IsNullOrWhiteSpace(fullName))
-                return fullName;
-
-            var windowsName = WindowsIdentity.GetCurrent()?.Name;
-            if (!string.IsNullOrWhiteSpace(windowsName))
-                return NormalizeUserLookupKey(windowsName);
-
-            return string.IsNullOrWhiteSpace(Environment.UserName)
-                ? "Unknown"
-                : Environment.UserName;
-        }
-
-        private async void AddSelectedTaskSiteNote_Click(object sender, RoutedEventArgs e)
-        {
-            if (!CanEditSelectedTaskTicket || SelectedTaskTicket == null)
-                return;
-
-            var site = SelectedTaskTicket.Site?.Trim();
-
-            if (string.IsNullOrWhiteSpace(site))
-                return;
-
-            await LoadKnownTechAliasesAsync();
-
-            var win = new SiteNoteEditorWindow(site)
-            {
-                Owner = Window.GetWindow(this)
-            };
-
-            if (win.ShowDialog() != true)
-                return;
-
-            try
-            {
-                await _siteNotesApi.CreateAsync(new CreateSiteNoteRequest
-                {
-                    SiteId = site,
-                    NoteType = "General",
-                    NoteText = win.NoteText,
-                    CreatedBy = GetCurrentUserDisplayName()
-                });
-
-                await LoadSiteNotesForSelectedTaskAsync(site);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"Failed to add site note.\n\n{ex.Message}",
-                    "Site Notes",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
-        private async void EditSelectedTaskSiteNote_Click(object sender, RoutedEventArgs e)
-        {
-            if (!CanEditSelectedTaskTicket || SelectedTaskTicket == null)
-                return;
-
-            if (sender is not Button button || button.Tag is not SiteNoteDto note)
-                return;
-
-            var site = SelectedTaskTicket.Site?.Trim() ?? "";
-
-            await LoadKnownTechAliasesAsync();
-
-            var win = new SiteNoteEditorWindow(site, note)
-            {
-                Owner = Window.GetWindow(this)
-            };
-
-            if (win.ShowDialog() != true)
-                return;
-
-            try
-            {
-                await _siteNotesApi.UpdateAsync(new UpdateSiteNoteRequest
-                {
-                    Id = note.Id,
-                    NoteType = "General",
-                    NoteText = win.NoteText,
-                    UpdatedBy = GetCurrentUserDisplayName()
-                });
-
-                await LoadSiteNotesForSelectedTaskAsync(site);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"Failed to update site note.\n\n{ex.Message}",
-                    "Site Notes",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
-        private async void DeleteSelectedTaskSiteNote_Click(object sender, RoutedEventArgs e)
-        {
-            if (!CanEditSelectedTaskTicket || SelectedTaskTicket == null)
-                return;
-
-            if (sender is not Button button || button.Tag is not SiteNoteDto note)
-                return;
-
-            var confirm = MessageBox.Show(
-                "Delete this site note?",
-                "Delete Site Note",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (confirm != MessageBoxResult.Yes)
-                return;
-
-            try
-            {
-                await LoadKnownTechAliasesAsync();
-                await _siteNotesApi.DeleteAsync(note.Id, GetCurrentUserDisplayName());
-                await LoadSiteNotesForSelectedTaskAsync(SelectedTaskTicket.Site);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"Failed to delete site note.\n\n{ex.Message}",
-                    "Site Notes",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
-        private void UpdateTaskSaveButtonState()
-        {
-            if (SaveTaskNotesButton != null)
-            {
-                SaveTaskNotesButton.IsEnabled =
-                    CanEditSelectedTaskTicket &&
-                    HasUnsavedSelectedTaskDispatchNotes;
-            }
-
-            UpdateTaskToolbarButtons();
-        }
-
-        private void TaskDispatchNotesTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            UpdateTaskSaveButtonState();
-        }
-
-        private void TaskTechWriteUpsTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            UpdateTaskSaveButtonState();
-        }
-
-        private void CollapseTaskDetailExpanders()
-        {
-            if (TaskSiteNotesExpander != null)
-                TaskSiteNotesExpander.IsExpanded = false;
-
-            if (TaskDispatchNotesExpander != null)
-                TaskDispatchNotesExpander.IsExpanded = false;
-
-            if (TaskTechWriteUpsExpander != null)
-                TaskTechWriteUpsExpander.IsExpanded = false;
-
-            UpdateTaskDetailTextBoxHeights();
-        }
-
-        private void TaskDetailExpander_ExpandedChanged(object sender, RoutedEventArgs e)
-        {
-            Dispatcher.BeginInvoke(
-                new Action(UpdateTaskDetailTextBoxHeights),
-                DispatcherPriority.Background);
-        }
-
-        private void UpdateTaskDetailTextBoxHeights()
-        {
-            if (TaskDispatchNotesTextBox == null || TaskTechWriteUpsTextBox == null)
-                return;
-
-            var expandedCount = 0;
-
-            if (TaskSiteNotesExpander?.IsExpanded == true)
-                expandedCount++;
-
-            if (TaskDispatchNotesExpander?.IsExpanded == true)
-                expandedCount++;
-
-            if (TaskTechWriteUpsExpander?.IsExpanded == true)
-                expandedCount++;
-
-            var dispatchHeight = expandedCount switch
-            {
-                0 => double.NaN,
-                1 => 360,
-                2 => 280,
-                _ => 210
-            };
-
-            var techHeight = expandedCount switch
-            {
-                0 => double.NaN,
-                1 => 430,
-                2 => 320,
-                _ => 240
-            };
-
-            TaskDispatchNotesTextBox.Height =
-                TaskDispatchNotesExpander?.IsExpanded == true
-                    ? dispatchHeight
-                    : double.NaN;
-
-            TaskTechWriteUpsTextBox.Height =
-                TaskTechWriteUpsExpander?.IsExpanded == true
-                    ? techHeight
-                    : double.NaN;
-        }
-
-        private async void SaveTaskNotes_Click(object sender, RoutedEventArgs e)
-        {
-            if (SelectedTaskTicket == null || IsSelectedTaskTicketClosed)
-                return;
-
-            var ticket = SelectedTaskTicket;
-
-            var req = new UpdateTicketRequest(
-                Site: ticket.Site ?? "",
-                NotificationName: ticket.NotificationName ?? "",
-                Notification: ticket.Notification ?? "",
-                WorkOrder: string.IsNullOrWhiteSpace(ticket.CurrentWorkOrder) ? null : ticket.CurrentWorkOrder,
-                WorkOrderClass: ticket.WorkOrderType ?? "",
-                GroupCode: ticket.GroupCode ?? "",
-                PriorityDays: ticket.PriorityDays,
-                Status: ticket.Status ?? "",
-                TaskCategoryId: ticket.TaskCategoryId,
-                ActionRequiredOverride: string.IsNullOrWhiteSpace(ticket.ActionRequiredOverride)
-                    ? null
-                    : ticket.ActionRequiredOverride,
-                AssignedTech: ticket.AssignedTech ?? "(Unassigned)",
-                Problem: ticket.Problem ?? "",
-                Notes: ticket.Notes ?? "",
-                DispatchNotes: ticket.DispatchNotes ?? ""
-            );
-
-            SaveTaskNotesButton.IsEnabled = false;
-
-            try
-            {
-                await _ticketsApi.UpdateTicketAsync(ticket.Id, req);
-
-                _selectedTaskOriginalDispatchNotes = ticket.DispatchNotes ?? "";
-                _selectedTaskOriginalTechNotes = ticket.Notes ?? "";
-
-                UpdateTaskSaveButtonState();
-
-                MessageBox.Show(
-                    "Dispatch Notes / Tech Write-Ups saved.",
-                    "Task Notes",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    $"Failed to save notes.\n\n{ex.Message}",
-                    "Task Notes",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-
-                UpdateTaskSaveButtonState();
-            }
         }
 
         private void ShowBusyOverlay(string message)
@@ -1458,7 +1162,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             SetTaskPaneControlsEnabled(true);
 
             UpdateTaskToolbarButtons();
-            UpdateTaskSaveButtonState();
+            UpdateTaskToolbarButtons();
         }
 
         private void SetTaskPaneControlsEnabled(bool enabled)
@@ -1469,24 +1173,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             RefreshTasksButton.IsEnabled = enabled;
             TasksGrid.IsEnabled = enabled;
 
-            DetailsPanel.IsEnabled = enabled;
-
-            OpenTaskDetailsButton.IsEnabled = enabled && SelectedTask != null;
-            OpenTaskTicketButton.IsEnabled = enabled && SelectedTask != null;
-
-            var canCloseSelectedTask =
+            var hasSelection =
                 enabled &&
-                SelectedTask != null &&
-                !HasUnsavedSelectedTaskDispatchNotes &&
-                !IsSelectedTaskTicketClosed;
+                SelectedTask != null;
 
-            MarkTaskClosedButton.IsEnabled = canCloseSelectedTask;
-            MarkDetailsClosedButton.IsEnabled = canCloseSelectedTask;
+            OpenTaskTicketButton.IsEnabled =
+                hasSelection;
 
-            SaveTaskNotesButton.IsEnabled =
-                enabled &&
-                CanEditSelectedTaskTicket &&
-                HasUnsavedSelectedTaskDispatchNotes;
+            MarkTaskClosedButton.IsEnabled =
+                hasSelection &&
+                !IsSelectedTaskClosed &&
+                (SelectedTask?.CanMarkClosed ?? false);
         }
     }
 }

@@ -40,7 +40,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     siteHistoryWriteUpText,
                     true,
                     IncludePingStatsCheckBox.IsChecked == true,
-                    IncludeSnmpStatsCheckBox.IsChecked == true));
+                    IncludeSnmpStatsCheckBox.IsChecked == true,
+                    GetSelectedWriteUpFlagIds(),
+                    GetSelectedReferToOptionIds()));
         }
 
         private bool IsTowerDashboard => string.Equals(EquipmentDashboardKind, SmartGridSuite.Contracts.SiteDashboard.SiteDashboardKinds.Tower,
@@ -720,13 +722,27 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 string siteHistoryWriteUpText,
                 bool includeEquipmentReplacements,
                 bool includePingStats,
-                bool includeSnmpStats)
+                bool includeSnmpStats,
+                IReadOnlyCollection<uint>? writeUpFlagIds = null,
+                IReadOnlyCollection<uint>? referToOptionIds = null)
             {
                 FinalWriteUpText = finalWriteUpText;
                 SiteHistoryWriteUpText = siteHistoryWriteUpText;
                 IncludeEquipmentReplacements = includeEquipmentReplacements;
                 IncludePingStats = includePingStats;
                 IncludeSnmpStats = includeSnmpStats;
+
+                WriteUpFlagIds =
+                    (writeUpFlagIds ?? Array.Empty<uint>())
+                    .Where(x => x > 0)
+                    .Distinct()
+                    .ToList();
+
+                ReferToOptionIds =
+                    (referToOptionIds ?? Array.Empty<uint>())
+                    .Where(x => x > 0)
+                    .Distinct()
+                    .ToList();
             }
 
             public string FinalWriteUpText { get; }
@@ -735,6 +751,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             public bool IncludeEquipmentReplacements { get; }
             public bool IncludePingStats { get; }
             public bool IncludeSnmpStats { get; }
+
+            public IReadOnlyList<uint> WriteUpFlagIds { get; }
+            public IReadOnlyList<uint> ReferToOptionIds { get; }
         }
 
         private static string BuildSimpleWriteUpSection(string header, string body)

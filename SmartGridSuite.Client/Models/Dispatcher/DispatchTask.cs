@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Collections.Generic;
 
 namespace SmartGridSuite.Client.Models.Dispatcher
 {
@@ -216,5 +217,167 @@ namespace SmartGridSuite.Client.Models.Dispatcher
                 OnPropertyChanged();
             }
         }
+
+        private long? _submissionId;
+
+        public long? SubmissionId
+        {
+            get => _submissionId;
+            set
+            {
+                if (_submissionId == value)
+                    return;
+
+                _submissionId = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private DateTime? _submittedAt;
+
+        public DateTime? SubmittedAt
+        {
+            get => _submittedAt;
+            set
+            {
+                if (_submittedAt == value)
+                    return;
+
+                _submittedAt = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _submittedByName = "";
+
+        public string SubmittedByName
+        {
+            get => _submittedByName;
+            set
+            {
+                var cleaned = Clean(value);
+
+                if (_submittedByName == cleaned)
+                    return;
+
+                _submittedByName = cleaned;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _submittedWriteUp = "";
+
+        public string SubmittedWriteUp
+        {
+            get => _submittedWriteUp;
+            set
+            {
+                var cleaned = value ?? "";
+
+                if (_submittedWriteUp == cleaned)
+                    return;
+
+                _submittedWriteUp = cleaned;
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SubmittedWriteUpDisplay));
+            }
+        }
+
+        public string SubmittedWriteUpDisplay => BuildDispatchWriteUpDisplay(SubmittedWriteUp);
+
+        private static string BuildDispatchWriteUpDisplay(string? value)
+        {
+            var text = value?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(text))
+                return "";
+
+            const string ticketHeader =
+                "------------Ticket------------";
+
+            var ticketStart =
+                text.IndexOf(
+                    ticketHeader,
+                    StringComparison.OrdinalIgnoreCase);
+
+            if (ticketStart < 0)
+                return text;
+
+            /*
+             * The Site History version intentionally contains a Ticket
+             * reference section. Dispatch already has the ticket fields in
+             * the row above, so omit that duplicated section here.
+             *
+             * Preserve the CNP Techs footer when one follows the Ticket block.
+             */
+            var techFooterStart =
+                text.IndexOf(
+                    "CNP Techs:",
+                    ticketStart,
+                    StringComparison.OrdinalIgnoreCase);
+
+            var beforeTicket =
+                text[..ticketStart].TrimEnd();
+
+            if (techFooterStart < 0)
+                return beforeTicket;
+
+            var techFooter =
+                text[techFooterStart..].TrimStart();
+
+            if (string.IsNullOrWhiteSpace(beforeTicket))
+                return techFooter;
+
+            return beforeTicket +
+               Environment.NewLine +
+               "------------------------------" +
+               Environment.NewLine +
+               techFooter;
+        }
+
+        public List<string> WriteUpFlags { get; set; } = new();
+
+        public List<string> ReferToOptions { get; set; } = new();
+
+        public List<DispatchCloseoutChecklistItem> CloseoutChecklistItems { get; set; } = new();
+
+        private int _requiredChecklistRemaining;
+
+        public int RequiredChecklistRemaining
+        {
+            get => _requiredChecklistRemaining;
+            set
+            {
+                if (_requiredChecklistRemaining == value)
+                    return;
+
+                _requiredChecklistRemaining = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private bool _canMarkClosed = true;
+
+        public bool CanMarkClosed
+        {
+            get => _canMarkClosed;
+            set
+            {
+                if (_canMarkClosed == value)
+                    return;
+
+                _canMarkClosed = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string WriteUpFlagsDisplay => WriteUpFlags.Count == 0
+            ? ""
+            : string.Join(Environment.NewLine, WriteUpFlags);
+
+        public string ReferToOptionsDisplay => ReferToOptions.Count == 0
+            ? ""
+            : string.Join(" • ", ReferToOptions);
     }
 }

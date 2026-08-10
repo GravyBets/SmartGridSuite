@@ -5,7 +5,6 @@ using System.Net.Http.Json;
 using System.Net;
 using System.Text.Json;
 
-
 namespace SmartGridSuite.Client.Services
 {
     public sealed class ApiClient
@@ -201,6 +200,91 @@ namespace SmartGridSuite.Client.Services
                 ct);
         }
 
+        public async Task<List<WriteUpFlagDto>> GetWriteUpFlagsAsync(
+            bool activeOnly = false,
+            bool technicianVisibleOnly = false)
+        {
+            var url =
+                "api/admin/general-settings/write-up-flags" +
+                $"?activeOnly={activeOnly.ToString().ToLowerInvariant()}" +
+                $"&technicianVisibleOnly={technicianVisibleOnly.ToString().ToLowerInvariant()}";
+
+            return await GetAsync<List<WriteUpFlagDto>>(url)
+                   ?? new List<WriteUpFlagDto>();
+        }
+
+        public async Task<WriteUpFlagDto?> CreateWriteUpFlagAsync(
+            SaveWriteUpFlagRequest request)
+        {
+            return await PostAsync<SaveWriteUpFlagRequest, WriteUpFlagDto>(
+                "api/admin/general-settings/write-up-flags",
+                request);
+        }
+
+        public async Task<WriteUpFlagDto?> UpdateWriteUpFlagAsync(
+            uint id,
+            SaveWriteUpFlagRequest request)
+        {
+            return await PutAsync<SaveWriteUpFlagRequest, WriteUpFlagDto>(
+                $"api/admin/general-settings/write-up-flags/{id}",
+                request);
+        }
+
+        public async Task DeleteWriteUpFlagAsync(
+            uint id, CancellationToken ct = default)
+        {
+            using var response = await SendAsync(
+                HttpMethod.Delete,
+                $"api/admin/general-settings/write-up-flags/{id}",
+                content: null,
+                ct);
+        }
+
+        // -------------------------
+        // Refer To Options
+        // -------------------------
+
+        public async Task<List<ReferToOptionDto>> GetReferToOptionsAsync(
+            bool activeOnly = false)
+        {
+            var url =
+                "api/admin/general-settings/refer-to-options" +
+                $"?activeOnly={activeOnly.ToString().ToLowerInvariant()}";
+
+            return await GetAsync<List<ReferToOptionDto>>(url)
+                   ?? new List<ReferToOptionDto>();
+        }
+
+        public async Task<ReferToOptionDto?> CreateReferToOptionAsync(
+            SaveReferToOptionRequest request)
+        {
+            return await PostAsync<
+                SaveReferToOptionRequest,
+                ReferToOptionDto>(
+                "api/admin/general-settings/refer-to-options",
+                request);
+        }
+
+        public async Task<ReferToOptionDto?> UpdateReferToOptionAsync(
+            uint id,
+            SaveReferToOptionRequest request)
+        {
+            return await PutAsync<
+                SaveReferToOptionRequest,
+                ReferToOptionDto>(
+                $"api/admin/general-settings/refer-to-options/{id}",
+                request);
+        }
+
+        public async Task DeleteReferToOptionAsync(
+            uint id,
+            CancellationToken ct = default)
+        {
+            await DeleteAsync(
+                $"api/admin/general-settings/refer-to-options/{id}",
+                ct);
+        }
+
         public async Task<RangeExtenderLinkUrlDto?> GetRangeExtenderLinkUrlAsync(
             CancellationToken ct = default)
         {
@@ -218,6 +302,59 @@ namespace SmartGridSuite.Client.Services
                 {
                     Url = url ?? string.Empty
                 },
+                ct);
+        }
+
+        // -------------------------
+        // Dispatch Closeout Checklist Definitions
+        // -------------------------
+
+        public async Task<List<DispatchCloseoutChecklistDefinitionDto>>
+            GetDispatchCloseoutChecklistDefinitionsAsync(
+                bool activeOnly = false)
+        {
+            var url =
+                "api/admin/general-settings/" +
+                "dispatch-closeout-checklist-definitions" +
+                $"?activeOnly={activeOnly.ToString().ToLowerInvariant()}";
+
+            return await GetAsync<
+                       List<DispatchCloseoutChecklistDefinitionDto>>(url)
+                   ?? new List<DispatchCloseoutChecklistDefinitionDto>();
+        }
+
+        public async Task<DispatchCloseoutChecklistDefinitionDto?>
+            CreateDispatchCloseoutChecklistDefinitionAsync(
+                SaveDispatchCloseoutChecklistDefinitionRequest request)
+        {
+            return await PostAsync<
+                SaveDispatchCloseoutChecklistDefinitionRequest,
+                DispatchCloseoutChecklistDefinitionDto>(
+                "api/admin/general-settings/" +
+                "dispatch-closeout-checklist-definitions",
+                request);
+        }
+
+        public async Task<DispatchCloseoutChecklistDefinitionDto?>
+            UpdateDispatchCloseoutChecklistDefinitionAsync(
+                uint id,
+                SaveDispatchCloseoutChecklistDefinitionRequest request)
+        {
+            return await PutAsync<
+                SaveDispatchCloseoutChecklistDefinitionRequest,
+                DispatchCloseoutChecklistDefinitionDto>(
+                "api/admin/general-settings/" +
+                $"dispatch-closeout-checklist-definitions/{id}",
+                request);
+        }
+
+        public async Task DeleteDispatchCloseoutChecklistDefinitionAsync(
+            uint id,
+            CancellationToken ct = default)
+        {
+            await DeleteAsync(
+                "api/admin/general-settings/" +
+                $"dispatch-closeout-checklist-definitions/{id}",
                 ct);
         }
 

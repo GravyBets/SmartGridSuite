@@ -1,5 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data.Entities;
+using SmartGridSuite.Contracts.Settings;
 
 namespace SmartGridSuite.Api.Data
 {
@@ -65,9 +66,25 @@ namespace SmartGridSuite.Api.Data
         public DbSet<TicketWriteUpSubmissionEntity> TicketWriteUpSubmissions => Set<TicketWriteUpSubmissionEntity>();
 
         public DbSet<TicketWriteUpSubmissionTechnicianEntity> TicketWriteUpSubmissionTechnicians
-        => Set<TicketWriteUpSubmissionTechnicianEntity>();
+            => Set<TicketWriteUpSubmissionTechnicianEntity>();
+
+        public DbSet<TicketWriteUpSubmissionFlagEntity> TicketWriteUpSubmissionFlags
+            => Set<TicketWriteUpSubmissionFlagEntity>();
+
+        public DbSet<TicketWriteUpSubmissionReferToOptionEntity> TicketWriteUpSubmissionReferToOptions
+            => Set<TicketWriteUpSubmissionReferToOptionEntity>();
+
+        public DbSet<TicketWriteUpSubmissionCloseoutItemEntity>TicketWriteUpSubmissionCloseoutItems
+            => Set<TicketWriteUpSubmissionCloseoutItemEntity>();
 
         public virtual DbSet<CommunicationDeviceTypeEntity> CommunicationDeviceTypes { get; set; }
+
+        public DbSet<WriteUpFlagEntity> WriteUpFlags => Set<WriteUpFlagEntity>();
+
+        public DbSet<ReferToOptionEntity> ReferToOptions => Set<ReferToOptionEntity>();
+
+        public DbSet<DispatchCloseoutChecklistDefinitionEntity> DispatchCloseoutChecklistDefinitions =>
+            Set<DispatchCloseoutChecklistDefinitionEntity>();
 
         public DbSet<DailyTicketAssignmentEntity> DailyTicketAssignments => Set<DailyTicketAssignmentEntity>();
 
@@ -555,6 +572,170 @@ namespace SmartGridSuite.Api.Data
                     .HasDatabaseName("ux_communication_device_types_display_name");
             });
 
+            modelBuilder.Entity<WriteUpFlagEntity>(entity =>
+            {
+                entity.ToTable("write_up_flags");
+
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("id");
+
+                entity.Property(e => e.DisplayName)
+                    .HasColumnName("display_name")
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(e => e.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("tinyint(1)")
+                    .HasDefaultValue(true);
+
+                entity.Property(e => e.SortOrder)
+                    .HasColumnName("sort_order")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.IsTechnicianVisible)
+                    .HasColumnName("is_technician_visible")
+                    .HasColumnType("tinyint(1)")
+                    .HasDefaultValue(true);
+
+                entity.Property(e => e.IsSystem)
+                    .HasColumnName("is_system")
+                    .HasColumnType("tinyint(1)")
+                    .HasDefaultValue(false);
+
+                entity.Property(e => e.SystemKey)
+                    .HasColumnName("system_key")
+                    .HasMaxLength(100);
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at");
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at");
+
+                entity.HasIndex(e => e.DisplayName)
+                    .IsUnique()
+                    .HasDatabaseName("ux_write_up_flags_display_name");
+
+                entity.HasIndex(e => e.SystemKey)
+                    .IsUnique()
+                    .HasDatabaseName("ux_write_up_flags_system_key");
+            });
+
+            modelBuilder.Entity<ReferToOptionEntity>(entity =>
+            {
+                entity.ToTable("refer_to_options");
+
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("id");
+
+                entity.Property(e => e.DisplayName)
+                    .HasColumnName("display_name")
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(e => e.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("tinyint(1)")
+                    .HasDefaultValue(true);
+
+                entity.Property(e => e.SortOrder)
+                    .HasColumnName("sort_order")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at")
+                    .HasColumnType("datetime(6)");
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at")
+                    .HasColumnType("datetime(6)");
+
+                entity.HasIndex(e => e.DisplayName)
+                    .IsUnique()
+                    .HasDatabaseName("ux_refer_to_options_display_name");
+            });
+
+            modelBuilder.Entity<DispatchCloseoutChecklistDefinitionEntity>(entity =>
+            {
+                entity.ToTable("dispatch_closeout_checklist_definitions");
+
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("id");
+
+                entity.Property(e => e.DisplayName)
+                    .HasColumnName("display_name")
+                    .HasMaxLength(150)
+                    .IsRequired();
+
+                entity.Property(e => e.IsActive)
+                    .HasColumnName("is_active")
+                    .HasColumnType("tinyint(1)")
+                    .HasDefaultValue(true);
+
+                entity.Property(e => e.SortOrder)
+                    .HasColumnName("sort_order")
+                    .HasDefaultValue(0);
+
+                entity.Property(e => e.IsRequired)
+                    .HasColumnName("is_required")
+                    .HasColumnType("tinyint(1)")
+                    .HasDefaultValue(true);
+
+                entity.Property(e => e.ConditionType)
+                    .HasColumnName("condition_type")
+                    .HasMaxLength(32)
+                    .HasDefaultValue(
+                        DispatchCloseoutConditionTypes.Always)
+                    .IsRequired();
+
+                entity.Property(e => e.WriteUpFlagId)
+                    .HasColumnName("write_up_flag_id");
+
+                entity.Property(e => e.ReferToOptionId)
+                    .HasColumnName("refer_to_option_id");
+
+                entity.Property(e => e.CreatedAt)
+                    .HasColumnName("created_at")
+                    .HasColumnType("datetime(6)");
+
+                entity.Property(e => e.UpdatedAt)
+                    .HasColumnName("updated_at")
+                    .HasColumnType("datetime(6)");
+
+                entity.HasIndex(e => e.DisplayName)
+                    .IsUnique()
+                    .HasDatabaseName(
+                        "ux_closeout_checklist_display_name");
+
+                entity.HasIndex(e => e.WriteUpFlagId)
+                    .HasDatabaseName(
+                        "ix_closeout_checklist_write_up_flag");
+
+                entity.HasIndex(e => e.ReferToOptionId)
+                    .HasDatabaseName(
+                        "ix_closeout_checklist_refer_to_option");
+
+                entity.HasOne(e => e.WriteUpFlag)
+                    .WithMany()
+                    .HasForeignKey(e => e.WriteUpFlagId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .HasConstraintName(
+                        "fk_closeout_checklist_write_up_flag");
+
+                entity.HasOne(e => e.ReferToOption)
+                    .WithMany()
+                    .HasForeignKey(e => e.ReferToOptionId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .HasConstraintName(
+                        "fk_closeout_checklist_refer_to_option");
+            });
             modelBuilder.Entity<SiteNoteEntity>(e =>
             {
                 e.ToTable("site_notes");
@@ -1970,6 +2151,209 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.EditedBy)
                     .HasColumnName("edited_by")
                     .HasMaxLength(100);
+            });
+
+            // Stores write-up flags separately from the submitted narrative.
+            modelBuilder.Entity<TicketWriteUpSubmissionFlagEntity>(e =>
+            {
+                e.ToTable("ticket_writeup_submission_flags");
+
+                e.HasKey(x => new
+                {
+                    x.SubmissionId,
+                    x.WriteUpFlagId
+                });
+
+                e.Property(x => x.SubmissionId)
+                    .HasColumnName("submission_id");
+
+                e.Property(x => x.WriteUpFlagId)
+                    .HasColumnName("write_up_flag_id")
+                    .HasColumnType("int unsigned");
+
+                e.Property(x => x.DisplayNameSnapshot)
+                    .HasColumnName("display_name_snapshot")
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                e.Property(x => x.SelectionSource)
+                    .HasColumnName("selection_source")
+                    .HasMaxLength(20)
+                    .HasDefaultValue("Manual")
+                    .IsRequired();
+
+                e.Property(x => x.AutomaticReason)
+                    .HasColumnName("automatic_reason")
+                    .HasMaxLength(255);
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at")
+                    .HasColumnType("datetime(6)")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                    .ValueGeneratedOnAdd();
+
+                e.HasIndex(x => x.WriteUpFlagId)
+                    .HasDatabaseName("ix_submission_flags_flag");
+
+                e.HasOne(x => x.Submission)
+                    .WithMany()
+                    .HasForeignKey(x => x.SubmissionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.WriteUpFlag)
+                    .WithMany()
+                    .HasForeignKey(x => x.WriteUpFlagId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Stores Refer To destinations separately from the submitted narrative.
+            modelBuilder.Entity<TicketWriteUpSubmissionReferToOptionEntity>(e =>
+            {
+                e.ToTable("ticket_writeup_submission_refer_to_options");
+
+                e.HasKey(x => new
+                {
+                    x.SubmissionId,
+                    x.ReferToOptionId
+                });
+
+                e.Property(x => x.SubmissionId)
+                    .HasColumnName("submission_id");
+
+                e.Property(x => x.ReferToOptionId)
+                    .HasColumnName("refer_to_option_id")
+                    .HasColumnType("int unsigned");
+
+                e.Property(x => x.DisplayNameSnapshot)
+                    .HasColumnName("display_name_snapshot")
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at")
+                    .HasColumnType("datetime(6)")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                    .ValueGeneratedOnAdd();
+
+                e.HasIndex(x => x.ReferToOptionId)
+                    .HasDatabaseName("ix_submission_refer_to_option");
+
+                e.HasOne(x => x.Submission)
+                    .WithMany()
+                    .HasForeignKey(x => x.SubmissionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.ReferToOption)
+                    .WithMany()
+                    .HasForeignKey(x => x.ReferToOptionId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Stores the permanent Dispatch closeout checklist generated
+            // for one specific submitted technician write-up.
+            modelBuilder.Entity<TicketWriteUpSubmissionCloseoutItemEntity>(e =>
+            {
+                e.ToTable(
+                    "ticket_writeup_submission_closeout_items");
+
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.Id)
+                    .HasColumnName("id")
+                    .ValueGeneratedOnAdd();
+
+                e.Property(x => x.SubmissionId)
+                    .HasColumnName("submission_id");
+
+                e.Property(x => x.DefinitionId)
+                    .HasColumnName("definition_id")
+                    .HasColumnType("int unsigned");
+
+                e.Property(x => x.DisplayNameSnapshot)
+                    .HasColumnName("display_name_snapshot")
+                    .HasMaxLength(150)
+                    .IsRequired();
+
+                e.Property(x => x.SortOrderSnapshot)
+                    .HasColumnName("sort_order_snapshot")
+                    .HasDefaultValue(0);
+
+                e.Property(x => x.IsRequired)
+                    .HasColumnName("is_required")
+                    .HasColumnType("tinyint(1)")
+                    .HasDefaultValue(true);
+
+                e.Property(x => x.ConditionTypeSnapshot)
+                    .HasColumnName("condition_type_snapshot")
+                    .HasMaxLength(32)
+                    .IsRequired();
+
+                e.Property(x => x.WriteUpFlagId)
+                    .HasColumnName("write_up_flag_id")
+                    .HasColumnType("int unsigned");
+
+                e.Property(x => x.ReferToOptionId)
+                    .HasColumnName("refer_to_option_id")
+                    .HasColumnType("int unsigned");
+
+                e.Property(x => x.IsCompleted)
+                    .HasColumnName("is_completed")
+                    .HasColumnType("tinyint(1)")
+                    .HasDefaultValue(false);
+
+                e.Property(x => x.CompletedBy)
+                    .HasColumnName("completed_by")
+                    .HasMaxLength(150);
+
+                e.Property(x => x.CompletedAt)
+                    .HasColumnName("completed_at")
+                    .HasColumnType("datetime(6)");
+
+                e.Property(x => x.CreatedAt)
+                    .HasColumnName("created_at")
+                    .HasColumnType("datetime(6)")
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP(6)");
+
+                e.HasIndex(x => new
+                {
+                    x.SubmissionId,
+                    x.DefinitionId
+                })
+                    .IsUnique()
+                    .HasDatabaseName(
+                        "ux_submission_closeout_definition");
+
+                e.HasIndex(x => new
+                {
+                    x.SubmissionId,
+                    x.SortOrderSnapshot,
+                    x.Id
+                })
+                    .HasDatabaseName(
+                        "ix_submission_closeout_submission");
+
+                e.HasIndex(x => new
+                {
+                    x.SubmissionId,
+                    x.IsRequired,
+                    x.IsCompleted
+                })
+                    .HasDatabaseName(
+                        "ix_submission_closeout_required_complete");
+
+                e.HasOne(x => x.Submission)
+                    .WithMany()
+                    .HasForeignKey(x => x.SubmissionId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .HasConstraintName(
+                        "fk_submission_closeout_submission");
+
+                e.HasOne(x => x.Definition)
+                    .WithMany()
+                    .HasForeignKey(x => x.DefinitionId)
+                    .OnDelete(DeleteBehavior.SetNull)
+                    .HasConstraintName(
+                        "fk_submission_closeout_definition");
             });
 
             // Maps the technicians who participated in a submitted write-up so every
