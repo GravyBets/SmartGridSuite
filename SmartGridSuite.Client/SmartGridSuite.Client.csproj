@@ -7,10 +7,10 @@
     <UseWPF>true</UseWPF>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <ApplicationIcon>Assets\Branding\SmartGridSuite_Icon.ico</ApplicationIcon>
-    <Version>2.0.0.5</Version>
-    <AssemblyVersion>2.0.0.5</AssemblyVersion>
-    <FileVersion>2.0.0.5</FileVersion>
-    <InformationalVersion>2.0.0.5</InformationalVersion>
+    <Version>3.0.0.1</Version>
+    <AssemblyVersion>3.0.0.1</AssemblyVersion>
+    <FileVersion>3.0.0.1</FileVersion>
+    <InformationalVersion>3.0.0.1</InformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>

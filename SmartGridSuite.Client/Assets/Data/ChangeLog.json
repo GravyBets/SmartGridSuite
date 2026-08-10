@@ -1,5 +1,24 @@
 [
   {
+    "version": "3.0.0.1",
+    "date": "August 10, 2026",
+    "title": "Write-up workflow and Dispatch closeout overhaul",
+    "changes": [
+      "Added configurable technician Write-Up Flags, including protected DB Correction Needed and Will Need Follow-Up system flags.",
+      "Added configurable Refer To destinations with support for selecting multiple departments or work groups on a write-up.",
+      "Added automatic API-side DB Correction Needed detection when equipment is replaced or an existing site IP address is changed.",
+      "Added configurable Dispatch closeout checklist definitions with Always, Write-Up Flag, and Refer To selection triggers.",
+      "Added persistent shared Dispatch closeout checklists that record completion status, completed by, and completed date/time.",
+      "Added API-enforced ticket closure rules so required closeout items must be completed before a ticket can be closed.",
+      "Redesigned Dispatch Tasks with expandable rows containing the submitted technician write-up, selected flags, Refer To destinations, and shared closeout checklist.",
+      "Added activity-aware automatic refreshing to Dispatch Tasks without interrupting active dispatcher work.",
+      "Expanded RX searching and improved cached fallback behavior when the Parent database is unavailable.",
+      "Improved Tower search and Tower dashboard cached fallback behavior.",
+      "Improved application title-bar and network-result theming across supported themes."
+    ]
+  },
+
+  {
     "version": "2.0.0.5",
     "date": "August 4, 2026",
     "title": "Reliability and performance improvements",
