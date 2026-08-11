@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.0.0.2",
+    "date": "August 11, 2026",
+    "title": "Write-up laptop and Tower search hotfix",
+    "changes": [
+      "Fixed the Site Dashboard write-up panel on laptop-height displays so expanded Write-Up Flags, Refer To options, and SNMP categories cannot hide the Submit button.",
+      "Made the write-up options independently scrollable while keeping the Submit button pinned and visible.",
+      "Fixed Tower searches so hyphens, underscores, and spaces are treated equivalently.",
+      "Fixed Tower search fallback so cached tower data is searched when the Parent database returns no matching live results."
+    ]
+  },
+
+  {
     "version": "3.0.0.1",
     "date": "August 10, 2026",
     "title": "Write-up workflow and Dispatch closeout overhaul",

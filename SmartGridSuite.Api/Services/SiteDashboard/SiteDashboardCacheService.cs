@@ -356,26 +356,33 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                 take = 100;
             }
 
-            var normalizedTerm =
-                term.ToUpperInvariant();
+            var normalizedTerm = term
+                .ToUpperInvariant()
+                .Replace("-", "")
+                .Replace("_", "")
+                .Replace(" ", "");
 
-            var towers =
-                await _db.CacheTowers
-                    .AsNoTracking()
-                    .Where(
-                        x =>
-                            x.IsActive &&
-                            (
-                                (x.TopName != null &&
-                                 x.TopName.ToUpper()
-                                     .Contains(normalizedTerm)) ||
-                                (x.TopDescription != null &&
-                                 x.TopDescription.ToUpper()
-                                     .Contains(normalizedTerm))
-                            ))
-                    .OrderBy(x => x.TopName)
-                    .Take(take)
-                    .ToListAsync(cancellationToken);
+            var towers = await _db.CacheTowers
+                .AsNoTracking()
+                .Where(x => x.IsActive && (
+                        (x.TopName != null &&
+                            x.TopName
+                                .ToUpper()
+                                .Replace("-", "")
+                                .Replace("_", "")
+                                .Replace(" ", "")
+                                .Contains(normalizedTerm)) ||
+                        (x.TopDescription != null &&
+                            x.TopDescription
+                                .ToUpper()
+                                .Replace("-", "")
+                                .Replace("_", "")
+                                .Replace(" ", "")
+                                .Contains(normalizedTerm))
+                ))
+                .OrderBy(x => x.TopName)
+                .Take(take)
+                .ToListAsync(cancellationToken);
 
             var topNameIds =
                 towers

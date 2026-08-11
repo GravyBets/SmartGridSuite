@@ -902,63 +902,70 @@
                                     BorderThickness="1"
                                     Background="{DynamicResource SurfaceBg}">
 
-                                <!-- Border can only have ONE child -->
-                                <StackPanel>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                                    <TextBlock Text="Available Ticket Requests"
+                                    <ScrollViewer Grid.Row="0"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <StackPanel Margin="0,0,4,0">
+                                            <TextBlock Text="Available Ticket Requests"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" />
 
-                                    <TextBlock x:Name="TicketRequestsDescriptionTextBlock"
-                                               Text="Only request actions available for this ticket are shown."
-                                               TextWrapping="Wrap"
-                                               Margin="0,6,0,0"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource TextSecondary}" />
+                                            <TextBlock x:Name="TicketRequestsDescriptionTextBlock"
+                                                        Text="Only request actions available for this ticket are shown."
+                                                        TextWrapping="Wrap"
+                                                        Margin="0,6,0,0"
+                                                        FontSize="11"
+                                                        Foreground="{DynamicResource TextSecondary}" />
 
-                                    <Button x:Name="RequestTicketButton"
-                                            Style="{StaticResource SecondaryButtonStyle}"
-                                            Content="Request Ticket"
-                                            Height="30"
-                                            Margin="0,10,0,0"
-                                            Padding="12,0"
-                                            HorizontalAlignment="Stretch"
-                                            Click="RequestTicketButton_Click" />
+                                                <Button x:Name="RequestTicketButton"
+                                                        Style="{StaticResource SecondaryButtonStyle}"
+                                                        Content="Request Ticket"
+                                                        Height="30"
+                                                        Margin="0,10,0,0"
+                                                        Padding="12,0"
+                                                        HorizontalAlignment="Stretch"
+                                                        Click="RequestTicketButton_Click" />
 
-                                    <Button x:Name="RequestMaintenanceButton"
-                                            Style="{StaticResource SecondaryButtonStyle}"
-                                            Content="Request Maintenance"
-                                            Height="30"
-                                            Margin="0,6,0,0"
-                                            Padding="12,0"
-                                            HorizontalAlignment="Stretch"
-                                            Click="RequestMaintenanceButton_Click" />
+                                                <Button x:Name="RequestMaintenanceButton"
+                                                        Style="{StaticResource SecondaryButtonStyle}"
+                                                        Content="Request Maintenance"
+                                                        Height="30"
+                                                        Margin="0,6,0,0"
+                                                        Padding="12,0"
+                                                        HorizontalAlignment="Stretch"
+                                                        Click="RequestMaintenanceButton_Click" />
 
-                                    <Button x:Name="RequestCapitalButton"
-                                            Style="{StaticResource SecondaryButtonStyle}"
-                                            Content="Request Capital"
-                                            Height="30"
-                                            Margin="0,6,0,0"
-                                            Padding="12,0"
-                                            HorizontalAlignment="Stretch"
-                                            Click="RequestCapitalButton_Click" />
+                                                <Button x:Name="RequestCapitalButton"
+                                                        Style="{StaticResource SecondaryButtonStyle}"
+                                                        Content="Request Capital"
+                                                        Height="30"
+                                                        Margin="0,6,0,0"
+                                                        Padding="12,0"
+                                                        HorizontalAlignment="Stretch"
+                                                        Click="RequestCapitalButton_Click" />
 
-                                    <StackPanel x:Name="WriteUpFlagsSection"
-                                                Visibility="Collapsed">
+                                            <StackPanel x:Name="WriteUpFlagsSection"
+                                                        Visibility="Collapsed">
 
-                                        <Border Height="1"
-                                                Margin="0,14,0,12"
-                                                Background="{DynamicResource SurfaceBorder}" />
+                                                <Border Height="1"
+                                                        Margin="0,14,0,12"
+                                                        Background="{DynamicResource SurfaceBorder}" />
 
-                                        <TextBlock Text="Write-Up Flags"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextPrimary}" />
+                                            <TextBlock Text="Write-Up Flags"
+                                                        FontWeight="SemiBold"
+                                                        Foreground="{DynamicResource TextPrimary}" />
 
-                                        <TextBlock Text="Select any flags that apply to this write-up."
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,5,0,0"
-                                                   FontSize="11"
-                                                   Foreground="{DynamicResource TextSecondary}" />
+                                            <TextBlock Text="Select any flags that apply to this write-up."
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,5,0,0"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondary}" />
 
                                         <!--
                                             Administrator-configured Write-Up Flags are inserted here.
@@ -1034,16 +1041,20 @@
                                                   Foreground="{DynamicResource TextPrimary}" />
                                     </StackPanel>
 
+                                        </StackPanel>
+                                    </ScrollViewer>
+
                                     <Button x:Name="SubmitWriteUpButton"
+                                            Grid.Row="1"
                                             Style="{StaticResource PrimaryButtonStyle}"
                                             Content="Submit"
                                             Height="32"
-                                            Margin="0,16,0,0"
+                                            Margin="0,10,0,0"
                                             Padding="14,0"
                                             HorizontalAlignment="Stretch"
                                             Click="SubmitWriteUpButton_Click" />
 
-                                </StackPanel>
+                                </Grid>
                             </Border>
                         </Grid>
                     </Grid>

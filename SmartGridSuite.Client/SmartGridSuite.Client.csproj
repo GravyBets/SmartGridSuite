@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
@@ -7,13 +7,13 @@
     <UseWPF>true</UseWPF>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <ApplicationIcon>Assets\Branding\SmartGridSuite_Icon.ico</ApplicationIcon>
-    <Version>3.0.0.1</Version>
-    <AssemblyVersion>3.0.0.1</AssemblyVersion>
-    <FileVersion>3.0.0.1</FileVersion>
-    <InformationalVersion>3.0.0.1</InformationalVersion>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
+        <Version>3.0.0.2</Version>
+        <AssemblyVersion>3.0.0.2</AssemblyVersion>
+        <FileVersion>3.0.0.2</FileVersion>
+        <InformationalVersion>3.0.0.2</InformationalVersion>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
-  <ItemGroup>
+	<ItemGroup>
     <None Remove="Assets\Branding\CenterPoint Logo Black Transparent bkgrnd.png" />
     <None Remove="Assets\Branding\CenterPoint Logo Color Transparent bkgrnd.png" />
     <None Remove="Assets\Branding\CenterPoint Logo Color White text Transparent bkgrnd.png" />

@@ -204,8 +204,8 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
         }
 
         public async Task<AssociatedSiteByIpLookupDto> FindAssociatedSiteByIpAsync(
-        string ip,
-        CancellationToken cancellationToken = default)
+            string ip,
+            CancellationToken cancellationToken = default)
         {
             using var liveLookupCancellation =
                 CancellationTokenSource.CreateLinkedTokenSource(
@@ -361,11 +361,24 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                         take,
                         liveLookupCancellation.Token);
 
-                return new TowerSearchLookupResult
+                if (liveRows.Count > 0)
                 {
-                    State = SiteDashboardLookupState.Live,
-                    Rows = liveRows
-                };
+                    return new TowerSearchLookupResult
+                    {
+                        State = SiteDashboardLookupState.Live,
+                        Rows = liveRows
+                    };
+                }
+
+                _logger.LogInformation(
+                    "Parent database tower search returned no results for " +
+                    "{SearchTerm}. Attempting cached tower search.",
+                    term);
+
+                return await SearchCachedTowersAsync(
+                    term,
+                    take,
+                    cancellationToken);
             }
             catch (OperationCanceledException ex)
                 when (!cancellationToken.IsCancellationRequested &&
