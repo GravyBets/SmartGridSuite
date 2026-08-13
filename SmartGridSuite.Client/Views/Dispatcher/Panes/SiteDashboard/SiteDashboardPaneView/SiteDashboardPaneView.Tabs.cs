@@ -255,7 +255,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return result == MessageBoxResult.Yes;
         }
 
-        public bool ConfirmDiscardWriteUpsForShellClose()
+        public bool ConfirmDiscardWriteUpsForShellClose(Window? owner = null)
         {
             /*
              * Capture the currently visible TextBox before checking
@@ -296,13 +296,37 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 "Leaving the Field Technician module will permanently " +
                 "discard the unsubmitted write-up text. Continue?";
 
-            return MessageBox.Show(
-                       Window.GetWindow(this),
-                       message,
-                       "Unsaved Write-Up",
-                       MessageBoxButton.YesNo,
-                       MessageBoxImage.Warning)
-                   == MessageBoxResult.Yes;
+            var messageBoxOwner = owner ?? Window.GetWindow(this);
+
+            MessageBoxResult result;
+
+            if (messageBoxOwner is not null)
+            {
+                result =
+                    MessageBox.Show(
+                        messageBoxOwner,
+                        message,
+                        "Unsaved Write-Up",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+            }
+            else
+            {
+                /*
+                 * Final safety fallback. A detached Site Dashboard view may no
+                 * longer have a Window ancestor, but unsaved-write-up protection
+                 * must never crash the application because of that.
+                 */
+                result =
+                    MessageBox.Show(
+                        message,
+                        "Unsaved Write-Up",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+            }
+
+            return result ==
+                   MessageBoxResult.Yes;
         }
 
         public void LoadPoppedOutSessions(IEnumerable<SiteDashboardTabSession> sessions, string? selectedSessionKey)

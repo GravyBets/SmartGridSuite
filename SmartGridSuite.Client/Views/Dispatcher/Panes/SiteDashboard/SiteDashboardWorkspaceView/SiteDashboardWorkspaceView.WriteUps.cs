@@ -65,6 +65,27 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
 
             /*
+             * Refer To is part of the permanent write-up narrative,
+             * so include the friendly selected destinations before the
+             * technician sees the Submit preview.
+             *
+             * The API also validates/inserts this line server-side, so
+             * the saved record remains protected even if an older client
+             * submits only the structured ReferToOptionIds.
+             */
+            var referToNames =
+                GetSelectedReferToOptionNames();
+
+            if (referToNames.Count > 0)
+            {
+                sections.Add(
+                    "Refer To: " +
+                    string.Join(
+                        ", ",
+                        referToNames));
+            }
+
+            /*
              * Record every IP address that was changed in the
              * Network card. These lines become part of both the
              * Dispatch write-up and Site History write-up.

@@ -215,6 +215,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 ReferToOptionsPanel);
         }
 
+        private IReadOnlyList<string> GetSelectedReferToOptionNames()
+        {
+            if (IncludeReferToCheckBox.IsChecked != true)
+                return Array.Empty<string>();
+
+            return ReferToOptionsPanel.Children
+                .OfType<CheckBox>()
+                .Where(x => x.IsChecked == true)
+                .Select(x =>
+                    (x.Content?.ToString() ?? string.Empty).Trim())
+                .Where(x =>
+                    !string.IsNullOrWhiteSpace(x))
+                .Distinct(
+                    StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         private static IReadOnlyList<uint> GetCheckedIds(
             Panel panel)
         {

@@ -347,7 +347,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
                 return;
 
             if (_siteDashboardPaneView
-                .ConfirmDiscardWriteUpsForShellClose())
+                .ConfirmDiscardWriteUpsForShellClose(this))
             {
                 return;
             }
