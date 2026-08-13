@@ -31,6 +31,7 @@ namespace SmartGridSuite.Api.Controllers
         private const string TechnicianRoleCode = "TECHNICIAN";
 
         private const string AssignmentStatusActive = "Active";
+        private const string AssignmentStatusCompleted = "Completed";
 
         private const string TicketSiteRequiredMessage =
             "A Site Number is required before this ticket can be saved. " +
@@ -1396,22 +1397,26 @@ namespace SmartGridSuite.Api.Controllers
                     x.TargetType == "Technician" &&
                     x.TechnicianId == technicianId &&
                     x.PublishedVersion == latestPublishedVersion.Value &&
+                    x.SourceAssignment != null &&
+
+                    x.SourceAssignment.AssignmentStatus ==
+                        AssignmentStatusActive &&
 
                     /*
-                     * A published row describes what Dispatch last sent to the field,
-                     * but the source Daily Assignment remains authoritative for whether
-                     * that work is still active.
+                     * The source assignment is authoritative not only for lifecycle,
+                     * but also for CURRENT route ownership.
                      *
-                     * Removed or completed assignments must disappear from My Tasks
-                     * immediately without destroying the published snapshot.
+                     * A published snapshot for Tech A must stop being actionable if
+                     * Dispatch later moves that same active assignment to Tech B.
                      *
-                     * SourceAssignmentId may also be null on legacy rows whose source
-                     * assignment was previously hard-deleted. Those are no longer
-                     * active work either.
+                     * TruckId is intentionally NOT compared here because technician
+                     * ownership is stable while truck/crew display context may change.
                      */
-                    x.SourceAssignment != null &&
-                    x.SourceAssignment.AssignmentStatus ==
-                        AssignmentStatusActive)
+                    x.SourceAssignment.TargetType ==
+                        "Technician" &&
+
+                    x.SourceAssignment.TechnicianId ==
+                        technicianId)
                 .OrderBy(x => x.SortOrder)
                 .ThenBy(x => x.Id)
                 .ToListAsync(ct);
@@ -3954,15 +3959,23 @@ namespace SmartGridSuite.Api.Controllers
                 entity.LastActivityAt = submittedAt;
                 entity.Status = writeUpSubmitStatus.Name;
 
-                await CreateSubmittedWriteUpRecordsAsync(
-                    entity,
-                    canonicalSiteHistoryWriteUp,
+                var writeUpSubmissionId =
+                    await CreateSubmittedWriteUpRecordsAsync(
+                        entity,
+                        canonicalSiteHistoryWriteUp,
+                        submittedWork,
+                        clientSubmissionId,
+                        submittedAt,
+                        selectedWriteUpFlags,
+                        selectedReferToOptions,
+                        automaticDbCorrectionReason,
+                        ct);
+
+                await CompleteActiveDailyAssignmentForWriteUpAsync(
+                    entity.Id,
+                    writeUpSubmissionId,
                     submittedWork,
-                    clientSubmissionId,
                     submittedAt,
-                    selectedWriteUpFlags,
-                    selectedReferToOptions,
-                    automaticDbCorrectionReason,
                     ct);
 
                 await _db.SaveChangesAsync(ct);
@@ -4018,7 +4031,7 @@ namespace SmartGridSuite.Api.Controllers
 
         // Creates Site History, the structured write-up submission, and permanent
         // participant rows using the client idempotency key for duplicate protection.
-        private async Task CreateSubmittedWriteUpRecordsAsync(
+        private async Task<long> CreateSubmittedWriteUpRecordsAsync(
             TicketEntity ticket,
             string siteHistoryWriteUp,
             SubmittedWorkInfo submittedWork,
@@ -4201,6 +4214,68 @@ namespace SmartGridSuite.Api.Controllers
                 selectedReferToOptions,
                 submittedAt,
                 ct);
+            return submission.Id;
+        }
+
+        private async Task CompleteActiveDailyAssignmentForWriteUpAsync(
+            long ticketId,
+            long writeUpSubmissionId,
+            SubmittedWorkInfo submittedWork,
+            DateTime completedAt,
+            CancellationToken ct)
+        {
+            /*
+             * A write-up completes the CURRENT Daily Assignment, not the
+             * technician's long-term relationship with the ticket.
+             *
+             * If this ticket was not currently on a Daily Assignment,
+             * there is nothing to complete.
+             */
+            var assignment =
+                await _db.DailyTicketAssignments
+                    .FirstOrDefaultAsync(
+                        x =>
+                            x.AssignmentDate == ActiveAssignmentDate &&
+                            x.TicketId == ticketId &&
+                            x.AssignmentStatus == AssignmentStatusActive,
+                        ct);
+
+            if (assignment is null)
+                return;
+
+            var completedBy =
+                FirstNonBlank(
+                    submittedWork.SubmittedByName,
+                    submittedWork.SubmittedByEmployeeId,
+                    "Unknown");
+
+            assignment.AssignmentStatus =
+                AssignmentStatusCompleted;
+
+            assignment.CompletedAt =
+                completedAt;
+
+            assignment.CompletedBy =
+                TrimForColumn(
+                    completedBy,
+                    100);
+
+            assignment.CompletedWriteUpSubmissionId =
+                writeUpSubmissionId;
+
+            /*
+             * Completion and removal are mutually exclusive lifecycle paths.
+             */
+            assignment.RemovedAt = null;
+            assignment.RemovedBy = null;
+
+            assignment.UpdatedAt =
+                completedAt;
+
+            assignment.UpdatedBy =
+                TrimForColumn(
+                    completedBy,
+                    100);
         }
 
         // Generates the permanent Dispatch closeout checklist for one

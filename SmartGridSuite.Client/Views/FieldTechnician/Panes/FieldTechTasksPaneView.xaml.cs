@@ -74,6 +74,18 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
             await LoadTasksAsync();
         }
 
+        /*
+         * Allows the Field Technician shell to request a fresh task list
+         * whenever the technician returns to the Tasks pane.
+         *
+         * LoadTasksAsync already owns the busy guard and all API/offline
+         * error handling, so callers do not need to duplicate that logic.
+         */
+        public Task RefreshAsync()
+        {
+            return LoadTasksAsync();
+        }
+
         // Loads API-defined task sections while preserving the last successful result
         // whenever the API or field network is temporarily unavailable.
         private async Task LoadTasksAsync()

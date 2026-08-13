@@ -105,8 +105,26 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
                     break;
 
                 case "Tasks":
-                    MainPaneHost.Content = GetOrCreateTasksPane();
-                    break;
+                    {
+                        var tasksPane =
+                            GetOrCreateTasksPane();
+
+                        MainPaneHost.Content =
+                            tasksPane;
+
+                        /*
+                         * Daily Assignment lifecycle may have changed while the
+                         * technician was working in Site Dashboard.
+                         *
+                         * Refresh every time Tasks becomes active so a completed
+                         * assignment immediately moves out of Daily Assignments and,
+                         * when the technician is still attached to the ticket, can
+                         * appear under Other Assigned Tickets.
+                         */
+                        _ = tasksPane.RefreshAsync();
+
+                        break;
+                    }
 
                 case "History":
                     _historyPaneView ??= new FieldTechHistoryPaneView();

@@ -1688,57 +1688,44 @@ namespace SmartGridSuite.Api.Controllers
             if (draftAssignments.Count == 0)
             {
                 /*
-                 * Publishing an empty target removes that target's field-tech task list.
-                 * The ticket records above are also returned to unassigned when eligible.
+                 * Published assignment rows are permanent snapshots.
+                 *
+                 * An empty current route must not delete previous publications.
+                 * Active/Removed/Completed state on the source assignment determines
+                 * whether old published rows are still actionable by Field Tech.
                  */
-                var existingPublishedRows = await FilterPublishedTargetRows(
-                    _db.DailyTicketAssignmentPublished,
-                    workDate,
-                    cleanTargetType,
-                    truckId,
-                    technicianId)
-                .ToListAsync(ct);
-
-                if (existingPublishedRows.Count > 0)
-                    _db.DailyTicketAssignmentPublished.RemoveRange(existingPublishedRows);
-
                 await _db.SaveChangesAsync(ct);
 
                 return Ok(new PublishDailyAssignmentTargetResponse
                 {
                     WorkDate = rosterDate,
                     TargetType = cleanTargetType,
-                    TruckId = truckId == null ? null : (int?)truckId.Value,
-                    TechnicianId = technicianId == null ? null : (int?)technicianId.Value,
+                    TruckId = truckId == null
+                        ? null
+                        : (int?)truckId.Value,
+                    TechnicianId = technicianId == null
+                        ? null
+                        : (int?)technicianId.Value,
                     PublishedCount = 0,
                     PublishedVersion = nextPublishedVersion,
                     PublishedAt = now,
                     PublishedBy = publishedBy,
 
                     EmailStatus = "Skipped",
-                    EmailMessage = "No tickets are currently published for this target. Email was not sent."
+                    EmailMessage =
+                        "No tickets are currently published for this target. Email was not sent."
                 });
             }
-
             /*
-             * DailyTicketAssignmentPublished is the active published route snapshot
-             * used by Field Technician My Tasks.
+             * Every publish is an immutable historical snapshot.
              *
-             * Replace this target's old published rows with the newly published list.
-             * Otherwise removed/moved tickets remain visible to the field tech.
+             * Do NOT replace or delete earlier published versions.
+             * Field Technician loading uses the latest applicable version,
+             * while older versions remain available for audit and
+             * "Changes Since Previous Publish" comparisons.
              */
-            var existingPublishedRowsForTarget = await FilterPublishedTargetRows(
-                _db.DailyTicketAssignmentPublished,
-                workDate,
-                cleanTargetType,
-                truckId,
-                technicianId)
-            .ToListAsync(ct);
-
-            if (existingPublishedRowsForTarget.Count > 0)
-                _db.DailyTicketAssignmentPublished.RemoveRange(existingPublishedRowsForTarget);
-
-            _db.DailyTicketAssignmentPublished.AddRange(publishedRows);
+            _db.DailyTicketAssignmentPublished.AddRange(
+                publishedRows);
 
             await _db.SaveChangesAsync(ct);
 
