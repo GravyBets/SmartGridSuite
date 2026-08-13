@@ -1889,7 +1889,9 @@
                                     Content="Poll All"
                                     Height="28"
                                     Width="66"
-                                    Padding="12,0"
+                                    MinWidth="66"
+                                    MaxWidth="66"
+                                    Padding="8,0"
                                     Click="PollAllSnmpButton_Click" />
                         </Grid>
                     </Grid>

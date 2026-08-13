@@ -464,32 +464,119 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private async void WorkspaceView_RunSnmpCategoryRequested(object? sender, SnmpRunCategoryRequestedEventArgs e)
+        private async void WorkspaceView_PollAllSnmpRequested(object? sender, EventArgs e)
         {
-            var session = GetSelectedSession();
+            /*
+             * Capture the selected session ONCE.
+             *
+             * Everything below belongs to this exact Site Dashboard tab,
+             * even if the technician switches tabs while SNMP is running.
+             */
+            var session =
+                GetSelectedSession();
+
             if (session is null)
                 return;
 
-            if (session.SnmpProfile is null)
+            /*
+             * A second click while this session is polling means Stop.
+             * Do not inspect some other/currently selected session later.
+             */
+            if (session.IsSnmpPollAllRunning)
             {
-                TopBarView.StatusText = "No active SNMP profile is loaded for this site.";
+                session.SnmpPollAllCts?.Cancel();
+
+                if (session.SessionKey == _selectedSessionKey)
+                {
+                    TopBarView.StatusText =
+                        $"Stopping SNMP poll for {session.HeaderText}...";
+                }
+
                 return;
             }
 
-            var targetIp = WorkspaceView.GetSnmpTargetIp();
+            if (session.SnmpProfile is null)
+            {
+                TopBarView.StatusText =
+                    "No active SNMP profile is loaded for this site.";
+
+                return;
+            }
+
+            /*
+             * Capture the target at the moment Poll All begins.
+             * The technician may change tabs or UI values afterward,
+             * but this operation must continue against its original target.
+             */
+            var targetIp =
+                WorkspaceView.GetSnmpTargetIp();
+
             if (string.IsNullOrWhiteSpace(targetIp))
             {
-                TopBarView.StatusText = "Enter a target IP first.";
+                TopBarView.StatusText =
+                    "Enter a target IP first.";
+
                 return;
+            }
+
+            var oids =
+                session.SnmpOids
+                    .Where(x => x.ShowInWorkspace)
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.Label)
+                    .ToList();
+
+            if (oids.Count == 0)
+            {
+                TopBarView.StatusText =
+                    "No SNMP OIDs are configured for this profile.";
+
+                return;
+            }
+
+            var pollCts =
+                new CancellationTokenSource();
+
+            /*
+             * Dispose any stale runtime token before replacing it.
+             * There should normally not be one here because the running
+             * check above handles active polls.
+             */
+            session.SnmpPollAllCts?.Dispose();
+            session.SnmpPollAllCts = pollCts;
+
+            session.IsSnmpPollAllRunning = true;
+            session.SnmpTargetIp = targetIp;
+
+            if (session.SessionKey == _selectedSessionKey)
+            {
+                WorkspaceView.SetSnmpPollAllRunning(true);
+
+                TopBarView.StatusText =
+                    $"Polling all SNMP fields for {session.HeaderText}...";
             }
 
             try
             {
-                session.SnmpTargetIp = targetIp;
-
-                foreach (var oid in e.Oids.OrderBy(x => x.SortOrder).ThenBy(x => x.Label))
+                foreach (var oid in oids)
                 {
-                    WorkspaceView.SetSnmpOidResult(oid.Id, "Running...");
+                    pollCts.Token.ThrowIfCancellationRequested();
+
+                    /*
+                     * Store the running state in the originating session.
+                     *
+                     * Only touch the shared WorkspaceView when this session
+                     * is still the visible Site Dashboard tab.
+                     */
+                    session.SnmpOidResults[oid.Id] =
+                        "Running...";
+
+                    if (session.SessionKey == _selectedSessionKey)
+                    {
+                        WorkspaceView.SetSnmpOidResult(
+                            oid.Id,
+                            "Running...");
+                    }
 
                     try
                     {
@@ -498,28 +585,130 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                                 session.SnmpProfile,
                                 oid,
                                 targetIp,
-                                CancellationToken.None);
+                                pollCts.Token);
 
-                        var display = result?.Success == true
-                            ? result.DisplayValue
-                            : $"ERROR: {result?.ErrorMessage}";
+                        pollCts.Token.ThrowIfCancellationRequested();
 
-                        session.SnmpOidResults[oid.Id] = display ?? string.Empty;
-                        WorkspaceView.SetSnmpOidResult(oid.Id, display ?? string.Empty);
+                        var display =
+                            result?.Success == true
+                                ? result.DisplayValue
+                                : $"ERROR: {result?.ErrorMessage}";
+
+                        session.SnmpOidResults[oid.Id] =
+                            display ?? string.Empty;
+
+                        /*
+                         * This is the important cross-tab guard.
+                         *
+                         * Site A's result is always saved into Site A's
+                         * session, but it is rendered only if Site A is
+                         * still the visible tab.
+                         */
+                        if (session.SessionKey == _selectedSessionKey)
+                        {
+                            WorkspaceView.SetSnmpOidResult(
+                                oid.Id,
+                                display ?? string.Empty);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                        when (pollCts.IsCancellationRequested)
+                    {
+                        throw;
                     }
                     catch (Exception ex)
                     {
-                        var error = $"ERROR: {ex.Message}";
-                        session.SnmpOidResults[oid.Id] = error;
-                        WorkspaceView.SetSnmpOidResult(oid.Id, error);
+                        var error =
+                            $"ERROR: {ex.Message}";
+
+                        session.SnmpOidResults[oid.Id] =
+                            error;
+
+                        if (session.SessionKey == _selectedSessionKey)
+                        {
+                            WorkspaceView.SetSnmpOidResult(
+                                oid.Id,
+                                error);
+                        }
                     }
                 }
 
-                TopBarView.StatusText = $"{e.Category} SNMP poll complete.";
+                if (session.SessionKey == _selectedSessionKey)
+                {
+                    TopBarView.StatusText =
+                        $"SNMP Poll All complete for {session.HeaderText}.";
+                }
+            }
+            catch (OperationCanceledException)
+                when (pollCts.IsCancellationRequested)
+            {
+                /*
+                 * The OID that was in-flight when Stop was pressed was marked
+                 * "Running..." before its await began. Since that await was
+                 * cancelled, it never receives a normal result to replace the
+                 * temporary state.
+                 *
+                 * Reset any in-flight markers so the session cannot permanently
+                 * display a poll as still running after cancellation.
+                 */
+                var interruptedOidIds =
+                    session.SnmpOidResults
+                        .Where(x =>
+                            string.Equals(
+                                x.Value,
+                                "Running...",
+                                StringComparison.OrdinalIgnoreCase))
+                        .Select(x => x.Key)
+                        .ToList();
+
+                foreach (var oidId in interruptedOidIds)
+                {
+                    session.SnmpOidResults[oidId] =
+                        "Not polled.";
+
+                    if (session.SessionKey == _selectedSessionKey)
+                    {
+                        WorkspaceView.SetSnmpOidResult(
+                            oidId,
+                            "Not polled.");
+                    }
+                }
+
+                if (session.SessionKey == _selectedSessionKey)
+                {
+                    TopBarView.StatusText =
+                        $"SNMP Poll All stopped for {session.HeaderText}.";
+                }
             }
             catch (Exception ex)
             {
-                TopBarView.StatusText = $"Category poll failed: {ex.Message}";
+                if (session.SessionKey == _selectedSessionKey)
+                {
+                    TopBarView.StatusText =
+                        $"SNMP Poll All failed: {ex.Message}";
+                }
+            }
+            finally
+            {
+                /*
+                 * Only clear the token if this is still the token owned
+                 * by the session. This protects against any future restart
+                 * logic replacing it before an old operation unwinds.
+                 */
+                if (ReferenceEquals(
+                        session.SnmpPollAllCts,
+                        pollCts))
+                {
+                    session.SnmpPollAllCts = null;
+                    session.IsSnmpPollAllRunning = false;
+                }
+
+                pollCts.Dispose();
+
+                if (session.SessionKey == _selectedSessionKey)
+                {
+                    WorkspaceView.SetSnmpPollAllRunning(false);
+                }
             }
         }
 
@@ -538,6 +727,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             WorkspaceView.SetSnmpProfiles(session.SnmpProfiles, session.SnmpProfileId);
             WorkspaceView.SetSnmpOids(session.SnmpOids, session.SnmpOidResults);
+            WorkspaceView.SetSnmpPollAllRunning(session.IsSnmpPollAllRunning);
         }
     }
 }

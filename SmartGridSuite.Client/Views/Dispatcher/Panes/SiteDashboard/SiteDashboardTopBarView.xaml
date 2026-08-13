@@ -30,10 +30,23 @@
 
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource CardBackground}"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
                                 <Setter Property="Panel.ZIndex" Value="20"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TabBgSelected}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PrimaryBg}"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="1.5,1.5,1.5,0"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
                             </Trigger>
+
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="False"/>
+                                    <Condition SourceName="Bd" Property="IsMouseOver" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TabBgHover}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderHover}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                            </MultiTrigger>
 
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.65"/>

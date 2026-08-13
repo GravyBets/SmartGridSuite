@@ -92,7 +92,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             WorkspaceView.OpenTopTunnelRequested += WorkspaceView_OpenTopTunnelRequested;
 
             WorkspaceView.RunSnmpOidRequested += WorkspaceView_RunSnmpOidRequested;
-            WorkspaceView.RunSnmpCategoryRequested += WorkspaceView_RunSnmpCategoryRequested;
+            WorkspaceView.PollAllSnmpRequested += WorkspaceView_PollAllSnmpRequested;
             WorkspaceView.SetSelectedSnmpRequested += WorkspaceView_SetSelectedSnmpRequested;
             WorkspaceView.SnmpTargetChanged += WorkspaceView_SnmpTargetChanged;
             WorkspaceView.SelectedSnmpProfileChanged += WorkspaceView_SelectedSnmpProfileChanged;

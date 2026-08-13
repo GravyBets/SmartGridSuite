@@ -20,15 +20,45 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private List<SnmpCategoryGroupViewModel> _snmpCategoryGroups = new();
         public event EventHandler<SnmpRunOidRequestedEventArgs>? RunSnmpOidRequested;
-        public event EventHandler<SnmpRunCategoryRequestedEventArgs>? RunSnmpCategoryRequested;
 
-        private void PollAllSnmpButton_Click(object sender, RoutedEventArgs e)
+        public event EventHandler? PollAllSnmpRequested;
+
+        private void PollAllSnmpButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
-            foreach (var group in _snmpCategoryGroups.Where(x => x.Rows.Count > 0))
-            {
-                var oids = group.Rows.Select(x => x.Oid).ToList();
-                RunSnmpCategoryRequested?.Invoke(this, new SnmpRunCategoryRequestedEventArgs(group.Category, oids));
-            }
+            /*
+             * Poll All is one operation owned by the current Site Dashboard
+             * session. The pane decides whether this click starts a new poll
+             * or stops the poll already running for that session.
+             */
+            PollAllSnmpRequested?.Invoke(
+                this,
+                EventArgs.Empty);
+        }
+
+        public void SetSnmpPollAllRunning(bool isRunning)
+        {
+            PollAllSnmpButton.Content =
+                isRunning
+                    ? "Stop"
+                    : "Poll All";
+
+            PollAllSnmpButton.ToolTip =
+                isRunning
+                    ? "Stop SNMP Poll All"
+                    : "Poll all configured SNMP OIDs";
+
+            /*
+             * Make the active Stop state visually unmistakable.
+             * SetResourceReference keeps the button tied to the application's
+             * existing themed styles rather than hard-coding colors here.
+             */
+            PollAllSnmpButton.SetResourceReference(
+                FrameworkElement.StyleProperty,
+                isRunning
+                    ? "DangerButtonStyle"
+                    : "PrimaryButtonStyle");
         }
 
         public void ResetSnmp()
@@ -67,6 +97,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             SetSelectedSnmpButton.IsEnabled = false;
             SnmpDecoderValuesTextBox.Text = string.Empty;
+            SetSnmpPollAllRunning(false);
         }
 
         public void SetSnmpContext(bool supported, string supportMessage, string deviceFamily, string profileName, string? primaryIp, string? lanIp,

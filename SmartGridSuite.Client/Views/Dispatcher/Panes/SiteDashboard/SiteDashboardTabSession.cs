@@ -75,6 +75,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public SnmpProfileDetailDto? SnmpProfile { get; set; }
         public Dictionary<ulong, string> SnmpOidResults { get; set; } = new();
 
+        /*
+         * Runtime-only Poll All state.
+         *
+         * Each Site Dashboard tab owns its own cancellation token so
+         * an SNMP poll can continue or be stopped independently even
+         * when the technician switches to another site tab.
+         */
+        public CancellationTokenSource? SnmpPollAllCts { get; set; }
+
+        public bool IsSnmpPollAllRunning { get; set; }
+
         //Towers
         public int? TowerTopNameId { get; set; }
         public string TowerSummaryText { get; set; } = string.Empty;

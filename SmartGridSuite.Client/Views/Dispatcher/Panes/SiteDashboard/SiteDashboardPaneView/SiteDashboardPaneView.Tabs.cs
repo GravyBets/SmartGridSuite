@@ -37,6 +37,21 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             _selectedSessionKey = sessionKey;
             RenderSelectedSession();
+
+            /*
+             * WorkspaceView is shared by every Site Dashboard tab.
+             * Rendering a different tab can reset the Poll All button back
+             * to its default appearance, even though the originating session
+             * is still actively polling.
+             *
+             * Always restore the button from the newly selected session's
+             * runtime SNMP state after the tab has been rendered.
+             */
+            var selectedSession =
+                GetSelectedSession();
+
+            WorkspaceView.SetSnmpPollAllRunning(
+                selectedSession?.IsSnmpPollAllRunning == true);
         }
 
         private void TopBarView_CloseTabRequested(object? sender, string? sessionKey)
