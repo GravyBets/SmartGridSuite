@@ -24,7 +24,12 @@ namespace SmartGridSuite.Api.Controllers
         private readonly ILogger<DailyAssignmentsController> _logger;
 
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
+
         private const string TechnicianRoleCode = "TECHNICIAN";
+
+        private const string AssignmentStatusActive = "Active";
+        private const string AssignmentStatusCompleted = "Completed";
+        private const string AssignmentStatusRemoved = "Removed";
 
         public DailyAssignmentsController(
             SmartGridDbContext db,
@@ -87,7 +92,9 @@ namespace SmartGridSuite.Api.Controllers
                     .ThenInclude(t => t!.TaskCategory)
                 .Include(x => x.Truck)
                 .Include(x => x.Technician)
-                .Where(x => x.AssignmentDate == assignmentDate)
+                .Where(x =>
+                    x.AssignmentDate == assignmentDate &&
+                    x.AssignmentStatus == AssignmentStatusActive)
                 .OrderBy(x => x.SortOrder)
                 .ThenBy(x => x.Id)
                 .ToListAsync(ct);
@@ -485,7 +492,10 @@ namespace SmartGridSuite.Api.Controllers
                 return BadRequest($"Closed tickets cannot be assigned: {string.Join(", ", closedTickets)}");
 
             var existingAssignments = await _db.DailyTicketAssignments
-                .Where(x => x.AssignmentDate == workDate && ticketIds.Contains(x.TicketId))
+                .Where(x =>
+                    x.AssignmentDate == workDate &&
+                    x.AssignmentStatus == AssignmentStatusActive &&
+                    ticketIds.Contains(x.TicketId))
                 .ToListAsync(ct);
 
             var existingByTicketId = existingAssignments
@@ -496,6 +506,7 @@ namespace SmartGridSuite.Api.Controllers
                 .AsNoTracking()
                 .Where(x =>
                     x.AssignmentDate == workDate &&
+                    x.AssignmentStatus == AssignmentStatusActive &&
                     x.TargetType == cleanTargetType &&
                     x.TruckId == truckId &&
                     x.TechnicianId == technicianId)
@@ -554,6 +565,7 @@ namespace SmartGridSuite.Api.Controllers
                         PublishedBy = null,
 
                         AssignmentNotes = assignmentNotes,
+                        AssignmentStatus = AssignmentStatusActive,
 
                         CreatedAt = now,
                         CreatedBy = updatedBy,
@@ -594,7 +606,10 @@ namespace SmartGridSuite.Api.Controllers
                 return BadRequest("At least one ticket is required.");
 
             var assignments = await _db.DailyTicketAssignments
-                .Where(x => x.AssignmentDate == workDate && ticketIds.Contains(x.TicketId))
+                .Where(x =>
+                    x.AssignmentDate == workDate &&
+                    x.AssignmentStatus == AssignmentStatusActive &&
+                    ticketIds.Contains(x.TicketId))
                 .ToListAsync(ct);
 
             if (assignments.Count == 0)
@@ -613,7 +628,30 @@ namespace SmartGridSuite.Api.Controllers
                 .OrderBy(x => x)
                 .ToList();
 
-            _db.DailyTicketAssignments.RemoveRange(assignments);
+            var now = DateTime.Now;
+
+            var removedBy =
+                string.IsNullOrWhiteSpace(req.UpdatedBy)
+                    ? "Dispatcher"
+                    : req.UpdatedBy.Trim();
+
+            foreach (var assignment in assignments)
+            {
+                assignment.AssignmentStatus =
+                    AssignmentStatusRemoved;
+
+                assignment.RemovedAt =
+                    now;
+
+                assignment.RemovedBy =
+                    removedBy;
+
+                assignment.UpdatedAt =
+                    now;
+
+                assignment.UpdatedBy =
+                    removedBy;
+            }
 
             await _db.SaveChangesAsync(ct);
 
@@ -635,6 +673,7 @@ namespace SmartGridSuite.Api.Controllers
             var truckAssignments = await _db.DailyTicketAssignments
                 .Where(x =>
                     x.AssignmentDate == assignmentDate &&
+                    x.AssignmentStatus == AssignmentStatusActive &&
                     x.TargetType == "Truck" &&
                     x.TruckId.HasValue)
                 .OrderBy(x => x.TruckId)
@@ -828,6 +867,7 @@ namespace SmartGridSuite.Api.Controllers
             var targetAssignmentsQuery = _db.DailyTicketAssignments
                 .Where(x =>
                     x.AssignmentDate == workDate &&
+                    x.AssignmentStatus == AssignmentStatusActive &&
                     x.TargetType == cleanTargetType);
 
             if (cleanTargetType == "Technician")
@@ -999,7 +1039,9 @@ namespace SmartGridSuite.Api.Controllers
 
             var existingTodayTicketIds = await _db.DailyTicketAssignments
                 .AsNoTracking()
-                .Where(x => x.AssignmentDate == workDate)
+                .Where(x =>
+                    x.AssignmentDate == workDate &&
+                    x.AssignmentStatus == AssignmentStatusActive)
                 .Select(x => x.TicketId)
                 .ToListAsync(ct);
 
@@ -1140,6 +1182,7 @@ namespace SmartGridSuite.Api.Controllers
                 var existingTargetRows = await _db.DailyTicketAssignments
                     .Where(x =>
                         x.AssignmentDate == workDate &&
+                        x.AssignmentStatus == AssignmentStatusActive &&
                         x.TargetType == targetType &&
                         x.TruckId == truckId &&
                         x.TechnicianId == technicianId)
@@ -1461,6 +1504,7 @@ namespace SmartGridSuite.Api.Controllers
                             !(x.TargetType == "Truck" &&
                               x.TruckId == truckId));
                 }
+
 
                 publishedElsewhereTicketIds = (await publishedElsewhereQuery
                         .Select(x => x.TicketId)
@@ -2675,6 +2719,7 @@ namespace SmartGridSuite.Api.Controllers
         {
             query = query.Where(x =>
                 x.AssignmentDate == assignmentDate &&
+                x.AssignmentStatus == AssignmentStatusActive &&
                 x.TargetType == targetType);
 
             if (targetType.Equals("Technician", StringComparison.OrdinalIgnoreCase))
@@ -2792,6 +2837,7 @@ namespace SmartGridSuite.Api.Controllers
                 .Include(x => x.Ticket)
                 .Where(x =>
                     x.AssignmentDate == assignmentDate &&
+                    x.AssignmentStatus == AssignmentStatusActive &&
                     x.TargetType == "Technician" &&
                     x.TechnicianId.HasValue &&
                     nonLeadTechIds.Contains(x.TechnicianId.Value) &&

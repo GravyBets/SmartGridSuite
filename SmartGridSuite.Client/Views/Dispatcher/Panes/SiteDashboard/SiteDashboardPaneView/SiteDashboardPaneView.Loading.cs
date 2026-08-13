@@ -63,14 +63,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
 
             /*
-             * Do not attempt the live Parent DB tower search when the
-             * Parent DB has already reported that it is unavailable.
+             * A normal site lookup may fail because the Parent DB is unavailable,
+             * but Tower search has its own cached fallback path.
+             *
+             * Always give Tower search a chance before falling back to Limited Mode.
              */
-            if (lastParentDatabaseUnavailableException is not null)
-            {
-                throw lastParentDatabaseUnavailableException;
-            }
-
             var tower =
                 await TryFindTowerDashboardAsync(
                     cleanSearch,
@@ -79,6 +76,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (tower is not null)
             {
                 return tower;
+            }
+
+            /*
+             * No Tower matched either.
+             * If the Parent DB was unavailable during the normal site lookup,
+             * preserve the existing Limited Mode behavior.
+             */
+            if (lastParentDatabaseUnavailableException is not null)
+            {
+                throw lastParentDatabaseUnavailableException;
             }
 
             if (lastNotFoundException is not null)
@@ -226,6 +233,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.HistoryRows = new List<SiteDashboardHistoryRowViewModel>();
             session.TicketInfoText = "No ticket data returned yet.";
             session.CurrentTicketId = 0;
+
+            session.HasExplicitTicketContext = false;
 
             session.ShowIgsdPortalTab = false;
             session.IgsdPortalUrl = string.Empty;
@@ -397,6 +406,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
             }
 
+            /*
+             * Capture the visible write-up before deciding whether this
+             * dashboard tab is about to be reused for another site.
+             */
+            SaveCurrentTabUiState();
+
             var selectedSession =
                 GetSelectedSession();
 
@@ -431,6 +446,40 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             var shouldClearForSiteLoad =
                 isBlankSessionLoad ||
                 isDifferentSiteLoad;
+
+            /*
+             * Reusing this dashboard tab destroys its current session
+             * state. Only protect the manually typed write-up; Ping,
+             * SNMP, and other temporary diagnostic state may be discarded
+             * without prompting.
+             */
+            if (shouldClearForSiteLoad &&
+                HasUnsubmittedWriteUpText(
+                    selectedSession))
+            {
+                var siteLabel =
+                    GetSessionSiteLabel(
+                        selectedSession);
+
+                if (!ConfirmDiscardWriteUp(
+                        selectedSession,
+                        $"Loading {siteId} in this tab"))
+                {
+                    /*
+                     * Restore the search field so the screen clearly
+                     * remains associated with the original site.
+                     */
+                    TopBarView.SearchText =
+                        selectedSession.SearchText
+                        ?? string.Empty;
+
+                    TopBarView.StatusText =
+                        $"Load cancelled. Unsaved write-up for " +
+                        $"{siteLabel} was preserved.";
+
+                    return;
+                }
+            }
 
             if (shouldClearForSiteLoad)
             {

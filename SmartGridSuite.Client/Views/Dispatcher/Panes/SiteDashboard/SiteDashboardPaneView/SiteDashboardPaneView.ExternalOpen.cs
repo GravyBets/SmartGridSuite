@@ -1,33 +1,70 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using SmartGridSuite.Contracts.FieldTechnician;
+using System.Threading;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
     public partial class SiteDashboardPaneView
     {
-        public async Task OpenSitesFromFieldTechAsync(IEnumerable<string> sites)
+        public async Task OpenTicketsFromFieldTechTasksAsync(IEnumerable<FieldTechTicketListItemDto> tickets)
         {
-            var cleanSites = sites
-                .Select(x => (x ?? string.Empty).Trim())
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+            var cleanTickets = tickets
+                .Where(x =>
+                    x != null &&
+                    x.Id > 0 &&
+                    !string.IsNullOrWhiteSpace(x.Site))
+                .GroupBy(x => x.Id)
+                .Select(g => g.First())
                 .ToList();
 
-            if (cleanSites.Count == 0)
+            if (cleanTickets.Count == 0)
                 return;
 
             SaveCurrentTabUiState();
 
-            foreach (var site in cleanSites)
+            foreach (var ticket in cleanTickets)
             {
-                if (!IsSiteAlreadyOpen(site) && !CanLoadIntoSelectedTab())
+                var site =
+                    (ticket.Site ?? string.Empty).Trim();
+
+                if (!IsSiteAlreadyOpen(site) &&
+                    !CanLoadIntoSelectedTab())
                 {
-                    CreateBlankTab(selectNewTab: true);
+                    CreateBlankTab(
+                        selectNewTab: true);
                 }
 
+                /*
+                 * Load the site normally first. This loads all Site Dashboard
+                 * information and performs the normal site ticket lookup.
+                 */
                 await LoadAsync(site);
+
+                /*
+                 * My Tasks knows exactly which ticket the technician opened.
+                 * Make that ticket authoritative for this dashboard session
+                 * instead of allowing the site-level ticket search to guess.
+                 */
+                var session =
+                    GetSelectedSession();
+
+                if (session is null)
+                    continue;
+
+                session.CurrentTicketId = ticket.Id;
+
+                session.HasExplicitTicketContext =
+                    true;
+
+                await RefreshTicketInfoAsync(
+                    session,
+                    CancellationToken.None,
+                    preferredTicketId: ticket.Id);
+
+                if (session.SessionKey ==
+                    _selectedSessionKey)
+                {
+                    RenderSelectedSession();
+                }
             }
         }
 

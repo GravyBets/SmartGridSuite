@@ -44,29 +44,56 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (string.IsNullOrWhiteSpace(sessionKey))
                 return;
 
+            /*
+             * If this is the selected tab, capture whatever is
+             * currently visible in the write-up TextBox first.
+             */
             SaveCurrentTabUiState();
 
-            var index = _sessions.FindIndex(x => x.SessionKey == sessionKey);
+            var index =
+                _sessions.FindIndex(
+                    x => x.SessionKey == sessionKey);
+
             if (index < 0)
                 return;
+
+            var sessionToClose =
+                _sessions[index];
+
+            if (!ConfirmDiscardWriteUp(
+                    sessionToClose,
+                    "Closing this tab"))
+            {
+                return;
+            }
 
             if (_poppedOutWindow is not null)
             {
                 _poppedOutWindow.Close();
             }
 
-            var wasSelected = string.Equals(_selectedSessionKey, sessionKey, StringComparison.Ordinal);
+            var wasSelected =
+                string.Equals(
+                    _selectedSessionKey,
+                    sessionKey,
+                    StringComparison.Ordinal);
 
             _sessions.RemoveAt(index);
 
             if (_sessions.Count == 0)
             {
-                CreateBlankTab(selectNewTab: true);
+                CreateBlankTab(
+                    selectNewTab: true);
             }
             else if (wasSelected)
             {
-                var newIndex = Math.Min(index, _sessions.Count - 1);
-                _selectedSessionKey = _sessions[newIndex].SessionKey;
+                var newIndex =
+                    Math.Min(
+                        index,
+                        _sessions.Count - 1);
+
+                _selectedSessionKey =
+                    _sessions[newIndex].SessionKey;
             }
 
             RenderSelectedSession();
@@ -168,6 +195,101 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.TowerPingState = WorkspaceView.GetTowerPingSessionState();
         }
 
+        private static bool HasUnsubmittedWriteUpText(
+            SiteDashboardTabSession? session)
+        {
+            return session is not null &&
+                   !string.IsNullOrWhiteSpace(
+                       session.WriteUpText);
+        }
+
+        private static string GetSessionSiteLabel(
+            SiteDashboardTabSession session)
+        {
+            var label =
+                (session.HeaderText ?? string.Empty).Trim();
+
+            return string.IsNullOrWhiteSpace(label)
+                ? "this site"
+                : label;
+        }
+
+        private bool ConfirmDiscardWriteUp(
+            SiteDashboardTabSession session,
+            string destructiveAction)
+        {
+            if (!HasUnsubmittedWriteUpText(session))
+                return true;
+
+            var siteLabel =
+                GetSessionSiteLabel(session);
+
+            var result =
+                MessageBox.Show(
+                    Window.GetWindow(this),
+                    $"There is text in the write-up for {siteLabel} " +
+                    "that has not been submitted."
+                    + Environment.NewLine
+                    + Environment.NewLine
+                    + $"{destructiveAction} will permanently discard " +
+                    "that write-up. Continue?",
+                    "Unsaved Write-Up",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+            return result == MessageBoxResult.Yes;
+        }
+
+        public bool ConfirmDiscardWriteUpsForShellClose()
+        {
+            /*
+             * Capture the currently visible TextBox before checking
+             * every dashboard session.
+             */
+            SaveCurrentTabUiState();
+
+            var sessionsWithWriteUps =
+                _sessions
+                    .Where(HasUnsubmittedWriteUpText)
+                    .ToList();
+
+            if (sessionsWithWriteUps.Count == 0)
+                return true;
+
+            string message;
+
+            if (sessionsWithWriteUps.Count == 1)
+            {
+                var siteLabel =
+                    GetSessionSiteLabel(
+                        sessionsWithWriteUps[0]);
+
+                message =
+                    $"There is text in the write-up for {siteLabel} " +
+                    "that has not been submitted.";
+            }
+            else
+            {
+                message =
+                    $"{sessionsWithWriteUps.Count} Site Dashboard tabs " +
+                    "contain write-up text that has not been submitted.";
+            }
+
+            message +=
+                Environment.NewLine +
+                Environment.NewLine +
+                "Leaving the Field Technician module will permanently " +
+                "discard the unsubmitted write-up text. Continue?";
+
+            return MessageBox.Show(
+                       Window.GetWindow(this),
+                       message,
+                       "Unsaved Write-Up",
+                       MessageBoxButton.YesNo,
+                       MessageBoxImage.Warning)
+                   == MessageBoxResult.Yes;
+        }
+
         public void LoadPoppedOutSessions(IEnumerable<SiteDashboardTabSession> sessions, string? selectedSessionKey)
         {
             _isPopOutInstance = true;
@@ -213,6 +335,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             session.TicketInfoText = "Loading ticket data...";
             session.HistoryRows = new List<SiteDashboardHistoryRowViewModel>();
             session.CurrentTicketId = 0;
+
+            session.HasExplicitTicketContext = false;
 
             session.DashboardKind = string.Empty;
 

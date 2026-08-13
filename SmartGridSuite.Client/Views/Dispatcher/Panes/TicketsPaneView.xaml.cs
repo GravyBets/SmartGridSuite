@@ -89,7 +89,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         public ObservableCollection<StatusFilterOption> StatusOptions { get; } = new();
 
-        
+        private readonly HashSet<string> _appliedStatusNames = new(StringComparer.OrdinalIgnoreCase);
+
+        private bool _syncingStatusSelection;
+
+
         private DispatchTicket? _selectedTicket;
         public DispatchTicket? SelectedTicket
         {
@@ -245,37 +249,61 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        public string SelectedStatusesSummary
+        public string SelectedStatusesSummary => BuildStatusSummary(_appliedStatusNames);
+
+        public string StagedStatusesSummary => BuildStatusSummary(StatusOptions
+            .Where(x => x.IsSelected)
+            .Select(x => x.Name));
+
+        private string BuildStatusSummary(IEnumerable<string> statusNames)
         {
-            get
-            {
-                var selected = StatusOptions
-                    .Where(x => x.IsSelected)
+            var selectedNames =
+                statusNames
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x))
+                    .ToHashSet(
+                        StringComparer.OrdinalIgnoreCase);
+
+            var selected =
+                StatusOptions
+                    .Where(x =>
+                        selectedNames.Contains(x.Name))
                     .ToList();
 
-                if (selected.Count == 0)
-                    return "No statuses";
+            if (selected.Count == 0)
+                return "No statuses";
 
-                if (selected.Count == StatusOptions.Count)
-                    return "All statuses";
+            if (StatusOptions.Count > 0 &&
+                selected.Count == StatusOptions.Count)
+            {
+                return "All statuses";
+            }
 
-                var nonClosedStatuses = StatusOptions
+            var nonClosedStatuses =
+                StatusOptions
                     .Where(x => !x.IsClosed)
                     .ToList();
 
-                var allNonClosedSelected =
-                    nonClosedStatuses.Count > 0 &&
-                    nonClosedStatuses.All(x => x.IsSelected) &&
-                    StatusOptions.Where(x => x.IsClosed).All(x => !x.IsSelected);
+            var allNonClosedSelected =
+                nonClosedStatuses.Count > 0 &&
+                nonClosedStatuses.All(
+                    x => selectedNames.Contains(x.Name)) &&
+                StatusOptions
+                    .Where(x => x.IsClosed)
+                    .All(
+                        x => !selectedNames.Contains(x.Name));
 
-                if (allNonClosedSelected)
-                    return "All Active";
+            if (allNonClosedSelected)
+                return "All Active";
 
-                if (selected.Count <= 2)
-                    return string.Join(", ", selected.Select(x => x.Name));
-
-                return $"{selected.Count} selected";
+            if (selected.Count <= 2)
+            {
+                return string.Join(
+                    ", ",
+                    selected.Select(x => x.Name));
             }
+
+            return $"{selected.Count} selected";
         }
 
         private const int TicketPageSize = 500;
@@ -829,18 +857,31 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 SummaryStatuses.Add(status);
         }
 
-        private async Task LoadStatusOptionsFromApiAsync(bool preserveSelections, CancellationToken ct = default)
+        private async Task LoadStatusOptionsFromApiAsync(
+            bool preserveSelections,
+            CancellationToken ct = default)
         {
-            var previousSelections = StatusOptions
-                .ToDictionary(
+            /*
+             * Capture the currently APPLIED state, not any
+             * temporary checkbox changes.
+             */
+            var previousSelections =
+                StatusOptions.ToDictionary(
                     x => x.Name,
-                    x => x.IsSelected,
+                    x => _appliedStatusNames.Contains(x.Name),
                     StringComparer.OrdinalIgnoreCase);
 
-            var statuses = await _ticketsApi.GetFilterStatusesAsync(ct);
+            var statuses =
+                await _ticketsApi.GetFilterStatusesAsync(ct);
 
-            var previousSuppress = _suppressFilterEvents;
-            _suppressFilterEvents = true;
+            var previousSuppress =
+                _suppressFilterEvents;
+
+            _suppressFilterEvents =
+                true;
+
+            _syncingStatusSelection =
+                true;
 
             try
             {
@@ -850,24 +891,60 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     .OrderBy(x => x.SortOrder)
                     .ThenBy(x => x.Name))
                 {
-                    var isSelected =
-                        preserveSelections &&
-                        previousSelections.TryGetValue(status.Name, out var previousSelection)
-                            ? previousSelection
-                            : !status.IsClosed;
+                    bool isSelected;
 
-                    StatusOptions.Add(new StatusFilterOption(
-                        status.Name,
-                        status.IsClosed,
-                        isSelected));
+                    if (preserveSelections &&
+                        previousSelections.TryGetValue(
+                            status.Name,
+                            out var previousSelection))
+                    {
+                        isSelected =
+                            previousSelection;
+                    }
+                    else
+                    {
+                        /*
+                         * Default behavior:
+                         *
+                         * Active statuses = checked
+                         * Closed statuses = unchecked
+                         */
+                        isSelected =
+                            !status.IsClosed;
+                    }
+
+                    StatusOptions.Add(
+                        new StatusFilterOption(
+                            status.Name,
+                            status.IsClosed,
+                            isSelected));
+                }
+
+                _appliedStatusNames.Clear();
+
+                foreach (var option in StatusOptions
+                    .Where(x => x.IsSelected))
+                {
+                    _appliedStatusNames.Add(
+                        option.Name);
                 }
             }
             finally
             {
-                _suppressFilterEvents = previousSuppress;
+                _syncingStatusSelection =
+                    false;
+
+                _suppressFilterEvents =
+                    previousSuppress;
             }
 
-            OnPropertyChanged(nameof(SelectedStatusesSummary));
+            OnPropertyChanged(
+                nameof(SelectedStatusesSummary));
+
+            OnPropertyChanged(
+                nameof(StagedStatusesSummary));
+
+            UpdateStatusBulkToggleText();
         }
 
         private static DispatchTicket Map(TicketListItemDto dto)
@@ -995,10 +1072,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private HashSet<string> GetSelectedStatuses()
         {
-            return StatusOptions
-                .Where(x => x.IsSelected)
-                .Select(x => x.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return new HashSet<string>(
+                _appliedStatusNames,
+                StringComparer.OrdinalIgnoreCase);
         }
 
         private (DateTime? from, DateTime? to) GetLastActivityDateRangeFromUi()
@@ -1127,22 +1203,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             };
         }
 
-        private async void SetSelectedStatuses(params string[] statusNames)
-        {
-            SetSelectedStatusesWithoutRefresh(statusNames);
-            await LoadTicketsFromApiAsync(resetPage: true);
-        }
-
-        private void SetSelectedStatusesWithoutRefresh(params string[] statusNames)
-        {
-            var selected = new HashSet<string>(statusNames, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var option in StatusOptions)
-                option.IsSelected = selected.Contains(option.Name);
-
-            OnPropertyChanged(nameof(SelectedStatusesSummary));
-        }
-
         private void UpdateCustomDateVisibility()
         {
             var sel = DateRangeFilter?.SelectedItem as string ?? "All";
@@ -1254,41 +1314,183 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void StatusFilterButton_Click(object sender, RoutedEventArgs e)
         {
-            StatusPopup.IsOpen = !StatusPopup.IsOpen;
+            /*
+             * Clicking the button again while open behaves
+             * exactly like Cancel.
+             */
+            if (StatusPopup.IsOpen)
+            {
+                RestoreStagedStatusSelectionFromApplied();
+
+                StatusPopup.IsOpen =
+                    false;
+
+                return;
+            }
+
+            RestoreStagedStatusSelectionFromApplied();
+
+            StatusPopup.IsOpen =
+                true;
         }
 
-        private async void StatusOption_Changed(object sender, RoutedEventArgs e)
+        private void StatusOption_Changed(object sender, RoutedEventArgs e)
         {
-            if (_suppressFilterEvents || !_filtersInitialized)
+            if (_suppressFilterEvents ||
+                _syncingStatusSelection ||
+                !_filtersInitialized)
+            {
+                return;
+            }
+
+            OnPropertyChanged(
+                nameof(StagedStatusesSummary));
+
+            UpdateStatusBulkToggleText();
+        }
+
+        private void ToggleAllStatuses_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            var allSelected =
+                StatusOptions.Count > 0 &&
+                StatusOptions.All(
+                    x => x.IsSelected);
+
+            _syncingStatusSelection =
+                true;
+
+            try
+            {
+                foreach (var option in StatusOptions)
+                {
+                    option.IsSelected =
+                        !allSelected;
+                }
+            }
+            finally
+            {
+                _syncingStatusSelection =
+                    false;
+            }
+
+            OnPropertyChanged(
+                nameof(StagedStatusesSummary));
+
+            UpdateStatusBulkToggleText();
+        }
+
+        private void UpdateStatusBulkToggleText()
+        {
+            if (ToggleAllStatusesButton is null)
                 return;
 
-            OnPropertyChanged(nameof(SelectedStatusesSummary));
-            await LoadTicketsFromApiAsync(resetPage: true);
+            var allSelected =
+                StatusOptions.Count > 0 &&
+                StatusOptions.All(
+                    x => x.IsSelected);
+
+            ToggleAllStatusesButton.Content =
+                allSelected
+                    ? "Clear All"
+                    : "Select All";
         }
 
-        private void SelectAllOpenStatuses_Click(object sender, RoutedEventArgs e)
+        private void RestoreStagedStatusSelectionFromApplied()
         {
-            SetSelectedStatuses(
-                StatusOptions
-                    .Where(x => !x.IsClosed)
-                    .Select(x => x.Name)
-                    .ToArray());
+            _syncingStatusSelection =
+                true;
+
+            try
+            {
+                foreach (var option in StatusOptions)
+                {
+                    option.IsSelected =
+                        _appliedStatusNames.Contains(
+                            option.Name);
+                }
+            }
+            finally
+            {
+                _syncingStatusSelection =
+                    false;
+            }
+
+            OnPropertyChanged(
+                nameof(StagedStatusesSummary));
+
+            UpdateStatusBulkToggleText();
         }
 
-        private void SelectAllStatuses_Click(object sender, RoutedEventArgs e)
+        private void CancelStatusFilter_Click(object sender, RoutedEventArgs e)
         {
-            SetSelectedStatuses(
-                StatusOptions
-                    .Select(x => x.Name)
-                    .ToArray());
+            RestoreStagedStatusSelectionFromApplied();
+
+            StatusPopup.IsOpen =
+                false;
+        }
+
+        private async void ConfirmStatusFilter_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            _appliedStatusNames.Clear();
+
+            foreach (var option in StatusOptions
+                .Where(x => x.IsSelected))
+            {
+                _appliedStatusNames.Add(
+                    option.Name);
+            }
+
+            OnPropertyChanged(
+                nameof(SelectedStatusesSummary));
+
+            OnPropertyChanged(
+                nameof(StagedStatusesSummary));
+
+            StatusPopup.IsOpen =
+                false;
+
+            await LoadTicketsFromApiAsync(
+                resetPage: true);
         }
 
         private void SetDefaultStatusSelectionWithoutRefresh()
         {
-            foreach (var option in StatusOptions)
-                option.IsSelected = !option.IsClosed;
+            _syncingStatusSelection =
+                true;
 
-            OnPropertyChanged(nameof(SelectedStatusesSummary));
+            try
+            {
+                _appliedStatusNames.Clear();
+
+                foreach (var option in StatusOptions)
+                {
+                    option.IsSelected =
+                        !option.IsClosed;
+
+                    if (option.IsSelected)
+                    {
+                        _appliedStatusNames.Add(
+                            option.Name);
+                    }
+                }
+            }
+            finally
+            {
+                _syncingStatusSelection =
+                    false;
+            }
+
+            OnPropertyChanged(
+                nameof(SelectedStatusesSummary));
+
+            OnPropertyChanged(
+                nameof(StagedStatusesSummary));
+
+            UpdateStatusBulkToggleText();
         }
 
         private async void ClearFilters_Click(object sender, RoutedEventArgs e)

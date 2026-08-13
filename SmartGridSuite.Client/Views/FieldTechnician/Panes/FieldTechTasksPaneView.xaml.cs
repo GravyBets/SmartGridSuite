@@ -16,8 +16,10 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
     public partial class FieldTechTasksPaneView : UserControl, INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
-        public event EventHandler<string>? OpenSiteRequested;
-        public event EventHandler<IReadOnlyList<string>>? OpenAllSitesRequested;
+        public event Action<FieldTechTicketListItemDto>? OpenTicketRequested;
+
+        public event Action<IReadOnlyList<FieldTechTicketListItemDto>>?
+            OpenAllTicketsRequested;
 
         private readonly ApiClient _api = ClientAppSettings.CreateApiClient();
 
@@ -249,13 +251,15 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
         // Supplemental directly assigned tickets are intentionally excluded.
         private void OpenAll_Click(object sender, RoutedEventArgs e)
         {
-            var sites = DailyAssignments
-                .Select(x => (x.Site ?? string.Empty).Trim())
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+            var tickets = DailyAssignments
+                .Where(x =>
+                    x.Id > 0 &&
+                    !string.IsNullOrWhiteSpace(x.Site))
+                .GroupBy(x => x.Id)
+                .Select(g => g.First())
                 .ToList();
 
-            if (sites.Count == 0)
+            if (tickets.Count == 0)
             {
                 MessageBox.Show(
                     "There are no Daily Assignment sites to open.",
@@ -266,7 +270,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
                 return;
             }
 
-            OpenAllSitesRequested?.Invoke(this, sites);
+            OpenAllTicketsRequested?.Invoke(tickets);
         }
 
         // Restores the correct collapsed or expanded state when WPF creates or recycles
@@ -381,10 +385,13 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
 
             var site = (selectedTicket.Site ?? string.Empty).Trim();
 
-            if (string.IsNullOrWhiteSpace(site))
+            if (selectedTicket.Id <= 0 ||
+                string.IsNullOrWhiteSpace(site))
+            {
                 return;
+            }
 
-            OpenSiteRequested?.Invoke(this, site);
+            OpenTicketRequested?.Invoke(selectedTicket);
         }
 
         // Copies one Notification or Work Order value from either task grid and

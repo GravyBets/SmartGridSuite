@@ -2,6 +2,8 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using SmartGridSuite.Contracts.SiteNotes;
 
 namespace SmartGridSuite.Client.Models.Dispatcher
 {
@@ -190,6 +192,38 @@ namespace SmartGridSuite.Client.Models.Dispatcher
             }
         }
 
+        private bool _siteNotesLoaded;
+
+        public bool SiteNotesLoaded
+        {
+            get => _siteNotesLoaded;
+            set
+            {
+                if (_siteNotesLoaded == value)
+                    return;
+
+                _siteNotesLoaded = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private bool _isSiteNotesLoading;
+
+        public bool IsSiteNotesLoading
+        {
+            get => _isSiteNotesLoading;
+            set
+            {
+                if (_isSiteNotesLoading == value)
+                    return;
+
+                _isSiteNotesLoading = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<SiteNoteDto> SiteNotes { get; } = new();
+
         private string _status = "Open";
         public string Status
         {
@@ -200,9 +234,26 @@ namespace SmartGridSuite.Client.Models.Dispatcher
                 if (_status == cleaned) return;
 
                 _status = cleaned;
+
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(IsClosed));
+                OnPropertyChanged(nameof(CanCloseFromTasks));
             }
         }
+
+        public bool IsClosed =>
+            Status.Equals(
+                "Closed",
+                StringComparison.OrdinalIgnoreCase) ||
+            Status.Equals(
+                "Completed",
+                StringComparison.OrdinalIgnoreCase) ||
+            Status.Equals(
+                "Cancelled",
+                StringComparison.OrdinalIgnoreCase) ||
+            Status.Equals(
+                "Canceled",
+                StringComparison.OrdinalIgnoreCase);
 
         private string _category = "";
         public string Category
@@ -244,7 +295,9 @@ namespace SmartGridSuite.Client.Models.Dispatcher
                     return;
 
                 _submittedAt = value;
+
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(SubmittedWriteUpCopyText));
             }
         }
 
@@ -281,10 +334,191 @@ namespace SmartGridSuite.Client.Models.Dispatcher
 
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(SubmittedWriteUpDisplay));
+                OnPropertyChanged(nameof(SubmittedWriteUpCopyText));
+                OnPropertyChanged(nameof(IpChangeLinesDisplay));
+                OnPropertyChanged(nameof(EquipmentReplacementLinesDisplay));
+                OnPropertyChanged(nameof(DispatchChangesDisplay));
             }
         }
 
         public string SubmittedWriteUpDisplay => BuildDispatchWriteUpDisplay(SubmittedWriteUp);
+
+        public string IpChangeLinesDisplay => BuildIpChangeLinesDisplay(SubmittedWriteUpDisplay);
+
+        private static string BuildIpChangeLinesDisplay(
+            string? writeUpText)
+        {
+            var text =
+                writeUpText?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(text))
+                return "";
+
+            var lines =
+                text.Split(
+                        new[] { "\r\n", "\n" },
+                        StringSplitOptions.None)
+                    .Select(x => x.Trim())
+                    .Where(x =>
+                        x.StartsWith(
+                            "New ",
+                            StringComparison.OrdinalIgnoreCase) &&
+                        x.Contains(
+                            " IP:",
+                            StringComparison.OrdinalIgnoreCase))
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+            return lines.Count == 0
+                ? ""
+                : string.Join(
+                    Environment.NewLine,
+                    lines);
+        }
+
+        public string EquipmentReplacementLinesDisplay => BuildEquipmentReplacementLinesDisplay(SubmittedWriteUpDisplay);
+
+        public string DispatchChangesDisplay
+        {
+            get
+            {
+                var sections =
+                    new[]
+                    {
+                IpChangeLinesDisplay,
+                EquipmentReplacementLinesDisplay
+                    }
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x))
+                    .ToList();
+
+                return sections.Count == 0
+                    ? ""
+                    : string.Join(
+                        Environment.NewLine,
+                        sections);
+            }
+        }
+
+        private static string BuildEquipmentReplacementLinesDisplay(
+            string? writeUpText)
+        {
+            var text =
+                writeUpText?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(text))
+                return "";
+
+            const string equipmentHeader =
+                "----Equipment Replacements----";
+
+            var lines =
+                text.Split(
+                        new[] { "\r\n", "\n" },
+                        StringSplitOptions.None)
+                    .ToList();
+
+            var headerIndex =
+                lines.FindIndex(
+                    x =>
+                        x.Trim().Equals(
+                            equipmentHeader,
+                            StringComparison.OrdinalIgnoreCase));
+
+            if (headerIndex < 0)
+                return "";
+
+            var equipmentLines =
+                new List<string>();
+
+            for (var i = headerIndex + 1;
+                 i < lines.Count;
+                 i++)
+            {
+                var line =
+                    lines[i].Trim();
+
+                /*
+                 * Reached the next formatted write-up section.
+                 */
+                if (line.StartsWith(
+                        "----",
+                        StringComparison.Ordinal))
+                {
+                    break;
+                }
+
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                equipmentLines.Add(line);
+            }
+
+            return equipmentLines.Count == 0
+                ? ""
+                : string.Join(
+                    Environment.NewLine,
+                    equipmentLines.Distinct(
+                        StringComparer.OrdinalIgnoreCase));
+        }
+
+        public string SubmittedWriteUpCopyText => BuildSubmittedWriteUpCopyText(SubmittedWriteUpDisplay, SubmittedAt);
+
+        private static string BuildSubmittedWriteUpCopyText(
+            string? writeUpText,
+            DateTime? submittedAt)
+        {
+            var text =
+                writeUpText?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(text) ||
+                !submittedAt.HasValue)
+            {
+                return text;
+            }
+
+            var submittedLine =
+                $"Submitted: {submittedAt.Value:MM/dd/yyyy HH:mm}";
+
+            var lines =
+                text.Split(
+                        new[] { "\r\n", "\n" },
+                        StringSplitOptions.None)
+                    .ToList();
+
+            var reasonIndex =
+                lines.FindIndex(
+                    line =>
+                        line.TrimStart().StartsWith(
+                            "Reason:",
+                            StringComparison.OrdinalIgnoreCase));
+
+            if (reasonIndex >= 0)
+            {
+                /*
+                 * Keep the submission timestamp immediately above
+                 * the Reason line in the copied write-up.
+                 */
+                lines.Insert(
+                    reasonIndex,
+                    submittedLine);
+            }
+            else
+            {
+                /*
+                 * Older write-ups may not contain a Reason line.
+                 * Still include the submission timestamp.
+                 */
+                lines.Insert(
+                    0,
+                    submittedLine);
+            }
+
+            return string.Join(
+                Environment.NewLine,
+                lines);
+        }
 
         private static string BuildDispatchWriteUpDisplay(string? value)
         {
@@ -342,6 +576,38 @@ namespace SmartGridSuite.Client.Models.Dispatcher
 
         public List<DispatchCloseoutChecklistItem> CloseoutChecklistItems { get; set; } = new();
 
+        public int ChecklistTotalCount => CloseoutChecklistItems?.Count ?? 0;
+
+        public int ChecklistCompletedCount =>
+            CloseoutChecklistItems?.Count(
+                x => x.IsCompleted) ?? 0;
+
+        public string ChecklistProgressDisplay
+        {
+            get
+            {
+                var total =
+                    ChecklistTotalCount;
+
+                if (total == 0)
+                    return "—";
+
+                return $"{ChecklistCompletedCount} of {total} complete";
+            }
+        }
+
+        public void RefreshChecklistProgress()
+        {
+            OnPropertyChanged(
+                nameof(ChecklistTotalCount));
+
+            OnPropertyChanged(
+                nameof(ChecklistCompletedCount));
+
+            OnPropertyChanged(
+                nameof(ChecklistProgressDisplay));
+        }
+
         private int _requiredChecklistRemaining;
 
         public int RequiredChecklistRemaining
@@ -368,9 +634,13 @@ namespace SmartGridSuite.Client.Models.Dispatcher
                     return;
 
                 _canMarkClosed = value;
+
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(CanCloseFromTasks));
             }
         }
+
+        public bool CanCloseFromTasks => CanMarkClosed && !IsClosed;
 
         public string WriteUpFlagsDisplay => WriteUpFlags.Count == 0
             ? ""

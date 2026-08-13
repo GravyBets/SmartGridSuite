@@ -14,6 +14,7 @@ using SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard;
 using SmartGridSuite.Contracts.SiteNotes;
 using System.Security.Principal;
 using System.Windows.Threading;
+using System.Threading.Tasks;
 
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
@@ -26,6 +27,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private readonly ObservableCollection<DispatchTask> _tasks = new();
         private readonly TicketsApi _ticketsApi;
         private readonly TicketAdminApi _ticketAdminApi;
+
+        private readonly SiteNotesApi _siteNotesApi;
+
+        private readonly TechniciansApi _techniciansApi;
 
         private bool _suppressFilterEvents;
         private bool _filtersInitialized;
@@ -73,8 +78,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 OnPropertyChanged(nameof(SelectedTask));
                 OnPropertyChanged(nameof(HasSelectedTask));
-
-                UpdateTaskToolbarButtons();
             }
         }
 
@@ -127,6 +130,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             _ticketsApi = new TicketsApi(api);
             _ticketAdminApi = new TicketAdminApi(api);
+            _siteNotesApi = new SiteNotesApi(api);
+            _techniciansApi = new TechniciansApi(api);
 
             _searchDebounceTimer = new DispatcherTimer
             {
@@ -171,7 +176,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 _suppressFilterEvents = false;
             }
-            UpdateTaskToolbarButtons();
         }
 
         private async void UserControl_Loaded(object sender, RoutedEventArgs e)
@@ -564,6 +568,62 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return WorkOrderClass.Unknown;
         }
 
+        private async Task EnsureTaskSiteNotesLoadedAsync(
+            DispatchTask task,
+            bool force = false)
+        {
+            if (task == null)
+                return;
+
+            var siteId =
+                (task.Site ?? string.Empty)
+                .Trim()
+                .ToUpperInvariant();
+
+            if (string.IsNullOrWhiteSpace(siteId))
+                return;
+
+            if (task.IsSiteNotesLoading)
+                return;
+
+            if (task.SiteNotesLoaded && !force)
+                return;
+
+            task.IsSiteNotesLoading = true;
+
+            try
+            {
+                var notes =
+                    await _siteNotesApi.GetBySiteAsync(
+                        siteId);
+
+                task.SiteNotes.Clear();
+
+                foreach (var note in notes
+                             .GroupBy(x => x.Id)
+                             .Select(x => x.First())
+                             .OrderByDescending(
+                                 x => x.UpdatedAt ?? x.CreatedAt))
+                {
+                    task.SiteNotes.Add(note);
+                }
+
+                task.SiteNotesLoaded = true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to load site notes for {siteId}.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            finally
+            {
+                task.IsSiteNotesLoading = false;
+            }
+        }
+
         private static DispatchTask MapDtoToModel(DispatchTaskListItemDto dto)
         {
             return new DispatchTask
@@ -788,9 +848,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     : Visibility.Collapsed;
         }
 
-        private void ToggleTaskRowDetails_Click(
-            object sender,
-            RoutedEventArgs e)
+        private async void ToggleTaskRowDetails_Click(
+             object sender,
+             RoutedEventArgs e)
         {
             if (sender is not Button button ||
                 FindVisualParent<DataGridRow>(button)
@@ -800,6 +860,65 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
             }
 
+            ToggleTaskRowDetails(
+                row,
+                task);
+
+            if (row.DetailsVisibility == Visibility.Visible)
+            {
+                await EnsureTaskSiteNotesLoadedAsync(task);
+            }
+        }
+
+        private async void TasksGrid_MouseDoubleClick(
+            object sender,
+            MouseButtonEventArgs e)
+        {
+            if (e.OriginalSource is not DependencyObject source)
+                return;
+
+            /*
+             * Only treat a double-click on an actual grid cell as
+             * a row expand/collapse action.
+             *
+             * This prevents double-clicking controls inside the
+             * expanded details area from collapsing the row.
+             */
+            var cell =
+                FindVisualParent<DataGridCell>(source);
+
+            if (cell == null)
+                return;
+
+            /*
+             * Do not steal double-clicks from the existing
+             * expand/copy buttons inside cells.
+             */
+            if (FindVisualParent<Button>(source) != null)
+                return;
+
+            var row =
+                FindVisualParent<DataGridRow>(cell);
+
+            if (row?.Item is not DispatchTask task)
+                return;
+
+            ToggleTaskRowDetails(
+                row,
+                task);
+
+            if (row.DetailsVisibility == Visibility.Visible)
+            {
+                await EnsureTaskSiteNotesLoadedAsync(task);
+            }
+
+            e.Handled = true;
+        }
+
+        private void ToggleTaskRowDetails(
+            DataGridRow row,
+            DispatchTask task)
+        {
             TasksGrid.SelectedItem =
                 task;
 
@@ -820,23 +939,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             _expandedTaskTicketIds.Add(
                 task.TicketId);
-        }
-
-        private void UpdateTaskToolbarButtons()
-        {
-            var hasSelection =
-                SelectedTask != null;
-
-            if (OpenTaskTicketButton != null)
-                OpenTaskTicketButton.IsEnabled = hasSelection;
-
-            if (MarkTaskClosedButton != null)
-            {
-                MarkTaskClosedButton.IsEnabled =
-                    hasSelection &&
-                    !IsSelectedTaskClosed &&
-                    (SelectedTask?.CanMarkClosed ?? false);
-            }
         }
 
         private async void CopySubmittedWriteUp_Click(
@@ -965,12 +1067,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 task.CanMarkClosed =
                     task.RequiredChecklistRemaining == 0;
 
-                if (ReferenceEquals(
-                        SelectedTask,
-                        task))
-                {
-                    UpdateTaskToolbarButtons();
-                }
+                task.RefreshChecklistProgress();
             }
             catch (Exception ex)
             {
@@ -997,8 +1094,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private async void OpenNotification_Click(object sender, RoutedEventArgs e)
+        private async void OpenNotification_Click(
+            object sender,
+            RoutedEventArgs e)
         {
+            if (sender is FrameworkElement element &&
+                element.DataContext is DispatchTask task)
+            {
+                SelectedTask = task;
+                TasksGrid.SelectedItem = task;
+            }
+
             if (SelectedTask == null)
                 return;
 
@@ -1028,10 +1134,34 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 var ticket = MapTicketDtoToModel(dto);
 
-                var win = new NewTicketWindow(_ticketsApi, Enumerable.Empty<string>(), ticket)
-                {
-                    Owner = Window.GetWindow(this)
-                };
+                var technicians =
+                    await _techniciansApi.GetTechniciansAsync(
+                        includeInactive: false);
+
+                var techNames = technicians
+                    .Where(x =>
+                        x.IsActive &&
+                        x.RoleCodes.Any(role =>
+                            role.Equals(
+                                "Technician",
+                                StringComparison.OrdinalIgnoreCase)))
+                    .Select(x => x.Name?.Trim())
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x))
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x)
+                    .Cast<string>()
+                    .ToList();
+
+                var win =
+                    new NewTicketWindow(
+                        _ticketsApi,
+                        techNames,
+                        ticket)
+                    {
+                        Owner = Window.GetWindow(this)
+                    };
 
                 if (win.ShowDialog() != true)
                     return;
@@ -1052,9 +1182,21 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private async void MarkClosed_Click(object sender, RoutedEventArgs e)
+        private async void MarkClosed_Click(
+            object sender,
+            RoutedEventArgs e)
         {
+            if (sender is FrameworkElement element &&
+                element.DataContext is DispatchTask task)
+            {
+                SelectedTask = task;
+                TasksGrid.SelectedItem = task;
+            }
+
             if (SelectedTask == null)
+                return;
+
+            if (SelectedTask.IsClosed)
                 return;
 
             if (SelectedTask.TicketId <= 0)
@@ -1099,7 +1241,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 TasksGrid.SelectedItem = null;
 
                 await LoadTasksAsync();
-                UpdateTaskToolbarButtons();
             }
             catch (Exception ex)
             {
@@ -1127,6 +1268,183 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
 
             return null;
+        }
+
+        private static string GetTaskSiteNoteUserName()
+        {
+            var windowsName =
+                WindowsIdentity.GetCurrent()?.Name;
+
+            if (!string.IsNullOrWhiteSpace(windowsName))
+            {
+                var clean =
+                    windowsName.Trim();
+
+                var slashIndex =
+                    clean.LastIndexOf('\\');
+
+                if (slashIndex >= 0 &&
+                    slashIndex < clean.Length - 1)
+                {
+                    clean =
+                        clean[(slashIndex + 1)..];
+                }
+
+                if (!string.IsNullOrWhiteSpace(clean))
+                    return clean;
+            }
+
+            return string.IsNullOrWhiteSpace(
+                Environment.UserName)
+                    ? "Unknown"
+                    : Environment.UserName;
+        }
+
+        private async void AddTaskSiteNote_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement element ||
+                element.DataContext is not DispatchTask task)
+            {
+                return;
+            }
+
+            var siteId =
+                (task.Site ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(siteId))
+                return;
+
+            var win =
+                new SiteNoteEditorWindow(siteId)
+                {
+                    Owner = Window.GetWindow(this)
+                };
+
+            if (win.ShowDialog() != true)
+                return;
+
+            try
+            {
+                await _siteNotesApi.CreateAsync(
+                    new CreateSiteNoteRequest
+                    {
+                        SiteId = siteId,
+                        NoteType = win.NoteType,
+                        NoteText = win.NoteText,
+                        CreatedBy =
+                            GetTaskSiteNoteUserName()
+                    });
+
+                await EnsureTaskSiteNotesLoadedAsync(
+                    task,
+                    force: true);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to add site note.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private async void EditTaskSiteNote_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (sender is not Button button ||
+                button.Tag is not SiteNoteDto note ||
+                FindVisualParent<DataGridRow>(button)
+                    is not DataGridRow row ||
+                row.Item is not DispatchTask task)
+            {
+                return;
+            }
+
+            var siteId =
+                (task.Site ?? string.Empty).Trim();
+
+            var win =
+                new SiteNoteEditorWindow(
+                    siteId,
+                    note)
+                {
+                    Owner = Window.GetWindow(this)
+                };
+
+            if (win.ShowDialog() != true)
+                return;
+
+            try
+            {
+                await _siteNotesApi.UpdateAsync(
+                    new UpdateSiteNoteRequest
+                    {
+                        Id = note.Id,
+                        NoteType = win.NoteType,
+                        NoteText = win.NoteText,
+                        UpdatedBy =
+                            GetTaskSiteNoteUserName()
+                    });
+
+                await EnsureTaskSiteNotesLoadedAsync(
+                    task,
+                    force: true);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to update site note.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private async void DeleteTaskSiteNote_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (sender is not Button button ||
+                button.Tag is not SiteNoteDto note ||
+                FindVisualParent<DataGridRow>(button)
+                    is not DataGridRow row ||
+                row.Item is not DispatchTask task)
+            {
+                return;
+            }
+
+            var confirm =
+                MessageBox.Show(
+                    "Delete this site note?",
+                    "Delete Site Note",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                await _siteNotesApi.DeleteAsync(
+                    note.Id,
+                    GetTaskSiteNoteUserName());
+
+                await EnsureTaskSiteNotesLoadedAsync(
+                    task,
+                    force: true);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to delete site note.\n\n{ex.Message}",
+                    "Site Notes",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         private void ShowBusyOverlay(string message)
@@ -1160,9 +1478,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             BusyOverlay.Visibility = Visibility.Collapsed;
             SetTaskPaneControlsEnabled(true);
-
-            UpdateTaskToolbarButtons();
-            UpdateTaskToolbarButtons();
         }
 
         private void SetTaskPaneControlsEnabled(bool enabled)
@@ -1172,18 +1487,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             ClearTaskFiltersButton.IsEnabled = enabled;
             RefreshTasksButton.IsEnabled = enabled;
             TasksGrid.IsEnabled = enabled;
-
-            var hasSelection =
-                enabled &&
-                SelectedTask != null;
-
-            OpenTaskTicketButton.IsEnabled =
-                hasSelection;
-
-            MarkTaskClosedButton.IsEnabled =
-                hasSelection &&
-                !IsSelectedTaskClosed &&
-                (SelectedTask?.CanMarkClosed ?? false);
         }
     }
 }

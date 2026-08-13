@@ -55,12 +55,35 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             var sections = new List<string>();
 
-            var reasonText = BuildWriteUpReasonText();
+            var reasonText =
+                BuildWriteUpReasonText();
 
             if (!string.IsNullOrWhiteSpace(reasonText))
-                sections.Add($"Reason: {reasonText}");
+            {
+                sections.Add(
+                    $"Reason: {reasonText}");
+            }
 
-            var manualWriteUp = (WriteUpTextBox.Text ?? string.Empty).Trim();
+            /*
+             * Record every IP address that was changed in the
+             * Network card. These lines become part of both the
+             * Dispatch write-up and Site History write-up.
+             */
+            var ipChangeLines =
+                IpChangeWriteUpLinesProvider?.Invoke()
+                ?? Array.Empty<string>();
+
+            foreach (var line in ipChangeLines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                sections.Add(
+                    line.Trim());
+            }
+
+            var manualWriteUp =
+                (WriteUpTextBox.Text ?? string.Empty).Trim();
 
             if (!string.IsNullOrWhiteSpace(manualWriteUp))
                 sections.Add(manualWriteUp);

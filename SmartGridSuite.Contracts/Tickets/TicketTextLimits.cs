@@ -9,7 +9,7 @@
         public const int WorkOrderClass = 30;
         public const int GroupCode = 30;
         public const int Status = 100;
-        public const int AssignedTech = 250;
+        public const int AssignedTech = 2000;
         public const int CreatedBy = 100;
 
         public const int Problem = 5000;

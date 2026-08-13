@@ -241,27 +241,206 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 }
 
                 var pendingTicketId =
-                    pendingDraft?.TicketId ?? 0;
+    pendingDraft?.TicketId ?? 0;
 
-                var targetTicketId =
-                    isPendingRetry && pendingTicketId > 0
-                        ? pendingTicketId
-                        : session.CurrentTicketId;
+                long targetTicketId = 0;
 
                 UpdateSiteLoadOverlayMessage(
-                    "Finding or creating ticket for write-up...");
+                    "Resolving ticket for write-up...");
 
-                if (targetTicketId <= 0)
+                /*
+                 * A pending retry that already has a TicketId must reuse that
+                 * exact ticket. The idempotent retry payload was previously
+                 * associated with it, so we must never silently redirect the
+                 * retry to another ticket.
+                 *
+                 * Run it through the resolver as explicit context so the API
+                 * also validates that the ticket still exists and belongs to
+                 * this site.
+                 */
+                if (isPendingRetry &&
+                    pendingTicketId > 0)
                 {
-                    targetTicketId =
-                        await _ticketsApi.RequestTicketAsync(
+                    var retryResolution =
+                        await _ticketsApi.ResolveSiteTicketAsync(
                             session.HeaderText,
-                            "Write-up submitted from Site Dashboard with no associated ticket.",
-                            requestedBy: employeeId,
+                            employeeId,
+                            explicitTicketId: pendingTicketId,
                             CancellationToken.None);
+
+                    if (!string.Equals(
+                            retryResolution.Resolution,
+                            "Resolved",
+                            StringComparison.OrdinalIgnoreCase) ||
+                        !retryResolution.TicketId.HasValue ||
+                        retryResolution.TicketId.Value <= 0)
+                    {
+                        throw new InvalidOperationException(
+                            string.IsNullOrWhiteSpace(
+                                retryResolution.Message)
+                                ? "The pending write-up's original ticket could not be validated."
+                                : retryResolution.Message.Trim());
+                    }
+
+                    targetTicketId =
+                        retryResolution.TicketId.Value;
 
                     session.CurrentTicketId =
                         targetTicketId;
+
+                    session.HasExplicitTicketContext =
+                        true;
+                }
+                else
+                {
+                    /*
+                     * Brand-new write-up:
+                     *
+                     * Explicit dashboard context:
+                     *     My Tasks / technician-selected ticket / ticket action
+                     *     → validate and use that exact TicketId.
+                     *
+                     * Manual/inferred dashboard context:
+                     *     → do NOT pass CurrentTicketId.
+                     *     → resolve again against the site's current tickets now.
+                     */
+                    long? explicitTicketId =
+                        session.HasExplicitTicketContext &&
+                        session.CurrentTicketId > 0
+                            ? session.CurrentTicketId
+                            : null;
+
+                    var resolution =
+                        await _ticketsApi.ResolveSiteTicketAsync(
+                            session.HeaderText,
+                            employeeId,
+                            explicitTicketId,
+                            CancellationToken.None);
+
+                    var resolutionType =
+                        (resolution.Resolution ??
+                         string.Empty)
+                        .Trim();
+
+                    if (resolutionType.Equals(
+                            "Resolved",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!resolution.TicketId.HasValue ||
+                            resolution.TicketId.Value <= 0)
+                        {
+                            throw new InvalidOperationException(
+                                "The API reported that a ticket was resolved but did not return a valid TicketId.");
+                        }
+
+                        targetTicketId =
+                            resolution.TicketId.Value;
+                    }
+                    else if (resolutionType.Equals(
+                                 "ChoiceRequired",
+                                 StringComparison.OrdinalIgnoreCase))
+                    {
+                        /*
+                         * Technician assignment and oldest CreatedAt still
+                         * resulted in an exact tie.
+                         *
+                         * The technician must make the final decision.
+                         */
+                        UpdateSiteLoadOverlayMessage(
+                            "Select the ticket for this write-up...");
+
+                        var selectedTicketId =
+                            ShowTicketSelectionDialog(
+                                resolution);
+
+                        if (!selectedTicketId.HasValue ||
+                            selectedTicketId.Value <= 0)
+                        {
+                            TopBarView.StatusText =
+                                "Write-up was not submitted because no ticket was selected.";
+
+                            return;
+                        }
+
+                        /*
+                         * Validate the technician's selection through the API
+                         * before using it.
+                         */
+                        var selectedResolution =
+                            await _ticketsApi.ResolveSiteTicketAsync(
+                                session.HeaderText,
+                                employeeId,
+                                explicitTicketId:
+                                    selectedTicketId.Value,
+                                CancellationToken.None);
+
+                        if (!string.Equals(
+                                selectedResolution.Resolution,
+                                "Resolved",
+                                StringComparison.OrdinalIgnoreCase) ||
+                            !selectedResolution.TicketId.HasValue ||
+                            selectedResolution.TicketId.Value <= 0)
+                        {
+                            throw new InvalidOperationException(
+                                string.IsNullOrWhiteSpace(
+                                    selectedResolution.Message)
+                                    ? "The selected ticket could not be validated."
+                                    : selectedResolution.Message.Trim());
+                        }
+
+                        targetTicketId =
+                            selectedResolution.TicketId.Value;
+                    }
+                    else if (resolutionType.Equals(
+                                 "NoActiveTicket",
+                                 StringComparison.OrdinalIgnoreCase))
+                    {
+                        /*
+                         * The API positively confirmed that no active ticket
+                         * currently exists for this site.
+                         *
+                         * Only now may Site Dashboard create its fallback ticket.
+                         */
+                        UpdateSiteLoadOverlayMessage(
+                            "Creating ticket for write-up...");
+
+                        targetTicketId =
+                            await _ticketsApi.RequestTicketAsync(
+                                session.HeaderText,
+                                "Write-up submitted from Site Dashboard with no associated ticket.",
+                                requestedBy: employeeId,
+                                CancellationToken.None);
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(
+                            string.IsNullOrWhiteSpace(
+                                resolution.Message)
+                                ? "Smart Grid Suite could not resolve a ticket for this write-up."
+                                : resolution.Message.Trim());
+                    }
+
+                    /*
+                     * The resolver has now made the final submission-time
+                     * decision.
+                     *
+                     * Even if this dashboard began as a manual/inferred site
+                     * search, this exact TicketId is now authoritative for THIS
+                     * write-up attempt.
+                     *
+                     * This is also important for offline recovery: if the POST
+                     * loses connectivity after this point, the pending JSON will
+                     * preserve the exact resolved TicketId instead of re-guessing
+                     * later.
+                     */
+                    if (targetTicketId > 0)
+                    {
+                        session.CurrentTicketId =
+                            targetTicketId;
+
+                        session.HasExplicitTicketContext =
+                            true;
+                    }
                 }
 
                 if (targetTicketId <= 0)
@@ -277,6 +456,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 await _ticketsApi.SubmitWriteUpAsync(
                     targetTicketId,
+                    session.HeaderText,
                     clientSubmissionId,
                     finalWriteUpText,
                     siteHistoryWriteUpText,
@@ -545,9 +725,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         {
             try
             {
-                var ticketId = session.CurrentTicketId > 0
-                    ? session.CurrentTicketId
-                    : (long?)null;
+                /*
+                 * Only persist a ticket ID into an offline pending write-up
+                 * when that ticket is authoritative for this dashboard session.
+                 *
+                 * A manually loaded site's inferred CurrentTicketId may become
+                 * stale while the technician is working, so it must not be
+                 * permanently attached to the pending submission.
+                 *
+                 * A NO-TICKET pending draft is still recoverable by employee +
+                 * site and will be resolved again once connectivity returns.
+                 */
+                var ticketId =
+                    session.HasExplicitTicketContext &&
+                    session.CurrentTicketId > 0
+                        ? session.CurrentTicketId
+                        : (long?)null;
 
                 var existingDraft =
                     await _writeUpDraftService.LoadDraftAsync(

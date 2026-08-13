@@ -18,8 +18,6 @@ namespace SmartGridSuite.Api.Data.Entities
         public uint? TechnicianId { get; set; }
 
         // Optional snapshot if the truck currently has a multi-tech crew.
-        // Solo truck assignments may not have a CrewId because your current crew table
-        // only creates CrewEntity rows when a truck has more than one tech.
         public uint? CrewId { get; set; }
 
         public int SortOrder { get; set; }
@@ -33,6 +31,19 @@ namespace SmartGridSuite.Api.Data.Entities
 
         public string? AssignmentNotes { get; set; }
 
+        // Active, Completed, or Removed.
+        public string AssignmentStatus { get; set; } = "Active";
+
+        // Populated when successful write-up submission completes
+        // this technician's current Daily Assignment.
+        public DateTime? CompletedAt { get; set; }
+        public string? CompletedBy { get; set; }
+        public long? CompletedWriteUpSubmissionId { get; set; }
+
+        // Populated when Dispatch explicitly withdraws the assignment.
+        public DateTime? RemovedAt { get; set; }
+        public string? RemovedBy { get; set; }
+
         public DateTime CreatedAt { get; set; }
         public string CreatedBy { get; set; } = "";
 
@@ -45,5 +56,7 @@ namespace SmartGridSuite.Api.Data.Entities
         public CrewEntity? Crew { get; set; }
 
         public DailyTicketAssignmentEntity? CarriedFromAssignment { get; set; }
+
+        public TicketWriteUpSubmissionEntity? CompletedWriteUpSubmission { get; set; }
     }
 }

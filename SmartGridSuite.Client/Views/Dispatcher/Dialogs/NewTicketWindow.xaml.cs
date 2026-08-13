@@ -17,6 +17,10 @@ public partial class NewTicketWindow : Window
     private readonly TicketAdminApi _ticketAdminApi;
     private readonly List<string> _techSuggestions;
 
+    private const double DefaultWindowHeight = 772;
+
+    private const double DefaultTechnicianWriteUpHeight = 180;
+
     public ObservableCollection<NewTicketAssignedTechOption> AssignedTechOptions { get; } = new();
 
     private bool _syncingAssignedTechSelection;
@@ -33,6 +37,12 @@ public partial class NewTicketWindow : Window
     private readonly string _preservedNotes = "";
 
     private bool _hasLoadedLookups;
+
+    private TicketDraftState? _originalDraftState;
+
+    private bool _suppressDirtyStateRefresh;
+
+    private bool _isBusy;
 
     public long? CreatedTicketId { get; private set; }
 
@@ -142,6 +152,176 @@ public partial class NewTicketWindow : Window
 
             TechnicianNotesPanel.Visibility = Visibility.Collapsed;
         }
+        Draft.PropertyChanged += Draft_PropertyChanged;
+
+        _originalDraftState = CaptureCurrentDraftState();
+
+        RefreshSaveButtonState();
+    }
+
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (TechnicianNotesTextBox is null)
+            return;
+
+        if (TechnicianNotesPanel is null ||
+            TechnicianNotesPanel.Visibility !=
+                Visibility.Visible)
+        {
+            return;
+        }
+
+        /*
+         * Give all additional vertical window space to the
+         * Technician Write-Up box.
+         *
+         * At the normal 772px window height it remains 180px.
+         * Expanding the window makes the write-up area grow
+         * by the same amount.
+         */
+        var extraHeight =
+            Math.Max(
+                0,
+                ActualHeight -
+                DefaultWindowHeight);
+
+        TechnicianNotesTextBox.Height =
+            DefaultTechnicianWriteUpHeight +
+            extraHeight;
+    }
+
+    private void Draft_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_suppressDirtyStateRefresh)
+            return;
+
+        RefreshSaveButtonState();
+    }
+
+    private TicketDraftState CaptureCurrentDraftState()
+    {
+        var workOrder =
+            NormalizeDraftText(
+                Draft.WorkOrder);
+
+        /*
+         * This mirrors Create_Click.
+         *
+         * Work Order Type and Code are not actually persisted
+         * when there is no Work Order, so changing those alone
+         * should not make Save appear enabled.
+         */
+        var workOrderType =
+            string.IsNullOrWhiteSpace(workOrder)
+                ? ""
+                : NormalizeDraftText(
+                    Draft.WorkOrderType);
+
+        var workOrderCode =
+            string.IsNullOrWhiteSpace(workOrder)
+                ? ""
+                : NormalizeDraftText(
+                    Draft.WorkOrderCode);
+
+        return new TicketDraftState(
+            Site:
+                NormalizeDraftText(
+                    Draft.Site),
+
+            Problem:
+                NormalizeDraftText(
+                    Draft.Problem),
+
+            AssignedTo:
+                NormalizeAssignedTechForComparison(
+                    Draft.AssignedTo),
+
+            Status:
+                NormalizeDraftText(
+                    Draft.Status),
+
+            NotificationName:
+                NormalizeDraftText(
+                    Draft.NotificationName),
+
+            NotificationNumber:
+                NormalizeDraftText(
+                    Draft.NotificationNumber),
+
+            WorkOrder:
+                workOrder,
+
+            WorkOrderType:
+                workOrderType,
+
+            WorkOrderCode:
+                workOrderCode,
+
+            PriorityDays:
+                NormalizeDraftText(
+                    Draft.PriorityDays),
+
+            DispatchNotes:
+                NormalizeDraftText(
+                    Draft.DispatchNotes),
+
+            Notes:
+                NormalizeDraftText(
+                    Draft.Notes));
+    }
+
+    private static string NormalizeDraftText(
+        string? value)
+    {
+        return (value ?? string.Empty)
+            .Trim();
+    }
+
+    private static string NormalizeAssignedTechForComparison(
+        string? value)
+    {
+        var clean =
+            NormalizeDraftText(value);
+
+        if (string.IsNullOrWhiteSpace(clean) ||
+            clean.Equals(
+                "(Unassigned)",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return "(Unassigned)";
+        }
+
+        var names =
+            ParseAssignedTechDisplayNames(
+                clean);
+
+        if (names.Count == 0)
+            return clean;
+
+        return FormatAssignedTechDisplayText(
+            names);
+    }
+
+    private bool HasUnsavedTicketChanges()
+    {
+        if (_originalDraftState is null)
+            return false;
+
+        var current =
+            CaptureCurrentDraftState();
+
+        return current !=
+               _originalDraftState;
+    }
+
+    private void RefreshSaveButtonState()
+    {
+        if (CreateBtn is null)
+            return;
+
+        CreateBtn.IsEnabled =
+            !_isBusy &&
+            HasUnsavedTicketChanges();
     }
 
     private void PopulateDraftFromExistingTicket(DispatchTicket ticket, string fallbackCreatedBy)
@@ -200,25 +380,56 @@ public partial class NewTicketWindow : Window
         return null;
     }
 
-    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    private async void Window_Loaded(
+        object sender,
+        RoutedEventArgs e)
     {
         if (_hasLoadedLookups)
             return;
 
         _hasLoadedLookups = true;
 
+        _suppressDirtyStateRefresh =
+            true;
+
         try
         {
             await LoadStatusesAsync();
+
             ApplyAssignedTechSelection();
         }
         catch (Exception ex)
         {
             MessageBox.Show(
                 $"Failed to load ticket setup data.\n\n{ex.Message}",
-                IsEditMode ? "Edit Ticket" : "New Ticket",
+                IsEditMode
+                    ? "Edit Ticket"
+                    : "New Ticket",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
+        }
+        finally
+        {
+            /*
+             * Status may have been initialized automatically
+             * from the server lookup. That is setup, not a
+             * user edit.
+             */
+            if (_originalDraftState is not null)
+            {
+                _originalDraftState =
+                    _originalDraftState with
+                    {
+                        Status =
+                            NormalizeDraftText(
+                                Draft.Status)
+                    };
+            }
+
+            _suppressDirtyStateRefresh =
+                false;
+
+            RefreshSaveButtonState();
         }
     }
 
@@ -251,10 +462,32 @@ public partial class NewTicketWindow : Window
         }
     }
 
-    private void AssignedTechDropDownButton_Click(object sender, RoutedEventArgs e)
+    private void AssignedTechDropDownButton_Click(
+        object sender,
+        RoutedEventArgs e)
     {
+        /*
+         * Clicking the dropdown button again while the picker
+         * is open behaves like Cancel.
+         */
+        if (AssignedTechDropDownPopup.IsOpen)
+        {
+            ApplyAssignedTechSelection();
+
+            AssignedTechDropDownPopup.IsOpen =
+                false;
+
+            return;
+        }
+
+        /*
+         * Start every picker session from the value that is
+         * currently committed to the ticket draft.
+         */
+        ApplyAssignedTechSelection();
+
         AssignedTechDropDownPopup.IsOpen =
-            !AssignedTechDropDownPopup.IsOpen;
+            true;
     }
 
     private void ApplyAssignedTechSelection()
@@ -301,8 +534,11 @@ public partial class NewTicketWindow : Window
         }
         finally
         {
-            _syncingAssignedTechSelection = false;
+            _syncingAssignedTechSelection =
+                false;
+
             UpdateAssignedTechSummary();
+            UpdateAssignedTechBulkButtonText();
         }
     }
 
@@ -354,7 +590,9 @@ public partial class NewTicketWindow : Window
         }
     }
 
-    private void AssignedToUnassignedCheckBox_Checked(object sender, RoutedEventArgs e)
+    private void AssignedToUnassignedCheckBox_Checked(
+        object sender,
+        RoutedEventArgs e)
     {
         if (_syncingAssignedTechSelection)
             return;
@@ -364,75 +602,159 @@ public partial class NewTicketWindow : Window
         try
         {
             foreach (var option in AssignedTechOptions)
-                option.IsSelected = false;
-
-            Draft.AssignedTo = "(Unassigned)";
+            {
+                option.IsSelected =
+                    false;
+            }
         }
         finally
         {
-            _syncingAssignedTechSelection = false;
+            _syncingAssignedTechSelection =
+                false;
+
             UpdateAssignedTechSummary();
+            UpdateAssignedTechBulkButtonText();
         }
     }
 
-    private void AssignedToUnassignedCheckBox_Unchecked(object sender, RoutedEventArgs e)
+    private void AssignedToUnassignedCheckBox_Unchecked(
+        object sender,
+        RoutedEventArgs e)
     {
         if (_syncingAssignedTechSelection)
             return;
 
         UpdateAssignedTechSummary();
+        UpdateAssignedTechBulkButtonText();
     }
 
-    private void AssignedTechOption_Changed(object sender, RoutedEventArgs e)
+    private void AssignedTechOption_Changed(
+        object sender,
+        RoutedEventArgs e)
     {
         if (_syncingAssignedTechSelection)
             return;
 
-        if (AssignedTechOptions.Any(x => x.IsSelected))
-            AssignedToUnassignedCheckBox.IsChecked = false;
-
-        Draft.AssignedTo = BuildAssignedTechDisplayText();
+        if (AssignedTechOptions.Any(
+                x => x.IsSelected))
+        {
+            AssignedToUnassignedCheckBox.IsChecked =
+                false;
+        }
 
         UpdateAssignedTechSummary();
+        UpdateAssignedTechBulkButtonText();
     }
 
-    private void SelectAllAssignedTechs_Click(object sender, RoutedEventArgs e)
+    private void ToggleAllAssignedTechs_Click(
+        object sender,
+        RoutedEventArgs e)
     {
-        _syncingAssignedTechSelection = true;
+        var allSelected =
+            AssignedTechOptions.Count > 0 &&
+            AssignedTechOptions.All(
+                x => x.IsSelected);
+
+        _syncingAssignedTechSelection =
+            true;
 
         try
         {
-            AssignedToUnassignedCheckBox.IsChecked = false;
+            if (allSelected)
+            {
+                /*
+                 * Clear All returns the picker to Unassigned.
+                 */
+                foreach (var option in AssignedTechOptions)
+                {
+                    option.IsSelected =
+                        false;
+                }
 
-            foreach (var option in AssignedTechOptions)
-                option.IsSelected = true;
+                AssignedToUnassignedCheckBox.IsChecked =
+                    true;
+            }
+            else
+            {
+                AssignedToUnassignedCheckBox.IsChecked =
+                    false;
 
-            Draft.AssignedTo = BuildAssignedTechDisplayText();
+                foreach (var option in AssignedTechOptions)
+                {
+                    option.IsSelected =
+                        true;
+                }
+            }
         }
         finally
         {
-            _syncingAssignedTechSelection = false;
+            _syncingAssignedTechSelection =
+                false;
+
             UpdateAssignedTechSummary();
+            UpdateAssignedTechBulkButtonText();
         }
     }
 
-    private void ClearAssignedTechs_Click(object sender, RoutedEventArgs e)
+    private void ConfirmAssignedTechSelection_Click(
+        object sender,
+        RoutedEventArgs e)
     {
-        _syncingAssignedTechSelection = true;
+        var assigned =
+            BuildAssignedTechDisplayText();
 
-        try
+        /*
+         * Do not allow an ambiguous completely blank assignment.
+         * No selected technicians means Unassigned.
+         */
+        if (string.IsNullOrWhiteSpace(assigned))
         {
-            foreach (var option in AssignedTechOptions)
-                option.IsSelected = false;
+            assigned =
+                "(Unassigned)";
+        }
 
-            AssignedToUnassignedCheckBox.IsChecked = true;
-            Draft.AssignedTo = "(Unassigned)";
-        }
-        finally
-        {
-            _syncingAssignedTechSelection = false;
-            UpdateAssignedTechSummary();
-        }
+        Draft.AssignedTo =
+            assigned;
+
+        /*
+         * Re-apply the committed value so the controls and
+         * summary are guaranteed to match the ticket draft.
+         */
+        ApplyAssignedTechSelection();
+
+        AssignedTechDropDownPopup.IsOpen =
+            false;
+    }
+
+    private void CancelAssignedTechSelection_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        /*
+         * Draft.AssignedTo was never changed while the picker
+         * was open, so simply reload it and discard the staged
+         * checkbox changes.
+         */
+        ApplyAssignedTechSelection();
+
+        AssignedTechDropDownPopup.IsOpen =
+            false;
+    }
+
+    private void UpdateAssignedTechBulkButtonText()
+    {
+        if (SelectAllAssignedTechsButton is null)
+            return;
+
+        var allSelected =
+            AssignedTechOptions.Count > 0 &&
+            AssignedTechOptions.All(
+                x => x.IsSelected);
+
+        SelectAllAssignedTechsButton.Content =
+            allSelected
+                ? "Clear All"
+                : "Select All";
     }
 
     private string BuildAssignedTechDisplayText()
@@ -605,6 +927,7 @@ public partial class NewTicketWindow : Window
         var notification = (Draft.NotificationNumber ?? "").Trim();
         var workOrderText = (Draft.WorkOrder ?? "").Trim();
         var dispatchNotes = (Draft.DispatchNotes ?? "").Trim();
+        var technicianNotes = (Draft.Notes ?? "").Trim();
 
         if (!ValidateTicketTextLengths(
                 site,
@@ -691,8 +1014,7 @@ public partial class NewTicketWindow : Window
                     AssignedTech: assignedTech,
                     Problem: problem,
 
-                    // Technician write-ups are shown read-only and preserved exactly.
-                    Notes: _preservedNotes,
+                    Notes: technicianNotes,
 
                     DispatchNotes: dispatchNotes
                 );
@@ -832,10 +1154,29 @@ public partial class NewTicketWindow : Window
         return false;
     }
 
+    private sealed record TicketDraftState(
+        string Site,
+        string Problem,
+        string AssignedTo,
+        string Status,
+        string NotificationName,
+        string NotificationNumber,
+        string WorkOrder,
+        string WorkOrderType,
+        string WorkOrderCode,
+        string PriorityDays,
+        string DispatchNotes,
+        string Notes);
+
     private void SetBusy(bool busy)
     {
-        CreateBtn.IsEnabled = !busy;
-        CancelBtn.IsEnabled = !busy;
+        _isBusy =
+            busy;
+
+        RefreshSaveButtonState();
+
+        CancelBtn.IsEnabled =
+            !busy;
 
         DeleteTicketButton.IsEnabled =
             !busy &&

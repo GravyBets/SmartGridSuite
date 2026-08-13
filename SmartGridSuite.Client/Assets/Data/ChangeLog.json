@@ -1,5 +1,22 @@
 [
   {
+    "version": "3.0.0.3",
+    "date": "August 12, 2026",
+    "title": "Field testing reliability and workflow improvements",
+    "changes": [
+      "Added clear failure and retry handling for Site Dashboard Ticket, Maintenance, and Capital requests when connectivity is interrupted.",
+      "Added retry protection so uncertain Maintenance and Capital requests do not create duplicate Dispatch Notes.",
+      "Added protection against losing unsubmitted Site Dashboard write-up text when closing a site tab, loading another site into the same tab, returning Home, or closing the Field Technician module.",
+      "Preserved Site Dashboard write-up text while technicians move between Site Dashboard, Tasks, and History.",
+      "Fixed Site History matching so DACS and corresponding MR sites remain separate, including sites such as 6849 and 6849MR.",
+      "Improved Dispatch Ticket controls, including Edit Ticket styling, action ordering, and staged Status filtering.",
+      "Improved technician assignment selection and ticket editing workflows.",
+      "Improved Dispatch Tasks presentation for write-up changes, equipment replacements, and IP-address changes.",
+      "Made the Site Dashboard write-up submit area more compact for laptop-height displays."
+    ]
+  },
+
+  {
     "version": "3.0.0.2",
     "date": "August 11, 2026",
     "title": "Write-up laptop and Tower search hotfix",

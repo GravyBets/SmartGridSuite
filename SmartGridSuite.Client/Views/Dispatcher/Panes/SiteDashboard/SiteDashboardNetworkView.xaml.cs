@@ -253,34 +253,106 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             string? originalIgsdSecondaryCommsEthernetIp,
             string? originalIgsdSecondaryRtuIp)
         {
-            return
-                !IpValuesMatch(
-                    PrimaryIpTextBox.Text,
-                    originalPrimaryIp) ||
+            return GetIpAddressChangeWriteUpLines(
+                    originalPrimaryIp,
+                    originalLanIp,
+                    originalSecondaryIp,
+                    originalIgsdPrimaryRtuIp,
+                    originalIgsdPrimaryCommsEthernetIp,
+                    originalIgsdSecondaryCommsEthernetIp,
+                    originalIgsdSecondaryRtuIp)
+                .Count > 0;
+        }
 
-                !IpValuesMatch(
-                    LanIpTextBox.Text,
-                    originalLanIp) ||
+        public IReadOnlyList<string> GetIpAddressChangeWriteUpLines(
+            string? originalPrimaryIp,
+            string? originalLanIp,
+            string? originalSecondaryIp,
+            string? originalIgsdPrimaryRtuIp,
+            string? originalIgsdPrimaryCommsEthernetIp,
+            string? originalIgsdSecondaryCommsEthernetIp,
+            string? originalIgsdSecondaryRtuIp)
+        {
+            var lines =
+                new List<string>();
 
-                !IpValuesMatch(
-                    SecondaryIpTextBox.Text,
-                    originalSecondaryIp) ||
+            AddIpChangeWriteUpLine(
+                lines,
+                PrimaryPingLabel,
+                PrimaryIpTextBox.Text,
+                originalPrimaryIp);
 
-                !IpValuesMatch(
-                    IgsdPrimaryRtuIpTextBox.Text,
-                    originalIgsdPrimaryRtuIp) ||
+            AddIpChangeWriteUpLine(
+                lines,
+                LanPingLabel,
+                LanIpTextBox.Text,
+                originalLanIp);
 
-                !IpValuesMatch(
-                    IgsdPrimaryCommsEthernetIpTextBox.Text,
-                    originalIgsdPrimaryCommsEthernetIp) ||
+            AddIpChangeWriteUpLine(
+                lines,
+                SecondaryPingLabel,
+                SecondaryIpTextBox.Text,
+                originalSecondaryIp);
 
-                !IpValuesMatch(
-                    IgsdSecondaryCommsEthernetIpTextBox.Text,
-                    originalIgsdSecondaryCommsEthernetIp) ||
+            AddIpChangeWriteUpLine(
+                lines,
+                "Primary RTU",
+                IgsdPrimaryRtuIpTextBox.Text,
+                originalIgsdPrimaryRtuIp);
 
-                !IpValuesMatch(
-                    IgsdSecondaryRtuIpTextBox.Text,
-                    originalIgsdSecondaryRtuIp);
+            AddIpChangeWriteUpLine(
+                lines,
+                "Primary Comms Ethernet",
+                IgsdPrimaryCommsEthernetIpTextBox.Text,
+                originalIgsdPrimaryCommsEthernetIp);
+
+            AddIpChangeWriteUpLine(
+                lines,
+                "Secondary Comms Ethernet",
+                IgsdSecondaryCommsEthernetIpTextBox.Text,
+                originalIgsdSecondaryCommsEthernetIp);
+
+            AddIpChangeWriteUpLine(
+                lines,
+                "Secondary RTU",
+                IgsdSecondaryRtuIpTextBox.Text,
+                originalIgsdSecondaryRtuIp);
+
+            return lines;
+        }
+
+        private static void AddIpChangeWriteUpLine(
+            List<string> lines,
+            string label,
+            string? currentValue,
+            string? originalValue)
+        {
+            var current =
+                SnapshotIp(currentValue);
+
+            var original =
+                SnapshotIp(originalValue);
+
+            if (string.Equals(
+                    current,
+                    original,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var cleanLabel =
+                string.IsNullOrWhiteSpace(label)
+                    ? "Network"
+                    : label.Trim();
+
+            var displayValue =
+                string.IsNullOrWhiteSpace(current)
+                    ? "(cleared)"
+                    : current;
+
+            lines.Add(
+                $"New {cleanLabel} IP: {displayValue}");
         }
 
         private static bool IpValuesMatch(

@@ -70,6 +70,25 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             WorkspaceView.PingStatsProvider = () => NetworkView.GetPingStatsForWriteUp();
 
+            WorkspaceView.IpChangeWriteUpLinesProvider =
+                () =>
+                {
+                    var session =
+                        GetSelectedSession();
+
+                    if (session is null)
+                        return Array.Empty<string>();
+
+                    return NetworkView.GetIpAddressChangeWriteUpLines(
+                        session.PrimaryIp,
+                        session.LanIp,
+                        session.SecondaryIp,
+                        session.IgsdPrimaryRtuIp,
+                        session.IgsdPrimaryCommsEthernetIp,
+                        session.IgsdSecondaryCommsEthernetIp,
+                        session.IgsdSecondaryRtuIp);
+                };
+
             WorkspaceView.OpenTopTunnelRequested += WorkspaceView_OpenTopTunnelRequested;
 
             WorkspaceView.RunSnmpOidRequested += WorkspaceView_RunSnmpOidRequested;

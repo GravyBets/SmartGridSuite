@@ -48,6 +48,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public List<SiteDashboardHistoryRowViewModel> HistoryRows { get; set; } = new();
         public long CurrentTicketId { get; set; }
 
+        /*
+         * True only when the technician deliberately entered this exact
+         * ticket context:
+         *
+         * - opened from My Tasks
+         * - explicitly chose a ticket
+         * - explicitly created/requested a ticket
+         *
+         * False means CurrentTicketId was merely inferred from a site search.
+         * Inferred ticket context must be re-resolved before a write-up is sent.
+         */
+        public bool HasExplicitTicketContext { get; set; }
+
         //SNMP
         public bool SnmpSupported { get; set; }
         public string SnmpSupportMessage { get; set; } = string.Empty;

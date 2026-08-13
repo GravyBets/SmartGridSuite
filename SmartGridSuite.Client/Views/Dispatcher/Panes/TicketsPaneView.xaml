@@ -301,7 +301,7 @@
                        PlacementTarget="{Binding ElementName=StatusFilterButton}"
                        VerticalOffset="6"
                        AllowsTransparency="True"
-                       StaysOpen="False"
+                       StaysOpen="True"
                        PopupAnimation="Fade">
                     <Border Background="{DynamicResource CardBackground}"
                             BorderBrush="{DynamicResource CardBorder}"
@@ -316,7 +316,7 @@
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimary}"/>
 
-                            <TextBlock Text="Check the statuses you want visible in the Tickets list."
+                            <TextBlock Text="Choose the statuses you want visible. Changes apply when you click OK. Closed is excluded by default."
                                        Margin="0,3,0,10"
                                        FontSize="12"
                                        TextWrapping="Wrap"
@@ -345,37 +345,55 @@
                                     Background="{DynamicResource CardBorder}"/>
 
                             <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="8"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="10"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
 
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding SelectedStatusesSummary}"
+                                <!-- Staged selection summary -->
+                                <TextBlock Grid.Row="0"
+                                           Text="{Binding StagedStatusesSummary}"
                                            FontSize="12"
                                            Foreground="{DynamicResource TextSecondary}"
                                            TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center"/>
 
-                                <Button Grid.Column="1"
-                                        Content="Active Only"
-                                        Height="30"
-                                        MinWidth="92"
-                                        Padding="10,0"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        ToolTip="Show all active/non-closed ticket statuses"
-                                        Click="SelectAllOpenStatuses_Click"/>
+                                <!-- Actions -->
+                                <Grid Grid.Row="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                                <Button Grid.Column="3"
-                                        Content="Include Closed"
-                                        Height="30"
-                                        MinWidth="104"
-                                        Padding="10,0"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        ToolTip="Show every ticket status, including Closed"
-                                        Click="SelectAllStatuses_Click"/>
+                                    <Button x:Name="ToggleAllStatusesButton"
+                                            Grid.Column="0"
+                                            Content="Select All"
+                                            Height="30"
+                                            MinWidth="86"
+                                            Padding="10,0"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Click="ToggleAllStatuses_Click"/>
+
+                                    <Button Grid.Column="2"
+                                            Content="Cancel"
+                                            Height="30"
+                                            MinWidth="76"
+                                            Padding="10,0"
+                                            Style="{StaticResource SecondaryButtonStyle}"
+                                            Click="CancelStatusFilter_Click"/>
+
+                                    <Button Grid.Column="4"
+                                            Content="OK"
+                                            Height="30"
+                                            MinWidth="70"
+                                            Padding="10,0"
+                                            Style="{StaticResource PrimaryButtonStyle}"
+                                            Click="ConfirmStatusFilter_Click"/>
+                                </Grid>
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -461,14 +479,6 @@
                                     Orientation="Horizontal"
                                     VerticalAlignment="Center">
 
-                            <Button x:Name="AssignSelectedButton"
-                                    Content="Assign Selected"
-                                    Height="30"
-                                    Padding="12,0"
-                                    Margin="0,0,4,0"
-                                    IsEnabled="False"
-                                    Click="AssignSelected_Click"/>
-
                             <Button x:Name="CopySelectedWorkOrdersButton"
                                     Content="Copy WOs"
                                     Height="30"
@@ -476,9 +486,17 @@
                                     Padding="12,0"
                                     Margin="0,0,4,0"
                                     IsEnabled="False"
-                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Style="{StaticResource PrimaryButtonStyle}"
                                     ToolTip="Copy selected Work Orders as a vertical list for Excel"
                                     Click="CopySelectedWorkOrders_Click"/>
+
+                            <Button x:Name="AssignSelectedButton"
+                                    Content="Assign Selected"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Margin="0,0,4,0"
+                                    IsEnabled="False"
+                                    Click="AssignSelected_Click"/>
 
                             <Button x:Name="BulkSetProblemButton"
                                     Content="Set Problem"
@@ -510,23 +528,24 @@
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Click="BulkSetStatus_Click"/>
 
-                            <Button x:Name="EditSelectedTicketButton"
-                                    Content="Edit Ticket"
-                                    Height="30"
-                                    Padding="12,0"
-                                    Margin="0,0,4,0"
-                                    IsEnabled="False"
-                                    Style="{StaticResource SecondaryButtonStyle}"
-                                    Click="EditSelectedTicket_Click"/>
-
                             <Button x:Name="OpenDetailsButton"
                                     Content="Open Details"
                                     Height="30"
                                     Width="96"
                                     Padding="12,0"
+                                    Margin="0,0,4,0"
+                                    IsEnabled="False"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="OpenDetails_Click"/>
+
+                            <Button x:Name="EditSelectedTicketButton"
+                                    Content="Edit Ticket"
+                                    Height="30"
+                                    Width="84"
+                                    Padding="12,0"
                                     IsEnabled="False"
                                     Style="{StaticResource PrimaryButtonStyle}"
-                                    Click="OpenDetails_Click"/>
+                                    Click="EditSelectedTicket_Click"/>
                         </StackPanel>
 
                         <!-- Title / quick filter / status -->

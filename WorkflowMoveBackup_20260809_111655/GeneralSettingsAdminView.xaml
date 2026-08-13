@@ -1,0 +1,1923 @@
+﻿<UserControl x:Class="SmartGridSuite.Client.Views.Administration.GeneralSettings.GeneralSettingsAdminView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0">
+
+            <!-- Header -->
+            <Border Style="{StaticResource Card}"
+                    Padding="16"
+                    Margin="0,0,0,4">
+                <StackPanel>
+                    <TextBlock Text="General Settings"
+                               FontSize="24"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimary}"/>
+
+                    <TextBlock Text="Application-wide settings, shared URLs, and selectable field values."
+                               Margin="0,4,0,0"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Email Settings -->
+            <Border Style="{StaticResource Card}"
+                    Padding="16"
+                    Margin="0,0,0,4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="4"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Header -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock Text="Email Settings"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                            <TextBlock Text="Controls server-side email sending from the SmartGridSuite API on the VM."
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </StackPanel>
+
+                        <Button x:Name="ReloadEmailSettingsButton"
+                                Grid.Column="1"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Content="Reload"
+                                Height="34"
+                                Padding="14,0"/>
+
+                        <Button x:Name="SaveEmailSettingsButton"
+                                Grid.Column="3"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Width="138"
+                                Content="Save Email Settings"
+                                Height="34"
+                                Padding="14,0"/>
+                    </Grid>
+
+                    <!-- Toggles -->
+                    <Border Grid.Row="2"
+                            Padding="12"
+                            CornerRadius="10"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            Background="{DynamicResource SurfaceBg}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="18"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <CheckBox x:Name="EmailEnabledCheckBox"
+                                          Content="Emails Enabled"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock Text="Master switch. When off, emails are skipped and logged."
+                                           Margin="24,3,0,10"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+
+                                <CheckBox x:Name="EmailDryRunCheckBox"
+                                          Content="Dry Run Mode"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock Text="Builds and logs emails but does not send them."
+                                           Margin="24,3,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <CheckBox x:Name="EmailDailyAssignmentsCheckBox"
+                                          Content="Daily Assignment Emails"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock Text="Allows emails when Daily Assignments are published."
+                                           Margin="24,3,0,10"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+
+                                <CheckBox x:Name="EmailWriteUpsCheckBox"
+                                          Content="Write-Up Emails"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock Text="Allows emails when technician write-ups are submitted."
+                                           Margin="24,3,0,10"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+
+                                <CheckBox x:Name="EmailBccSenderCheckBox"
+                                          Content="BCC Sender Copy"
+                                          FontWeight="SemiBold"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock Text="When a workflow sends from a tech or dispatcher, BCC that person so they receive a copy."
+                                           Margin="24,3,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- All emails address -->
+                    <StackPanel Grid.Row="4">
+                        <TextBlock Text="All Emails Address"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   Margin="0,0,0,3"/>
+
+                        <TextBox x:Name="EmailAllEmailsAddressTextBox"
+                                 Style="{StaticResource ModernTextBox}"
+                                 Height="34"
+                                 Padding="10,0"
+                                 VerticalContentAlignment="Center"/>
+
+                        <TextBlock Text="Daily Assignment and Modified Assignment emails CC this address. Write-up emails are sent to this address."
+                                   Margin="0,4,0,0"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                    </StackPanel>
+
+                    <!-- Test recipient override -->
+                    <Grid Grid.Row="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Test Recipient Override"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Margin="0,0,0,3"/>
+
+                            <TextBox x:Name="EmailTestRecipientOverrideTextBox"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Height="34"
+                                     Padding="10,0"
+                                     VerticalContentAlignment="Center"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Send Test Email To"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Margin="0,0,0,3"/>
+
+                            <TextBox x:Name="EmailTestRecipientTextBox"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Height="34"
+                                     Padding="10,0"
+                                     VerticalContentAlignment="Center"/>
+                        </StackPanel>
+
+                        <Button x:Name="SendTestEmailButton"
+                                Grid.Column="4"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Content="Send Test Email"
+                                Height="34"
+                                Padding="14,0"
+                                VerticalAlignment="Bottom"/>
+                    </Grid>
+
+                    <TextBlock Grid.Row="8"
+                               x:Name="EmailSettingsStatusTextBlock"
+                               Text="Ready."
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </Grid>
+            </Border>
+
+            <!-- External Links -->
+            <Border Style="{StaticResource Card}"
+                    Padding="16"
+                    Margin="0,0,0,4">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="6"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="External Links"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimary}"/>
+
+                        <TextBlock Text="Shared URLs used by Site Dashboard tabs and actions."
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondary}"/>
+                    </StackPanel>
+
+                    <!-- IGSD Portal URL -->
+                    <Border Grid.Row="2"
+                            Padding="12"
+                            CornerRadius="10"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            Background="{DynamicResource SurfaceBg}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="IGSD Portal URL"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBox x:Name="IgsdPortalUrlTextBox"
+                                         Grid.Column="0"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Height="34"
+                                         Padding="10,0"
+                                         VerticalContentAlignment="Center"
+                                         Tag="IGSD Portal URL"/>
+
+                                <Button x:Name="ReloadPortalUrlButton"
+                                        Grid.Column="2"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Reload"
+                                        Width="84"
+                                        Height="34"
+                                        Padding="14,0"
+                                        Click="ReloadPortalUrlButton_Click"/>
+
+                                <Button x:Name="SavePortalUrlButton"
+                                        Grid.Column="4"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Content="Save"
+                                        Width="84"
+                                        Height="34"
+                                        Padding="14,0"
+                                        Click="SavePortalUrlButton_Click"/>
+                            </Grid>
+
+                            <TextBlock x:Name="PortalUrlStatusTextBlock"
+                                       Grid.Row="4"
+                                       Text="Ready."
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Range Extender Link URL -->
+                    <Border Grid.Row="4"
+                            Padding="12"
+                            CornerRadius="10"
+                            BorderBrush="{DynamicResource SurfaceBorder}"
+                            BorderThickness="1"
+                            Background="{DynamicResource SurfaceBg}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="6"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="Range Extender Link URL"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBox x:Name="RangeExtenderLinkUrlTextBox"
+                                         Grid.Column="0"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Height="34"
+                                         Padding="10,0"
+                                         VerticalContentAlignment="Center"
+                                         Tag="Range Extender Link URL"/>
+
+                                <Button x:Name="ReloadRangeExtenderLinkButton"
+                                        Grid.Column="2"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Reload"
+                                        Width="84"
+                                        Height="34"
+                                        Padding="14,0"
+                                        Click="ReloadRangeExtenderLinkButton_Click"/>
+
+                                <Button x:Name="SaveRangeExtenderLinkButton"
+                                        Grid.Column="4"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Content="Save"
+                                        Width="84"
+                                        Height="34"
+                                        Padding="14,0"
+                                        Click="SaveRangeExtenderLinkButton_Click"/>
+                            </Grid>
+
+                            <TextBlock x:Name="RangeExtenderLinkStatusTextBlock"
+                                       Grid.Row="4"
+                                       Text="Ready."
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- Communication Device Types -->
+            <Border Style="{StaticResource Card}"
+                    Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Header -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Communication Device Types"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                            <TextBlock Text="These populate the Device Type picker when Primary or Secondary Communications are swapped in Site Dashboard."
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Top">
+
+                            <Button x:Name="ReloadDeviceTypesButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Reload"
+                                    MinWidth="86"
+                                    Height="34"
+                                    Padding="14,0"
+                                    Margin="0,0,6,0"
+                                    Click="ReloadDeviceTypesButton_Click"/>
+
+                            <Button x:Name="ToggleAddDeviceTypeButton"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Content="+ New Type"
+                                    MinWidth="108"
+                                    Height="34"
+                                    Padding="14,0"
+                                    Margin="0,0,6,0"
+                                    Click="ToggleAddDeviceTypeButton_Click"/>
+
+                            <Button x:Name="EditSelectedDeviceTypeButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Edit Selected"
+                                    MinWidth="112"
+                                    Height="34"
+                                    Padding="14,0"
+                                    Margin="0,0,6,0"
+                                    IsEnabled="False"
+                                    Click="EditSelectedDeviceTypeButton_Click"/>
+
+                            <Button x:Name="DeleteSelectedDeviceTypeButton"
+                                    Style="{StaticResource DangerButtonStyle}"
+                                    Content="Delete Selected"
+                                    MinWidth="122"
+                                    Height="34"
+                                    Padding="14,0"
+                                    IsEnabled="False"
+                                    Click="DeleteSelectedDeviceTypeButton_Click"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Add/Edit Form Card -->
+                    <Border x:Name="AddDeviceTypeCard"
+                            Grid.Row="2"
+                            Style="{StaticResource Card}"
+                            Padding="12"
+                            Visibility="Collapsed">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0">
+                                <TextBlock x:Name="DeviceTypeFormTitleTextBlock"
+                                           Text="Add Communication Device Type"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock x:Name="DeviceTypeFormHelpTextBlock"
+                                           Text="Create a new selectable communication device type."
+                                           Margin="0,3,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Device Type"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
+
+                                    <TextBox x:Name="NewDeviceTypeNameTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Height="32"
+                                             MaxLength="100"
+                                             Padding="10,0"
+                                             VerticalContentAlignment="Center"
+                                             Tag="Device Type Name"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Sort"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
+
+                                    <TextBox x:Name="NewDeviceTypeSortOrderTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Height="32"
+                                             Padding="10,0"
+                                             VerticalContentAlignment="Center"
+                                             Text="100"/>
+                                </StackPanel>
+
+                                <CheckBox x:Name="NewDeviceTypeActiveCheckBox"
+                                          Grid.Column="4"
+                                          Content="Active"
+                                          IsChecked="True"
+                                          VerticalAlignment="Bottom"
+                                          Margin="0,0,0,7"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <Button x:Name="AddDeviceTypeButton"
+                                        Grid.Column="6"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Content="Add"
+                                        MinWidth="84"
+                                        Height="32"
+                                        Padding="16,0"
+                                        VerticalAlignment="Bottom"
+                                        Click="AddDeviceTypeButton_Click"/>
+
+                                <Button x:Name="CancelAddDeviceTypeButton"
+                                        Grid.Column="8"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Cancel"
+                                        MinWidth="84"
+                                        Height="32"
+                                        Padding="14,0"
+                                        VerticalAlignment="Bottom"
+                                        Click="CancelAddDeviceTypeButton_Click"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- Existing Types Table -->
+                    <Border Grid.Row="4"
+                            Style="{StaticResource Card}"
+                            Padding="8"
+                            ClipToBounds="False">
+                        <DataGrid x:Name="DeviceTypesDataGrid"
+                                  Height="230"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  CanUserResizeRows="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  RowHeaderWidth="0"
+                                  BorderThickness="0"
+                                  Background="{DynamicResource CardBackground}"
+                                  GridLinesVisibility="None"
+                                  HeadersVisibility="Column"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  SelectionChanged="DeviceTypesDataGrid_SelectionChanged">
+
+                            <DataGrid.Resources>
+                                <Style TargetType="{x:Type DataGridColumnHeader}">
+                                    <Setter Property="Background" Value="{DynamicResource TabBgHover}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                    <Setter Property="Height" Value="32"/>
+                                    <Setter Property="Padding" Value="12,0"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource DataGridHeaderBorder}"/>
+                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                </Style>
+
+                                <Style TargetType="{x:Type DataGridRow}">
+                                    <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                    <Setter Property="MinHeight" Value="34"/>
+                                    <Setter Property="BorderThickness" Value="0"/>
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource TileFillHover}"/>
+                                        </Trigger>
+
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource TileFillPressed}"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+
+                                <Style TargetType="{x:Type DataGridCell}">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
+                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                    <Setter Property="Padding" Value="12,6"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                                    <Setter Property="IsTabStop" Value="False"/>
+
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+
+                                <Style x:Key="DeviceTypeGridTextStyle"
+                                       TargetType="{x:Type TextBlock}">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize" Value="13"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                                </Style>
+                            </DataGrid.Resources>
+
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID"
+                                                    Width="64"
+                                                    Binding="{Binding Id}"
+                                                    ElementStyle="{StaticResource DeviceTypeGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Device Type"
+                                                    Width="*"
+                                                    Binding="{Binding DisplayName}"
+                                                    ElementStyle="{StaticResource DeviceTypeGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Sort"
+                                                    Width="80"
+                                                    Binding="{Binding SortOrder}"
+                                                    ElementStyle="{StaticResource DeviceTypeGridTextStyle}"/>
+
+                                <DataGridTemplateColumn Header="Active"
+                                                        Width="86">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsActive}"
+                                                      IsHitTestVisible="False"
+                                                      Focusable="False"
+                                                      HorizontalAlignment="Left"
+                                                      VerticalAlignment="Center"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <TextBlock Grid.Row="6"
+                               x:Name="DeviceTypesStatusTextBlock"
+                               Text="Ready."
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </Grid>
+            </Border>
+
+            <!-- Technician Write-Up Flags -->
+            <Border Style="{StaticResource Card}"
+                    Padding="16"
+                    Margin="0,12,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Header -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Technician Write-Up Flags"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                            <TextBlock Margin="0,4,16,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Text="Configure the flags technicians may select during write-up submission. Protected flags may be activated, deactivated, reordered, or hidden from technicians, but cannot be renamed or deleted."/>
+                        </StackPanel>
+
+                        <WrapPanel Grid.Column="1"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Top">
+
+                            <Button x:Name="ReloadWriteUpFlagsButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Reload"
+                                    MinWidth="82"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    Click="ReloadWriteUpFlagsButton_Click"/>
+
+                            <Button x:Name="ToggleAddWriteUpFlagButton"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Content="+ New Flag"
+                                    MinWidth="102"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    Click="ToggleAddWriteUpFlagButton_Click"/>
+
+                            <Button x:Name="EditSelectedWriteUpFlagButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Edit Selected"
+                                    MinWidth="108"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    IsEnabled="False"
+                                    Click="EditSelectedWriteUpFlagButton_Click"/>
+
+                            <Button x:Name="MoveWriteUpFlagUpButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Move Up"
+                                    MinWidth="86"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    IsEnabled="False"
+                                    Click="MoveWriteUpFlagUpButton_Click"/>
+
+                            <Button x:Name="MoveWriteUpFlagDownButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Move Down"
+                                    MinWidth="92"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    IsEnabled="False"
+                                    Click="MoveWriteUpFlagDownButton_Click"/>
+
+                            <Button x:Name="DeleteSelectedWriteUpFlagButton"
+                                    Style="{StaticResource DangerButtonStyle}"
+                                    Content="Delete Selected"
+                                    MinWidth="116"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,0,6"
+                                    IsEnabled="False"
+                                    Click="DeleteSelectedWriteUpFlagButton_Click"/>
+                        </WrapPanel>
+                    </Grid>
+
+                    <!-- Add/Edit Form -->
+                    <Border x:Name="AddWriteUpFlagCard"
+                            Grid.Row="2"
+                            Style="{StaticResource Card}"
+                            Padding="12"
+                            Visibility="Collapsed">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0">
+                                <TextBlock x:Name="WriteUpFlagFormTitleTextBlock"
+                                           Text="Add Technician Write-Up Flag"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock x:Name="WriteUpFlagFormHelpTextBlock"
+                                           Text="Create a new selectable technician write-up flag."
+                                           Margin="0,3,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Flag Name"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
+
+                                    <TextBox x:Name="NewWriteUpFlagNameTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Height="32"
+                                             MaxLength="100"
+                                             Padding="10,0"
+                                             VerticalContentAlignment="Center"
+                                             Tag="Write-Up Flag Name"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Sort"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
+
+                                    <TextBox x:Name="NewWriteUpFlagSortOrderTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Height="32"
+                                             Padding="10,0"
+                                             VerticalContentAlignment="Center"
+                                             Text="100"/>
+                                </StackPanel>
+
+                                <CheckBox x:Name="NewWriteUpFlagActiveCheckBox"
+                                          Grid.Column="4"
+                                          Content="Active"
+                                          IsChecked="True"
+                                          VerticalAlignment="Bottom"
+                                          Margin="0,0,0,7"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <CheckBox x:Name="NewWriteUpFlagTechnicianVisibleCheckBox"
+                                          Grid.Column="6"
+                                          Content="Technician Visible"
+                                          IsChecked="True"
+                                          VerticalAlignment="Bottom"
+                                          Margin="0,0,0,7"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <Button x:Name="AddWriteUpFlagButton"
+                                        Grid.Column="8"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Content="Add"
+                                        MinWidth="80"
+                                        Height="32"
+                                        Padding="14,0"
+                                        VerticalAlignment="Bottom"
+                                        Click="AddWriteUpFlagButton_Click"/>
+
+                                <Button x:Name="CancelAddWriteUpFlagButton"
+                                        Grid.Column="10"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Cancel"
+                                        MinWidth="80"
+                                        Height="32"
+                                        Padding="14,0"
+                                        VerticalAlignment="Bottom"
+                                        Click="CancelAddWriteUpFlagButton_Click"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- Existing Flags -->
+                    <Border Grid.Row="4"
+                            Style="{StaticResource Card}"
+                            Padding="8"
+                            ClipToBounds="False">
+                        <DataGrid x:Name="WriteUpFlagsDataGrid"
+                                  Height="260"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  CanUserResizeRows="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  RowHeaderWidth="0"
+                                  BorderThickness="0"
+                                  Background="{DynamicResource CardBackground}"
+                                  GridLinesVisibility="None"
+                                  HeadersVisibility="Column"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  SelectionChanged="WriteUpFlagsDataGrid_SelectionChanged">
+
+                            <DataGrid.Resources>
+                                <Style TargetType="{x:Type DataGridColumnHeader}">
+                                    <Setter Property="Background"
+                                            Value="{DynamicResource TabBgHover}"/>
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontWeight"
+                                            Value="SemiBold"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="Height"
+                                            Value="32"/>
+                                    <Setter Property="Padding"
+                                            Value="12,0"/>
+                                    <Setter Property="HorizontalContentAlignment"
+                                            Value="Left"/>
+                                    <Setter Property="VerticalContentAlignment"
+                                            Value="Center"/>
+                                    <Setter Property="BorderBrush"
+                                            Value="{DynamicResource DataGridHeaderBorder}"/>
+                                    <Setter Property="BorderThickness"
+                                            Value="0,0,0,1"/>
+                                </Style>
+
+                                <Style TargetType="{x:Type DataGridRow}">
+                                    <Setter Property="Background"
+                                            Value="{DynamicResource CardBackground}"/>
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="MinHeight"
+                                            Value="34"/>
+                                    <Setter Property="BorderThickness"
+                                            Value="0"/>
+                                    <Setter Property="FocusVisualStyle"
+                                            Value="{x:Null}"/>
+
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver"
+                                                 Value="True">
+                                            <Setter Property="Background"
+                                                    Value="{DynamicResource TileFillHover}"/>
+                                        </Trigger>
+
+                                        <Trigger Property="IsSelected"
+                                                 Value="True">
+                                            <Setter Property="Background"
+                                                    Value="{DynamicResource TileFillPressed}"/>
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+
+                                <Style TargetType="{x:Type DataGridCell}">
+                                    <Setter Property="Background"
+                                            Value="Transparent"/>
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="BorderBrush"
+                                            Value="{DynamicResource SurfaceBorder}"/>
+                                    <Setter Property="BorderThickness"
+                                            Value="0,0,0,1"/>
+                                    <Setter Property="Padding"
+                                            Value="12,6"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="VerticalContentAlignment"
+                                            Value="Center"/>
+                                    <Setter Property="FocusVisualStyle"
+                                            Value="{x:Null}"/>
+                                    <Setter Property="IsTabStop"
+                                            Value="False"/>
+
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected"
+                                                 Value="True">
+                                            <Setter Property="Background"
+                                                    Value="Transparent"/>
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+
+                                <Style x:Key="WriteUpFlagGridTextStyle"
+                                       TargetType="{x:Type TextBlock}">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="VerticalAlignment"
+                                            Value="Center"/>
+                                    <Setter Property="TextTrimming"
+                                            Value="CharacterEllipsis"/>
+                                    <Setter Property="TextWrapping"
+                                            Value="NoWrap"/>
+                                </Style>
+                            </DataGrid.Resources>
+
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID"
+                                                    Width="55"
+                                                    Binding="{Binding Id}"
+                                                    ElementStyle="{StaticResource WriteUpFlagGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Flag"
+                                                    Width="*"
+                                                    Binding="{Binding DisplayName}"
+                                                    ElementStyle="{StaticResource WriteUpFlagGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Sort"
+                                                    Width="65"
+                                                    Binding="{Binding SortOrder}"
+                                                    ElementStyle="{StaticResource WriteUpFlagGridTextStyle}"/>
+
+                                <DataGridTemplateColumn Width="70">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Active"
+                                                   HorizontalAlignment="Center"/>
+                                    </DataGridTemplateColumn.Header>
+
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <CheckBox IsChecked="{Binding IsActive}"
+                                                          IsHitTestVisible="False"
+                                                          Focusable="False"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTemplateColumn Width="100">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Tech Visible"
+                                                   HorizontalAlignment="Center"/>
+                                    </DataGridTemplateColumn.Header>
+
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <CheckBox IsChecked="{Binding IsTechnicianVisible}"
+                                                          IsHitTestVisible="False"
+                                                          Focusable="False"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTemplateColumn Width="90">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Protected"
+                                                   HorizontalAlignment="Center"/>
+                                    </DataGridTemplateColumn.Header>
+
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <CheckBox IsChecked="{Binding IsSystem}"
+                                                          IsHitTestVisible="False"
+                                                          Focusable="False"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <TextBlock Grid.Row="6"
+                               x:Name="WriteUpFlagsStatusTextBlock"
+                               Text="Ready."
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </Grid>
+            </Border>
+
+            <!-- Refer To Options -->
+            <Border Style="{StaticResource Card}"
+                    Padding="16"
+                    Margin="0,12,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Refer To Options"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                            <TextBlock Margin="0,4,16,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Text="Configure the departments or work groups that may be selected beneath Refer To during technician write-up submission."/>
+                        </StackPanel>
+
+                        <WrapPanel Grid.Column="1"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Top">
+
+                            <Button x:Name="ReloadReferToOptionsButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Reload"
+                                    MinWidth="82"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    Click="ReloadReferToOptionsButton_Click"/>
+
+                            <Button x:Name="ToggleAddReferToOptionButton"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Content="+ New Option"
+                                    MinWidth="110"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    Click="ToggleAddReferToOptionButton_Click"/>
+
+                            <Button x:Name="EditSelectedReferToOptionButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Edit Selected"
+                                    MinWidth="108"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    IsEnabled="False"
+                                    Click="EditSelectedReferToOptionButton_Click"/>
+
+                            <Button x:Name="MoveReferToOptionUpButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Move Up"
+                                    MinWidth="86"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    IsEnabled="False"
+                                    Click="MoveReferToOptionUpButton_Click"/>
+
+                            <Button x:Name="MoveReferToOptionDownButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Move Down"
+                                    MinWidth="92"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    IsEnabled="False"
+                                    Click="MoveReferToOptionDownButton_Click"/>
+
+                            <Button x:Name="DeleteSelectedReferToOptionButton"
+                                    Style="{StaticResource DangerButtonStyle}"
+                                    Content="Delete Selected"
+                                    MinWidth="116"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,0,6"
+                                    IsEnabled="False"
+                                    Click="DeleteSelectedReferToOptionButton_Click"/>
+                        </WrapPanel>
+                    </Grid>
+
+                    <!-- Add/Edit Form -->
+                    <Border x:Name="AddReferToOptionCard"
+                            Grid.Row="2"
+                            Style="{StaticResource Card}"
+                            Padding="12"
+                            Visibility="Collapsed">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0">
+                                <TextBlock x:Name="ReferToOptionFormTitleTextBlock"
+                                           Text="Add Refer To Option"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock x:Name="ReferToOptionFormHelpTextBlock"
+                                           Text="Create a new Refer To department or work group."
+                                           Margin="0,3,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Destination Name"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
+
+                                    <TextBox x:Name="NewReferToOptionNameTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Height="32"
+                                             MaxLength="100"
+                                             Padding="10,0"
+                                             VerticalContentAlignment="Center"
+                                             Tag="Refer To Destination"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Sort"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
+
+                                    <TextBox x:Name="NewReferToOptionSortOrderTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Height="32"
+                                             Padding="10,0"
+                                             VerticalContentAlignment="Center"
+                                             Text="100"/>
+                                </StackPanel>
+
+                                <CheckBox x:Name="NewReferToOptionActiveCheckBox"
+                                          Grid.Column="4"
+                                          Content="Active"
+                                          IsChecked="True"
+                                          VerticalAlignment="Bottom"
+                                          Margin="0,0,0,7"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <Button x:Name="AddReferToOptionButton"
+                                        Grid.Column="6"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Content="Add"
+                                        MinWidth="80"
+                                        Height="32"
+                                        Padding="14,0"
+                                        VerticalAlignment="Bottom"
+                                        Click="AddReferToOptionButton_Click"/>
+
+                                <Button x:Name="CancelAddReferToOptionButton"
+                                        Grid.Column="8"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Cancel"
+                                        MinWidth="80"
+                                        Height="32"
+                                        Padding="14,0"
+                                        VerticalAlignment="Bottom"
+                                        Click="CancelAddReferToOptionButton_Click"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- Existing Options -->
+                    <Border Grid.Row="4"
+                            Style="{StaticResource Card}"
+                            Padding="8"
+                            ClipToBounds="False">
+                        <DataGrid x:Name="ReferToOptionsDataGrid"
+                                  Height="240"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  CanUserResizeRows="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  RowHeaderWidth="0"
+                                  BorderThickness="0"
+                                  Background="{DynamicResource CardBackground}"
+                                  GridLinesVisibility="None"
+                                  HeadersVisibility="Column"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  SelectionChanged="ReferToOptionsDataGrid_SelectionChanged">
+
+                            <DataGrid.Resources>
+                                <Style TargetType="{x:Type DataGridColumnHeader}">
+                                    <Setter Property="Background"
+                                            Value="{DynamicResource TabBgHover}"/>
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontWeight"
+                                            Value="SemiBold"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="Height"
+                                            Value="32"/>
+                                    <Setter Property="Padding"
+                                            Value="12,0"/>
+                                    <Setter Property="HorizontalContentAlignment"
+                                            Value="Left"/>
+                                    <Setter Property="VerticalContentAlignment"
+                                            Value="Center"/>
+                                    <Setter Property="BorderBrush"
+                                            Value="{DynamicResource DataGridHeaderBorder}"/>
+                                    <Setter Property="BorderThickness"
+                                            Value="0,0,0,1"/>
+                                </Style>
+
+                                <Style TargetType="{x:Type DataGridRow}">
+                                    <Setter Property="Background"
+                                            Value="{DynamicResource CardBackground}"/>
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="MinHeight"
+                                            Value="34"/>
+                                    <Setter Property="BorderThickness"
+                                            Value="0"/>
+                                    <Setter Property="FocusVisualStyle"
+                                            Value="{x:Null}"/>
+
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver"
+                                                 Value="True">
+                                            <Setter Property="Background"
+                                                    Value="{DynamicResource TileFillHover}"/>
+                                        </Trigger>
+
+                                        <Trigger Property="IsSelected"
+                                                 Value="True">
+                                            <Setter Property="Background"
+                                                    Value="{DynamicResource TileFillPressed}"/>
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+
+                                <Style TargetType="{x:Type DataGridCell}">
+                                    <Setter Property="Background"
+                                            Value="Transparent"/>
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="BorderBrush"
+                                            Value="{DynamicResource SurfaceBorder}"/>
+                                    <Setter Property="BorderThickness"
+                                            Value="0,0,0,1"/>
+                                    <Setter Property="Padding"
+                                            Value="12,6"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="VerticalContentAlignment"
+                                            Value="Center"/>
+                                    <Setter Property="FocusVisualStyle"
+                                            Value="{x:Null}"/>
+                                    <Setter Property="IsTabStop"
+                                            Value="False"/>
+
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected"
+                                                 Value="True">
+                                            <Setter Property="Background"
+                                                    Value="Transparent"/>
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+
+                                <Style x:Key="ReferToOptionGridTextStyle"
+                                       TargetType="{x:Type TextBlock}">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="VerticalAlignment"
+                                            Value="Center"/>
+                                    <Setter Property="TextTrimming"
+                                            Value="CharacterEllipsis"/>
+                                    <Setter Property="TextWrapping"
+                                            Value="NoWrap"/>
+                                </Style>
+                            </DataGrid.Resources>
+
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID"
+                                                    Width="55"
+                                                    Binding="{Binding Id}"
+                                                    ElementStyle="{StaticResource ReferToOptionGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Destination"
+                                                    Width="*"
+                                                    Binding="{Binding DisplayName}"
+                                                    ElementStyle="{StaticResource ReferToOptionGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Sort"
+                                                    Width="75"
+                                                    Binding="{Binding SortOrder}"
+                                                    ElementStyle="{StaticResource ReferToOptionGridTextStyle}"/>
+
+                                <DataGridTemplateColumn Width="80">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Active"
+                                                   HorizontalAlignment="Center"/>
+                                    </DataGridTemplateColumn.Header>
+
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <CheckBox IsChecked="{Binding IsActive}"
+                                                          IsHitTestVisible="False"
+                                                          Focusable="False"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <TextBlock Grid.Row="6"
+                               x:Name="ReferToOptionsStatusTextBlock"
+                               Text="Ready."
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </Grid>
+            </Border>
+
+            <!-- Dispatch Closeout Checklist -->
+            <Border Style="{StaticResource Card}"
+                    Padding="16"
+                    Margin="0,12,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Dispatch Closeout Checklist"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"/>
+
+                            <TextBlock Margin="0,4,16,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Text="Configure the shared checklist Dispatch must complete before a field-completed ticket can be closed."/>
+                        </StackPanel>
+
+                        <WrapPanel Grid.Column="1"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Top">
+
+                            <Button x:Name="ReloadDispatchCloseoutChecklistButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Reload"
+                                    MinWidth="82"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    Click="ReloadDispatchCloseoutChecklistButton_Click"/>
+
+                            <Button x:Name="ToggleAddDispatchCloseoutChecklistButton"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Content="+ New Item"
+                                    MinWidth="100"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    Click="ToggleAddDispatchCloseoutChecklistButton_Click"/>
+
+                            <Button x:Name="EditSelectedDispatchCloseoutChecklistButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Edit Selected"
+                                    MinWidth="108"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    IsEnabled="False"
+                                    Click="EditSelectedDispatchCloseoutChecklistButton_Click"/>
+
+                            <Button x:Name="MoveDispatchCloseoutChecklistUpButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Move Up"
+                                    MinWidth="86"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    IsEnabled="False"
+                                    Click="MoveDispatchCloseoutChecklistUpButton_Click"/>
+
+                            <Button x:Name="MoveDispatchCloseoutChecklistDownButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="Move Down"
+                                    MinWidth="92"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,6,6"
+                                    IsEnabled="False"
+                                    Click="MoveDispatchCloseoutChecklistDownButton_Click"/>
+
+                            <Button x:Name="DeleteSelectedDispatchCloseoutChecklistButton"
+                                    Style="{StaticResource DangerButtonStyle}"
+                                    Content="Delete Selected"
+                                    MinWidth="116"
+                                    Height="34"
+                                    Padding="12,0"
+                                    Margin="0,0,0,6"
+                                    IsEnabled="False"
+                                    Click="DeleteSelectedDispatchCloseoutChecklistButton_Click"/>
+                        </WrapPanel>
+                    </Grid>
+
+                    <!-- Add/Edit Form -->
+                    <Border x:Name="AddDispatchCloseoutChecklistCard"
+                            Grid.Row="2"
+                            Style="{StaticResource Card}"
+                            Padding="12"
+                            Visibility="Collapsed">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0">
+                                <TextBlock x:Name="DispatchCloseoutChecklistFormTitleTextBlock"
+                                           Text="Add Dispatch Closeout Checklist Item"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"/>
+
+                                <TextBlock x:Name="DispatchCloseoutChecklistFormHelpTextBlock"
+                                           Text="Create a checklist item that may be required before ticket closure."
+                                           Margin="0,3,0,0"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}"/>
+                            </StackPanel>
+
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="180"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Checklist Item"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
+
+                                    <TextBox x:Name="NewDispatchCloseoutChecklistNameTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Height="32"
+                                             MaxLength="150"
+                                             Padding="10,0"
+                                             VerticalContentAlignment="Center"
+                                             Tag="Checklist Item"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Sort"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
+
+                                    <TextBox x:Name="NewDispatchCloseoutChecklistSortOrderTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Height="32"
+                                             Padding="10,0"
+                                             VerticalContentAlignment="Center"
+                                             Text="100"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="Condition"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
+
+                                    <ComboBox x:Name="DispatchCloseoutConditionTypeComboBox"
+                                              Height="32"
+                                              SelectionChanged="DispatchCloseoutConditionTypeComboBox_SelectionChanged"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="6">
+                                    <TextBlock Text="Triggering Write-Up Flag"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Margin="0,0,0,3"/>
+
+                                    <ComboBox x:Name="DispatchCloseoutWriteUpFlagComboBox"
+                                              Height="32"
+                                              DisplayMemberPath="DisplayName"
+                                              SelectedValuePath="Id"
+                                              IsEnabled="False"/>
+                                </StackPanel>
+
+                                <CheckBox x:Name="NewDispatchCloseoutChecklistActiveCheckBox"
+                                          Grid.Column="8"
+                                          Content="Active"
+                                          IsChecked="True"
+                                          VerticalAlignment="Bottom"
+                                          Margin="0,0,0,7"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <CheckBox x:Name="NewDispatchCloseoutChecklistRequiredCheckBox"
+                                          Grid.Column="10"
+                                          Content="Required"
+                                          IsChecked="True"
+                                          VerticalAlignment="Bottom"
+                                          Margin="0,0,0,7"
+                                          Foreground="{DynamicResource TextPrimary}"/>
+
+                                <Button x:Name="AddDispatchCloseoutChecklistButton"
+                                        Grid.Column="12"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Content="Add"
+                                        MinWidth="80"
+                                        Height="32"
+                                        Padding="14,0"
+                                        VerticalAlignment="Bottom"
+                                        Click="AddDispatchCloseoutChecklistButton_Click"/>
+
+                                <Button x:Name="CancelAddDispatchCloseoutChecklistButton"
+                                        Grid.Column="14"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Cancel"
+                                        MinWidth="80"
+                                        Height="32"
+                                        Padding="14,0"
+                                        VerticalAlignment="Bottom"
+                                        Click="CancelAddDispatchCloseoutChecklistButton_Click"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- Existing Definitions -->
+                    <Border Grid.Row="4"
+                            Style="{StaticResource Card}"
+                            Padding="8"
+                            ClipToBounds="False">
+                        <DataGrid x:Name="DispatchCloseoutChecklistDataGrid"
+                                  Height="260"
+                                  AutoGenerateColumns="False"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserReorderColumns="False"
+                                  CanUserResizeRows="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  SelectionUnit="FullRow"
+                                  RowHeaderWidth="0"
+                                  BorderThickness="0"
+                                  Background="{DynamicResource CardBackground}"
+                                  GridLinesVisibility="None"
+                                  HeadersVisibility="Column"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  SelectionChanged="DispatchCloseoutChecklistDataGrid_SelectionChanged">
+
+                            <DataGrid.Resources>
+                                <Style TargetType="{x:Type DataGridColumnHeader}">
+                                    <Setter Property="Background"
+                                            Value="{DynamicResource TabBgHover}"/>
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontWeight"
+                                            Value="SemiBold"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="Height"
+                                            Value="32"/>
+                                    <Setter Property="Padding"
+                                            Value="12,0"/>
+                                    <Setter Property="HorizontalContentAlignment"
+                                            Value="Left"/>
+                                    <Setter Property="VerticalContentAlignment"
+                                            Value="Center"/>
+                                    <Setter Property="BorderBrush"
+                                            Value="{DynamicResource DataGridHeaderBorder}"/>
+                                    <Setter Property="BorderThickness"
+                                            Value="0,0,0,1"/>
+                                </Style>
+
+                                <Style TargetType="{x:Type DataGridRow}">
+                                    <Setter Property="Background"
+                                            Value="{DynamicResource CardBackground}"/>
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="MinHeight"
+                                            Value="34"/>
+                                    <Setter Property="BorderThickness"
+                                            Value="0"/>
+                                    <Setter Property="FocusVisualStyle"
+                                            Value="{x:Null}"/>
+
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver"
+                                                 Value="True">
+                                            <Setter Property="Background"
+                                                    Value="{DynamicResource TileFillHover}"/>
+                                        </Trigger>
+
+                                        <Trigger Property="IsSelected"
+                                                 Value="True">
+                                            <Setter Property="Background"
+                                                    Value="{DynamicResource TileFillPressed}"/>
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+
+                                <Style TargetType="{x:Type DataGridCell}">
+                                    <Setter Property="Background"
+                                            Value="Transparent"/>
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="BorderBrush"
+                                            Value="{DynamicResource SurfaceBorder}"/>
+                                    <Setter Property="BorderThickness"
+                                            Value="0,0,0,1"/>
+                                    <Setter Property="Padding"
+                                            Value="12,6"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="VerticalContentAlignment"
+                                            Value="Center"/>
+                                    <Setter Property="FocusVisualStyle"
+                                            Value="{x:Null}"/>
+                                    <Setter Property="IsTabStop"
+                                            Value="False"/>
+
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected"
+                                                 Value="True">
+                                            <Setter Property="Background"
+                                                    Value="Transparent"/>
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource TextPrimary}"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+
+                                <Style x:Key="DispatchCloseoutGridTextStyle"
+                                       TargetType="{x:Type TextBlock}">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TextPrimary}"/>
+                                    <Setter Property="FontSize"
+                                            Value="13"/>
+                                    <Setter Property="VerticalAlignment"
+                                            Value="Center"/>
+                                    <Setter Property="TextTrimming"
+                                            Value="CharacterEllipsis"/>
+                                    <Setter Property="TextWrapping"
+                                            Value="NoWrap"/>
+                                </Style>
+                            </DataGrid.Resources>
+
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID"
+                                                    Width="55"
+                                                    Binding="{Binding Id}"
+                                                    ElementStyle="{StaticResource DispatchCloseoutGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Checklist Item"
+                                                    Width="*"
+                                                    Binding="{Binding DisplayName}"
+                                                    ElementStyle="{StaticResource DispatchCloseoutGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Condition"
+                                                    Width="130"
+                                                    Binding="{Binding ConditionType}"
+                                                    ElementStyle="{StaticResource DispatchCloseoutGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Trigger Flag"
+                                                    Width="180"
+                                                    Binding="{Binding WriteUpFlagName}"
+                                                    ElementStyle="{StaticResource DispatchCloseoutGridTextStyle}"/>
+
+                                <DataGridTextColumn Header="Sort"
+                                                    Width="65"
+                                                    Binding="{Binding SortOrder}"
+                                                    ElementStyle="{StaticResource DispatchCloseoutGridTextStyle}"/>
+
+                                <DataGridTemplateColumn Width="75">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Required"
+                                                   HorizontalAlignment="Center"/>
+                                    </DataGridTemplateColumn.Header>
+
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <CheckBox IsChecked="{Binding IsRequired}"
+                                                          IsHitTestVisible="False"
+                                                          Focusable="False"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
+                                <DataGridTemplateColumn Width="70">
+                                    <DataGridTemplateColumn.Header>
+                                        <TextBlock Text="Active"
+                                                   HorizontalAlignment="Center"/>
+                                    </DataGridTemplateColumn.Header>
+
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <CheckBox IsChecked="{Binding IsActive}"
+                                                          IsHitTestVisible="False"
+                                                          Focusable="False"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <TextBlock Grid.Row="6"
+                               x:Name="DispatchCloseoutChecklistStatusTextBlock"
+                               Text="Ready."
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondary}"/>
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

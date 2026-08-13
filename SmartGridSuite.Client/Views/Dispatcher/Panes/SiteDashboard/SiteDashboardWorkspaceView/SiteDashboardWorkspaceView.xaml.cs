@@ -87,6 +87,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 
         public Func<string>? PingStatsProvider { get; set; }
 
+        public Func<IReadOnlyList<string>>? IpChangeWriteUpLinesProvider { get; set; }
+
         public long CurrentTicketId { get; set; }
 
         public string TowerSummaryText

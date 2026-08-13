@@ -896,7 +896,7 @@
                                      TextChanged="WriteUpTextBox_TextChanged" />
 
                             <Border Grid.Column="2"
-                                    Padding="12"
+                                    Padding="10,8"
                                     CornerRadius="10"
                                     BorderBrush="{DynamicResource SurfaceBorder}"
                                     BorderThickness="1"
@@ -919,7 +919,7 @@
                                             <TextBlock x:Name="TicketRequestsDescriptionTextBlock"
                                                         Text="Only request actions available for this ticket are shown."
                                                         TextWrapping="Wrap"
-                                                        Margin="0,6,0,0"
+                                                        Margin="0,0,0,0"
                                                         FontSize="11"
                                                         Foreground="{DynamicResource TextSecondary}" />
 
@@ -927,7 +927,7 @@
                                                         Style="{StaticResource SecondaryButtonStyle}"
                                                         Content="Request Ticket"
                                                         Height="30"
-                                                        Margin="0,10,0,0"
+                                                        Margin="0,6,0,0"
                                                         Padding="12,0"
                                                         HorizontalAlignment="Stretch"
                                                         Click="RequestTicketButton_Click" />
@@ -954,25 +954,19 @@
                                                         Visibility="Collapsed">
 
                                                 <Border Height="1"
-                                                        Margin="0,14,0,12"
+                                                        Margin="0,6,0,4"
                                                         Background="{DynamicResource SurfaceBorder}" />
 
                                             <TextBlock Text="Write-Up Flags"
                                                         FontWeight="SemiBold"
                                                         Foreground="{DynamicResource TextPrimary}" />
 
-                                            <TextBlock Text="Select any flags that apply to this write-up."
-                                                       TextWrapping="Wrap"
-                                                       Margin="0,5,0,0"
-                                                       FontSize="11"
-                                                       Foreground="{DynamicResource TextSecondary}" />
-
-                                        <!--
+                                            <!--
                                             Administrator-configured Write-Up Flags are inserted here.
                                             Refer To remains below them so future flags always appear first.
-                                        -->
+                                            -->
                                         <StackPanel x:Name="WriteUpFlagsOptionsPanel"
-                                                    Margin="0,8,0,0" />
+                                                    Margin="0,4,0,0" />
 
                                         <StackPanel x:Name="ReferToOptionsSection"
                                                     Visibility="Collapsed">
@@ -987,41 +981,35 @@
 
                                             <StackPanel x:Name="ReferToOptionsPanel"
                                                         Visibility="Collapsed"
-                                                        Margin="18,6,0,0" />
+                                                        Margin="18,4,0,0" />
                                         </StackPanel>
                                     </StackPanel>
 
                                     <Border Height="1"
-                                            Margin="0,14,0,12"
+                                            Margin="0,4,0,4"
                                             Background="{DynamicResource SurfaceBorder}" />
 
                                     <TextBlock Text="Include With Submit"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" />
 
-                                    <TextBlock Text="Equipment replacements are included automatically when replacement entries exist."
-                                               TextWrapping="Wrap"
-                                               Margin="0,8,0,0"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource TextSecondary}" />
-
                                     <CheckBox x:Name="IncludePingStatsCheckBox"
                                               Content="Ping stats"
                                               IsChecked="True"
-                                              Margin="0,12,0,0"
+                                              Margin="0,4,0,0"
                                               Foreground="{DynamicResource TextPrimary}" />
 
                                     <CheckBox x:Name="IncludeSnmpStatsCheckBox"
                                               Content="SNMP stats"
                                               IsChecked="False"
-                                              Margin="0,8,0,0"
+                                              Margin="0,4,0,0"
                                               Foreground="{DynamicResource TextPrimary}"
                                               Checked="IncludeSnmpStatsCheckBox_CheckedChanged"
                                               Unchecked="IncludeSnmpStatsCheckBox_CheckedChanged" />
 
                                     <StackPanel x:Name="SnmpCategoryOptionsPanel"
                                                 Visibility="Collapsed"
-                                                Margin="18,6,0,0">
+                                                Margin="18,4,0,0">
 
                                         <CheckBox x:Name="IncludeSnmpAdminCheckBox"
                                                   Content="Admin"
@@ -1049,7 +1037,7 @@
                                             Style="{StaticResource PrimaryButtonStyle}"
                                             Content="Submit"
                                             Height="32"
-                                            Margin="0,10,0,0"
+                                            Margin="0,4,0,0"
                                             Padding="14,0"
                                             HorizontalAlignment="Stretch"
                                             Click="SubmitWriteUpButton_Click" />

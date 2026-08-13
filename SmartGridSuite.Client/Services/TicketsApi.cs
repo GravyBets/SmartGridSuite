@@ -37,6 +37,42 @@ namespace SmartGridSuite.Client.Services
             return await _api.GetAsync<List<TicketListItemDto>>(path, ct) ?? new();
         }
 
+        public async Task<ResolveSiteTicketResponse> ResolveSiteTicketAsync(
+            string site,
+            string employeeId,
+            long? explicitTicketId = null,
+            CancellationToken ct = default)
+        {
+            var request =
+                new ResolveSiteTicketRequest
+                {
+                    Site =
+                        (site ?? string.Empty).Trim(),
+
+                    EmployeeId =
+                        (employeeId ?? string.Empty).Trim(),
+
+                    ExplicitTicketId =
+                        explicitTicketId.HasValue &&
+                        explicitTicketId.Value > 0
+                            ? explicitTicketId
+                            : null
+                };
+
+            return await _api.PostAsync<
+                       ResolveSiteTicketRequest,
+                       ResolveSiteTicketResponse>(
+                           "api/tickets/resolve-site-ticket",
+                           request,
+                           ct)
+                   ?? new ResolveSiteTicketResponse
+                   {
+                       Resolution = "NoActiveTicket",
+                       Message =
+                           "The API did not return a ticket resolution."
+                   };
+        }
+
         public async Task<TicketSummaryDto> GetSummaryAsync(CancellationToken ct = default)
         {
             return await _api.GetAsync<TicketSummaryDto>("api/tickets/summary", ct)
@@ -275,6 +311,7 @@ namespace SmartGridSuite.Client.Services
         // retrying an uncertain request cannot create duplicate History records.
         public async Task SubmitWriteUpAsync(
             long ticketId,
+            string site,
             Guid clientSubmissionId,
             string finalWriteUpText,
             string siteHistoryWriteUpText,
@@ -299,6 +336,7 @@ namespace SmartGridSuite.Client.Services
                     new SubmitTicketWriteUpRequest
                     {
                         ClientSubmissionId = clientSubmissionId,
+                        Site = (site ?? string.Empty).Trim(),
                         FinalWriteUpText = finalWriteUpText ?? string.Empty,
                         SiteHistoryWriteUpText = siteHistoryWriteUpText ?? string.Empty,
                         SubmittedBy = submittedBy ?? "Unknown",

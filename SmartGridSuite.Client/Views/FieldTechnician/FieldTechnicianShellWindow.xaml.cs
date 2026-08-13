@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.ComponentModel;
+using SmartGridSuite.Contracts.FieldTechnician;
 
 namespace SmartGridSuite.Client.Views.FieldTechnician
 {
@@ -33,6 +35,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
 
             ConnectivityService.StateChanged += ConnectivityService_StateChanged;
 
+            Closing += FieldTechnicianShellWindow_Closing;
             Closed += FieldTechnicianShellWindow_Closed;
 
             ApplyConnectivityState(
@@ -185,36 +188,44 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
 
             _tasksPaneView = new FieldTechTasksPaneView();
 
-            _tasksPaneView.OpenSiteRequested += async (_, site) =>
+            _tasksPaneView.OpenTicketRequested += async ticket =>
             {
-                await OpenSitesInDashboardAsync(new[] { site });
+                await OpenTicketsInDashboardAsync(
+                    new[] { ticket });
             };
 
-            _tasksPaneView.OpenAllSitesRequested += async (_, sites) =>
+            _tasksPaneView.OpenAllTicketsRequested += async tickets =>
             {
-                await OpenSitesInDashboardAsync(sites);
+                await OpenTicketsInDashboardAsync(tickets);
             };
 
             return _tasksPaneView;
         }
 
-        private async Task OpenSitesInDashboardAsync(IEnumerable<string> sites)
+        private async Task OpenTicketsInDashboardAsync(IEnumerable<FieldTechTicketListItemDto> tickets)
         {
-            var cleanSites = sites
-                .Select(x => (x ?? string.Empty).Trim())
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+            var cleanTickets = tickets
+                .Where(x =>
+                    x != null &&
+                    x.Id > 0 &&
+                    !string.IsNullOrWhiteSpace(x.Site))
+                .GroupBy(x => x.Id)
+                .Select(g => g.First())
                 .ToList();
 
-            if (cleanSites.Count == 0)
+            if (cleanTickets.Count == 0)
                 return;
 
             SelectNavIndex(0);
 
-            var dashboard = GetOrCreateSiteDashboardPane();
-            MainPaneHost.Content = dashboard;
+            var dashboard =
+                GetOrCreateSiteDashboardPane();
 
-            await dashboard.OpenSitesFromFieldTechTasksAsync(cleanSites);
+            MainPaneHost.Content =
+                dashboard;
+
+            await dashboard.OpenTicketsFromFieldTechTasksAsync(
+                cleanTickets);
         }
 
         private SiteDashboardPaneView GetOrCreateSiteDashboardPane()
@@ -326,6 +337,22 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
         {
             ConnectivityService.StateChanged -=
                 ConnectivityService_StateChanged;
+        }
+
+        private void FieldTechnicianShellWindow_Closing(
+            object? sender,
+            CancelEventArgs e)
+        {
+            if (_siteDashboardPaneView is null)
+                return;
+
+            if (_siteDashboardPaneView
+                .ConfirmDiscardWriteUpsForShellClose())
+            {
+                return;
+            }
+
+            e.Cancel = true;
         }
 
         private sealed class ApiHealthResponse

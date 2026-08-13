@@ -12,6 +12,14 @@ namespace SmartGridSuite.Contracts.Tickets
          */
         public Guid ClientSubmissionId { get; set; }
 
+        /*
+         * Site the client resolved immediately before submission.
+         * The API uses this to verify that the supplied TicketId still
+         * belongs to the dashboard site and never silently redirects
+         * the write-up to another ticket.
+         */
+        public string Site { get; set; } = "";
+
         public string FinalWriteUpText { get; set; } = "";
 
         public string SiteHistoryWriteUpText { get; set; } = "";

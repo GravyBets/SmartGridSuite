@@ -30,6 +30,8 @@ namespace SmartGridSuite.Api.Controllers
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
         private const string TechnicianRoleCode = "TECHNICIAN";
 
+        private const string AssignmentStatusActive = "Active";
+
         private const string TicketSiteRequiredMessage =
             "A Site Number is required before this ticket can be saved. " +
             "You may enter the Problem / Issue first, but Smart Grid Suite " +
@@ -736,6 +738,277 @@ namespace SmartGridSuite.Api.Controllers
             });
         }
 
+        [HttpPost("resolve-site-ticket")]
+        public async Task<ActionResult<ResolveSiteTicketResponse>> ResolveSiteTicket(
+            [FromBody] ResolveSiteTicketRequest req,
+            CancellationToken ct)
+        {
+            req ??= new ResolveSiteTicketRequest();
+
+            var site =
+                (req.Site ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(site))
+            {
+                return BadRequest(
+                    "A site is required to resolve the working ticket.");
+            }
+
+            var normalizedSite =
+                NormalizeSiteIdForFieldDetails(site);
+
+            /*
+             * An explicit TicketId is authoritative.
+             *
+             * This is used when:
+             * - the technician opened the ticket from My Tasks
+             * - the technician explicitly chose a ticket from an ambiguity dialog
+             *
+             * The ticket may have changed status since the dashboard was opened.
+             * We therefore do NOT require it to still be active here.
+             */
+            if (req.ExplicitTicketId.HasValue &&
+                req.ExplicitTicketId.Value > 0)
+            {
+                var explicitTicket =
+                    await _db.Tickets
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(
+                            x => x.Id == req.ExplicitTicketId.Value,
+                            ct);
+
+                if (explicitTicket is null)
+                {
+                    return NotFound(
+                        $"Ticket {req.ExplicitTicketId.Value} was not found.");
+                }
+
+                var explicitTicketSite =
+                    NormalizeSiteIdForFieldDetails(
+                        explicitTicket.Site);
+
+                if (!string.Equals(
+                        normalizedSite,
+                        explicitTicketSite,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return Conflict(
+                        $"Ticket {explicitTicket.Id} belongs to site " +
+                        $"'{explicitTicket.Site}', not '{site}'.");
+                }
+
+                return Ok(
+                    new ResolveSiteTicketResponse
+                    {
+                        Resolution = "Resolved",
+
+                        TicketId =
+                            explicitTicket.Id,
+
+                        Message =
+                            $"Using explicitly selected ticket " +
+                            $"#{explicitTicket.Id}."
+                    });
+            }
+
+            /*
+             * Manual Site Dashboard sessions do not have an authoritative
+             * TicketId, so resolve against the site's CURRENT active tickets.
+             *
+             * Use configured Ticket Status metadata instead of hard-coding
+             * Open / Assigned / Waiting / etc.
+             */
+            var activeStatusNames =
+                await _db.TicketStatuses
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.IsActive &&
+                        !x.IsClosed)
+                    .Select(x => x.Name)
+                    .ToListAsync(ct);
+
+            var activeTickets =
+                await _db.Tickets
+                    .AsNoTracking()
+                    .Where(t =>
+                        t.Site != null &&
+
+                        t.Site
+                            .Replace("_", "")
+                            .Replace("-", "")
+                            .Replace(" ", "")
+                            .ToUpper() == normalizedSite &&
+
+                        activeStatusNames.Contains(
+                            t.Status))
+                    .OrderBy(t => t.CreatedAt)
+                    .ThenBy(t => t.Id)
+                    .ToListAsync(ct);
+
+            /*
+             * No ticket currently exists.
+             *
+             * Refresh will display no ticket.
+             * Submit may create the Site Dashboard fallback ticket.
+             */
+            if (activeTickets.Count == 0)
+            {
+                return Ok(
+                    new ResolveSiteTicketResponse
+                    {
+                        Resolution = "NoActiveTicket",
+
+                        Message =
+                            $"No active ticket is currently associated " +
+                            $"with {site}."
+                    });
+            }
+
+            /*
+             * Exactly one active ticket is completely unambiguous.
+             */
+            if (activeTickets.Count == 1)
+            {
+                return Ok(
+                    new ResolveSiteTicketResponse
+                    {
+                        Resolution = "Resolved",
+
+                        TicketId =
+                            activeTickets[0].Id,
+
+                        Message =
+                            $"Using the only active ticket for {site}: " +
+                            $"#{activeTickets[0].Id}."
+                    });
+            }
+
+            /*
+             * Two or more active tickets exist.
+             *
+             * First priority:
+             * Prefer tickets assigned to the signed-in technician.
+             */
+            var employeeId =
+                (req.EmployeeId ?? string.Empty).Trim();
+
+            TechnicianEntity? technician =
+                null;
+
+            if (!string.IsNullOrWhiteSpace(employeeId))
+            {
+                technician =
+                    await _db.Technicians
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(
+                            x =>
+                                x.IsActive &&
+                                x.EmployeeId == employeeId,
+                            ct);
+            }
+
+            var technicianName =
+                technician is null
+                    ? string.Empty
+                    : $"{technician.FirstName} {technician.LastName}".Trim();
+
+            var technicianAssignedTickets =
+                activeTickets
+                    .Where(ticket =>
+                        IsTicketAssignedToTechnician(
+                            ticket.AssignedTech,
+                            employeeId,
+                            technicianName))
+                    .OrderBy(ticket => ticket.CreatedAt)
+                    .ThenBy(ticket => ticket.Id)
+                    .ToList();
+
+            var usedTechnicianAssignment =
+                technicianAssignedTickets.Count > 0;
+
+            /*
+             * If one or more tickets are assigned to this technician,
+             * ignore tickets assigned only to other technicians.
+             *
+             * Otherwise all active site tickets remain candidates.
+             */
+            var candidateTickets =
+                usedTechnicianAssignment
+                    ? technicianAssignedTickets
+                    : activeTickets;
+
+            /*
+             * Second priority:
+             * Oldest CreatedAt wins.
+             */
+            var oldestCreatedAt =
+                candidateTickets.Min(x => x.CreatedAt);
+
+            var oldestTickets =
+                candidateTickets
+                    .Where(x =>
+                        x.CreatedAt == oldestCreatedAt)
+                    .OrderBy(x => x.Id)
+                    .ToList();
+
+            /*
+             * The oldest timestamp uniquely identifies one ticket.
+             */
+            if (oldestTickets.Count == 1)
+            {
+                var selected =
+                    oldestTickets[0];
+
+                return Ok(
+                    new ResolveSiteTicketResponse
+                    {
+                        Resolution = "Resolved",
+
+                        TicketId =
+                            selected.Id,
+
+                        UsedTechnicianAssignment =
+                            usedTechnicianAssignment,
+
+                        Message =
+                            usedTechnicianAssignment
+                                ? $"Using oldest active ticket assigned to " +
+                                  $"{technicianName}: #{selected.Id}."
+                                : $"Using oldest active ticket for {site}: " +
+                                  $"#{selected.Id}."
+                    });
+            }
+
+            /*
+             * The remaining candidates have exactly the same oldest
+             * CreatedAt timestamp.
+             *
+             * At this point there is no safe deterministic rule left.
+             * Return the tied tickets and let the technician choose.
+             */
+            return Ok(
+                new ResolveSiteTicketResponse
+                {
+                    Resolution = "ChoiceRequired",
+
+                    UsedTechnicianAssignment =
+                        usedTechnicianAssignment,
+
+                    Message =
+                        usedTechnicianAssignment
+                            ? $"{oldestTickets.Count} tickets assigned to " +
+                              $"{technicianName} have the same Created At time."
+                            : $"{oldestTickets.Count} active tickets for {site} " +
+                              $"have the same Created At time.",
+
+                    Candidates =
+                        oldestTickets
+                            .Select(
+                                MapSiteTicketResolutionCandidate)
+                            .ToList()
+                });
+        }
+
         [HttpGet("by-site/{siteId}")]
         public async Task<ActionResult<List<TicketListItemDto>>> GetBySite(string siteId, CancellationToken ct)
         {
@@ -1122,7 +1395,23 @@ namespace SmartGridSuite.Api.Controllers
                     x.AssignmentDate == assignmentDate &&
                     x.TargetType == "Technician" &&
                     x.TechnicianId == technicianId &&
-                    x.PublishedVersion == latestPublishedVersion.Value)
+                    x.PublishedVersion == latestPublishedVersion.Value &&
+
+                    /*
+                     * A published row describes what Dispatch last sent to the field,
+                     * but the source Daily Assignment remains authoritative for whether
+                     * that work is still active.
+                     *
+                     * Removed or completed assignments must disappear from My Tasks
+                     * immediately without destroying the published snapshot.
+                     *
+                     * SourceAssignmentId may also be null on legacy rows whose source
+                     * assignment was previously hard-deleted. Those are no longer
+                     * active work either.
+                     */
+                    x.SourceAssignment != null &&
+                    x.SourceAssignment.AssignmentStatus ==
+                        AssignmentStatusActive)
                 .OrderBy(x => x.SortOrder)
                 .ThenBy(x => x.Id)
                 .ToListAsync(ct);
@@ -1507,79 +1796,165 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPost("{id:long}/request-capital")]
-        public async Task<ActionResult<UpdateTicketResponse>> RequestCapital(long id, [FromBody] TicketActionReasonRequest req, CancellationToken ct)
+        public async Task<ActionResult<UpdateTicketResponse>> RequestCapital(
+            long id,
+            [FromBody] TicketActionReasonRequest req,
+            CancellationToken ct)
         {
-            var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+            var entity = await _db.Tickets
+                .FirstOrDefaultAsync(
+                    t => t.Id == id,
+                    ct);
 
             if (entity == null)
                 return NotFound();
 
-            var reason = (req.Reason ?? string.Empty).Trim();
+            var reason =
+                (req.Reason ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(reason))
                 return BadRequest("Reason is required.");
 
-            var awaitingCapitalStatus = await _db.TicketStatuses
-                .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    x => x.IsActive && x.Name.ToLower() == "awaiting capital",
-                    ct);
+            var awaitingCapitalStatus =
+                await _db.TicketStatuses
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        x =>
+                            x.IsActive &&
+                            x.Name.ToLower() ==
+                                "awaiting capital",
+                        ct);
 
             if (awaitingCapitalStatus == null)
-                return BadRequest("Status 'Awaiting Capital' is missing or inactive.");
+            {
+                return BadRequest(
+                    "Status 'Awaiting Capital' is missing or inactive.");
+            }
 
-            entity.Status = awaitingCapitalStatus.Name;
-            entity.ActionRequiredOverride = "Review Capital request";
+            /*
+             * Retry protection:
+             *
+             * If the original request reached the API but the client
+             * lost the response, a retry must not append another
+             * Dispatch Note for the same pending request.
+             */
+            var alreadyPending =
+                string.Equals(
+                    entity.Status,
+                    awaitingCapitalStatus.Name,
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(
+                    entity.ActionRequiredOverride,
+                    "Review Capital request",
+                    StringComparison.OrdinalIgnoreCase);
 
-            entity.DispatchNotes = AppendDispatchRequestNote(
-                entity.DispatchNotes,
-                "Capital",
-                reason,
-                req.RequestedBy);
+            if (alreadyPending)
+            {
+                return Ok(
+                    new UpdateTicketResponse(
+                        entity.Id));
+            }
 
-            entity.LastActivityAt = DateTime.Now;
+            entity.Status =
+                awaitingCapitalStatus.Name;
+
+            entity.ActionRequiredOverride =
+                "Review Capital request";
+
+            entity.DispatchNotes =
+                AppendDispatchRequestNote(
+                    entity.DispatchNotes,
+                    "Capital",
+                    reason,
+                    req.RequestedBy);
+
+            entity.LastActivityAt =
+                DateTime.Now;
 
             await _db.SaveChangesAsync(ct);
 
-            return Ok(new UpdateTicketResponse(entity.Id));
+            return Ok(
+                new UpdateTicketResponse(
+                    entity.Id));
         }
 
         [HttpPost("{id:long}/request-maintenance")]
-        public async Task<ActionResult<UpdateTicketResponse>> RequestMaintenance(long id, [FromBody] TicketActionReasonRequest req, CancellationToken ct)
+        public async Task<ActionResult<UpdateTicketResponse>> RequestMaintenance(
+            long id,
+            [FromBody] TicketActionReasonRequest req,
+            CancellationToken ct)
         {
-            var entity = await _db.Tickets.FirstOrDefaultAsync(t => t.Id == id, ct);
+            var entity = await _db.Tickets
+                .FirstOrDefaultAsync(
+                    t => t.Id == id,
+                    ct);
 
             if (entity == null)
                 return NotFound();
 
-            var reason = (req.Reason ?? string.Empty).Trim();
+            var reason =
+                (req.Reason ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(reason))
                 return BadRequest("Reason is required.");
 
-            var needsReviewStatus = await _db.TicketStatuses
-                .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    x => x.IsActive && x.Name.ToLower() == "needs review",
-                    ct);
+            var needsReviewStatus =
+                await _db.TicketStatuses
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(
+                        x =>
+                            x.IsActive &&
+                            x.Name.ToLower() ==
+                                "needs review",
+                        ct);
 
             if (needsReviewStatus == null)
-                return BadRequest("Status 'Needs Review' is missing or inactive.");
+            {
+                return BadRequest(
+                    "Status 'Needs Review' is missing or inactive.");
+            }
 
-            entity.Status = needsReviewStatus.Name;
-            entity.ActionRequiredOverride = "Review Maintenance request";
+            /*
+             * Retry protection for an uncertain client response.
+             */
+            var alreadyPending =
+                string.Equals(
+                    entity.Status,
+                    needsReviewStatus.Name,
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(
+                    entity.ActionRequiredOverride,
+                    "Review Maintenance request",
+                    StringComparison.OrdinalIgnoreCase);
 
-            entity.DispatchNotes = AppendDispatchRequestNote(
-                entity.DispatchNotes,
-                "Maintenance",
-                reason,
-                req.RequestedBy);
+            if (alreadyPending)
+            {
+                return Ok(
+                    new UpdateTicketResponse(
+                        entity.Id));
+            }
 
-            entity.LastActivityAt = DateTime.Now;
+            entity.Status =
+                needsReviewStatus.Name;
+
+            entity.ActionRequiredOverride =
+                "Review Maintenance request";
+
+            entity.DispatchNotes =
+                AppendDispatchRequestNote(
+                    entity.DispatchNotes,
+                    "Maintenance",
+                    reason,
+                    req.RequestedBy);
+
+            entity.LastActivityAt =
+                DateTime.Now;
 
             await _db.SaveChangesAsync(ct);
 
-            return Ok(new UpdateTicketResponse(entity.Id));
+            return Ok(
+                new UpdateTicketResponse(
+                    entity.Id));
         }
 
         [HttpPut("{ticketId:long}/dispatch-closeout-items/{itemId:long}")]
@@ -2980,6 +3355,94 @@ namespace SmartGridSuite.Api.Controllers
                 ?? new SapQueueImportLastImportDto());
         }
 
+        private static bool IsTicketAssignedToTechnician(
+            string? assignedTech,
+            string employeeId,
+            string technicianName)
+        {
+            var assigned =
+                (assignedTech ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(assigned) ||
+                assigned.Equals(
+                    "(Unassigned)",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            /*
+             * Current tickets may contain either:
+             *
+             * Michael Lindemann
+             *
+             * or a formatted multi-tech value such as:
+             *
+             * Michael Lindemann, Alex Smith & Pat Jones
+             *
+             * Older data may also contain employee IDs.
+             */
+            if (!string.IsNullOrWhiteSpace(technicianName) &&
+                assigned.Contains(
+                    technicianName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(employeeId) &&
+                assigned.Contains(
+                    employeeId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static SiteTicketResolutionCandidateDto
+            MapSiteTicketResolutionCandidate(
+                TicketEntity ticket)
+        {
+            return new SiteTicketResolutionCandidateDto
+            {
+                TicketId =
+                    ticket.Id,
+
+                Site =
+                    ticket.Site ?? string.Empty,
+
+                NotificationName =
+                    ticket.NotificationName ?? string.Empty,
+
+                Notification =
+                    ticket.Notification ?? string.Empty,
+
+                WorkOrder =
+                    ticket.CurrentWorkOrder ?? string.Empty,
+
+                WorkOrderClass =
+                    NormalizeWorkOrderType(
+                        ticket.WorkOrderClass),
+
+                Status =
+                    ticket.Status ?? string.Empty,
+
+                AssignedTech =
+                    ticket.AssignedTech ?? string.Empty,
+
+                Problem =
+                    ticket.Problem ?? string.Empty,
+
+                CreatedAt =
+                    ticket.CreatedAt,
+
+                CreatedBy =
+                    ticket.CreatedBy ?? string.Empty
+            };
+        }
+
         private async Task RecordSapImportRunAsync(DateTime importedAt, string importedBy, int importedCount, int alreadyExistsCount,
             int invalidCount, CancellationToken ct)
         {
@@ -3121,6 +3584,94 @@ namespace SmartGridSuite.Api.Controllers
             }
         }
 
+        private static string InsertReferToIntoWriteUp(
+            string? writeUpText,
+            IReadOnlyCollection<ReferToOptionEntity> referToOptions)
+        {
+            var cleanWriteUp =
+                (writeUpText ?? string.Empty).Trim();
+
+            var referToNames =
+                (referToOptions ??
+                 Array.Empty<ReferToOptionEntity>())
+                .Select(x =>
+                    (x.DisplayName ?? string.Empty).Trim())
+                .Where(x =>
+                    !string.IsNullOrWhiteSpace(x))
+                .Distinct(
+                    StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (referToNames.Count == 0)
+                return cleanWriteUp;
+
+            var referToLine =
+                "Refer To: " +
+                string.Join(
+                    ", ",
+                    referToNames);
+
+            /*
+             * Normalize the incoming text into logical lines. The API will write
+             * it back using the server's normal newline convention.
+             */
+            var lines =
+                Regex.Split(
+                        cleanWriteUp,
+                        @"\r\n|\n|\r")
+                    .ToList();
+
+            /*
+             * Defensive duplicate handling. If a client ever begins including
+             * Refer To itself, replace that line instead of creating two copies.
+             */
+            var existingReferToIndex =
+                lines.FindIndex(x =>
+                    x.TrimStart().StartsWith(
+                        "Refer To:",
+                        StringComparison.OrdinalIgnoreCase));
+
+            if (existingReferToIndex >= 0)
+            {
+                lines[existingReferToIndex] =
+                    referToLine;
+
+                return string.Join(
+                        Environment.NewLine,
+                        lines)
+                    .Trim();
+            }
+
+            var reasonIndex =
+                lines.FindIndex(x =>
+                    x.TrimStart().StartsWith(
+                        "Reason:",
+                        StringComparison.OrdinalIgnoreCase));
+
+            if (reasonIndex >= 0)
+            {
+                lines.Insert(
+                    reasonIndex + 1,
+                    referToLine);
+            }
+            else
+            {
+                /*
+                 * A normal Site Dashboard write-up should have a Reason line.
+                 * If an unusual/legacy payload does not, still preserve the
+                 * referral instead of silently losing it.
+                 */
+                lines.Insert(
+                    0,
+                    referToLine);
+            }
+
+            return string.Join(
+                    Environment.NewLine,
+                    lines)
+                .Trim();
+        }
+
         // Submits a technician write-up as one atomic operation so ticket state,
         // Site History, and technician completion History can never drift apart.
         [HttpPost("{id:long}/submit-writeup")]
@@ -3171,6 +3722,40 @@ namespace SmartGridSuite.Api.Controllers
             if (entity == null)
                 return NotFound();
 
+            /*
+             * The client resolves the target ticket immediately before submission,
+             * but the API still owns the final safety check.
+             *
+             * Never allow a supplied TicketId to receive a write-up for a different
+             * Site Dashboard site, and never silently substitute another ticket.
+             */
+            var requestedSite =
+                NormalizeSiteIdForFieldDetails(
+                    req.Site);
+
+            if (string.IsNullOrWhiteSpace(requestedSite))
+            {
+                return BadRequest(
+                    "Site is required when submitting a write-up.");
+            }
+
+            var ticketSite =
+                NormalizeSiteIdForFieldDetails(
+                    entity.Site);
+
+            if (!string.Equals(
+                    requestedSite,
+                    ticketSite,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return Conflict(
+                    $"Write-up ticket/site mismatch. " +
+                    $"Ticket {id} belongs to site " +
+                    $"'{(string.IsNullOrWhiteSpace(ticketSite) ? "(blank)" : ticketSite)}', " +
+                    $"not '{requestedSite}'. " +
+                    "The write-up was not submitted.");
+            }
+
             var finalWriteUp = (req.FinalWriteUpText ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(finalWriteUp))
@@ -3181,8 +3766,11 @@ namespace SmartGridSuite.Api.Controllers
                 : req.SiteHistoryWriteUpText.Trim();
 
             /*
-             * Write-up flags and Refer To selections are structured metadata.
-             * They are intentionally not appended to either write-up narrative.
+             * Write-up flags remain structured metadata.
+             *
+             * Refer To selections are also stored as structured metadata, but they
+             * are additionally inserted into the saved write-up narrative so the
+             * referral is visible everywhere the technician write-up is displayed.
              */
             var requestedWriteUpFlagIds =
                 (req.WriteUpFlagIds ?? new List<uint>())
@@ -3295,6 +3883,25 @@ namespace SmartGridSuite.Api.Controllers
                         "One or more selected Refer To destinations are inactive or no longer available.");
                 }
             }
+
+            /*
+             * Refer To is operationally important, so it must be part of the
+             * permanent narrative rather than existing only as structured metadata.
+             *
+             * Insert it directly below the Reason line in both narrative variants.
+             * From there the existing write-up pipeline automatically carries it
+             * into Ticket Notes, Site History, Field Tech History, Dispatch review,
+             * and the submitted-write-up email.
+             */
+            finalWriteUp =
+                InsertReferToIntoWriteUp(
+                    finalWriteUp,
+                    selectedReferToOptions);
+
+            siteHistoryWriteUp =
+                InsertReferToIntoWriteUp(
+                    siteHistoryWriteUp,
+                    selectedReferToOptions);
 
             var writeUpSubmitStatus = await _db.TicketStatuses
                             .AsNoTracking()
@@ -4204,22 +4811,30 @@ namespace SmartGridSuite.Api.Controllers
 
         private static List<string> BuildTicketSiteHistoryMatchKeys(params string?[] values)
         {
-            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var keys =
+                new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase);
 
             foreach (var value in values)
             {
-                var key = NormalizeTicketSiteHistoryKey(value);
+                var key =
+                    NormalizeTicketSiteHistoryKey(
+                        value);
 
                 if (string.IsNullOrWhiteSpace(key))
                     continue;
 
+                /*
+                 * Site History must remain site-specific.
+                 *
+                 * Example:
+                 *     6849   = DACS
+                 *     6849MR = Meter Reading
+                 *
+                 * Do not strip the MR suffix or otherwise create
+                 * aliases between these distinct sites.
+                 */
                 keys.Add(key);
-
-                if (key.EndsWith("MR", StringComparison.OrdinalIgnoreCase) &&
-                    key.Length > 2)
-                {
-                    keys.Add(key[..^2]);
-                }
             }
 
             return keys.ToList();

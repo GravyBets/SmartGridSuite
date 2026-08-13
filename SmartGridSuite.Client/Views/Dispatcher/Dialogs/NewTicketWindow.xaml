@@ -8,6 +8,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Loaded="Window_Loaded"
+        SizeChanged="Window_SizeChanged"
         Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
         Background="{StaticResource AppBackground}">
 
@@ -100,7 +101,7 @@
                                    Placement="Bottom"
                                    PlacementTarget="{Binding ElementName=AssignedTechDropDownButton}"
                                    VerticalOffset="4"
-                                   StaysOpen="False"
+                                   StaysOpen="True"
                                    AllowsTransparency="True"
                                    PopupAnimation="Fade">
 
@@ -121,8 +122,11 @@
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="8"/>
                                             <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="10"/>
+                                            <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
+                                        <!-- Unassigned -->
                                         <CheckBox x:Name="AssignedToUnassignedCheckBox"
                                                   Grid.Row="0"
                                                   Content="(Unassigned)"
@@ -131,11 +135,10 @@
                                                   Checked="AssignedToUnassignedCheckBox_Checked"
                                                   Unchecked="AssignedToUnassignedCheckBox_Unchecked"/>
 
+                                        <!-- Header / bulk toggle -->
                                         <Grid Grid.Row="2">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="8"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
 
@@ -145,40 +148,65 @@
                                                        Foreground="{DynamicResource TextPrimary}"
                                                        VerticalAlignment="Center"/>
 
-                                            <Button Grid.Column="1"
+                                            <Button x:Name="SelectAllAssignedTechsButton"
+                                                    Grid.Column="1"
                                                     Content="Select All"
                                                     Height="28"
                                                     MinWidth="86"
                                                     Padding="10,0"
-                                                    Click="SelectAllAssignedTechs_Click"/>
-
-                                            <Button Grid.Column="3"
-                                                    Content="Clear"
-                                                    Height="28"
-                                                    MinWidth="70"
-                                                    Padding="10,0"
-                                                    Click="ClearAssignedTechs_Click"/>
+                                                    Style="{StaticResource SecondaryButtonStyle}"
+                                                    Click="ToggleAllAssignedTechs_Click"/>
                                         </Grid>
 
+                                        <!-- Technician list -->
                                         <ScrollViewer Grid.Row="4"
-                                                      MaxHeight="390"
+                                                      MaxHeight="350"
                                                       VerticalScrollBarVisibility="Auto">
 
-                                            <ItemsControl ItemsSource="{Binding AssignedTechOptions, RelativeSource={RelativeSource AncestorType=Window}}">
+                                            <ItemsControl ItemsSource="{Binding AssignedTechOptions,
+                                                            RelativeSource={RelativeSource AncestorType=Window}}">
+
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <CheckBox Content="{Binding Name}"
                                                                   IsChecked="{Binding IsSelected,
-                                                                                      Mode=TwoWay,
-                                                                                      UpdateSourceTrigger=PropertyChanged}"
+                                                                      Mode=TwoWay,
+                                                                      UpdateSourceTrigger=PropertyChanged}"
                                                                   Foreground="{DynamicResource TextPrimary}"
                                                                   Margin="0,3"
                                                                   Checked="AssignedTechOption_Changed"
                                                                   Unchecked="AssignedTechOption_Changed"/>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
+
                                             </ItemsControl>
                                         </ScrollViewer>
+
+                                        <!-- Footer -->
+                                        <Grid Grid.Row="6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="8"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <Button Grid.Column="1"
+                                                    Content="Cancel"
+                                                    Width="86"
+                                                    Height="30"
+                                                    Padding="12,0"
+                                                    Style="{StaticResource SecondaryButtonStyle}"
+                                                    Click="CancelAssignedTechSelection_Click"/>
+
+                                            <Button Grid.Column="3"
+                                                    Content="OK"
+                                                    Width="86"
+                                                    Height="30"
+                                                    Padding="12,0"
+                                                    Style="{StaticResource PrimaryButtonStyle}"
+                                                    Click="ConfirmAssignedTechSelection_Click"/>
+                                        </Grid>
                                     </Grid>
                                 </Border>
                             </Popup>
@@ -374,7 +402,7 @@
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimary}"/>
 
-                    <TextBlock Text="Submitted field notes are shown for reference only. Changes to submitted write-ups should be handled through Site History."
+                    <TextBlock Text="Submitted technician write-up. Dispatch may edit this text before closing the ticket. Editing this does NOT change Site History."
                                Margin="2,0,0,6"
                                FontSize="11"
                                Foreground="{DynamicResource TextSecondary}"
@@ -382,15 +410,17 @@
 
                     <TextBox x:Name="TechnicianNotesTextBox"
                              Height="180"
+                             MinHeight="180"
                              Padding="6,6"
-                             IsReadOnly="True"
-                             IsReadOnlyCaretVisible="True"
+                             MaxLength="10000"
                              AcceptsReturn="True"
                              TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto"
                              VerticalContentAlignment="Top"
                              HorizontalContentAlignment="Left"
-                             Text="{Binding Notes, Mode=OneWay}"/>
+                             Text="{Binding Notes,
+                                            Mode=TwoWay,
+                                            UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>
@@ -429,6 +459,7 @@
                         Style="{StaticResource PrimaryButtonStyle}"
                         Content="Create Ticket"
                         MinWidth="110"
+                        IsEnabled="False"
                         Click="Create_Click"/>
             </StackPanel>
         </Grid>

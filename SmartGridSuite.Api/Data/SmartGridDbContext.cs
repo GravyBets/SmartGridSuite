@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Contracts.Settings;
+using SmartGridSuite.Contracts.Tickets;
 
 namespace SmartGridSuite.Api.Data
 {
@@ -101,7 +102,7 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.Site).HasColumnName("site");
                 e.Property(x => x.Notification).HasColumnName("notification").HasMaxLength(10).IsRequired(false);
                 e.Property(x => x.Status).HasColumnName("status");
-                e.Property(x => x.AssignedTech).HasColumnName("assigned_tech");
+                e.Property(x => x.AssignedTech).HasColumnName("assigned_tech").HasMaxLength(TicketTextLimits.AssignedTech);
                 e.Property(x => x.CreatedAt).HasColumnName("created_at");
                 e.Property(x => x.LastActivityAt).HasColumnName("last_activity_at");
                 e.Property(x => x.CurrentWorkOrder).HasColumnName("current_work_order");
@@ -2489,6 +2490,29 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.AssignmentNotes)
                     .HasColumnName("assignment_notes");
 
+                e.Property(x => x.AssignmentStatus)
+                    .HasColumnName("assignment_status")
+                    .HasMaxLength(20)
+                    .HasDefaultValue("Active")
+                    .IsRequired();
+
+                e.Property(x => x.CompletedAt)
+                    .HasColumnName("completed_at");
+
+                e.Property(x => x.CompletedBy)
+                    .HasColumnName("completed_by")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.CompletedWriteUpSubmissionId)
+                    .HasColumnName("completed_writeup_submission_id");
+
+                e.Property(x => x.RemovedAt)
+                    .HasColumnName("removed_at");
+
+                e.Property(x => x.RemovedBy)
+                    .HasColumnName("removed_by")
+                    .HasMaxLength(100);
+
                 e.Property(x => x.CreatedAt)
                     .HasColumnName("created_at");
 
@@ -2503,10 +2527,6 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.UpdatedBy)
                     .HasColumnName("updated_by")
                     .HasMaxLength(100);
-
-                e.HasIndex(x => new { x.AssignmentDate, x.TicketId })
-                    .IsUnique()
-                    .HasDatabaseName("ux_daily_assignment_date_ticket");
 
                 e.HasIndex(x => x.AssignmentDate)
                     .HasDatabaseName("ix_daily_assignments_date");
@@ -2528,6 +2548,12 @@ namespace SmartGridSuite.Api.Data
 
                 e.HasIndex(x => x.CarriedFromAssignmentId)
                     .HasDatabaseName("ix_daily_assignments_carried_from");
+
+                e.HasIndex(x => x.AssignmentStatus)
+                    .HasDatabaseName("ix_daily_assignments_status");
+
+                e.HasIndex(x => x.CompletedWriteUpSubmissionId)
+                    .HasDatabaseName("ix_daily_assignments_completed_writeup");
 
                 e.HasOne(x => x.Ticket)
                     .WithMany()
@@ -2553,6 +2579,12 @@ namespace SmartGridSuite.Api.Data
                     .WithMany()
                     .HasForeignKey(x => x.CarriedFromAssignmentId)
                     .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(x => x.CompletedWriteUpSubmission)
+                    .WithMany()
+                    .HasForeignKey(x => x.CompletedWriteUpSubmissionId)
+                    .OnDelete(DeleteBehavior.SetNull)
+                    .HasConstraintName("fk_daily_assignments_completed_writeup");
             });
 
             modelBuilder.Entity<DailyTicketAssignmentPublishedEntity>(e =>
