@@ -1,5 +1,26 @@
 [
   {
+    "version": "3.1.0.1",
+    "date": "August 13, 2026",
+    "title": "Field workflow synchronization and Site Dashboard reliability",
+    "changes": [
+      "Improved Site Dashboard ticket resolution so write-ups and ticket actions stay tied to the correct ticket when multiple active tickets exist for the same site.",
+      "Added API-side protection against submitting a write-up to a ticket that does not belong to the currently loaded site.",
+      "Improved Refer To handling so selections appear in the Submit Write-Up preview and are preserved in the permanent submitted write-up.",
+      "Fixed a Field Technician crash that could occur when returning Home with an unsaved Site Dashboard write-up.",
+      "Improved SNMP Poll All so each Site Dashboard tab keeps its own polling state and results cannot appear on the wrong site tab.",
+      "Added per-tab Stop support for SNMP Poll All and improved running-state feedback.",
+      "Improved selected Site Dashboard tab visibility across application themes.",
+      "Added Daily Assignment lifecycle tracking so submitting a write-up completes the current Daily Assignment without removing the technician from the ticket.",
+      "Improved Field Technician task synchronization so completed Daily Assignments disappear automatically and active assigned tickets can move to Other Assigned Tickets.",
+      "Preserved completed work in technician History independently of the current Daily Assignment.",
+      "Allowed a completed ticket assignment to be dispatched again later as a new Daily Assignment without restoring the previous completed assignment.",
+      "Preserved Daily Assignment publication snapshots for audit history and future publish-change tracking.",
+      "Improved Dispatch Tickets Open Details button sizing."
+    ]
+  },
+
+  {
     "version": "3.0.0.3",
     "date": "August 12, 2026",
     "title": "Field testing reliability and workflow improvements",
