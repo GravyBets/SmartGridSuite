@@ -531,7 +531,7 @@
                             <Button x:Name="OpenDetailsButton"
                                     Content="Open Details"
                                     Height="30"
-                                    Width="96"
+                                    Width="108"
                                     Padding="12,0"
                                     Margin="0,0,4,0"
                                     IsEnabled="False"
