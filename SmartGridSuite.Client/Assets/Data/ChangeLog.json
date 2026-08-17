@@ -1,5 +1,19 @@
 [
   {
+    "version": "3.1.0.2",
+    "date": "August 17, 2026",
+    "title": "Daily Assignments workflow and Field Technician stability",
+    "changes": [
+      "Redesigned Dispatch Daily Assignments with selectable technician and crew cards, stable alphabetical ordering, assignment status indicators, and a more compact route-focused layout.",
+      "Improved the Daily Assignments Ticket Pool and Work List with compact ticket cards, clearer selected-target information, and easier route management.",
+      "Added double-click ticket editing from both the Daily Assignments Ticket Pool and assigned Work List.",
+      "Added New Ticket directly to Daily Assignments so Dispatch can create work without leaving the assignment pane.",
+      "Fixed a Field Technician Site Dashboard issue where opening another ticket from Tasks could copy an existing write-up into a Blank tab and crash the application after cancelling the warning.",
+      "Fixed the Administration Dispatch Closeout Checklist Trigger selector so saved Write-Up Flag and Refer To triggers display their friendly names instead of contract type names."
+    ]
+  },
+
+  {
     "version": "3.1.0.1",
     "date": "August 13, 2026",
     "title": "Field workflow synchronization and Site Dashboard reliability",

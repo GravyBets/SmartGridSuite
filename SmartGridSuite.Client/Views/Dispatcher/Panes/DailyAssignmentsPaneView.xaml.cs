@@ -12,6 +12,9 @@ using System.Windows.Media;
 using System.Runtime.InteropServices;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media.Animation;
+using SmartGridSuite.Client.Models.Dispatcher;
+using SmartGridSuite.Client.Views.Dispatcher.Dialogs;
+using SmartGridSuite.Contracts.Tickets;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
@@ -25,6 +28,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         }
 
         private readonly ApiClient _api = ClientAppSettings.CreateApiClient();
+        private readonly TicketsApi _ticketsApi = new(ClientAppSettings.CreateApiClient());
         private readonly DispatcherTimer _ticketSearchTimer;
         private readonly ObservableCollection<DailyAssignmentTicketDto> _filteredTicketPool = new();
         private readonly ObservableCollection<AssignmentTargetVm> _assignmentTargets = new();
@@ -101,6 +105,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 OnPropertyChanged(nameof(HasSelectedTargetAssignedTickets));
                 OnPropertyChanged(nameof(SelectedTargetSubtitle));
                 OnPropertyChanged(nameof(SelectedTargetPublishStatusText));
+                OnPropertyChanged(nameof(SelectedTargetHeaderText));
+                OnPropertyChanged(nameof(SelectedTargetContextText));
+                OnPropertyChanged(nameof(SelectedTargetHeaderText));
+                OnPropertyChanged(nameof(SelectedTargetContextText));
 
                 /*
                  * The selected route determines which tickets must be excluded from
@@ -122,6 +130,39 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             SelectedTarget == null
                 ? "Choose a crew or individual technician."
                 : $"{SelectedTarget.PrimaryText} · {SelectedTarget.SecondaryText}";
+
+        public string SelectedTargetHeaderText =>
+            SelectedTarget?.PrimaryText
+            ?? "No Crew / Technician Selected";
+
+        public string SelectedTargetContextText
+        {
+            get
+            {
+                var target = SelectedTarget;
+
+                if (target == null)
+                    return "Select a crew or technician above.";
+
+                var targetLabel =
+                    target.TargetType.Equals(
+                        "Truck",
+                        StringComparison.OrdinalIgnoreCase)
+                        ? "Crew Work List"
+                        : "Technician Work List";
+
+                var ticketText =
+                    target.AssignedTicketCount == 1
+                        ? "1 ticket"
+                        : $"{target.AssignedTicketCount} tickets";
+
+                if (string.IsNullOrWhiteSpace(target.SecondaryText))
+                    return $"{targetLabel} · {ticketText}";
+
+                return
+                    $"{targetLabel} · {target.SecondaryText} · {ticketText}";
+            }
+        }
 
         public string SelectedTargetPublishStatusText => SelectedTarget?.PublishStatusText ?? "";
 
@@ -189,6 +230,47 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private async void Refresh_Click(object sender, RoutedEventArgs e)
         {
             await LoadBoardAsync();
+        }
+
+        private async void NewTicket_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var techSuggestions =
+                    Board.TechnicianTargets
+                        .Select(x => x.TechnicianName)
+                        .Concat(
+                            Board.TruckTargets
+                                .SelectMany(x => x.Technicians)
+                                .Select(x => x.Name))
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Select(x => x!.Trim())
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(
+                            x => x,
+                            StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                var win = new NewTicketWindow(
+                    _ticketsApi,
+                    techSuggestions)
+                {
+                    Owner = Window.GetWindow(this)
+                };
+
+                if (win.ShowDialog() != true)
+                    return;
+
+                await LoadBoardAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "New Ticket",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         private async Task LoadBoardAsync()
@@ -577,6 +659,144 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 _ticketPoolDragTicketIds.Add(ticket.TicketId);
             }
+        }
+
+        private async void TicketPoolList_MouseDoubleClick(
+            object sender,
+            MouseButtonEventArgs e)
+        {
+            // Double-clicking the checkbox should only affect selection.
+            if (FindVisualParent<CheckBox>(
+                    e.OriginalSource as DependencyObject) != null)
+            {
+                return;
+            }
+
+            // Route action buttons should only perform their own action.
+            if (FindVisualParent<Button>(
+                    e.OriginalSource as DependencyObject) != null)
+            {
+                return;
+            }
+
+            var item = FindVisualParent<ListBoxItem>(
+                e.OriginalSource as DependencyObject);
+
+            if (item?.DataContext is not DailyAssignmentTicketDto ticket ||
+                ticket.TicketId <= 0)
+            {
+                return;
+            }
+
+            try
+            {
+                StatusText = $"Opening ticket for {ticket.Site}...";
+
+                // Always load the current ticket before opening Edit Ticket.
+                var dto = await _ticketsApi.GetTicketByIdAsync(
+                    ticket.TicketId);
+
+                if (dto == null)
+                {
+                    MessageBox.Show(
+                        "The ticket could not be loaded.",
+                        "Edit Ticket",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+
+                    StatusText = "Ticket could not be loaded.";
+                    return;
+                }
+
+                var ticketToEdit = MapTicketForEditor(dto);
+
+                var techSuggestions =
+                    Board.TechnicianTargets
+                        .Select(x => x.TechnicianName)
+                        .Concat(
+                            Board.TruckTargets
+                                .SelectMany(x => x.Technicians)
+                                .Select(x => x.Name))
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Select(x => x!.Trim())
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(
+                            x => x,
+                            StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                var win = new NewTicketWindow(
+                    _ticketsApi,
+                    techSuggestions,
+                    ticketToEdit)
+                {
+                    Owner = Window.GetWindow(this)
+                };
+
+                var result = win.ShowDialog();
+
+                if (result == true || win.WasDeleted)
+                {
+                    await LoadBoardAsync();
+
+                    StatusText = win.WasDeleted
+                        ? $"Ticket for {ticket.Site} deleted."
+                        : $"Ticket for {ticket.Site} updated.";
+                }
+                else
+                {
+                    StatusText = "Ready.";
+                }
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                StatusText =
+                    $"Ticket load failed: {ex.Body ?? ex.Message}";
+
+                MessageBox.Show(
+                    ex.Body ?? ex.Message,
+                    "Edit Ticket",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                StatusText =
+                    "Ticket load failed: " + ex.Message;
+
+                MessageBox.Show(
+                    ex.Message,
+                    "Edit Ticket",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private static DispatchTicket MapTicketForEditor(TicketListItemDto dto)
+        {
+            return new DispatchTicket
+            {
+                Id = dto.Id,
+                Site = dto.Site,
+                NotificationName = dto.NotificationName ?? "",
+                Notification = dto.Notification ?? "",
+                Status = dto.Status,
+                AssignedTech = dto.AssignedTech,
+                CreatedAt = dto.CreatedAt,
+                LastActivityAt = dto.LastActivityAt,
+                CurrentWorkOrder = dto.CurrentWorkOrder ?? "",
+                WorkOrderType = dto.WorkOrderClass ?? "",
+                GroupCode = dto.GroupCode,
+                PriorityDays = dto.PriorityDays,
+                Problem = dto.Problem,
+                Notes = dto.Notes,
+                DispatchNotes = dto.DispatchNotes,
+                CreatedBy = dto.CreatedBy,
+                TaskCategoryId = dto.TaskCategoryId,
+                TaskCategoryName = dto.TaskCategoryName ?? "",
+                ActionRequiredOverride =
+                    dto.ActionRequiredOverride ?? ""
+            };
         }
 
         private void TicketPoolList_PreviewMouseMove(object sender, MouseEventArgs e)
@@ -1747,9 +1967,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 .Select(AssignmentTargetVm.FromDto));
 
             foreach (var target in targets
-                         .OrderBy(x => x.HasNoTickets ? 0 : 1)
-                         .ThenBy(x => x.PrimaryText)
-                         .ThenBy(x => x.SecondaryText))
+             .OrderBy(
+                 x => x.SortText,
+                 StringComparer.OrdinalIgnoreCase)
+             .ThenBy(
+                 x => x.SecondaryText,
+                 StringComparer.OrdinalIgnoreCase)
+             .ThenBy(
+                 x => x.TargetKey,
+                 StringComparer.OrdinalIgnoreCase))
             {
                 _assignmentTargets.Add(target);
             }
@@ -1936,7 +2162,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         public int? TechnicianId { get; set; }
 
         public string PrimaryText { get; set; } = "";
+
+        public string PrimaryLine1 { get; set; } = "";
+        public string PrimaryLine2 { get; set; } = "";
+
         public string SecondaryText { get; set; } = "";
+        public string SortText { get; set; } = "";
 
         public ObservableCollection<DailyAssignedTicketDto> AssignedTickets { get; set; } = new();
 
@@ -1977,19 +2208,42 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             var isTruck = dto.TruckId.HasValue && dto.Technicians.Count > 0;
 
             var names = dto.Technicians
-                .Select(x => x.Name)
+                .Select(x => FormatLastFirst(
+                    x.FirstName,
+                    x.LastName,
+                    x.Name))
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(x => x)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
+            var individualName = FormatLastFirst(dto.TechnicianName);
+
             var primary = isTruck
-                ? names.Count == 0 ? "Unassigned Truck" : FormatCrewNames(names)
-                : string.IsNullOrWhiteSpace(dto.TechnicianName) ? "Unknown Technician" : dto.TechnicianName!;
+                ? names.Count == 0
+                    ? "Unassigned Truck"
+                    : FormatCrewNames(names)
+                : string.IsNullOrWhiteSpace(individualName)
+                    ? "Unknown Technician"
+                    : individualName;
 
             var secondary = isTruck
                 ? $"Truck {dto.TruckNumber} · {dto.TruckStyleName}"
                 : dto.TechnicianTitle ?? "";
+
+            var sortText = isTruck
+                ? names.FirstOrDefault() ?? primary
+                : primary;
+
+            var primaryLine1 = isTruck
+                ? names.FirstOrDefault() ?? primary
+                : primary;
+
+            var primaryLine2 = isTruck && names.Count > 1
+                ? names.Count == 2
+                    ? names[1]
+                    : $"{names[1]} +{names.Count - 2} more"
+                : "";
 
             return new AssignmentTargetVm
             {
@@ -1997,8 +2251,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 TargetType = dto.TargetType,
                 TruckId = dto.TruckId,
                 TechnicianId = dto.TechnicianId,
+
                 PrimaryText = primary,
+                PrimaryLine1 = primaryLine1,
+                PrimaryLine2 = primaryLine2,
+
                 SecondaryText = secondary,
+                SortText = sortText,
+
                 AssignedTickets = BuildOrderedAssignedTickets(dto.AssignedTickets)
             };
         }
@@ -2024,6 +2284,53 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             return new ObservableCollection<DailyAssignedTicketDto>(
                 orderedTickets);
+        }
+
+        private static string FormatLastFirst(
+            string? firstName,
+            string? lastName,
+            string? fallbackName)
+        {
+            var first = (firstName ?? "").Trim();
+            var last = (lastName ?? "").Trim();
+
+            if (!string.IsNullOrWhiteSpace(last) &&
+                !string.IsNullOrWhiteSpace(first))
+            {
+                return $"{last}, {first}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(last))
+                return last;
+
+            if (!string.IsNullOrWhiteSpace(first))
+                return first;
+
+            return FormatLastFirst(fallbackName);
+        }
+
+        private static string FormatLastFirst(string? fullName)
+        {
+            var name = (fullName ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(name))
+                return "";
+
+            // Already Last, First.
+            if (name.Contains(','))
+                return name;
+
+            var parts = name.Split(
+                ' ',
+                StringSplitOptions.RemoveEmptyEntries);
+
+            if (parts.Length == 1)
+                return parts[0];
+
+            var lastName = parts[^1];
+            var firstName = string.Join(" ", parts[..^1]);
+
+            return $"{lastName}, {firstName}";
         }
 
         private static string FormatCrewNames(IReadOnlyList<string> names)

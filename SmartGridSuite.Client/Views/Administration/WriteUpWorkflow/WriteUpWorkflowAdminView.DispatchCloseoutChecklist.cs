@@ -12,6 +12,18 @@ namespace SmartGridSuite.Client.Views.Administration.WriteUpWorkflow
 
         private uint? _editingDispatchCloseoutChecklistDefinitionId;
 
+        private sealed class DispatchCloseoutTriggerOption
+        {
+            public uint Id { get; init; }
+
+            public string DisplayName { get; init; } = "";
+
+            public override string ToString()
+            {
+                return DisplayName;
+            }
+        }
+
         private void UpdateDispatchCloseoutChecklistBusyState(
             bool isBusy)
         {
@@ -55,13 +67,18 @@ namespace SmartGridSuite.Client.Views.Administration.WriteUpWorkflow
                     ? DispatchCloseoutWriteUpFlagComboBox.SelectedValue
                     : null;
 
-            if (conditionType ==
-                DispatchCloseoutConditionTypes.WriteUpFlag)
+            if (conditionType == DispatchCloseoutConditionTypes.WriteUpFlag)
             {
                 DispatchCloseoutWriteUpFlagComboBox.ItemsSource =
                     _writeUpFlags
                         .OrderBy(x => x.SortOrder)
                         .ThenBy(x => x.DisplayName)
+                        .Select(x =>
+                            new DispatchCloseoutTriggerOption
+                            {
+                                Id = x.Id,
+                                DisplayName = x.DisplayName
+                            })
                         .ToList();
             }
             else if (conditionType ==
@@ -71,6 +88,12 @@ namespace SmartGridSuite.Client.Views.Administration.WriteUpWorkflow
                     _referToOptions
                         .OrderBy(x => x.SortOrder)
                         .ThenBy(x => x.DisplayName)
+                        .Select(x =>
+                            new DispatchCloseoutTriggerOption
+                            {
+                                Id = x.Id,
+                                DisplayName = x.DisplayName
+                            })
                         .ToList();
             }
             else
