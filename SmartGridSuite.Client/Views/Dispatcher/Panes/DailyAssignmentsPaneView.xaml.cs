@@ -123,8 +123,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         public bool HasSelectedTargetAssignedTickets => SelectedTarget?.AssignedTicketCount > 0;
 
-        public string HeaderSubtitle =>
-            $"Assign tickets for {Board.WorkDate:dddd, MMMM d, yyyy}.";
+        public string HeaderSubtitle => $"Assign tickets for {Board.WorkDate:dddd, MMMM d, yyyy}.";
 
         public string SelectedTargetSubtitle =>
             SelectedTarget == null
@@ -507,6 +506,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
             }
 
+            var assignmentMode = ResolveAssignmentModeForTickets(
+                ticketIds,
+                target);
+
+            if (assignmentMode == null)
+            {
+                StatusText =
+                    "Assignment canceled.";
+
+                return;
+            }
+
             ShowBusyOverlay("Assigning selected ticket(s)...");
 
             try
@@ -520,6 +531,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     TargetType = target.TargetType,
                     TruckId = target.TruckId,
                     TechnicianId = target.TechnicianId,
+
+                    AssignmentMode = assignmentMode,
+
                     AssignmentNotes = null,
                     UpdatedBy = Environment.UserName
                 };
@@ -563,13 +577,72 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void RemoveAssignedTicket_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button button || button.Tag is not DailyAssignedTicketDto ticket)
+            if (sender is not Button button ||
+                button.Tag is not DailyAssignedTicketDto ticket)
+            {
                 return;
+            }
 
-            await RemoveAssignedTicketsAsync(
-                new List<long> { ticket.TicketId },
-                "Removing assigned ticket...",
-                $"Removed {ticket.Site} from the selected list.");
+            ShowBusyOverlay("Removing assigned ticket...");
+
+            try
+            {
+                StatusText =
+                    "Removing assigned ticket...";
+
+                var req =
+                    new RemoveDailyTicketAssignmentsRequest
+                    {
+                        WorkDate =
+                            Board.WorkDate,
+
+                        AssignmentIds =
+                            new List<ulong>
+                            {
+                        ticket.AssignmentId
+                            },
+
+                        UpdatedBy =
+                            Environment.UserName
+                    };
+
+                await _api.PostAsync<
+                    RemoveDailyTicketAssignmentsRequest,
+                    RemoveDailyTicketAssignmentsResponse>(
+                        "api/daily-assignments/remove",
+                        req);
+
+                await LoadBoardAsync();
+
+                StatusText =
+                    $"Removed {ticket.Site} from the selected list.";
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                StatusText =
+                    $"Remove failed: {ex.Body ?? ex.Message}";
+
+                MessageBox.Show(
+                    ex.Body ?? ex.Message,
+                    "Remove Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                StatusText =
+                    "Remove failed: " + ex.Message;
+
+                MessageBox.Show(
+                    ex.Message,
+                    "Remove Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                HideBusyOverlay();
+            }
         }
 
         private async Task RemoveAssignedTicketsAsync(List<long> ticketIds, string workingStatus, string successStatus)
@@ -1499,6 +1572,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (cleanTicketIds.Count == 0)
                 return;
 
+            var assignmentMode = ResolveAssignmentModeForTickets(
+                cleanTicketIds,
+                target);
+
+            if (assignmentMode == null)
+            {
+                StatusText =
+                    "Assignment canceled.";
+
+                ResetRouteCardPreview();
+
+                return;
+            }
+
             var targetKey = target.TargetKey;
 
             ShowBusyOverlay("Assigning dropped ticket(s)...");
@@ -1518,6 +1605,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     TargetType = target.TargetType,
                     TruckId = target.TruckId,
                     TechnicianId = target.TechnicianId,
+
+                    AssignmentMode = assignmentMode,
+
                     AssignmentNotes = null,
                     UpdatedBy = Environment.UserName
                 };
@@ -1709,19 +1799,24 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (target == null)
                 return;
 
-            var ticketIds = target.AssignedTickets
-                .Select(x => x.TicketId)
-                .Where(x => x > 0)
-                .Distinct()
-                .ToList();
+            var assignmentIds =
+                target.AssignedTickets
+                    .Select(x => x.AssignmentId)
+                    .Where(x => x > 0)
+                    .Distinct()
+                    .ToList();
 
-            if (ticketIds.Count == 0)
+            if (assignmentIds.Count == 0)
                 return;
+
+            var ticketCount =
+                target.AssignedTickets.Count;
 
             var confirm = MessageBox.Show(
                 $"Clear and publish an empty task list for {target.PrimaryText}?\n\n" +
-                $"This will remove all {ticketIds.Count} ticket(s) from this route, clear the field tech My Tasks list for this target, " +
-                "and return eligible tickets to unassigned.",
+                $"This will remove all {ticketCount} ticket(s) from this route and clear " +
+                "the Field Technician My Tasks list for this target.\n\n" +
+                "Tickets that are also assigned to another crew or technician will remain on that other route.",
                 "Clear Assignment List",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
@@ -1738,7 +1833,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 var removeReq = new RemoveDailyTicketAssignmentsRequest
                 {
                     WorkDate = Board.WorkDate,
-                    TicketIds = ticketIds,
+                    AssignmentIds = assignmentIds,
                     UpdatedBy = Environment.UserName
                 };
 
@@ -2033,6 +2128,156 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return target.TechnicianName
                    ?? target.TruckNumber
                    ?? "";
+        }
+
+        private string? ResolveAssignmentModeForTickets(
+            IReadOnlyCollection<long> ticketIds,
+            AssignmentTargetVm destinationTarget)
+        {
+            var cleanTicketIds =
+                ticketIds
+                    .Where(x => x > 0)
+                    .Distinct()
+                    .ToHashSet();
+
+            if (cleanTicketIds.Count == 0)
+                return "Move";
+
+            /*
+             * Look across every OTHER current Daily Assignment target.
+             *
+             * The selected destination itself is excluded because adding a
+             * ticket twice to the exact same route is never meaningful.
+             */
+            var otherAssignments =
+                AssignmentTargets
+                    .Where(target =>
+                        !string.Equals(
+                            target.TargetKey,
+                            destinationTarget.TargetKey,
+                            StringComparison.OrdinalIgnoreCase))
+                    .SelectMany(target =>
+                        target.AssignedTickets
+                            .Where(ticket =>
+                                cleanTicketIds.Contains(
+                                    ticket.TicketId))
+                            .Select(ticket => new
+                            {
+                                ticket.TicketId,
+                                TargetName =
+                                    target.PrimaryText
+                            }))
+                    .ToList();
+
+            if (otherAssignments.Count == 0)
+            {
+                /*
+                 * Nothing is currently assigned elsewhere.
+                 * Preserve normal Daily Assignments behavior.
+                 */
+                return "Move";
+            }
+
+            var affectedTicketIds =
+                otherAssignments
+                    .Select(x => x.TicketId)
+                    .Distinct()
+                    .ToHashSet();
+
+            var affectedTickets =
+                Board.TicketPool
+                    .Where(x =>
+                        affectedTicketIds.Contains(
+                            x.TicketId))
+                    .ToList();
+
+            string ticketDescription;
+
+            if (affectedTicketIds.Count == 1)
+            {
+                var ticketId =
+                    affectedTicketIds.First();
+
+                var ticket =
+                    affectedTickets.FirstOrDefault(
+                        x => x.TicketId == ticketId);
+
+                ticketDescription =
+                    ticket == null
+                        ? $"Ticket #{ticketId}"
+                        : string.IsNullOrWhiteSpace(ticket.Site)
+                            ? $"Ticket #{ticketId}"
+                            : $"{ticket.Site} · {ticket.Notification}";
+            }
+            else
+            {
+                ticketDescription =
+                    $"{affectedTicketIds.Count} selected tickets";
+            }
+
+            var existingTargetNames =
+                otherAssignments
+                    .Select(x => x.TargetName)
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x))
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x)
+                    .ToList();
+
+            var existingTargetsText =
+                existingTargetNames.Count == 0
+                    ? "another crew or technician"
+                    : string.Join(
+                        ", ",
+                        existingTargetNames);
+
+            var message =
+                $"{ticketDescription} is already assigned to:\n\n" +
+                $"{existingTargetsText}\n\n" +
+                $"Destination: {destinationTarget.PrimaryText}\n\n" +
+
+                "YES  = Add Crew\n" +
+                "Keep the existing assignment and also assign this ticket " +
+                "to the selected crew/technician.\n\n" +
+
+                "NO  = Move Here\n" +
+                "Remove the other active assignment(s) and move this ticket " +
+                "to the selected crew/technician.\n\n" +
+
+                "CANCEL  = Make no changes.";
+
+            /*
+             * This choice may be opened from inside a WPF drag/drop operation.
+             *
+             * Clear the drag visuals BEFORE opening the modal MessageBox so the
+             * ticket does not remain visually suspended/hovered behind it.
+             */
+            ResetRouteCardPreview();
+            EndDragGhost();
+
+            /*
+             * Give WPF one render pass before entering MessageBox's nested
+             * dispatcher loop. Without this, the old drag visual can remain on
+             * screen until the dialog closes.
+             */
+            Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.Render);
+
+            var choice =
+                MessageBox.Show(
+                    message,
+                    "Ticket Already Assigned",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Question);
+
+            return choice switch
+            {
+                MessageBoxResult.Yes => "Add",
+                MessageBoxResult.No => "Move",
+                _ => null
+            };
         }
 
         private async Task<AssignDailyTicketsResponse?> AssignTicketsWithConflictWarningAsync(

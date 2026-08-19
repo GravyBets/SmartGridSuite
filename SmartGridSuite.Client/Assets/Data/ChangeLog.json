@@ -1,5 +1,21 @@
 [
   {
+    "version": "3.1.0.3",
+    "date": "August 19, 2026",
+    "title": "Multi-crew assignments and SAP reconciliation",
+    "changes": [
+      "Added support for assigning the same Daily Assignment ticket to multiple crews or technicians while preserving independent route ownership.",
+      "Added Add Crew versus Move Here behavior when assigning a ticket that is already on another route.",
+      "Improved multi-crew write-up handling so each crew can complete its own field work while participating technicians retain the appropriate Site History records.",
+      "Updated Dispatch Tasks to combine multiple submitted write-ups, write-up flags, Refer To selections, and closeout requirements for the same ticket.",
+      "Collapsed duplicate Dispatch closeout requirements across multiple write-ups into a single logical checklist item while preserving ticket-wide completion enforcement.",
+      "Fixed Daily Assignment removal and Clear List behavior so removing a shared ticket from one route does not remove it from another crew's route.",
+      "Improved Daily Assignment drag-and-drop behavior so the Add Crew or Move Here prompt no longer leaves a suspended ticket visual behind the dialog.",
+      "Added SAP Import Queue reconciliation for existing SmartGridSuite tickets, including review of tickets missing from the SAP import and controlled status changes."
+    ]
+  },
+
+  {
     "version": "3.1.0.2",
     "date": "August 17, 2026",
     "title": "Daily Assignments workflow and Field Technician stability",

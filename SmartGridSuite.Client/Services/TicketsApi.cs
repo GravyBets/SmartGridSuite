@@ -162,6 +162,14 @@ namespace SmartGridSuite.Client.Services
                    ?? new();
         }
 
+        public async Task<List<TicketFilterStatusDto>> GetSapQueueImportStatusOptionsAsync(CancellationToken ct = default)
+        {
+            return await _api.GetAsync<List<TicketFilterStatusDto>>(
+                       "api/tickets/sap-import/status-options",
+                       ct)
+                   ?? new List<TicketFilterStatusDto>();
+        }
+
         public async Task<SapQueueImportCommitResponse> CommitSapQueueImportAsync(SapQueueImportCommitRequest req, CancellationToken ct = default)
         {
             return await _api.PostAsync<SapQueueImportCommitRequest, SapQueueImportCommitResponse>(

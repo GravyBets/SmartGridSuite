@@ -23,6 +23,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
         public ObservableCollection<SapQueuePreviewDisplayRow> PreviewRows { get; } = new();
 
+        public ObservableCollection<string> SapStatusOptions { get; } = new();
+
         private string _selectedFilePath = "";
         public string SelectedFilePath
         {
@@ -181,6 +183,34 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             }
         }
 
+        private int _spreadsheetReviewCount;
+        public int SpreadsheetReviewCount
+        {
+            get => _spreadsheetReviewCount;
+            set
+            {
+                if (_spreadsheetReviewCount == value)
+                    return;
+
+                _spreadsheetReviewCount = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private int _existingAppReviewCount;
+        public int ExistingAppReviewCount
+        {
+            get => _existingAppReviewCount;
+            set
+            {
+                if (_existingAppReviewCount == value)
+                    return;
+
+                _existingAppReviewCount = value;
+                OnPropertyChanged();
+            }
+        }
+
         public SapQueueImportWindow(TicketsApi ticketsApi)
         {
             InitializeComponent();
@@ -193,6 +223,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             Loaded += async (_, _) =>
             {
                 await LoadLastImportAsync();
+                await LoadSapStatusOptionsAsync();
             };
         }
 
@@ -217,6 +248,38 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             catch
             {
                 LastImportDisplay = "Unavailable";
+            }
+        }
+
+        private async Task LoadSapStatusOptionsAsync()
+        {
+            try
+            {
+                var statuses =
+                    await _ticketsApi.GetSapQueueImportStatusOptionsAsync();
+
+                SapStatusOptions.Clear();
+
+                foreach (var status in statuses
+                             .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+                             .OrderBy(x => x.SortOrder)
+                             .ThenBy(x => x.Name))
+                {
+                    SapStatusOptions.Add(status.Name.Trim());
+                }
+            }
+            catch
+            {
+                /*
+                 * Do not crash the SAP window merely because status options
+                 * failed to load. The preview itself can still explain the
+                 * reconciliation conditions.
+                 *
+                 * Before committing reconciliation changes later, we will
+                 * explicitly prevent status-changing actions if this list
+                 * could not be loaded.
+                 */
+                SapStatusOptions.Clear();
             }
         }
 
@@ -267,19 +330,58 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                     new SapQueueImportPreviewRequest(rows));
 
                 PreviewRows.Clear();
+
                 foreach (var row in preview.OrderBy(r => r.RowNumber))
                 {
-                    PreviewRows.Add(new SapQueuePreviewDisplayRow
-                    {
-                        RowNumber = row.RowNumber,
-                        Notification = row.Notification,
-                        WorkOrder = row.WorkOrder ?? "",
-                        NotificationDate = row.NotificationDate,
-                        Description = row.Description,
-                        ParsedSite = row.ParsedSite,
-                        ImportStatus = row.ImportStatus,
-                        Message = row.Message
-                    });
+                    var displayRow =
+                        new SapQueuePreviewDisplayRow
+                        {
+                            RowNumber = row.RowNumber,
+
+                            Notification =
+                                row.Notification,
+
+                            WorkOrder =
+                                row.WorkOrder ?? string.Empty,
+
+                            NotificationDate =
+                                row.NotificationDate,
+
+                            Description =
+                                row.Description,
+
+                            ParsedSite =
+                                row.ParsedSite,
+
+                            ImportStatus =
+                                row.ImportStatus,
+
+                            Message =
+                                row.Message,
+
+                            RowSource =
+                                string.IsNullOrWhiteSpace(row.RowSource)
+                                    ? "Spreadsheet"
+                                    : row.RowSource,
+
+                            ExistingTicketId =
+                                row.ExistingTicketId,
+
+                            CurrentTicketStatus =
+                                row.CurrentTicketStatus ?? string.Empty,
+
+                            RequiresReview =
+                                row.RequiresReview,
+
+                            ReviewReason =
+                                row.ReviewReason ?? string.Empty
+                        };
+
+                    ConfigureReconciliationDefaults(displayRow);
+
+                    displayRow.PropertyChanged += PreviewRow_PropertyChanged;
+
+                    PreviewRows.Add(displayRow);
                 }
 
                 UpdateCounts();
@@ -308,59 +410,276 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
         private async void ImportReady_Click(object sender, RoutedEventArgs e)
         {
-            var readyRows = PreviewRows
-                .Where(r => string.Equals(r.ImportStatus, "Ready", StringComparison.OrdinalIgnoreCase)
-                         && r.NotificationDate.HasValue)
-                .Select(r => new SapQueueImportCommitRow(
-                    RowNumber: r.RowNumber,
-                    Notification: r.Notification,
-                    WorkOrder: string.IsNullOrWhiteSpace(r.WorkOrder) ? null : r.WorkOrder,
-                    NotificationDate: r.NotificationDate!.Value,
-                    Description: r.Description,
-                    ParsedSite: r.ParsedSite ?? ""))
-                .ToList();
+            /*
+             * ------------------------------------------------------------
+             * SPREADSHEET ROWS SELECTED FOR IMPORT
+             * ------------------------------------------------------------
+             */
+            var spreadsheetRowsToImport =
+                PreviewRows
+                    .Where(r =>
+                        r.IsSpreadsheetRow &&
+                        string.Equals(
+                            r.SelectedAction,
+                            "Import",
+                            StringComparison.OrdinalIgnoreCase))
+                    .ToList();
 
-            if (readyRows.Count == 0)
+            /*
+             * Validate client-side before we send anything.
+             * The API will validate all of this again.
+             */
+            var missingDateRow =
+                spreadsheetRowsToImport
+                    .FirstOrDefault(r =>
+                        !r.NotificationDate.HasValue);
+
+            if (missingDateRow != null)
             {
-                MessageBox.Show("There are no Ready rows to import.", "Import SAP Queue",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(
+                    $"Notification {missingDateRow.Notification} cannot be imported " +
+                    "because its notification date is missing or invalid.",
+                    "SAP Queue Reconciliation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
                 return;
             }
 
-            var confirm = MessageBox.Show(
-                    $"Import {readyRows.Count} ready row(s)?\n\n" +
-                    $"Will import as Open: {WillImportOpenCount}\n" +
-                    $"Will import as Needs Review: {WillImportNeedsReviewCount}\n" +
-                    $"Missing Problem/Issue: {MissingProblemCount}\n" +
-                    $"With Work Order: {WithWorkOrderCount}\n" +
-                    $"Without Work Order: {WithoutWorkOrderCount}",
-                    "Confirm SAP Import",
+            var missingTargetStatusRow =
+                spreadsheetRowsToImport
+                    .FirstOrDefault(r =>
+                        string.IsNullOrWhiteSpace(
+                            r.TargetStatus));
+
+            if (missingTargetStatusRow != null)
+            {
+                MessageBox.Show(
+                    $"Choose a target status for notification " +
+                    $"{missingTargetStatusRow.Notification}.",
+                    "SAP Queue Reconciliation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return;
+            }
+
+            var commitRows =
+                spreadsheetRowsToImport
+                    .Select(r =>
+                        new SapQueueImportCommitRow(
+                            RowNumber:
+                                r.RowNumber,
+
+                            Notification:
+                                r.Notification,
+
+                            WorkOrder:
+                                string.IsNullOrWhiteSpace(r.WorkOrder)
+                                    ? null
+                                    : r.WorkOrder,
+
+                            NotificationDate:
+                                r.NotificationDate!.Value,
+
+                            Description:
+                                r.Description,
+
+                            ParsedSite:
+                                r.ParsedSite ?? string.Empty,
+
+                            TargetStatus:
+                                r.TargetStatus))
+                    .ToList();
+
+            /*
+             * ------------------------------------------------------------
+             * EXISTING SMARTGRIDSUITE TICKET ACTIONS
+             * ------------------------------------------------------------
+             *
+             * Send both:
+             *
+             *     Keep As Is
+             *     Change Status
+             *
+             * This lets the API report exactly how the reconciliation was
+             * handled, even though Keep As Is performs no database mutation.
+             */
+            var existingRows =
+                PreviewRows
+                    .Where(r =>
+                        r.IsExistingAppRow)
+                    .ToList();
+
+            var invalidExistingRow =
+                existingRows
+                    .FirstOrDefault(r =>
+                        !r.ExistingTicketId.HasValue ||
+                        r.ExistingTicketId.Value <= 0);
+
+            if (invalidExistingRow != null)
+            {
+                MessageBox.Show(
+                    $"An existing SmartGridSuite reconciliation row does not have " +
+                    $"a valid ticket ID. Reload the SAP preview.",
+                    "SAP Queue Reconciliation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return;
+            }
+
+            var missingExistingStatus =
+                existingRows
+                    .FirstOrDefault(r =>
+                        string.Equals(
+                            r.SelectedAction,
+                            "Change Status",
+                            StringComparison.OrdinalIgnoreCase)
+                        &&
+                        string.IsNullOrWhiteSpace(
+                            r.TargetStatus));
+
+            if (missingExistingStatus != null)
+            {
+                MessageBox.Show(
+                    $"Choose a new status for existing ticket " +
+                    $"{missingExistingStatus.Notification}.",
+                    "SAP Queue Reconciliation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return;
+            }
+
+            var existingActions =
+                existingRows
+                    .Select(r =>
+                        new SapQueueExistingTicketAction(
+                            TicketId:
+                                r.ExistingTicketId!.Value,
+
+                            Action:
+                                string.Equals(
+                                    r.SelectedAction,
+                                    "Change Status",
+                                    StringComparison.OrdinalIgnoreCase)
+                                    ? "Change Status"
+                                    : "Keep Current",
+
+                            TargetStatus:
+                                string.Equals(
+                                    r.SelectedAction,
+                                    "Change Status",
+                                    StringComparison.OrdinalIgnoreCase)
+                                    ? r.TargetStatus
+                                    : null))
+                    .ToList();
+
+            var changeStatusCount =
+                existingRows.Count(r =>
+                    string.Equals(
+                        r.SelectedAction,
+                        "Change Status",
+                        StringComparison.OrdinalIgnoreCase));
+
+            var keepCurrentCount =
+                existingRows.Count -
+                changeStatusCount;
+
+            var skippedSpreadsheetCount =
+                PreviewRows.Count(r =>
+                    r.IsSpreadsheetRow &&
+                    string.Equals(
+                        r.SelectedAction,
+                        "Skip",
+                        StringComparison.OrdinalIgnoreCase));
+
+            /*
+             * There is nothing meaningful to submit if there are neither
+             * spreadsheet imports nor existing ticket reconciliation rows.
+             */
+            if (commitRows.Count == 0 &&
+                existingActions.Count == 0)
+            {
+                MessageBox.Show(
+                    "There are no SAP reconciliation actions to apply.",
+                    "SAP Queue Reconciliation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                return;
+            }
+
+            var confirmText =
+                $"Apply SAP Queue reconciliation?\n\n" +
+                $"Spreadsheet tickets to import: {commitRows.Count}\n" +
+                $"  As Open: {WillImportOpenCount}\n" +
+                $"  As Needs Review: {WillImportNeedsReviewCount}\n" +
+                $"  Other selected status: " +
+                $"{Math.Max(0, commitRows.Count - WillImportOpenCount - WillImportNeedsReviewCount)}\n" +
+                $"Spreadsheet rows skipped: {skippedSpreadsheetCount}\n\n" +
+                $"Existing app tickets kept: {keepCurrentCount}\n" +
+                $"Existing app tickets changing status: {changeStatusCount}\n\n" +
+                $"SAP site conflicts found: {SpreadsheetReviewCount}\n" +
+                $"Existing app tickets flagged for review: {ExistingAppReviewCount}";
+
+            var confirm =
+                MessageBox.Show(
+                    confirmText,
+                    "Confirm SAP Queue Reconciliation",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
             if (confirm != MessageBoxResult.Yes)
                 return;
 
-            SetBusy(true, "Importing ready rows...");
+            SetBusy(
+                true,
+                "Applying SAP reconciliation...");
+
             await Task.Yield();
 
             try
             {
-                var result = await _ticketsApi.CommitSapQueueImportAsync(
-                    new SapQueueImportCommitRequest(
-                        CreatedBy: CreatedByDisplay,
-                        Rows: readyRows));
+                var result =
+                    await _ticketsApi.CommitSapQueueImportAsync(
+                        new SapQueueImportCommitRequest(
+                            CreatedBy:
+                                CreatedByDisplay,
+
+                            Rows:
+                                commitRows,
+
+                            ExistingTicketActions:
+                                existingActions));
 
                 ApplyCommitResults(result);
+
                 UpdateCounts();
 
-                MessageBox.Show(
-                    $"Imported {result.ImportedCount} Successfully!",
-                    "SAP Import Complete",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                var resultMessage =
+                    $"SAP Queue reconciliation complete.\n\n" +
+                    $"Imported: {result.ImportedCount}\n" +
+                    $"Already existed: {result.AlreadyExistsCount}\n" +
+                    $"Invalid: {result.InvalidCount}\n" +
+                    $"Existing kept: {result.ExistingKeptCount}\n" +
+                    $"Existing status changed: {result.ExistingStatusChangedCount}";
 
-                if (result.ImportedCount > 0)
+                MessageBox.Show(
+                    resultMessage,
+                    "SAP Reconciliation Complete",
+                    MessageBoxButton.OK,
+                    result.InvalidCount > 0
+                        ? MessageBoxImage.Warning
+                        : MessageBoxImage.Information);
+
+                /*
+                 * Return true when the operation changed ticket data.
+                 * TicketsPaneView will then refresh after this dialog closes.
+                 */
+                if (result.ImportedCount > 0 ||
+                    result.ExistingStatusChangedCount > 0)
                 {
                     DialogResult = true;
                     Close();
@@ -369,8 +688,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    $"Failed to import SAP queue.\n\n{ex.Message}",
-                    "Import SAP Queue",
+                    $"Failed to apply SAP Queue reconciliation.\n\n{ex.Message}",
+                    "SAP Queue Reconciliation",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -398,40 +717,271 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
         private void UpdateCounts()
         {
-            TotalRows = PreviewRows.Count;
+            /*
+             * Total means rows actually contained in the SAP spreadsheet.
+             * Existing SmartGridSuite reconciliation rows are counted separately.
+             */
+            TotalRows = PreviewRows.Count(
+                r => r.IsSpreadsheetRow);
 
-            ReadyCount = PreviewRows.Count(IsReadyRow);
-            AlreadyExistsCount = PreviewRows.Count(r =>
-                string.Equals(r.ImportStatus, "Already Exists", StringComparison.OrdinalIgnoreCase));
+            ReadyCount = PreviewRows.Count(
+                r =>
+                    r.IsSpreadsheetRow &&
+                    string.Equals(
+                        r.ImportStatus,
+                        "Ready",
+                        StringComparison.OrdinalIgnoreCase));
 
-            InvalidCount = PreviewRows.Count(r =>
-                string.Equals(r.ImportStatus, "Invalid", StringComparison.OrdinalIgnoreCase));
+            SpreadsheetReviewCount = PreviewRows.Count(
+                r =>
+                    r.IsSpreadsheetRow &&
+                    r.RequiresReview);
 
-            WillImportOpenCount = PreviewRows.Count(r =>
-                IsReadyRow(r) &&
-                !string.IsNullOrWhiteSpace(r.ParsedSite));
+            ExistingAppReviewCount = PreviewRows.Count(
+                r =>
+                    r.IsExistingAppRow &&
+                    r.RequiresReview);
 
-            WillImportNeedsReviewCount = PreviewRows.Count(r =>
-                IsReadyRow(r) &&
-                string.IsNullOrWhiteSpace(r.ParsedSite));
+            AlreadyExistsCount = PreviewRows.Count(
+                r =>
+                    r.IsSpreadsheetRow &&
+                    string.Equals(
+                        r.ImportStatus,
+                        "Already Exists",
+                        StringComparison.OrdinalIgnoreCase));
 
-            MissingSiteCount = PreviewRows.Count(r =>
-                IsReadyRow(r) &&
-                string.IsNullOrWhiteSpace(r.ParsedSite));
+            InvalidCount = PreviewRows.Count(
+                r =>
+                    r.IsSpreadsheetRow &&
+                    string.Equals(
+                        r.ImportStatus,
+                        "Invalid",
+                        StringComparison.OrdinalIgnoreCase));
 
-            WithWorkOrderCount = PreviewRows.Count(r =>
-                IsReadyRow(r) &&
-                !string.IsNullOrWhiteSpace(r.WorkOrder));
+            /*
+             * These next two counts reflect the dispatcher's CURRENT choices,
+             * not merely the initial API recommendation.
+             */
+            WillImportOpenCount = PreviewRows.Count(
+                r =>
+                    r.IsSpreadsheetRow &&
+                    string.Equals(
+                        r.SelectedAction,
+                        "Import",
+                        StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(
+                        r.TargetStatus,
+                        "Open",
+                        StringComparison.OrdinalIgnoreCase));
 
-            WithoutWorkOrderCount = PreviewRows.Count(r =>
-                IsReadyRow(r) &&
-                string.IsNullOrWhiteSpace(r.WorkOrder));
+            WillImportNeedsReviewCount = PreviewRows.Count(
+                r =>
+                    r.IsSpreadsheetRow &&
+                    string.Equals(
+                        r.SelectedAction,
+                        "Import",
+                        StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(
+                        r.TargetStatus,
+                        "Needs Review",
+                        StringComparison.OrdinalIgnoreCase));
 
-            // SAP import currently does not parse a Problem/Issue field,
-            // so every Ready imported row will land with a blank Problem.
-            MissingProblemCount = ReadyCount;
+            MissingSiteCount = PreviewRows.Count(
+                r =>
+                    r.IsSpreadsheetRow &&
+                    (
+                        string.Equals(
+                            r.SelectedAction,
+                            "Import",
+                            StringComparison.OrdinalIgnoreCase)
+                        ||
+                        string.Equals(
+                            r.ImportStatus,
+                            "Ready",
+                            StringComparison.OrdinalIgnoreCase)
+                    ) &&
+                    string.IsNullOrWhiteSpace(
+                        r.ParsedSite));
 
-            ImportBtn.IsEnabled = ReadyCount > 0;
+            WithWorkOrderCount = PreviewRows.Count(
+                r =>
+                    r.IsSpreadsheetRow &&
+                    string.Equals(
+                        r.SelectedAction,
+                        "Import",
+                        StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(
+                        r.WorkOrder));
+
+            WithoutWorkOrderCount = PreviewRows.Count(
+                r =>
+                    r.IsSpreadsheetRow &&
+                    string.Equals(
+                        r.SelectedAction,
+                        "Import",
+                        StringComparison.OrdinalIgnoreCase) &&
+                    string.IsNullOrWhiteSpace(
+                        r.WorkOrder));
+
+            /*
+             * SAP still does not provide the SmartGridSuite Problem field.
+             */
+            MissingProblemCount = PreviewRows.Count(
+                r =>
+                    r.IsSpreadsheetRow &&
+                    string.Equals(
+                        r.SelectedAction,
+                        "Import",
+                        StringComparison.OrdinalIgnoreCase));
+
+            /*
+             * Eventually the commit button will handle:
+             *
+             * - normal Ready rows
+             * - Review Required rows selected for Import
+             * - existing app tickets selected for Change Status
+             *
+             * For now we allow the button if there is at least one spreadsheet
+             * row that currently intends to import.
+             */
+            var hasRowsToImport = PreviewRows.Any(
+                r =>
+                    r.IsSpreadsheetRow &&
+                    string.Equals(
+                        r.SelectedAction,
+                        "Import",
+                        StringComparison.OrdinalIgnoreCase));
+
+            ImportBtn.IsEnabled =
+                HasReconciliationActions();
+        }
+
+        private bool HasReconciliationActions()
+        {
+            var hasSpreadsheetImport =
+                PreviewRows.Any(r =>
+                    r.IsSpreadsheetRow &&
+                    string.Equals(
+                        r.SelectedAction,
+                        "Import",
+                        StringComparison.OrdinalIgnoreCase));
+
+            var hasExistingTicketReview =
+                PreviewRows.Any(r =>
+                    r.IsExistingAppRow);
+
+            return
+                hasSpreadsheetImport ||
+                hasExistingTicketReview;
+        }
+
+        private void PreviewRow_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is
+                nameof(SapQueuePreviewDisplayRow.SelectedAction)
+                or nameof(SapQueuePreviewDisplayRow.TargetStatus)
+                or nameof(SapQueuePreviewDisplayRow.ImportStatus))
+            {
+                UpdateCounts();
+            }
+        }
+
+        private void ConfigureReconciliationDefaults(SapQueuePreviewDisplayRow row)
+        {
+            row.ActionOptions.Clear();
+
+            /*
+             * ------------------------------------------------------------
+             * EXISTING SMARTGRIDSUITE TICKET
+             * ------------------------------------------------------------
+             *
+             * Safest default: do absolutely nothing.
+             */
+            if (row.IsExistingAppRow)
+            {
+                row.ActionOptions.Add("Keep As Is");
+                row.ActionOptions.Add("Change Status");
+
+                row.SelectedAction =
+                    "Keep As Is";
+
+                /*
+                 * Keep the existing status visible in the target-status field,
+                 * but it will not be editable until Change Status is selected.
+                 */
+                row.TargetStatus =
+                    row.CurrentTicketStatus;
+
+                return;
+            }
+
+            /*
+             * ------------------------------------------------------------
+             * SPREADSHEET ROW REQUIRING RECONCILIATION
+             * ------------------------------------------------------------
+             *
+             * These are valid SAP rows, but the site is associated with more
+             * than one notification. Do not silently treat them as normal Open
+             * tickets.
+             */
+            if (string.Equals(
+                    row.ImportStatus,
+                    "Review Required",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                row.ActionOptions.Add("Import");
+                row.ActionOptions.Add("Skip");
+
+                row.SelectedAction =
+                    "Import";
+
+                row.TargetStatus =
+                    FindStatusOption("Needs Review")
+                    ?? string.Empty;
+
+                return;
+            }
+
+            /*
+             * ------------------------------------------------------------
+             * ORDINARY READY SPREADSHEET ROW
+             * ------------------------------------------------------------
+             */
+            if (string.Equals(
+                    row.ImportStatus,
+                    "Ready",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                row.ActionOptions.Add("Import");
+
+                row.SelectedAction =
+                    "Import";
+
+                row.TargetStatus =
+                    string.IsNullOrWhiteSpace(row.ParsedSite)
+                        ? FindStatusOption("Needs Review") ?? string.Empty
+                        : FindStatusOption("Open") ?? string.Empty;
+
+                return;
+            }
+
+            /*
+             * Already Exists / Invalid rows have no commit action.
+             */
+            row.SelectedAction =
+                string.Empty;
+
+            row.TargetStatus =
+                string.Empty;
+        }
+
+        private string? FindStatusOption(string statusName)
+        {
+            return SapStatusOptions.FirstOrDefault(
+                x => string.Equals(
+                    x,
+                    statusName,
+                    StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsReadyRow(SapQueuePreviewDisplayRow row)
@@ -451,7 +1001,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
             BrowseBtn.IsEnabled = !busy;
             LoadPreviewBtn.IsEnabled = !busy;
-            ImportBtn.IsEnabled = !busy && ReadyCount > 0;
+            ImportBtn.IsEnabled =
+                !busy &&
+                HasReconciliationActions();
             CloseBtn.IsEnabled = !busy;
 
             PreviewGrid.IsEnabled = !busy;
@@ -679,38 +1231,237 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
         }
     }
 
-    public sealed class SapQueuePreviewDisplayRow
+    public sealed class SapQueuePreviewDisplayRow : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void OnPropertyChanged(
+            [CallerMemberName] string? name = null)
+        {
+            PropertyChanged?.Invoke(
+                this,
+                new PropertyChangedEventArgs(name));
+        }
+
         public int RowNumber { get; set; }
-        public string Notification { get; set; } = "";
-        public string WorkOrder { get; set; } = "";
+
+        public string Notification { get; set; } =
+            string.Empty;
+
+        public string WorkOrder { get; set; } =
+            string.Empty;
+
         public DateTime? NotificationDate { get; set; }
-        public string Description { get; set; } = "";
-        public string ParsedSite { get; set; } = "";
-        public string ImportStatus { get; set; } = "";
-        public string Message { get; set; } = "";
+
+        public string Description { get; set; } =
+            string.Empty;
+
+        public string ParsedSite { get; set; } =
+            string.Empty;
+
+        private string _importStatus =
+            string.Empty;
+
+        public string ImportStatus
+        {
+            get => _importStatus;
+
+            set
+            {
+                if (_importStatus == value)
+                    return;
+
+                _importStatus =
+                    value ?? string.Empty;
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(WillBecome));
+                OnPropertyChanged(nameof(SiteCheck));
+                OnPropertyChanged(nameof(IsTargetStatusEditable));
+            }
+        }
+
+        private string _message =
+            string.Empty;
+
+        public string Message
+        {
+            get => _message;
+
+            set
+            {
+                if (_message == value)
+                    return;
+
+                _message =
+                    value ?? string.Empty;
+
+                OnPropertyChanged();
+            }
+        }
+
+        public string RowSource { get; set; } =
+            "Spreadsheet";
+
+        public long? ExistingTicketId { get; set; }
+
+        public string CurrentTicketStatus { get; set; } =
+            string.Empty;
+
+        public bool RequiresReview { get; set; }
+
+        public string ReviewReason { get; set; } =
+            string.Empty;
+
+        public ObservableCollection<string> ActionOptions { get; } =
+            new();
+
+        private string _selectedAction =
+            string.Empty;
+
+        public string SelectedAction
+        {
+            get => _selectedAction;
+
+            set
+            {
+                if (_selectedAction == value)
+                    return;
+
+                _selectedAction =
+                    value ?? string.Empty;
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsTargetStatusEditable));
+                OnPropertyChanged(nameof(WillBecome));
+            }
+        }
+
+        private string _targetStatus =
+            string.Empty;
+
+        public string TargetStatus
+        {
+            get => _targetStatus;
+
+            set
+            {
+                if (_targetStatus == value)
+                    return;
+
+                _targetStatus =
+                    value ?? string.Empty;
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(WillBecome));
+            }
+        }
+
+        public bool IsExistingAppRow =>
+            string.Equals(
+                RowSource,
+                "Existing App",
+                StringComparison.OrdinalIgnoreCase);
+
+        public bool IsSpreadsheetRow =>
+            !IsExistingAppRow;
+
+        public bool IsTargetStatusEditable
+        {
+            get
+            {
+                if (IsExistingAppRow)
+                {
+                    return string.Equals(
+                        SelectedAction,
+                        "Change Status",
+                        StringComparison.OrdinalIgnoreCase);
+                }
+
+                /*
+                 * Normal Ready rows keep their normal destination.
+                 * Only reconciliation rows get an editable status.
+                 */
+                return string.Equals(
+                           ImportStatus,
+                           "Review Required",
+                           StringComparison.OrdinalIgnoreCase)
+                       &&
+                       string.Equals(
+                           SelectedAction,
+                           "Import",
+                           StringComparison.OrdinalIgnoreCase);
+            }
+        }
 
         public string WillBecome
         {
             get
             {
-                if (string.Equals(ImportStatus, "Ready", StringComparison.OrdinalIgnoreCase))
+                if (IsExistingAppRow)
                 {
-                    return string.IsNullOrWhiteSpace(ParsedSite)
-                        ? "Needs Review"
-                        : "Open Ticket";
+                    if (string.Equals(
+                            SelectedAction,
+                            "Keep As Is",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return "No Change";
+                    }
+
+                    if (string.Equals(
+                            SelectedAction,
+                            "Change Status",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return string.IsNullOrWhiteSpace(TargetStatus)
+                            ? "Choose Status"
+                            : TargetStatus;
+                    }
                 }
 
-                if (string.Equals(ImportStatus, "Imported", StringComparison.OrdinalIgnoreCase))
-                    return "Imported";
-
-                if (string.Equals(ImportStatus, "Already Exists", StringComparison.OrdinalIgnoreCase))
-                    return "No Change";
-
-                if (string.Equals(ImportStatus, "Invalid", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(
+                        SelectedAction,
+                        "Skip",
+                        StringComparison.OrdinalIgnoreCase))
+                {
                     return "Will Not Import";
+                }
 
-                return "";
+                if (string.Equals(
+                        SelectedAction,
+                        "Import",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return string.IsNullOrWhiteSpace(TargetStatus)
+                        ? "Choose Status"
+                        : TargetStatus;
+                }
+
+                if (string.Equals(
+                        ImportStatus,
+                        "Imported",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Imported";
+                }
+
+                if (string.Equals(
+                        ImportStatus,
+                        "Already Exists",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return "No Change";
+                }
+
+                if (string.Equals(
+                        ImportStatus,
+                        "Invalid",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Will Not Import";
+                }
+
+                return string.Empty;
             }
         }
 
@@ -721,20 +1472,26 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                 if (!string.IsNullOrWhiteSpace(ParsedSite))
                     return "Site Parsed";
 
-                return string.Equals(ImportStatus, "Ready", StringComparison.OrdinalIgnoreCase)
+                return IsSpreadsheetRow &&
+                       (
+                           string.Equals(
+                               ImportStatus,
+                               "Ready",
+                               StringComparison.OrdinalIgnoreCase)
+                           ||
+                           string.Equals(
+                               ImportStatus,
+                               "Review Required",
+                               StringComparison.OrdinalIgnoreCase)
+                       )
                     ? "Missing Site"
-                    : "";
+                    : string.Empty;
             }
         }
 
-        public string WorkOrderCheck
-        {
-            get
-            {
-                return string.IsNullOrWhiteSpace(WorkOrder)
-                    ? "No WO"
-                    : "Has WO";
-            }
-        }
+        public string WorkOrderCheck =>
+            string.IsNullOrWhiteSpace(WorkOrder)
+                ? "No WO"
+                : "Has WO";
     }
 }

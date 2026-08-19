@@ -354,6 +354,26 @@ namespace SmartGridSuite.Api.Controllers
 
             var cleanTargetType = (req.TargetType ?? string.Empty).Trim();
 
+            var assignmentMode = string.IsNullOrWhiteSpace(req.AssignmentMode)
+                ? "Move"
+                : req.AssignmentMode.Trim();
+
+            var isAddMode =
+                assignmentMode.Equals(
+                    "Add",
+                    StringComparison.OrdinalIgnoreCase);
+
+            var isMoveMode =
+                assignmentMode.Equals(
+                    "Move",
+                    StringComparison.OrdinalIgnoreCase);
+
+            if (!isAddMode && !isMoveMode)
+            {
+                return BadRequest(
+                    "AssignmentMode must be Move or Add.");
+            }
+
             if (!IsTargetType(cleanTargetType, "Truck") && !IsTargetType(cleanTargetType, "Technician"))
                 return BadRequest("TargetType must be Truck or Technician.");
 
@@ -492,15 +512,53 @@ namespace SmartGridSuite.Api.Controllers
                 return BadRequest($"Closed tickets cannot be assigned: {string.Join(", ", closedTickets)}");
 
             var existingAssignments = await _db.DailyTicketAssignments
-                .Where(x =>
-                    x.AssignmentDate == workDate &&
-                    x.AssignmentStatus == AssignmentStatusActive &&
-                    ticketIds.Contains(x.TicketId))
-                .ToListAsync(ct);
+    .Where(x =>
+        x.AssignmentDate == workDate &&
+        x.AssignmentStatus == AssignmentStatusActive &&
+        ticketIds.Contains(x.TicketId))
+    .ToListAsync(ct);
 
-            var existingByTicketId = existingAssignments
-                .GroupBy(x => x.TicketId)
-                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.UpdatedAt).First());
+            /*
+             * A ticket may now have more than one active Daily Assignment.
+             *
+             * Do NOT collapse these rows to one assignment per TicketId.
+             */
+            var existingAssignmentsByTicketId =
+                existingAssignments
+                    .GroupBy(x => x.TicketId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g
+                            .OrderBy(x => x.SortOrder)
+                            .ThenBy(x => x.Id)
+                            .ToList());
+
+            bool IsSameTarget(DailyTicketAssignmentEntity assignment)
+            {
+                if (!string.Equals(
+                        assignment.TargetType,
+                        cleanTargetType,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                /*
+                 * Current crew routes are technician-owned.
+                 * TruckId is display/crew context and must not create a second
+                 * identity for the same technician-owned route.
+                 */
+                if (IsTargetType(cleanTargetType, "Technician"))
+                {
+                    return
+                        assignment.TechnicianId ==
+                        technicianId;
+                }
+
+                return
+                    assignment.TruckId ==
+                    truckId;
+            }
 
             var currentMaxSortOrder = await _db.DailyTicketAssignments
                 .AsNoTracking()
@@ -528,57 +586,335 @@ namespace SmartGridSuite.Api.Controllers
             {
                 currentMaxSortOrder += 10;
 
-                if (existingByTicketId.TryGetValue(ticketId, out var assignment))
+                existingAssignmentsByTicketId.TryGetValue(
+                    ticketId,
+                    out var ticketAssignments);
+
+                ticketAssignments ??=
+                    new List<DailyTicketAssignmentEntity>();
+
+                var assignmentForThisTarget =
+                    ticketAssignments
+                        .FirstOrDefault(IsSameTarget);
+
+                /*
+                 * ------------------------------------------------------------
+                 * ADD MODE
+                 * ------------------------------------------------------------
+                 *
+                 * Keep every existing crew assignment.
+                 *
+                 * If this exact target already owns the ticket, simply refresh that
+                 * assignment rather than creating a duplicate row.
+                 */
+                if (isAddMode)
                 {
-                    assignment.TargetType = cleanTargetType;
-                    assignment.TruckId = truckId;
-                    assignment.TechnicianId = technicianId;
-                    assignment.CrewId = crewId;
-                    assignment.SortOrder = currentMaxSortOrder;
-
-                    if (assignmentNotes != null)
-                        assignment.AssignmentNotes = assignmentNotes;
-
-                    assignment.IsPublished = false;
-                    assignment.UpdatedAt = now;
-                    assignment.UpdatedBy = updatedBy;
-
-                    assignmentIds.Add(assignment.Id);
-                }
-                else
-                {
-                    var newAssignment = new DailyTicketAssignmentEntity
+                    if (assignmentForThisTarget != null)
                     {
-                        AssignmentDate = workDate,
-                        TicketId = ticketId,
+                        assignmentForThisTarget.TruckId =
+                            truckId;
 
-                        TargetType = cleanTargetType,
-                        TruckId = truckId,
-                        TechnicianId = technicianId,
-                        CrewId = crewId,
+                        assignmentForThisTarget.CrewId =
+                            crewId;
 
-                        SortOrder = currentMaxSortOrder,
+                        if (assignmentNotes != null)
+                        {
+                            assignmentForThisTarget.AssignmentNotes =
+                                assignmentNotes;
+                        }
 
-                        IsPublished = false,
-                        PublishedVersion = 0,
-                        PublishedAt = null,
-                        PublishedBy = null,
+                        assignmentForThisTarget.IsPublished =
+                            false;
 
-                        AssignmentNotes = assignmentNotes,
-                        AssignmentStatus = AssignmentStatusActive,
+                        assignmentForThisTarget.UpdatedAt =
+                            now;
 
-                        CreatedAt = now,
-                        CreatedBy = updatedBy,
-                        UpdatedAt = now,
-                        UpdatedBy = updatedBy
-                    };
+                        assignmentForThisTarget.UpdatedBy =
+                            updatedBy;
 
-                    _db.DailyTicketAssignments.Add(newAssignment);
+                        assignmentIds.Add(
+                            assignmentForThisTarget.Id);
+
+                        continue;
+                    }
+
+                    var additionalAssignment =
+                        new DailyTicketAssignmentEntity
+                        {
+                            AssignmentDate =
+                                workDate,
+
+                            TicketId =
+                                ticketId,
+
+                            TargetType =
+                                cleanTargetType,
+
+                            TruckId =
+                                truckId,
+
+                            TechnicianId =
+                                technicianId,
+
+                            CrewId =
+                                crewId,
+
+                            SortOrder =
+                                currentMaxSortOrder,
+
+                            IsPublished =
+                                false,
+
+                            PublishedVersion =
+                                0,
+
+                            PublishedAt =
+                                null,
+
+                            PublishedBy =
+                                null,
+
+                            AssignmentNotes =
+                                assignmentNotes,
+
+                            AssignmentStatus =
+                                AssignmentStatusActive,
+
+                            CreatedAt =
+                                now,
+
+                            CreatedBy =
+                                updatedBy,
+
+                            UpdatedAt =
+                                now,
+
+                            UpdatedBy =
+                                updatedBy
+                        };
+
+                    _db.DailyTicketAssignments.Add(
+                        additionalAssignment);
 
                     await _db.SaveChangesAsync(ct);
 
-                    assignmentIds.Add(newAssignment.Id);
+                    assignmentIds.Add(
+                        additionalAssignment.Id);
+
+                    continue;
                 }
+
+                /*
+                 * ------------------------------------------------------------
+                 * MOVE MODE
+                 * ------------------------------------------------------------
+                 *
+                 * Preserve today's normal behavior:
+                 * after the move, only the destination target remains active.
+                 *
+                 * This also makes Move deterministic once multi-crew assignments
+                 * begin to exist.
+                 */
+                if (assignmentForThisTarget != null)
+                {
+                    assignmentForThisTarget.TruckId =
+                        truckId;
+
+                    assignmentForThisTarget.TechnicianId =
+                        technicianId;
+
+                    assignmentForThisTarget.CrewId =
+                        crewId;
+
+                    assignmentForThisTarget.SortOrder =
+                        currentMaxSortOrder;
+
+                    if (assignmentNotes != null)
+                    {
+                        assignmentForThisTarget.AssignmentNotes =
+                            assignmentNotes;
+                    }
+
+                    assignmentForThisTarget.IsPublished =
+                        false;
+
+                    assignmentForThisTarget.UpdatedAt =
+                        now;
+
+                    assignmentForThisTarget.UpdatedBy =
+                        updatedBy;
+
+                    /*
+                     * Any other active crew copies are withdrawn because Dispatch
+                     * explicitly chose Move rather than Add.
+                     */
+                    foreach (var otherAssignment in
+                             ticketAssignments.Where(
+                                 x => x.Id != assignmentForThisTarget.Id))
+                    {
+                        otherAssignment.AssignmentStatus =
+                            AssignmentStatusRemoved;
+
+                        otherAssignment.RemovedAt =
+                            now;
+
+                        otherAssignment.RemovedBy =
+                            updatedBy;
+
+                        otherAssignment.IsPublished =
+                            false;
+
+                        otherAssignment.UpdatedAt =
+                            now;
+
+                        otherAssignment.UpdatedBy =
+                            updatedBy;
+                    }
+
+                    assignmentIds.Add(
+                        assignmentForThisTarget.Id);
+
+                    continue;
+                }
+
+                /*
+                 * No assignment already exists for the destination.
+                 *
+                 * If the ticket was assigned elsewhere, reuse the newest existing
+                 * assignment as the moved row and withdraw any additional rows.
+                 */
+                var assignmentToMove =
+                    ticketAssignments
+                        .OrderByDescending(x => x.UpdatedAt)
+                        .ThenByDescending(x => x.Id)
+                        .FirstOrDefault();
+
+                if (assignmentToMove != null)
+                {
+                    assignmentToMove.TargetType =
+                        cleanTargetType;
+
+                    assignmentToMove.TruckId =
+                        truckId;
+
+                    assignmentToMove.TechnicianId =
+                        technicianId;
+
+                    assignmentToMove.CrewId =
+                        crewId;
+
+                    assignmentToMove.SortOrder =
+                        currentMaxSortOrder;
+
+                    if (assignmentNotes != null)
+                    {
+                        assignmentToMove.AssignmentNotes =
+                            assignmentNotes;
+                    }
+
+                    assignmentToMove.IsPublished =
+                        false;
+
+                    assignmentToMove.UpdatedAt =
+                        now;
+
+                    assignmentToMove.UpdatedBy =
+                        updatedBy;
+
+                    foreach (var otherAssignment in
+                             ticketAssignments.Where(
+                                 x => x.Id != assignmentToMove.Id))
+                    {
+                        otherAssignment.AssignmentStatus =
+                            AssignmentStatusRemoved;
+
+                        otherAssignment.RemovedAt =
+                            now;
+
+                        otherAssignment.RemovedBy =
+                            updatedBy;
+
+                        otherAssignment.IsPublished =
+                            false;
+
+                        otherAssignment.UpdatedAt =
+                            now;
+
+                        otherAssignment.UpdatedBy =
+                            updatedBy;
+                    }
+
+                    assignmentIds.Add(
+                        assignmentToMove.Id);
+
+                    continue;
+                }
+
+                /*
+                 * Brand-new ticket assignment.
+                 */
+                var newAssignment =
+                    new DailyTicketAssignmentEntity
+                    {
+                        AssignmentDate =
+                            workDate,
+
+                        TicketId =
+                            ticketId,
+
+                        TargetType =
+                            cleanTargetType,
+
+                        TruckId =
+                            truckId,
+
+                        TechnicianId =
+                            technicianId,
+
+                        CrewId =
+                            crewId,
+
+                        SortOrder =
+                            currentMaxSortOrder,
+
+                        IsPublished =
+                            false,
+
+                        PublishedVersion =
+                            0,
+
+                        PublishedAt =
+                            null,
+
+                        PublishedBy =
+                            null,
+
+                        AssignmentNotes =
+                            assignmentNotes,
+
+                        AssignmentStatus =
+                            AssignmentStatusActive,
+
+                        CreatedAt =
+                            now,
+
+                        CreatedBy =
+                            updatedBy,
+
+                        UpdatedAt =
+                            now,
+
+                        UpdatedBy =
+                            updatedBy
+                    };
+
+                _db.DailyTicketAssignments.Add(
+                    newAssignment);
+
+                await _db.SaveChangesAsync(ct);
+
+                assignmentIds.Add(
+                    newAssignment.Id);
             }
 
             await _db.SaveChangesAsync(ct);
@@ -592,41 +928,82 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPost("remove")]
-        public async Task<ActionResult<RemoveDailyTicketAssignmentsResponse>> RemoveAssignments([FromBody] RemoveDailyTicketAssignmentsRequest req,
+        public async Task<ActionResult<RemoveDailyTicketAssignmentsResponse>>RemoveAssignments(
+            [FromBody] RemoveDailyTicketAssignmentsRequest req,
             CancellationToken ct)
         {
             var workDate = ActiveAssignmentDate;
 
-            var ticketIds = (req.TicketIds ?? new List<long>())
-                .Where(x => x > 0)
-                .Distinct()
-                .ToList();
+            var assignmentIds =
+                (req.AssignmentIds ?? new List<ulong>())
+                    .Where(x => x > 0)
+                    .Distinct()
+                    .ToList();
 
-            if (ticketIds.Count == 0)
-                return BadRequest("At least one ticket is required.");
+            var ticketIds =
+                (req.TicketIds ?? new List<long>())
+                    .Where(x => x > 0)
+                    .Distinct()
+                    .ToList();
 
-            var assignments = await _db.DailyTicketAssignments
-                .Where(x =>
-                    x.AssignmentDate == workDate &&
-                    x.AssignmentStatus == AssignmentStatusActive &&
-                    ticketIds.Contains(x.TicketId))
-                .ToListAsync(ct);
+            if (assignmentIds.Count == 0 &&
+                ticketIds.Count == 0)
+            {
+                return BadRequest(
+                    "At least one assignment or ticket is required.");
+            }
+
+            /*
+             * AssignmentId is now the preferred identity.
+             *
+             * This matters because one ticket may legitimately have multiple
+             * active Daily Assignment rows owned by different crews.
+             *
+             * TicketIds remain only as a backward-compatible fallback until
+             * all callers have been migrated.
+             */
+            var assignmentsQuery =
+                _db.DailyTicketAssignments
+                    .Where(x =>
+                        x.AssignmentDate == workDate &&
+                        x.AssignmentStatus ==
+                            AssignmentStatusActive);
+
+            if (assignmentIds.Count > 0)
+            {
+                assignmentsQuery =
+                    assignmentsQuery.Where(
+                        x => assignmentIds.Contains(x.Id));
+            }
+            else
+            {
+                assignmentsQuery =
+                    assignmentsQuery.Where(
+                        x => ticketIds.Contains(x.TicketId));
+            }
+
+            var assignments =
+                await assignmentsQuery
+                    .ToListAsync(ct);
 
             if (assignments.Count == 0)
             {
-                return Ok(new RemoveDailyTicketAssignmentsResponse
-                {
-                    WorkDate = workDate,
-                    RemovedCount = 0,
-                    RemovedTicketIds = new List<long>()
-                });
+                return Ok(
+                    new RemoveDailyTicketAssignmentsResponse
+                    {
+                        WorkDate = workDate,
+                        RemovedCount = 0,
+                        RemovedTicketIds =
+                            new List<long>()
+                    });
             }
 
-            var removedTicketIds = assignments
-                .Select(x => x.TicketId)
-                .Distinct()
-                .OrderBy(x => x)
-                .ToList();
+            var removedTicketIds =
+                assignments
+                    .Select(x => x.TicketId)
+                    .Distinct()
+                    .OrderBy(x => x)
+                    .ToList();
 
             var now = DateTime.Now;
 
@@ -646,6 +1023,9 @@ namespace SmartGridSuite.Api.Controllers
                 assignment.RemovedBy =
                     removedBy;
 
+                assignment.IsPublished =
+                    false;
+
                 assignment.UpdatedAt =
                     now;
 
@@ -655,12 +1035,22 @@ namespace SmartGridSuite.Api.Controllers
 
             await _db.SaveChangesAsync(ct);
 
-            return Ok(new RemoveDailyTicketAssignmentsResponse
-            {
-                WorkDate = workDate,
-                RemovedCount = removedTicketIds.Count,
-                RemovedTicketIds = removedTicketIds
-            });
+            return Ok(
+                new RemoveDailyTicketAssignmentsResponse
+                {
+                    WorkDate = workDate,
+
+                    /*
+                     * Count actual assignment rows removed rather than unique
+                     * ticket IDs, since multi-crew tickets may have more than
+                     * one assignment.
+                     */
+                    RemovedCount =
+                        assignments.Count,
+
+                    RemovedTicketIds =
+                        removedTicketIds
+                });
         }
 
         [HttpPost("migrate-truck-targets-to-lead-techs")]

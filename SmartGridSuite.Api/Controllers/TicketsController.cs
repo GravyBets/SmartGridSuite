@@ -529,27 +529,35 @@ namespace SmartGridSuite.Api.Controllers
                         })
                         .ToListAsync(ct);
 
-                var latestSubmissionByTicket =
+                /*
+ * A ticket may now have write-ups from more than one crew.
+ *
+ * Dispatch still gets ONE task per ticket, but that task must include
+ * every active/non-deleted write-up submitted against the ticket.
+ */
+                var submissionsByTicket =
                     submissionCandidates
                         .GroupBy(x => x.TicketId)
                         .ToDictionary(
                             group => group.Key,
-                            group => group.First());
+                            group => group
+                                .OrderBy(x => x.SubmittedAt)
+                                .ThenBy(x => x.Id)
+                                .ToList());
 
-                var latestSubmissionIds =
-                    latestSubmissionByTicket
-                        .Values
+                var allSubmissionIds =
+                    submissionCandidates
                         .Select(x => x.Id)
                         .Distinct()
                         .ToList();
 
-                if (latestSubmissionIds.Count > 0)
+                if (allSubmissionIds.Count > 0)
                 {
                     var submittedFlags =
                         await _db.TicketWriteUpSubmissionFlags
                             .AsNoTracking()
                             .Where(x =>
-                                latestSubmissionIds.Contains(
+                                allSubmissionIds.Contains(
                                     x.SubmissionId))
                             .OrderBy(x => x.WriteUpFlagId)
                             .Select(x => new
@@ -565,7 +573,7 @@ namespace SmartGridSuite.Api.Controllers
                             .TicketWriteUpSubmissionReferToOptions
                             .AsNoTracking()
                             .Where(x =>
-                                latestSubmissionIds.Contains(
+                                allSubmissionIds.Contains(
                                     x.SubmissionId))
                             .OrderBy(x => x.ReferToOptionId)
                             .Select(x => new
@@ -580,7 +588,7 @@ namespace SmartGridSuite.Api.Controllers
                             .TicketWriteUpSubmissionCloseoutItems
                             .AsNoTracking()
                             .Where(x =>
-                                latestSubmissionIds.Contains(
+                                allSubmissionIds.Contains(
                                     x.SubmissionId))
                             .OrderBy(x => x.SortOrderSnapshot)
                             .ThenBy(x => x.DisplayNameSnapshot)
@@ -670,65 +678,223 @@ namespace SmartGridSuite.Api.Controllers
 
                     foreach (var item in items)
                     {
-                        if (!latestSubmissionByTicket.TryGetValue(
+                        if (!submissionsByTicket.TryGetValue(
                                 item.TicketId,
-                                out var submission))
+                                out var submissions) ||
+                            submissions.Count == 0)
                         {
                             continue;
                         }
 
+                        /*
+                         * Keep the latest submission in the legacy single-submission
+                         * fields so existing client behavior remains compatible.
+                         */
+                        var latestSubmission =
+                            submissions.Last();
+
                         item.SubmissionId =
-                            submission.Id;
+                            latestSubmission.Id;
 
                         item.SubmittedAt =
-                            submission.SubmittedAt;
+                            latestSubmission.SubmittedAt;
+
+                        var submittedByNames =
+                            submissions
+                                .Select(x =>
+                                    (x.SubmittedByName ?? string.Empty)
+                                        .Trim())
+                                .Where(x =>
+                                    !string.IsNullOrWhiteSpace(x))
+                                .Distinct(
+                                    StringComparer.OrdinalIgnoreCase)
+                                .ToList();
 
                         item.SubmittedByName =
-                            submission.SubmittedByName ?? "";
+                            submittedByNames.Count == 0
+                                ? "Unknown"
+                                : string.Join(
+                                    ", ",
+                                    submittedByNames);
 
-                        item.SubmittedWriteUp =
-                            submission.SubmittedNarrative ?? "";
-
-                        if (flagsBySubmission.TryGetValue(
-                                submission.Id,
-                                out var flags))
+                        /*
+                         * Preserve the old appearance when there is only one
+                         * submission.
+                         *
+                         * For multi-crew work, combine the narratives in chronological
+                         * order and identify who submitted each one.
+                         */
+                        if (submissions.Count == 1)
                         {
-                            item.WriteUpFlags = flags;
-                        }
-
-                        if (referToBySubmission.TryGetValue(
-                                submission.Id,
-                                out var referToOptions))
-                        {
-                            item.ReferToOptions =
-                                referToOptions;
-                        }
-
-                        if (closeoutItemsBySubmission.TryGetValue(
-                                submission.Id,
-                                out var closeoutItems))
-                        {
-                            item.CloseoutChecklistItems =
-                                closeoutItems;
-
-                            item.RequiredChecklistRemaining =
-                                closeoutItems.Count(x =>
-                                    x.IsRequired &&
-                                    !x.IsCompleted);
-
-                            item.CanMarkClosed =
-                                item.RequiredChecklistRemaining == 0;
+                            item.SubmittedWriteUp =
+                                latestSubmission.SubmittedNarrative
+                                ?? string.Empty;
                         }
                         else
                         {
-                            item.CloseoutChecklistItems =
-                                new List<
-                                    DispatchCloseoutChecklistItemDto>();
+                            item.SubmittedWriteUp =
+                                string.Join(
+                                    Environment.NewLine +
+                                    Environment.NewLine,
 
-                            item.RequiredChecklistRemaining = 0;
-                            item.CanMarkClosed = true;
+                                    submissions.Select(
+                                        submission =>
+                                        {
+                                            var submittedBy =
+                                                string.IsNullOrWhiteSpace(
+                                                    submission.SubmittedByName)
+                                                    ? "Unknown"
+                                                    : submission
+                                                        .SubmittedByName
+                                                        .Trim();
+
+                                            var narrative =
+                                                (submission.SubmittedNarrative
+                                                 ?? string.Empty)
+                                                .Trim();
+
+                                            return
+                                                $"[{submission.SubmittedAt:MM-dd-yyyy HH:mm}] " +
+                                                $"{submittedBy}" +
+                                                Environment.NewLine +
+                                                narrative;
+                                        }));
                         }
+
+                        /*
+                         * Combine flags from ALL submissions.
+                         *
+                         * If multiple crews triggered the same flag, only show the
+                         * identical label once.
+                         */
+                        item.WriteUpFlags =
+                            submissions
+                                .SelectMany(
+                                    submission =>
+                                        flagsBySubmission.TryGetValue(
+                                            submission.Id,
+                                            out var flags)
+                                            ? flags
+                                            : Enumerable.Empty<string>())
+                                .Where(x =>
+                                    !string.IsNullOrWhiteSpace(x))
+                                .Distinct(
+                                    StringComparer.OrdinalIgnoreCase)
+                                .ToList();
+
+                        /*
+                         * Refer-To selections are also ticket-wide for Dispatch review.
+                         */
+                        item.ReferToOptions =
+                            submissions
+                                .SelectMany(
+                                    submission =>
+                                        referToBySubmission.TryGetValue(
+                                            submission.Id,
+                                            out var referToOptions)
+                                            ? referToOptions
+                                            : Enumerable.Empty<string>())
+                                .Where(x =>
+                                    !string.IsNullOrWhiteSpace(x))
+                                .Distinct(
+                                    StringComparer.OrdinalIgnoreCase)
+                                .ToList();
+
+                        var rawCloseoutItems =
+    submissions
+        .SelectMany(
+            submission =>
+                closeoutItemsBySubmission.TryGetValue(
+                    submission.Id,
+                    out var closeoutItems)
+                    ? closeoutItems
+                    : Enumerable.Empty<
+                        DispatchCloseoutChecklistItemDto>())
+        .ToList();
+
+                        /*
+                         * Closeout requirements are ticket-wide.
+                         *
+                         * Multiple crews may submit separate write-ups that generate the
+                         * same Dispatch checklist definition. Show that requirement once.
+                         *
+                         * DefinitionId is the preferred identity. The fallback key protects
+                         * older/null-definition rows.
+                         */
+                        var combinedCloseoutItems =
+                            rawCloseoutItems
+                                .GroupBy(x =>
+                                    x.DefinitionId.HasValue
+                                        ? $"DEF:{x.DefinitionId.Value}"
+                                        : $"FALLBACK:" +
+                                          $"{x.ConditionType}|" +
+                                          $"{x.WriteUpFlagId}|" +
+                                          $"{x.ReferToOptionId}|" +
+                                          $"{x.DisplayName}",
+                                    StringComparer.OrdinalIgnoreCase)
+                                .Select(group =>
+                                {
+                                    var rows =
+                                        group
+                                            .OrderBy(x => x.SortOrder)
+                                            .ThenBy(x => x.Id)
+                                            .ToList();
+
+                                    var representative =
+                                        rows[0];
+
+                                    /*
+                                     * A logical requirement is complete only when every
+                                     * underlying submission copy is complete.
+                                     */
+                                    representative.IsRequired =
+                                        rows.Any(x => x.IsRequired);
+
+                                    representative.IsCompleted =
+                                        rows.All(x => x.IsCompleted);
+
+                                    representative.CompletedBy =
+                                        representative.IsCompleted
+                                            ? rows
+                                                .Where(x =>
+                                                    !string.IsNullOrWhiteSpace(
+                                                        x.CompletedBy))
+                                                .OrderByDescending(x =>
+                                                    x.CompletedAt)
+                                                .Select(x => x.CompletedBy)
+                                                .FirstOrDefault()
+                                                ?? ""
+                                            : "";
+
+                                    representative.CompletedAt =
+                                        representative.IsCompleted
+                                            ? rows
+                                                .Where(x =>
+                                                    x.CompletedAt.HasValue)
+                                                .Select(x => x.CompletedAt)
+                                                .Max()
+                                            : null;
+
+                                    return representative;
+                                })
+                                .OrderBy(x => x.SortOrder)
+                                .ThenBy(x => x.DisplayName)
+                                .ThenBy(x => x.Id)
+                                .ToList();
+
+                        item.CloseoutChecklistItems =
+                            combinedCloseoutItems;
+
+                        item.RequiredChecklistRemaining =
+                            combinedCloseoutItems.Count(
+                                x =>
+                                    x.IsRequired &&
+                                    !x.IsCompleted);
+
+                        item.CanMarkClosed =
+                            item.RequiredChecklistRemaining == 0;
                     }
+                
                 }
             }
 
@@ -1966,8 +2132,7 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<DispatchCloseoutChecklistItemDto>>UpdateDispatchCloseoutChecklistItem(
             long ticketId,
             long itemId,
-            [FromBody]
-            UpdateDispatchCloseoutChecklistItemRequest req,
+            [FromBody] UpdateDispatchCloseoutChecklistItemRequest req,
             CancellationToken ct)
         {
             var ticketExists =
@@ -1980,37 +2145,47 @@ namespace SmartGridSuite.Api.Controllers
             if (!ticketExists)
                 return NotFound("Ticket was not found.");
 
-            var latestSubmissionId =
+            /*
+             * A ticket may have multiple write-up submissions when more than
+             * one crew worked the same Daily Assignment.
+             *
+             * Dispatch treats matching closeout requirements as ONE logical
+             * ticket-wide checklist item.
+             */
+            var activeSubmissionIds =
                 await _db.TicketWriteUpSubmissions
                     .AsNoTracking()
                     .Where(x =>
                         x.TicketId == ticketId &&
                         !x.IsDeleted)
-                    .OrderByDescending(x => x.SubmittedAt)
-                    .ThenByDescending(x => x.Id)
-                    .Select(x => (long?)x.Id)
-                    .FirstOrDefaultAsync(ct);
+                    .Select(x => x.Id)
+                    .ToListAsync(ct);
 
-            if (!latestSubmissionId.HasValue)
+            if (activeSubmissionIds.Count == 0)
             {
-                return BadRequest(
+                return NotFound(
                     "This ticket does not have an active submitted write-up.");
             }
 
+            /*
+             * itemId is the representative row sent to the client.
+             * Make sure it actually belongs to this ticket.
+             */
             var item =
-                await _db.TicketWriteUpSubmissionCloseoutItems
+                await _db
+                    .TicketWriteUpSubmissionCloseoutItems
                     .FirstOrDefaultAsync(
                         x =>
                             x.Id == itemId &&
-                            x.SubmissionId ==
-                                latestSubmissionId.Value,
+                            activeSubmissionIds.Contains(
+                                x.SubmissionId),
                         ct);
 
             if (item is null)
             {
                 return NotFound(
-                    "The checklist item was not found for the " +
-                    "latest submitted write-up.");
+                    "The checklist item was not found for an active " +
+                    "write-up on this ticket.");
             }
 
             var updatedBy =
@@ -2021,38 +2196,120 @@ namespace SmartGridSuite.Api.Controllers
                     150)
                 ?? "Dispatcher";
 
-            if (req.IsCompleted)
+            /*
+             * Find every underlying copy of the same logical checklist
+             * requirement.
+             *
+             * DefinitionId is the preferred identity because each submission
+             * snapshots the same configured Dispatch checklist definition.
+             *
+             * The fallback protects older rows that may not have DefinitionId.
+             */
+            var matchingItemsQuery =
+                _db.TicketWriteUpSubmissionCloseoutItems
+                    .Where(x =>
+                        activeSubmissionIds.Contains(
+                            x.SubmissionId));
+
+            if (item.DefinitionId.HasValue)
             {
-                item.IsCompleted = true;
-                item.CompletedBy = updatedBy;
-                item.CompletedAt = DateTime.Now;
+                matchingItemsQuery =
+                    matchingItemsQuery.Where(
+                        x =>
+                            x.DefinitionId ==
+                            item.DefinitionId);
             }
             else
             {
-                item.IsCompleted = false;
-                item.CompletedBy = null;
-                item.CompletedAt = null;
+                matchingItemsQuery =
+                    matchingItemsQuery.Where(
+                        x =>
+                            x.DefinitionId == null &&
+                            x.DisplayNameSnapshot ==
+                                item.DisplayNameSnapshot &&
+                            x.ConditionTypeSnapshot ==
+                                item.ConditionTypeSnapshot &&
+                            x.WriteUpFlagId ==
+                                item.WriteUpFlagId &&
+                            x.ReferToOptionId ==
+                                item.ReferToOptionId);
+            }
+
+            var matchingItems =
+                await matchingItemsQuery
+                    .ToListAsync(ct);
+
+            if (matchingItems.Count == 0)
+            {
+                return NotFound(
+                    "No matching Dispatch checklist items were found.");
+            }
+
+            var completedAt =
+                req.IsCompleted
+                    ? DateTime.Now
+                    : (DateTime?)null;
+
+            foreach (var matchingItem in matchingItems)
+            {
+                matchingItem.IsCompleted =
+                    req.IsCompleted;
+
+                matchingItem.CompletedBy =
+                    req.IsCompleted
+                        ? updatedBy
+                        : null;
+
+                matchingItem.CompletedAt =
+                    completedAt;
             }
 
             await _db.SaveChangesAsync(ct);
 
+            /*
+             * Return the representative row the client originally clicked,
+             * but reflect the ticket-wide logical completion state.
+             */
             return Ok(
                 new DispatchCloseoutChecklistItemDto
                 {
                     Id = item.Id,
-                    SubmissionId = item.SubmissionId,
-                    DefinitionId = item.DefinitionId,
-                    DisplayName = item.DisplayNameSnapshot,
-                    SortOrder = item.SortOrderSnapshot,
-                    IsRequired = item.IsRequired,
+
+                    SubmissionId =
+                        item.SubmissionId,
+
+                    DefinitionId =
+                        item.DefinitionId,
+
+                    DisplayName =
+                        item.DisplayNameSnapshot,
+
+                    SortOrder =
+                        item.SortOrderSnapshot,
+
+                    IsRequired =
+                        matchingItems.Any(x =>
+                            x.IsRequired),
+
                     ConditionType =
                         item.ConditionTypeSnapshot,
-                    WriteUpFlagId = item.WriteUpFlagId,
-                    ReferToOptionId = item.ReferToOptionId,
-                    IsCompleted = item.IsCompleted,
+
+                    WriteUpFlagId =
+                        item.WriteUpFlagId,
+
+                    ReferToOptionId =
+                        item.ReferToOptionId,
+
+                    IsCompleted =
+                        req.IsCompleted,
+
                     CompletedBy =
-                        item.CompletedBy ?? "",
-                    CompletedAt = item.CompletedAt
+                        req.IsCompleted
+                            ? updatedBy
+                            : "",
+
+                    CompletedAt =
+                        completedAt
                 });
         }
 
@@ -2065,42 +2322,70 @@ namespace SmartGridSuite.Api.Controllers
             if (entity == null)
                 return NotFound();
 
-            var latestSubmissionId =
-                await _db.TicketWriteUpSubmissions
-                    .AsNoTracking()
-                    .Where(x =>
-                        x.TicketId == id &&
-                        !x.IsDeleted)
-                    .OrderByDescending(x => x.SubmittedAt)
-                    .ThenByDescending(x => x.Id)
-                    .Select(x => (long?)x.Id)
-                    .FirstOrDefaultAsync(ct);
+            /*
+             * A ticket may have write-ups from multiple crews.
+             *
+             * Dispatch cannot close the ticket until every required closeout
+             * item from every active/non-deleted write-up submission has been
+             * completed.
+             */
+            var incompleteRequiredItems =
+                await (
+                    from closeoutItem in
+                        _db.TicketWriteUpSubmissionCloseoutItems
+                            .AsNoTracking()
 
-            if (latestSubmissionId.HasValue)
+                    join submission in
+                        _db.TicketWriteUpSubmissions
+                            .AsNoTracking()
+
+                        on closeoutItem.SubmissionId
+                        equals submission.Id
+
+                    where
+                        submission.TicketId == id &&
+                        !submission.IsDeleted &&
+                        closeoutItem.IsRequired &&
+                        !closeoutItem.IsCompleted
+
+                    orderby
+                        submission.SubmittedAt,
+                        closeoutItem.SortOrderSnapshot,
+                        closeoutItem.DisplayNameSnapshot
+
+                    select new
+                    {
+                        closeoutItem.DisplayNameSnapshot,
+                        submission.SubmittedByName,
+                        submission.SubmittedAt
+                    })
+                    .ToListAsync(ct);
+
+            if (incompleteRequiredItems.Count > 0)
             {
-                var incompleteRequiredItems =
-                    await _db
-                        .TicketWriteUpSubmissionCloseoutItems
-                        .AsNoTracking()
-                        .Where(x =>
-                            x.SubmissionId ==
-                                latestSubmissionId.Value &&
-                            x.IsRequired &&
-                            !x.IsCompleted)
-                        .OrderBy(x => x.SortOrderSnapshot)
-                        .ThenBy(x => x.DisplayNameSnapshot)
-                        .Select(x => x.DisplayNameSnapshot)
-                        .ToListAsync(ct);
+                var incompleteDescriptions =
+                    incompleteRequiredItems
+                        .Select(x =>
+                        {
+                            var submittedBy =
+                                string.IsNullOrWhiteSpace(
+                                    x.SubmittedByName)
+                                    ? "Unknown technician"
+                                    : x.SubmittedByName.Trim();
 
-                if (incompleteRequiredItems.Count > 0)
-                {
-                    return BadRequest(
-                        "Complete all required Dispatch closeout " +
-                        "checklist items before closing this ticket: " +
-                        string.Join(
-                            ", ",
-                            incompleteRequiredItems));
-                }
+                            return
+                                $"{x.DisplayNameSnapshot} " +
+                                $"({submittedBy}, " +
+                                $"{x.SubmittedAt:MM-dd-yyyy HH:mm})";
+                        })
+                        .ToList();
+
+                return BadRequest(
+                    "Complete all required Dispatch closeout " +
+                    "checklist items before closing this ticket: " +
+                    string.Join(
+                        ", ",
+                        incompleteDescriptions));
             }
 
             var closedStatuses = await _db.TicketStatuses
@@ -3047,38 +3332,234 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPost("sap-import/preview")]
-        public async Task<ActionResult<List<SapQueueImportPreviewResultRow>>> PreviewSapImport([FromBody] SapQueueImportPreviewRequest req)
+        public async Task<ActionResult<List<SapQueueImportPreviewResultRow>>> PreviewSapImport(
+            [FromBody] SapQueueImportPreviewRequest req,
+            CancellationToken ct = default)
         {
-            var rows = req.Rows ?? new List<SapQueueImportPreviewRow>();
+            var rows =
+                req.Rows ??
+                new List<SapQueueImportPreviewRow>();
+
             if (rows.Count == 0)
-                return Ok(new List<SapQueueImportPreviewResultRow>());
+            {
+                return Ok(
+                    new List<SapQueueImportPreviewResultRow>());
+            }
 
-            var incomingNotifications = rows
-                .Select(r => NormalizeNotification(r.Notification))
-                .Where(n => !string.IsNullOrWhiteSpace(n))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList()!;
+            /*
+             * Normalize/parse the spreadsheet once.
+             *
+             * The API, not the WPF client, owns reconciliation rules.
+             */
+            var parsedRows = rows
+                .Select(row =>
+                {
+                    var rawNotification =
+                        (row.Notification ?? string.Empty).Trim();
 
+                    var notification =
+                        NormalizeNotification(rawNotification);
+
+                    var workOrder =
+                        NormalizeWorkOrder(row.WorkOrder);
+
+                    var description =
+                        (row.Description ?? string.Empty).Trim();
+
+                    var parsedSite =
+                        TryParseSiteFromDescription(description);
+
+                    return new
+                    {
+                        Row = row,
+                        RawNotification = rawNotification,
+                        Notification = notification,
+                        WorkOrder = workOrder,
+                        Description = description,
+                        ParsedSite = parsedSite
+                    };
+                })
+                .ToList();
+
+            var incomingNotificationSet = parsedRows
+                .Where(x =>
+                    !string.IsNullOrWhiteSpace(x.Notification))
+                .Select(x => x.Notification!)
+                .ToHashSet(
+                    StringComparer.OrdinalIgnoreCase);
+
+            /*
+             * A notification must remain globally unique even if the
+             * existing ticket is Closed.
+             *
+             * This preserves the existing SAP import duplicate protection.
+             */
             var existingNotifications = new HashSet<string>(
-                await _db.Tickets.AsNoTracking()
-                    .Where(t => t.Notification != null && incomingNotifications.Contains(t.Notification!))
+                await _db.Tickets
+                    .AsNoTracking()
+                    .Where(t =>
+                        t.Notification != null &&
+                        incomingNotificationSet.Contains(
+                            t.Notification))
                     .Select(t => t.Notification!)
-                    .ToListAsync(),
+                    .ToListAsync(ct),
                 StringComparer.OrdinalIgnoreCase);
 
-            var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var result = new List<SapQueueImportPreviewResultRow>();
+            /*
+             * Reconciliation only concerns ACTIVE application tickets.
+             *
+             * Do not hard-code "Closed", "Completed", etc. The Ticket Status
+             * administration table already defines which statuses are closed.
+             */
+            var closedStatusNames = await _db.TicketStatuses
+                .AsNoTracking()
+                .Where(x => x.IsClosed)
+                .Select(x => x.Name)
+                .ToListAsync(ct);
 
-            foreach (var row in rows)
+            var activeTicketQuery = _db.Tickets
+                .AsNoTracking()
+                .Where(t =>
+                    t.Notification != null &&
+                    t.Notification != "");
+
+            if (closedStatusNames.Count > 0)
             {
-                var rawNotification = (row.Notification ?? "").Trim();
-                var notif = NormalizeNotification(rawNotification);
-                var workOrder = NormalizeWorkOrder(row.WorkOrder);
-                var description = (row.Description ?? "").Trim();
-                var parsedSite = TryParseSiteFromDescription(description);
+                activeTicketQuery =
+                    activeTicketQuery.Where(t =>
+                        !closedStatusNames.Contains(t.Status));
+            }
+
+            var activeAppTickets =
+                await activeTicketQuery.ToListAsync(ct);
+
+            /*
+             * Build a complete CURRENT notification picture by site:
+             *
+             *     spreadsheet rows
+             *          +
+             *     active SmartGridSuite tickets
+             *
+             * This catches more than just duplicates inside the Excel file.
+             *
+             * Example:
+             *
+             *     G1234 / 140500001  <-- already in app
+             *     G1234 / 140500002  <-- new SAP row
+             *
+             * That is still a same-site / multiple-notification conflict.
+             */
+            var notificationsBySite =
+                new Dictionary<string, HashSet<string>>(
+                    StringComparer.OrdinalIgnoreCase);
+
+            static string NormalizeSite(string? site)
+            {
+                return (site ?? string.Empty)
+                    .Trim()
+                    .ToUpperInvariant();
+            }
+
+            void AddSiteNotification(
+                string? site,
+                string? notification)
+            {
+                var cleanSite =
+                    NormalizeSite(site);
+
+                var cleanNotification =
+                    NormalizeNotification(notification);
+
+                if (string.IsNullOrWhiteSpace(cleanSite) ||
+                    string.IsNullOrWhiteSpace(cleanNotification))
+                {
+                    return;
+                }
+
+                if (!notificationsBySite.TryGetValue(
+                        cleanSite,
+                        out var notifications))
+                {
+                    notifications =
+                        new HashSet<string>(
+                            StringComparer.OrdinalIgnoreCase);
+
+                    notificationsBySite[cleanSite] =
+                        notifications;
+                }
+
+                notifications.Add(
+                    cleanNotification);
+            }
+
+            foreach (var row in parsedRows)
+            {
+                AddSiteNotification(
+                    row.ParsedSite,
+                    row.Notification);
+            }
+
+            foreach (var ticket in activeAppTickets)
+            {
+                AddSiteNotification(
+                    ticket.Site,
+                    ticket.Notification);
+            }
+
+            /*
+             * Only sites having MORE THAN ONE DISTINCT notification are
+             * considered a notification conflict.
+             *
+             * Two copies of the same notification are handled by the normal
+             * duplicate-notification validation instead.
+             */
+            var conflictNotificationsBySite =
+                notificationsBySite
+                    .Where(x => x.Value.Count > 1)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.Value
+                            .OrderBy(n => n)
+                            .ToList(),
+                        StringComparer.OrdinalIgnoreCase);
+
+            var seenInFile =
+                new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase);
+
+            var result =
+                new List<SapQueueImportPreviewResultRow>();
+
+            /*
+             * ------------------------------------------------------------
+             * SPREADSHEET ROWS
+             * ------------------------------------------------------------
+             */
+            foreach (var parsed in parsedRows)
+            {
+                var row =
+                    parsed.Row;
+
+                var rawNotification =
+                    parsed.RawNotification;
+
+                var notif =
+                    parsed.Notification;
+
+                var workOrder =
+                    parsed.WorkOrder;
+
+                var description =
+                    parsed.Description;
+
+                var parsedSite =
+                    parsed.ParsedSite;
 
                 string status;
                 string message;
+
+                var requiresReview = false;
+                var reviewReason = string.Empty;
 
                 if (string.IsNullOrWhiteSpace(notif))
                 {
@@ -3088,254 +3569,1066 @@ namespace SmartGridSuite.Api.Controllers
                 else if (!seenInFile.Add(notif))
                 {
                     status = "Invalid";
-                    message = "Duplicate notification appears more than once in this import file.";
+
+                    message =
+                        "Duplicate notification appears more than once " +
+                        "in this import file.";
                 }
                 else if (existingNotifications.Contains(notif))
                 {
                     status = "Already Exists";
-                    message = $"Notification {notif} already exists.";
+
+                    message =
+                        $"Notification {notif} already exists.";
                 }
                 else if (row.NotificationDate is null)
                 {
                     status = "Invalid";
-                    message = "Notif.date is missing or invalid.";
+
+                    message =
+                        "Notif.date is missing or invalid.";
                 }
                 else if (string.IsNullOrWhiteSpace(description))
                 {
                     status = "Invalid";
-                    message = "Description is required.";
+
+                    message =
+                        "Description is required.";
                 }
-                else if (!string.IsNullOrWhiteSpace(row.WorkOrder) && string.IsNullOrWhiteSpace(workOrder))
+                else if (
+                    !string.IsNullOrWhiteSpace(row.WorkOrder) &&
+                    string.IsNullOrWhiteSpace(workOrder))
                 {
                     status = "Invalid";
-                    message = "Work Order could not be read.";
+
+                    message =
+                        "Work Order could not be read.";
                 }
                 else
                 {
                     status = "Ready";
-                    message = string.IsNullOrWhiteSpace(parsedSite)
-                        ? "Site not detected — will import blank site and Needs Review."
-                        : $"Site parsed as {parsedSite}. Will import as Open.";
+
+                    message =
+                        string.IsNullOrWhiteSpace(parsedSite)
+                            ? "Site not detected — will import blank site and Needs Review."
+                            : $"Site parsed as {parsedSite}. Will import as Open.";
                 }
 
-                result.Add(new SapQueueImportPreviewResultRow(
-                    RowNumber: row.RowNumber,
-                    Notification: rawNotification,
-                    WorkOrder: string.IsNullOrWhiteSpace(workOrder) ? row.WorkOrder?.Trim() : workOrder,
-                    NotificationDate: row.NotificationDate,
-                    Description: description,
-                    ParsedSite: parsedSite,
-                    ImportStatus: status,
-                    Message: message
-                ));
+                /*
+                 * Site-level notification conflict.
+                 *
+                 * Preserve Invalid / Already Exists because those facts still
+                 * matter, but also flag the row RequiresReview.
+                 *
+                 * A normally Ready row becomes Review Required so it cannot
+                 * silently import as an ordinary Open ticket.
+                 */
+                var cleanSite =
+                    NormalizeSite(parsedSite);
+
+                if (!string.IsNullOrWhiteSpace(cleanSite) &&
+                    conflictNotificationsBySite.TryGetValue(
+                        cleanSite,
+                        out var conflictingNotifications))
+                {
+                    requiresReview = true;
+
+                    reviewReason =
+                        $"Site {cleanSite} is associated with multiple " +
+                        $"active/incoming notifications: " +
+                        $"{string.Join(", ", conflictingNotifications)}.";
+
+                    if (string.Equals(
+                            status,
+                            "Ready",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        status =
+                            "Review Required";
+
+                        message =
+                            reviewReason +
+                            " Choose how this ticket should be handled.";
+                    }
+                    else
+                    {
+                        message =
+                            message +
+                            " " +
+                            reviewReason;
+                    }
+                }
+
+                result.Add(
+                    new SapQueueImportPreviewResultRow(
+                        RowNumber: row.RowNumber,
+                        Notification: rawNotification,
+
+                        WorkOrder:
+                            string.IsNullOrWhiteSpace(workOrder)
+                                ? row.WorkOrder?.Trim()
+                                : workOrder,
+
+                        NotificationDate:
+                            row.NotificationDate,
+
+                        Description:
+                            description,
+
+                        ParsedSite:
+                            parsedSite,
+
+                        ImportStatus:
+                            status,
+
+                        Message:
+                            message,
+
+                        RowSource:
+                            "Spreadsheet",
+
+                        ExistingTicketId:
+                            null,
+
+                        CurrentTicketStatus:
+                            string.Empty,
+
+                        RequiresReview:
+                            requiresReview,
+
+                        ReviewReason:
+                            reviewReason));
+            }
+
+            /*
+             * ------------------------------------------------------------
+             * EXISTING SMARTGRIDSUITE TICKETS
+             * ------------------------------------------------------------
+             *
+             * Surface an existing active ticket when:
+             *
+             *   A) its notification is NOT in the current SAP export
+             *
+             *      OR
+             *
+             *   B) its site participates in a multiple-notification conflict
+             *
+             * These rows are informational/action rows. They are NOT new
+             * tickets and can never be imported by Import Ready Rows.
+             */
+            var nextSyntheticRowNumber =
+                rows.Max(x => x.RowNumber) + 1;
+
+            foreach (var ticket in activeAppTickets
+                         .OrderBy(x => x.Site)
+                         .ThenBy(x => x.Notification))
+            {
+                var notif =
+                    NormalizeNotification(
+                        ticket.Notification);
+
+                if (string.IsNullOrWhiteSpace(notif))
+                    continue;
+
+                var cleanSite =
+                    NormalizeSite(ticket.Site);
+
+                var missingFromSap =
+                    !incomingNotificationSet.Contains(
+                        notif);
+
+                List<string>? siteNotifications = null;
+
+                var sameSiteConflict = false;
+
+                if (!string.IsNullOrWhiteSpace(cleanSite) &&
+                    conflictNotificationsBySite.TryGetValue(
+                        cleanSite,
+                        out var foundSiteNotifications))
+                {
+                    sameSiteConflict = true;
+                    siteNotifications = foundSiteNotifications;
+                }
+
+                if (!missingFromSap &&
+                    !sameSiteConflict)
+                {
+                    continue;
+                }
+
+                var reasons =
+                    new List<string>();
+
+                if (missingFromSap)
+                {
+                    reasons.Add(
+                        $"Existing SmartGridSuite notification {notif} " +
+                        "is not present in the current SAP Queue export.");
+                }
+
+                if (sameSiteConflict &&
+                    siteNotifications != null)
+                {
+                    reasons.Add(
+                        $"Site {cleanSite} is associated with multiple " +
+                        $"active/incoming notifications: " +
+                        $"{string.Join(", ", siteNotifications)}.");
+                }
+
+                var reviewReason =
+                    string.Join(
+                        " ",
+                        reasons);
+
+                var currentStatus =
+                    (ticket.Status ?? string.Empty)
+                        .Trim();
+
+                var message =
+                    reviewReason +
+                    $" Current status: " +
+                    $"{(string.IsNullOrWhiteSpace(currentStatus) ? "Unknown" : currentStatus)}. " +
+                    "Choose Keep As Is or change this ticket's status.";
+
+                result.Add(
+                    new SapQueueImportPreviewResultRow(
+                        RowNumber:
+                            nextSyntheticRowNumber++,
+
+                        Notification:
+                            notif,
+
+                        WorkOrder:
+                            ticket.CurrentWorkOrder ?? string.Empty,
+
+                        NotificationDate:
+                            ticket.CreatedAt,
+
+                        Description:
+                            ticket.NotificationName ?? string.Empty,
+
+                        ParsedSite:
+                            ticket.Site ?? string.Empty,
+
+                        ImportStatus:
+                            "Review Required",
+
+                        Message:
+                            message,
+
+                        RowSource:
+                            "Existing App",
+
+                        ExistingTicketId:
+                            ticket.Id,
+
+                        CurrentTicketStatus:
+                            currentStatus,
+
+                        RequiresReview:
+                            true,
+
+                        ReviewReason:
+                            reviewReason));
             }
 
             return Ok(result);
         }
 
-        [HttpPost("sap-import/commit")]
-        public async Task<ActionResult<SapQueueImportCommitResponse>> CommitSapImport([FromBody] SapQueueImportCommitRequest req, CancellationToken ct)
+        [HttpGet("sap-import/status-options")]
+        public async Task<ActionResult<List<TicketFilterStatusDto>>> GetSapImportStatusOptions(CancellationToken ct)
         {
-            var rows = req.Rows ?? new List<SapQueueImportCommitRow>();
-            var createdBy = string.IsNullOrWhiteSpace(req.CreatedBy) ? "Unknown" : req.CreatedBy.Trim();
-            var importTime = DateTime.Now;
+            var statuses = await _db.TicketStatuses
+                .AsNoTracking()
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Name)
+                .Select(x => new TicketFilterStatusDto
+                {
+                    Name = x.Name,
+                    SortOrder = x.SortOrder,
+                    IsClosed = x.IsClosed
+                })
+                .ToListAsync(ct);
 
-            if (rows.Count == 0)
+            return Ok(statuses);
+        }
+
+        [HttpPost("sap-import/commit")]
+        public async Task<ActionResult<SapQueueImportCommitResponse>> CommitSapImport(
+            [FromBody] SapQueueImportCommitRequest req,
+            CancellationToken ct)
+        {
+            var rows =
+                req.Rows ??
+                new List<SapQueueImportCommitRow>();
+
+            var existingActions =
+                req.ExistingTicketActions ??
+                new List<SapQueueExistingTicketAction>();
+
+            var createdBy =
+                string.IsNullOrWhiteSpace(req.CreatedBy)
+                    ? "Unknown"
+                    : req.CreatedBy.Trim();
+
+            var importTime =
+                DateTime.Now;
+
+            if (rows.Count == 0 &&
+                existingActions.Count == 0)
             {
-                return Ok(new SapQueueImportCommitResponse(
-                    ImportedCount: 0,
-                    AlreadyExistsCount: 0,
-                    InvalidCount: 0,
-                    Rows: new()));
+                return Ok(
+                    new SapQueueImportCommitResponse(
+                        ImportedCount: 0,
+                        AlreadyExistsCount: 0,
+                        InvalidCount: 0,
+                        Rows: new(),
+                        ExistingKeptCount: 0,
+                        ExistingStatusChangedCount: 0));
             }
 
-            var incomingNotifications = rows
-                .Select(r => NormalizeNotification(r.Notification))
-                .Where(n => !string.IsNullOrWhiteSpace(n))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList()!;
+            /*
+             * ------------------------------------------------------------
+             * STATUS CONFIGURATION
+             * ------------------------------------------------------------
+             *
+             * SAP reconciliation uses the same configurable statuses as the
+             * rest of SmartGridSuite. Never trust a status string from WPF
+             * without validating it again here.
+             */
+            var activeStatuses =
+                await _db.TicketStatuses
+                    .AsNoTracking()
+                    .Where(x => x.IsActive)
+                    .ToListAsync(ct);
 
-            var existingNotifications = new HashSet<string>(
-                await _db.Tickets.AsNoTracking()
-                    .Where(t => t.Notification != null && incomingNotifications.Contains(t.Notification!))
-                    .Select(t => t.Notification!)
-                    .ToListAsync(),
-                StringComparer.OrdinalIgnoreCase);
+            var activeStatusByName =
+                activeStatuses
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x.Name))
+                    .GroupBy(
+                        x => x.Name.Trim(),
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        x => x.Key,
+                        x => x.First().Name,
+                        StringComparer.OrdinalIgnoreCase);
 
-            var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            var results = new List<SapQueueImportCommitResultRow>();
-            int imported = 0;
-            int alreadyExists = 0;
-            int invalid = 0;
-
-            foreach (var row in rows)
+            if (activeStatusByName.Count == 0)
             {
-                var rawNotification = (row.Notification ?? "").Trim();
-                var notif = NormalizeNotification(rawNotification);
-                var workOrder = NormalizeWorkOrder(row.WorkOrder);
-                var description = (row.Description ?? "").Trim();
-                var parsedSite = string.IsNullOrWhiteSpace(row.ParsedSite)
-                    ? TryParseSiteFromDescription(description)
-                    : row.ParsedSite.Trim();
+                return BadRequest(
+                    "No active ticket statuses are configured.");
+            }
 
-                if (string.IsNullOrWhiteSpace(notif))
+            var closedStatusNames =
+                new HashSet<string>(
+                    await _db.TicketStatuses
+                        .AsNoTracking()
+                        .Where(x => x.IsClosed)
+                        .Select(x => x.Name)
+                        .ToListAsync(ct),
+                    StringComparer.OrdinalIgnoreCase);
+
+            static string NormalizeAction(string? action)
+            {
+                return new string(
+                    (action ?? string.Empty)
+                        .Where(char.IsLetterOrDigit)
+                        .Select(char.ToLowerInvariant)
+                        .ToArray());
+            }
+
+            /*
+             * ------------------------------------------------------------
+             * VALIDATE EXISTING-TICKET ACTIONS BEFORE CHANGING ANY DATA
+             * ------------------------------------------------------------
+             */
+            var duplicateActionTicket =
+                existingActions
+                    .Where(x => x.TicketId > 0)
+                    .GroupBy(x => x.TicketId)
+                    .FirstOrDefault(x => x.Count() > 1);
+
+            if (duplicateActionTicket != null)
+            {
+                return BadRequest(
+                    $"Ticket {duplicateActionTicket.Key} appears more than once " +
+                    "in the SAP reconciliation actions.");
+            }
+
+            foreach (var action in existingActions)
+            {
+                if (action.TicketId <= 0)
                 {
-                    invalid++;
-                    results.Add(new SapQueueImportCommitResultRow(
-                        row.RowNumber,
-                        rawNotification,
-                        "Invalid",
-                        "Notification is required.",
-                        null));
-                    continue;
+                    return BadRequest(
+                        "A valid ticket ID is required for every " +
+                        "existing-ticket reconciliation action.");
                 }
 
-                if (!seenInFile.Add(notif))
+                var normalizedAction =
+                    NormalizeAction(action.Action);
+
+                var isKeep =
+                    normalizedAction is
+                        "keep" or
+                        "keepcurrent" or
+                        "Keepasis";
+
+                var isChangeStatus =
+                    normalizedAction ==
+                    "changestatus";
+
+                if (!isKeep &&
+                    !isChangeStatus)
                 {
-                    invalid++;
-                    results.Add(new SapQueueImportCommitResultRow(
-                        row.RowNumber,
-                        notif,
-                        "Invalid",
-                        "Duplicate notification appears more than once in this import file.",
-                        null));
-                    continue;
+                    return BadRequest(
+                        $"Unknown SAP reconciliation action " +
+                        $"'{action.Action}'.");
                 }
 
-                if (existingNotifications.Contains(notif))
+                if (isChangeStatus)
                 {
-                    alreadyExists++;
-                    results.Add(new SapQueueImportCommitResultRow(
-                        row.RowNumber,
-                        notif,
-                        "Already Exists",
-                        $"Notification {notif} already exists.",
-                        null));
-                    continue;
-                }
+                    var requestedStatus =
+                        (action.TargetStatus ?? string.Empty)
+                            .Trim();
 
-                if (row.NotificationDate == default)
-                {
-                    invalid++;
-                    results.Add(new SapQueueImportCommitResultRow(
-                        row.RowNumber,
-                        notif,
-                        "Invalid",
-                        "Notif.date is missing or invalid.",
-                        null));
-                    continue;
-                }
-
-                if (string.IsNullOrWhiteSpace(description))
-                {
-                    invalid++;
-                    results.Add(new SapQueueImportCommitResultRow(
-                        row.RowNumber,
-                        notif,
-                        "Invalid",
-                        "Description is required.",
-                        null));
-                    continue;
-                }
-
-                if (!string.IsNullOrWhiteSpace(row.WorkOrder) && string.IsNullOrWhiteSpace(workOrder))
-                {
-                    invalid++;
-                    results.Add(new SapQueueImportCommitResultRow(
-                        row.RowNumber,
-                        notif,
-                        "Invalid",
-                        "Work Order could not be read.",
-                        null));
-                    continue;
-                }
-
-                var entity = new TicketEntity
-                {
-                    Site = parsedSite,
-                    NotificationName = description,
-                    Notification = notif,
-
-                    Status = string.IsNullOrWhiteSpace(parsedSite) ? "Needs Review" : "Open",
-                    AssignedTech = "(Unassigned)",
-
-                    CreatedAt = row.NotificationDate,
-                    LastActivityAt = importTime,
-
-                    CurrentWorkOrder = string.IsNullOrWhiteSpace(workOrder) ? null : workOrder,
-                    WorkOrderClass = null,
-                    GroupCode = "",
-                    PriorityDays = 0,
-
-                    Problem = "",
-                    Notes = null,
-                    DispatchNotes = null,
-                    CreatedBy = createdBy,
-                    Summary = description
-                };
-
-                try
-                {
-                    _db.Tickets.Add(entity);
-                    await _db.SaveChangesAsync(ct);
-
-                    existingNotifications.Add(notif);
-                    imported++;
-
-                    results.Add(new SapQueueImportCommitResultRow(
-                        row.RowNumber,
-                        notif,
-                        "Imported",
-                        string.IsNullOrWhiteSpace(parsedSite)
-                            ? "Imported with blank site. Dispatch review required."
-                            : $"Imported with parsed site {parsedSite} as Open.",
-                        entity.Id));
-                }
-                catch (DbUpdateException ex)
-                {
-                    _db.Entry(entity).State = EntityState.Detached;
-
-                    var msg = ex.InnerException?.Message ?? ex.Message;
-                    if (msg.Contains("Duplicate", StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrWhiteSpace(requestedStatus))
                     {
-                        existingNotifications.Add(notif);
-                        alreadyExists++;
-
-                        results.Add(new SapQueueImportCommitResultRow(
-                            row.RowNumber,
-                            notif,
-                            "Already Exists",
-                            $"Notification {notif} already exists.",
-                            null));
+                        return BadRequest(
+                            $"A new status is required for ticket " +
+                            $"{action.TicketId}.");
                     }
-                    else
+
+                    if (!activeStatusByName.ContainsKey(
+                            requestedStatus))
+                    {
+                        return BadRequest(
+                            $"Status '{requestedStatus}' is not an " +
+                            "active SmartGridSuite ticket status.");
+                    }
+                }
+            }
+
+            var existingActionTicketIds =
+                existingActions
+                    .Select(x => x.TicketId)
+                    .Distinct()
+                    .ToList();
+
+            var existingActionTickets =
+                existingActionTicketIds.Count == 0
+                    ? new List<TicketEntity>()
+                    : await _db.Tickets
+                        .Where(x =>
+                            existingActionTicketIds.Contains(x.Id))
+                        .ToListAsync(ct);
+
+            var existingActionTicketsById =
+                existingActionTickets
+                    .ToDictionary(x => x.Id);
+
+            foreach (var id in existingActionTicketIds)
+            {
+                if (!existingActionTicketsById.ContainsKey(id))
+                {
+                    return BadRequest(
+                        $"Existing SmartGridSuite ticket {id} " +
+                        "could not be found. Reload the SAP preview.");
+                }
+            }
+
+            /*
+             * Protect against somebody loading the preview, another dispatcher
+             * closing the ticket, and then the original preview accidentally
+             * changing that now-closed ticket.
+             */
+            foreach (var action in existingActions)
+            {
+                var normalizedAction =
+                    NormalizeAction(action.Action);
+
+                if (normalizedAction != "changestatus")
+                    continue;
+
+                var ticket =
+                    existingActionTicketsById[action.TicketId];
+
+                var currentStatus =
+                    (ticket.Status ?? string.Empty).Trim();
+
+                if (closedStatusNames.Contains(currentStatus))
+                {
+                    return Conflict(
+                        $"Ticket {ticket.Id} is now closed. " +
+                        "Reload the SAP Queue preview before changing it.");
+                }
+            }
+
+            /*
+             * ------------------------------------------------------------
+             * INCOMING NOTIFICATION CHECK
+             * ------------------------------------------------------------
+             */
+            var incomingNotifications =
+                rows
+                    .Select(r =>
+                        NormalizeNotification(r.Notification))
+                    .Where(n =>
+                        !string.IsNullOrWhiteSpace(n))
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToList()!;
+
+            var existingNotifications =
+                new HashSet<string>(
+                    await _db.Tickets
+                        .AsNoTracking()
+                        .Where(t =>
+                            t.Notification != null &&
+                            incomingNotifications.Contains(
+                                t.Notification!))
+                        .Select(t => t.Notification!)
+                        .ToListAsync(ct),
+                    StringComparer.OrdinalIgnoreCase);
+
+            /*
+             * ------------------------------------------------------------
+             * SERVER-SIDE SITE CONFLICT RECHECK
+             * ------------------------------------------------------------
+             *
+             * Never rely solely on what the preview told the client.
+             *
+             * If TargetStatus is omitted, a site conflict defaults to
+             * Needs Review instead of Open.
+             */
+            var incomingSiteRows =
+                rows
+                    .Select(row =>
+                    {
+                        var description =
+                            (row.Description ?? string.Empty)
+                                .Trim();
+
+                        var site =
+                            string.IsNullOrWhiteSpace(row.ParsedSite)
+                                ? TryParseSiteFromDescription(description)
+                                : row.ParsedSite.Trim();
+
+                        return new
+                        {
+                            Row = row,
+                            Site = site.ToUpperInvariant(),
+                            Notification =
+                                NormalizeNotification(
+                                    row.Notification)
+                        };
+                    })
+                    .ToList();
+
+            var conflictSites =
+                incomingSiteRows
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x.Site) &&
+                        !string.IsNullOrWhiteSpace(x.Notification))
+                    .GroupBy(
+                        x => x.Site,
+                        StringComparer.OrdinalIgnoreCase)
+                    .Where(group =>
+                        group
+                            .Select(x => x.Notification)
+                            .Distinct(
+                                StringComparer.OrdinalIgnoreCase)
+                            .Count() > 1)
+                    .Select(x => x.Key)
+                    .ToHashSet(
+                        StringComparer.OrdinalIgnoreCase);
+
+            /*
+             * Also detect a different ACTIVE application notification already
+             * associated with an incoming site.
+             */
+            var incomingSites =
+                incomingSiteRows
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x.Site))
+                    .Select(x => x.Site)
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+            if (incomingSites.Count > 0)
+            {
+                var activeTicketsAtIncomingSitesQuery =
+                    _db.Tickets
+                        .AsNoTracking()
+                        .Where(t =>
+                            t.Site != null &&
+                            incomingSites.Contains(t.Site) &&
+                            t.Notification != null &&
+                            t.Notification != "");
+
+                if (closedStatusNames.Count > 0)
+                {
+                    activeTicketsAtIncomingSitesQuery =
+                        activeTicketsAtIncomingSitesQuery
+                            .Where(t =>
+                                !closedStatusNames.Contains(
+                                    t.Status));
+                }
+
+                var activeTicketsAtIncomingSites =
+                    await activeTicketsAtIncomingSitesQuery
+                        .Select(t => new
+                        {
+                            t.Site,
+                            t.Notification
+                        })
+                        .ToListAsync(ct);
+
+                foreach (var incoming in incomingSiteRows)
+                {
+                    if (string.IsNullOrWhiteSpace(incoming.Site) ||
+                        string.IsNullOrWhiteSpace(incoming.Notification))
+                    {
+                        continue;
+                    }
+
+                    var hasDifferentActiveNotification =
+                        activeTicketsAtIncomingSites.Any(
+                            existing =>
+                                string.Equals(
+                                    existing.Site,
+                                    incoming.Site,
+                                    StringComparison.OrdinalIgnoreCase)
+                                &&
+                                !string.Equals(
+                                    NormalizeNotification(
+                                        existing.Notification),
+                                    incoming.Notification,
+                                    StringComparison.OrdinalIgnoreCase));
+
+                    if (hasDifferentActiveNotification)
+                    {
+                        conflictSites.Add(
+                            incoming.Site);
+                    }
+                }
+            }
+
+            var seenInFile =
+                new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase);
+
+            var results =
+                new List<SapQueueImportCommitResultRow>();
+
+            var imported = 0;
+            var alreadyExists = 0;
+            var invalid = 0;
+
+            var existingKept = 0;
+            var existingStatusChanged = 0;
+
+            await using var transaction =
+                await _db.Database
+                    .BeginTransactionAsync(ct);
+
+            try
+            {
+                /*
+                 * --------------------------------------------------------
+                 * IMPORT SELECTED SPREADSHEET ROWS
+                 * --------------------------------------------------------
+                 */
+                foreach (var row in rows)
+                {
+                    var rawNotification =
+                        (row.Notification ?? string.Empty)
+                            .Trim();
+
+                    var notif =
+                        NormalizeNotification(
+                            rawNotification);
+
+                    var workOrder =
+                        NormalizeWorkOrder(
+                            row.WorkOrder);
+
+                    var description =
+                        (row.Description ?? string.Empty)
+                            .Trim();
+
+                    var parsedSite =
+                        string.IsNullOrWhiteSpace(row.ParsedSite)
+                            ? TryParseSiteFromDescription(
+                                description)
+                            : row.ParsedSite.Trim();
+
+                    var normalizedSite =
+                        parsedSite.ToUpperInvariant();
+
+                    if (string.IsNullOrWhiteSpace(notif))
                     {
                         invalid++;
 
-                        results.Add(new SapQueueImportCommitResultRow(
-                            row.RowNumber,
-                            notif,
-                            "Invalid",
-                            "Import failed for this row.",
-                            null));
+                        results.Add(
+                            new SapQueueImportCommitResultRow(
+                                row.RowNumber,
+                                rawNotification,
+                                "Invalid",
+                                "Notification is required.",
+                                null));
+
+                        continue;
+                    }
+
+                    if (!seenInFile.Add(notif))
+                    {
+                        invalid++;
+
+                        results.Add(
+                            new SapQueueImportCommitResultRow(
+                                row.RowNumber,
+                                notif,
+                                "Invalid",
+                                "Duplicate notification appears more than once " +
+                                "in this import request.",
+                                null));
+
+                        continue;
+                    }
+
+                    if (existingNotifications.Contains(notif))
+                    {
+                        alreadyExists++;
+
+                        results.Add(
+                            new SapQueueImportCommitResultRow(
+                                row.RowNumber,
+                                notif,
+                                "Already Exists",
+                                $"Notification {notif} already exists.",
+                                null));
+
+                        continue;
+                    }
+
+                    if (row.NotificationDate == default)
+                    {
+                        invalid++;
+
+                        results.Add(
+                            new SapQueueImportCommitResultRow(
+                                row.RowNumber,
+                                notif,
+                                "Invalid",
+                                "Notif.date is missing or invalid.",
+                                null));
+
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(description))
+                    {
+                        invalid++;
+
+                        results.Add(
+                            new SapQueueImportCommitResultRow(
+                                row.RowNumber,
+                                notif,
+                                "Invalid",
+                                "Description is required.",
+                                null));
+
+                        continue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(row.WorkOrder) &&
+                        string.IsNullOrWhiteSpace(workOrder))
+                    {
+                        invalid++;
+
+                        results.Add(
+                            new SapQueueImportCommitResultRow(
+                                row.RowNumber,
+                                notif,
+                                "Invalid",
+                                "Work Order could not be read.",
+                                null));
+
+                        continue;
+                    }
+
+                    /*
+                     * Determine destination status.
+                     *
+                     * Explicit dispatcher selection wins.
+                     *
+                     * If none is supplied:
+                     *   blank site     -> Needs Review
+                     *   site conflict  -> Needs Review
+                     *   normal row     -> Open
+                     */
+                    var fallbackStatus =
+                        string.IsNullOrWhiteSpace(normalizedSite) ||
+                        conflictSites.Contains(normalizedSite)
+                            ? "Needs Review"
+                            : "Open";
+
+                    var requestedTargetStatus =
+                        string.IsNullOrWhiteSpace(row.TargetStatus)
+                            ? fallbackStatus
+                            : row.TargetStatus.Trim();
+
+                    if (!activeStatusByName.TryGetValue(
+                            requestedTargetStatus,
+                            out var targetStatus))
+                    {
+                        invalid++;
+
+                        results.Add(
+                            new SapQueueImportCommitResultRow(
+                                row.RowNumber,
+                                notif,
+                                "Invalid",
+                                $"Target status '{requestedTargetStatus}' " +
+                                "is not an active ticket status.",
+                                null));
+
+                        continue;
+                    }
+
+                    var entity =
+                        new TicketEntity
+                        {
+                            Site =
+                                parsedSite,
+
+                            NotificationName =
+                                description,
+
+                            Notification =
+                                notif,
+
+                            Status =
+                                targetStatus,
+
+                            AssignedTech =
+                                "(Unassigned)",
+
+                            CreatedAt =
+                                row.NotificationDate,
+
+                            LastActivityAt =
+                                importTime,
+
+                            CurrentWorkOrder =
+                                string.IsNullOrWhiteSpace(workOrder)
+                                    ? null
+                                    : workOrder,
+
+                            WorkOrderClass =
+                                null,
+
+                            GroupCode =
+                                "",
+
+                            PriorityDays =
+                                0,
+
+                            Problem =
+                                "",
+
+                            Notes =
+                                null,
+
+                            DispatchNotes =
+                                null,
+
+                            CreatedBy =
+                                createdBy,
+
+                            Summary =
+                                description
+                        };
+
+                    try
+                    {
+                        _db.Tickets.Add(entity);
+
+                        await _db.SaveChangesAsync(ct);
+
+                        existingNotifications.Add(notif);
+
+                        imported++;
+
+                        results.Add(
+                            new SapQueueImportCommitResultRow(
+                                row.RowNumber,
+                                notif,
+                                "Imported",
+                                string.IsNullOrWhiteSpace(parsedSite)
+                                    ? $"Imported with blank site as {targetStatus}."
+                                    : $"Imported site {parsedSite} as {targetStatus}.",
+                                entity.Id));
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        _db.Entry(entity).State =
+                            EntityState.Detached;
+
+                        var msg =
+                            ex.InnerException?.Message ??
+                            ex.Message;
+
+                        if (msg.Contains(
+                                "Duplicate",
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            existingNotifications.Add(notif);
+
+                            alreadyExists++;
+
+                            results.Add(
+                                new SapQueueImportCommitResultRow(
+                                    row.RowNumber,
+                                    notif,
+                                    "Already Exists",
+                                    $"Notification {notif} already exists.",
+                                    null));
+                        }
+                        else
+                        {
+                            invalid++;
+
+                            results.Add(
+                                new SapQueueImportCommitResultRow(
+                                    row.RowNumber,
+                                    notif,
+                                    "Invalid",
+                                    "Import failed for this row.",
+                                    null));
+                        }
                     }
                 }
+
+                /*
+                 * --------------------------------------------------------
+                 * EXISTING SMARTGRIDSUITE TICKET ACTIONS
+                 * --------------------------------------------------------
+                 */
+                foreach (var action in existingActions)
+                {
+                    var normalizedAction =
+                        NormalizeAction(action.Action);
+
+                    var ticket =
+                        existingActionTicketsById[
+                            action.TicketId];
+
+                    if (normalizedAction is
+                        "keep" or
+                        "keepcurrent" or
+                        "keepasis")
+                    {
+                        existingKept++;
+                        continue;
+                    }
+
+                    var requestedStatus =
+                        (action.TargetStatus ?? string.Empty)
+                            .Trim();
+
+                    var targetStatus =
+                        activeStatusByName[
+                            requestedStatus];
+
+                    var oldStatus =
+                        (ticket.Status ?? string.Empty)
+                            .Trim();
+
+                    /*
+                     * Treat selecting the current status as a safe no-op.
+                     */
+                    if (string.Equals(
+                            oldStatus,
+                            targetStatus,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        existingKept++;
+                        continue;
+                    }
+
+                    ticket.Status =
+                        targetStatus;
+
+                    ticket.LastActivityAt =
+                        importTime;
+
+                    /*
+                     * Leave an audit trail explaining why the status changed.
+                     */
+                    var auditEntry =
+                        $"[{importTime:MM-dd-yyyy HH:mm}] " +
+                        $"SAP Queue reconciliation by {createdBy}" +
+                        Environment.NewLine +
+                        $"Status: " +
+                        $"{(string.IsNullOrWhiteSpace(oldStatus) ? "Unknown" : oldStatus)} " +
+                        $"→ {targetStatus}";
+
+                    ticket.DispatchNotes =
+                        string.IsNullOrWhiteSpace(
+                            ticket.DispatchNotes)
+                            ? auditEntry
+                            : ticket.DispatchNotes.Trim()
+                              + Environment.NewLine
+                              + Environment.NewLine
+                              + auditEntry;
+
+                    existingStatusChanged++;
+                }
+
+                if (existingStatusChanged > 0)
+                {
+                    await _db.SaveChangesAsync(ct);
+                }
+
+                await RecordSapImportRunAsync(
+                    importTime,
+                    createdBy,
+                    imported,
+                    alreadyExists,
+                    invalid,
+                    ct);
+
+                await transaction.CommitAsync(ct);
+
+                return Ok(
+                    new SapQueueImportCommitResponse(
+                        ImportedCount:
+                            imported,
+
+                        AlreadyExistsCount:
+                            alreadyExists,
+
+                        InvalidCount:
+                            invalid,
+
+                        Rows:
+                            results,
+
+                        ExistingKeptCount:
+                            existingKept,
+
+                        ExistingStatusChangedCount:
+                            existingStatusChanged));
             }
-
-            await RecordSapImportRunAsync(
-                importTime,
-                createdBy,
-                imported,
-                alreadyExists,
-                invalid,
-                ct);
-
-            return Ok(new SapQueueImportCommitResponse(
-                ImportedCount: imported,
-                AlreadyExistsCount: alreadyExists,
-                InvalidCount: invalid,
-                Rows: results));
+            catch
+            {
+                await transaction.RollbackAsync(ct);
+                throw;
+            }
         }
 
         [HttpGet("sap-import/last")]

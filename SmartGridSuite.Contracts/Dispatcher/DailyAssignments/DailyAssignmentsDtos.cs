@@ -131,6 +131,10 @@ namespace SmartGridSuite.Contracts.Dispatcher.DailyAssignments
         public int? TruckId { get; set; }
         public int? TechnicianId { get; set; }
 
+        // "Move" = current behavior: this becomes the ticket's only active route.
+        // "Add"  = keep existing route(s) and add this target as another crew.
+        public string AssignmentMode { get; set; } = "Move";
+
         public string? AssignmentNotes { get; set; }
 
         public string? UpdatedBy { get; set; }
@@ -151,6 +155,19 @@ namespace SmartGridSuite.Contracts.Dispatcher.DailyAssignments
     {
         public DateTime WorkDate { get; set; }
 
+        /*
+         * Preferred removal identity.
+         *
+         * Each crew copy of a ticket has its own Daily Assignment row,
+         * so AssignmentIds allow one crew's copy to be removed without
+         * affecting another crew working the same ticket.
+         */
+        public List<ulong> AssignmentIds { get; set; } = new();
+
+        /*
+         * Legacy fallback for existing callers.
+         * We will migrate the Daily Assignments UI to AssignmentIds next.
+         */
         public List<long> TicketIds { get; set; } = new();
 
         public string? UpdatedBy { get; set; }

@@ -2,8 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Import SAP Queue"
-        Width="1380"
-        Height="820"
+        WindowState="Maximized"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
@@ -41,7 +40,7 @@
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource TextPrimary}"/>
 
-                        <TextBlock Text="Loads the raw SAP export, checks for duplicate notifications, and imports only ready rows."
+                        <TextBlock Text="Reconciles the current SAP queue against SmartGridSuite, detects duplicate site notifications, and surfaces tickets that need review."
                                    Margin="0,4,0,0"
                                    Foreground="{DynamicResource TextSecondary}"/>
 
@@ -129,7 +128,7 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextPrimary}"/>
 
-                        <TextBlock Text="Only rows marked Ready will be imported. Rows with a parsed site import as Open. Rows missing a site import as Needs Review."
+                        <TextBlock Text="Spreadsheet conflicts require review. Existing SmartGridSuite tickets default to Keep As Is until you explicitly choose otherwise."
                                    Margin="0,4,0,0"
                                    Foreground="{DynamicResource TextSecondary}"/>
                     </StackPanel>
@@ -236,10 +235,10 @@
                             CornerRadius="12"
                             Padding="10,8">
                         <StackPanel>
-                            <TextBlock Text="Review"
+                            <TextBlock Text="SAP Conflicts"
                                        FontSize="11"
                                        Foreground="{DynamicResource TextSecondary}"/>
-                            <TextBlock Text="{Binding WillImportNeedsReviewCount}"
+                            <TextBlock Text="{Binding SpreadsheetReviewCount}"
                                        Margin="0,3,0,0"
                                        FontSize="18"
                                        FontWeight="Bold"
@@ -307,10 +306,10 @@
                             CornerRadius="12"
                             Padding="10,8">
                         <StackPanel>
-                            <TextBlock Text="No Problem"
+                            <TextBlock Text="App Review"
                                        FontSize="11"
                                        Foreground="{DynamicResource TextSecondary}"/>
-                            <TextBlock Text="{Binding MissingProblemCount}"
+                            <TextBlock Text="{Binding ExistingAppReviewCount}"
                                        Margin="0,3,0,0"
                                        FontSize="18"
                                        FontWeight="Bold"
@@ -344,33 +343,108 @@
                           ItemsSource="{Binding PreviewRows}">
 
                     <DataGrid.Columns>
+
+                        <DataGridTextColumn Header="Source"
+                                            Width="94"
+                                            Binding="{Binding RowSource}"/>
+
                         <DataGridTextColumn Header="Site"
-                        Width="120"
-                        Binding="{Binding ParsedSite}"/>
+                                            Width="75"
+                                            Binding="{Binding ParsedSite}"/>
 
                         <DataGridTextColumn Header="Notification"
-                        Width="140"
-                        Binding="{Binding Notification}"/>
+                                            Width="102"
+                                            Binding="{Binding Notification}"/>
 
                         <DataGridTextColumn Header="Work Order"
-                        Width="130"
-                        Binding="{Binding WorkOrder}"/>
+                                            Width="102"
+                                            Binding="{Binding WorkOrder}"/>
 
                         <DataGridTextColumn Header="Description"
-                        Width="*"
-                        Binding="{Binding Description}"/>
+                                            Width="1.2*"
+                                            Binding="{Binding Description}"/>
 
                         <DataGridTextColumn Header="Notif. Date"
-                        Width="120"
-                        Binding="{Binding NotificationDate, StringFormat={}{0:MM/dd/yyyy}}"/>
+                                            Width="98"
+                                            Binding="{Binding NotificationDate, StringFormat={}{0:MM/dd/yyyy}}"/>
 
-                        <DataGridTextColumn Header="Status"
-                        Width="130"
-                        Binding="{Binding ImportStatus}"/>
+                        <DataGridTextColumn Header="Result"
+                                            Width="125"
+                                            Binding="{Binding ImportStatus}"/>
+
+                        <!--
+                            Dispatcher reconciliation action.
+                            Spreadsheet:
+                                Import / Skip
+                            Existing App:
+                                Keep As Is / Change Status
+                            Invalid and Already Exists rows intentionally show no action.
+                        -->
+                        <DataGridTemplateColumn Header="Action"
+                                                Width="168">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+
+                                    <ComboBox ItemsSource="{Binding ActionOptions}"
+                                              SelectedItem="{Binding SelectedAction,
+                                                                     Mode=TwoWay,
+                                                                     UpdateSourceTrigger=PropertyChanged}"
+                                              MinWidth="95"
+                                              MaxWidth="146"
+                                              Height="28"
+                                              HorizontalContentAlignment="Stretch">
+
+                                        <ComboBox.Style>
+                                            <Style TargetType="{x:Type ComboBox}"
+                                                   BasedOn="{StaticResource {x:Type ComboBox}}">
+
+                                                <Setter Property="Visibility"
+                    Value="Visible"/>
+
+                                                <Style.Triggers>
+
+                                                    <DataTrigger Binding="{Binding SelectedAction}"
+                             Value="">
+                                                        <Setter Property="Visibility"
+                            Value="Collapsed"/>
+                                                    </DataTrigger>
+
+                                                </Style.Triggers>
+
+                                            </Style>
+                                        </ComboBox.Style>
+
+                                    </ComboBox>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!--
+                            Status values come from Administration > Ticket Statuses.
+                            This is intentionally NOT a hard-coded list.
+                        -->
+                        <DataGridTemplateColumn Header="New Status"
+                                                Width="180">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+
+                                    <ComboBox ItemsSource="{Binding DataContext.SapStatusOptions,
+                                               RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                              SelectedItem="{Binding TargetStatus,
+                                                 Mode=TwoWay,
+                                                 UpdateSourceTrigger=PropertyChanged}"
+                                              IsEnabled="{Binding IsTargetStatusEditable}"
+                                              MinWidth="120"
+                                              Height="28"/>
+
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
                         <DataGridTextColumn Header="Message"
-                        Width="2*"
-                        Binding="{Binding Message}"/>
+                                            Width="2*"
+                                            Binding="{Binding Message}"/>
+
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
@@ -389,7 +463,7 @@
 
             <Button x:Name="ImportBtn"
                     Style="{StaticResource PrimaryButtonStyle}"
-                    Content="Import Ready Rows"
+                    Content="Apply Reconciliation"
                     MinWidth="170"
                     IsEnabled="False"
                     Click="ImportReady_Click"/>
