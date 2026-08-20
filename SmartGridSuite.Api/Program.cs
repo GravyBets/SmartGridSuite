@@ -33,6 +33,8 @@ namespace SmartGridSuite.Api
             builder.Services.Configure<ClientVersionOptions>(
                 builder.Configuration.GetSection(ClientVersionOptions.SectionName));
 
+            builder.Services.AddScoped<ParentDatabaseConnectionFactory>();
+
             builder.Services.AddScoped<ParentSyncService>();
 
             builder.Services.AddScoped<SiteDashboardCacheService>();

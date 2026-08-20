@@ -21,7 +21,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
             if (string.IsNullOrWhiteSpace(ip))
                 return empty;
 
-            await using var conn = new SqlConnection(_connectionString);
+            await using var conn = _parentDatabaseConnectionFactory.CreateConnection();
             await conn.OpenAsync(cancellationToken);
 
             var sql = """
@@ -562,7 +562,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
             }
 
             await using var conn =
-                new SqlConnection(_connectionString);
+                _parentDatabaseConnectionFactory.CreateConnection();
 
             await conn.OpenAsync(cancellationToken);
 

@@ -10,7 +10,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
         public async Task<SiteDashboardRouteInfo?> GetSiteDashboardRouteInfoAsync(
             string siteId, CancellationToken cancellationToken = default)
         {
-            await using var conn = new SqlConnection(_connectionString);
+            await using var conn = _parentDatabaseConnectionFactory.CreateConnection();
             await conn.OpenAsync(cancellationToken);
 
             var sql = """

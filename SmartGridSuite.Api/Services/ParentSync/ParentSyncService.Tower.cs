@@ -10,7 +10,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
     {
         public async Task<TowerDashboardRow?> GetTowerAsync(int topNameId, CancellationToken cancellationToken = default)
         {
-            await using var conn = new SqlConnection(_connectionString);
+            await using var conn = _parentDatabaseConnectionFactory.CreateConnection();
             await conn.OpenAsync(cancellationToken);
 
             var headerSql = """
@@ -194,7 +194,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
             if (take <= 0) take = 25;
             if (take > 100) take = 100;
 
-            await using var conn = new SqlConnection(_connectionString);
+            await using var conn = _parentDatabaseConnectionFactory.CreateConnection();
             await conn.OpenAsync(cancellationToken);
 
             var sql = """

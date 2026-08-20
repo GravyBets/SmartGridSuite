@@ -13,18 +13,27 @@ namespace SmartGridSuite.Api.Services.ParentSync
     {
         private readonly string _connectionString;
         private readonly SmartGridDbContext _appDb;
+        private readonly ParentDatabaseConnectionFactory _parentDatabaseConnectionFactory;
 
         public ParentSyncService(
             IOptions<ParentDatabaseOptions> options,
-            SmartGridDbContext appDb)
+            SmartGridDbContext appDb,
+            ParentDatabaseConnectionFactory
+            parentDatabaseConnectionFactory)
         {
-            _connectionString = options.Value.ConnectionString;
-            _appDb = appDb;
+            _connectionString =
+                options.Value.ConnectionString;
+
+            _appDb =
+                appDb;
+
+            _parentDatabaseConnectionFactory =
+                parentDatabaseConnectionFactory;
         }
 
         public async Task<int> GetSiteCountAsync(CancellationToken cancellationToken = default)
         {
-            await using var conn = new SqlConnection(_connectionString);
+            await using var conn = _parentDatabaseConnectionFactory.CreateConnection();
             await conn.OpenAsync(cancellationToken);
 
             const string sql = "SELECT COUNT(*) FROM [sgc_main].[Site];";

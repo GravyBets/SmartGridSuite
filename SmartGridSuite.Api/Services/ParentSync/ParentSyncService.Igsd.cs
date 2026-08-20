@@ -11,7 +11,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
         {
             siteId = (siteId ?? "").Trim();
 
-            await using var conn = new SqlConnection(_connectionString);
+            await using var conn = _parentDatabaseConnectionFactory.CreateConnection();
             await conn.OpenAsync(cancellationToken);
 
             var sql = """
