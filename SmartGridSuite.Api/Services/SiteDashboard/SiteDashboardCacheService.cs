@@ -442,6 +442,19 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                     .Trim()
                     .ToUpperInvariant();
 
+            /*
+             * DACS must be evaluated before AMS/MR.
+             *
+             * Some DACS sites also have an AMS cache record.
+             * If AMS is checked first, those sites are incorrectly
+             * rendered using the MR dashboard during cached fallback.
+             */
+            if (snapshot.Dacs is not null ||
+                siteType.Contains("DACS"))
+            {
+                return SiteDashboardKinds.Dacs;
+            }
+
             if (snapshot.Ams is not null ||
                 siteType.Contains("AMS") ||
                 siteId.EndsWith(
@@ -449,12 +462,6 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                     StringComparison.OrdinalIgnoreCase))
             {
                 return SiteDashboardKinds.AmsMr;
-            }
-
-            if (snapshot.Dacs is not null ||
-                siteType.Contains("DACS"))
-            {
-                return SiteDashboardKinds.Dacs;
             }
 
             if (snapshot.Rx is not null ||
