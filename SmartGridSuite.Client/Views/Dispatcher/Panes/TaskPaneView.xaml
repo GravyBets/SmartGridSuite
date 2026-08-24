@@ -1046,18 +1046,14 @@
                                                 ElementStyle="{StaticResource TrimCellText}" />
 
                             <DataGridTextColumn Header="Status"
-                                                Width="125"
+                                                Width="200"
                                                 Binding="{Binding Status}"
                                                 ElementStyle="{StaticResource TrimCellText}" />
 
                             <DataGridTextColumn Header="Tech" Width="140"
                                                 Binding="{Binding Tech}"
                                                 ElementStyle="{StaticResource TrimCellText}" />
-
-                            <DataGridTextColumn Header="Action Required"
-                                                Width="1.7*"
-                                                Binding="{Binding ActionRequired}"
-                                                ElementStyle="{StaticResource TrimCellText}" />
+                            
                             <DataGridTextColumn Header="Checklist"
                                                 Width="135"
                                                 Binding="{Binding ChecklistProgressDisplay}"

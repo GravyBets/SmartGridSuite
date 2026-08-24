@@ -233,15 +233,15 @@
 
                 <!-- Blue dot indicates this row has Dispatch Notes and/or Site Notes. -->
                 <Border Width="8"
-                Height="8"
-                CornerRadius="4"
-                Background="{DynamicResource PrimaryBg}"
-                BorderBrush="{DynamicResource CardBackground}"
-                BorderThickness="1"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Margin="0,-1,-1,0"
-                ToolTip="{Binding SiteNoteCount, StringFormat=Extra details available. Site notes: {0}}">
+                        Height="8"
+                        CornerRadius="4"
+                        Background="{DynamicResource PrimaryBg}"
+                        BorderBrush="{DynamicResource CardBackground}"
+                        BorderThickness="1"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="0,-1,-1,0"
+                        ToolTip="{Binding SiteNoteCount, StringFormat=Extra details available. Site notes: {0}}">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -317,113 +317,118 @@
                 </TextBlock>
 
                 <!-- Loaded detail content. -->
-                <Grid>
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Visible"/>
+                <ScrollViewer MaxHeight="500"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              CanContentScroll="False">
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Visible"/>
 
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Tag,
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Tag,
                                                        RelativeSource={RelativeSource AncestorType=DataGridRow}}"
                                      Value="{x:Null}">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
 
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="22"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="22"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                    <!-- Dispatch Notes -->
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="Dispatch Notes"
+                        <!-- Dispatch Notes -->
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Dispatch Notes"
                                    Style="{StaticResource FieldTechExpandedLabelText}"/>
 
-                        <TextBlock Text="{Binding Tag.DispatchNotes,
+                            <TextBlock Text="{Binding Tag.DispatchNotes,
                                          RelativeSource={RelativeSource AncestorType=DataGridRow}}">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock"
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock"
                                        BasedOn="{StaticResource FieldTechExpandedValueText}">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Tag.DispatchNotes,
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Tag.DispatchNotes,
                                                                RelativeSource={RelativeSource AncestorType=DataGridRow}}"
                                              Value="">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
 
-                        <TextBlock Text="No dispatch notes for this ticket."
+                            <TextBlock Text="No dispatch notes for this ticket."
                                    FontSize="12"
                                    FontStyle="Italic"
                                    Foreground="{DynamicResource TextSecondary}">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
 
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Tag.DispatchNotes,
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Tag.DispatchNotes,
                                                                RelativeSource={RelativeSource AncestorType=DataGridRow}}"
                                              Value="">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </StackPanel>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
 
-                    <!-- Site Notes -->
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Site Notes"
+                        <!-- Site Notes -->
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Site Notes"
                                    Style="{StaticResource FieldTechExpandedLabelText}"/>
 
-                        <ItemsControl ItemsSource="{Binding Tag.SiteNotes,
+                            <ItemsControl ItemsSource="{Binding Tag.SiteNotes,
                                                     RelativeSource={RelativeSource AncestorType=DataGridRow}}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="0,0,0,10">
-                                        <TextBlock Text="{Binding NoteText}"
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Margin="0,0,0,10">
+                                            <TextBlock Text="{Binding NoteText}"
                                            Style="{StaticResource FieldTechExpandedValueText}"/>
 
-                                        <TextBlock Margin="0,3,0,0"
+                                            <TextBlock Margin="0,3,0,0"
                                                    FontSize="11"
                                                    Foreground="{DynamicResource TextSecondary}">
                                             <Run Text="{Binding NoteType}"/>
                                             <Run Text="  •  "/>
                                             <Run Text="{Binding CreatedBy}"/>
-                                        </TextBlock>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
 
-                        <TextBlock Text="No active site notes for this site."
+                            <TextBlock Text="No active site notes for this site."
                                    FontSize="12"
                                    FontStyle="Italic"
                                    Foreground="{DynamicResource TextSecondary}">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
 
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Tag.SiteNotes.Count,
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Tag.SiteNotes.Count,
                                                                RelativeSource={RelativeSource AncestorType=DataGridRow}}"
                                              Value="0">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </StackPanel>
-                </Grid>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
             </Grid>
         </DataTemplate>
 
@@ -673,7 +678,7 @@
 
                     <DataGrid.Columns>
 
-                        <DataGridTemplateColumn Width="42"
+                        <DataGridTemplateColumn Width="46"
                                                 CanUserResize="False"
                                                 CanUserSort="False"
                                                 CellTemplate="{StaticResource FieldTechExpandRowCellTemplate}"/>

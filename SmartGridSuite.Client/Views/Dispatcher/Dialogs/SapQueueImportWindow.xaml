@@ -8,7 +8,7 @@
         Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
         Background="{StaticResource AppBackground}">
 
-    <Grid Margin="10">
+    <Grid Margin="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="4"/>
@@ -24,7 +24,7 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="14"/>
+                    <RowDefinition Height="8"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
@@ -118,7 +118,7 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="8"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
@@ -325,7 +325,7 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="6"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -340,10 +340,11 @@
                           HeadersVisibility="Column"
                           IsReadOnly="True"
                           CanUserAddRows="False"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                           ItemsSource="{Binding PreviewRows}">
 
                     <DataGrid.Columns>
-
                         <DataGridTextColumn Header="Source"
                                             Width="94"
                                             Binding="{Binding RowSource}"/>
@@ -361,7 +362,7 @@
                                             Binding="{Binding WorkOrder}"/>
 
                         <DataGridTextColumn Header="Description"
-                                            Width="1.2*"
+                                            Width="300"
                                             Binding="{Binding Description}"/>
 
                         <DataGridTextColumn Header="Notif. Date"
@@ -399,14 +400,14 @@
                                                    BasedOn="{StaticResource {x:Type ComboBox}}">
 
                                                 <Setter Property="Visibility"
-                    Value="Visible"/>
+                                                        Value="Visible"/>
 
                                                 <Style.Triggers>
 
                                                     <DataTrigger Binding="{Binding SelectedAction}"
-                             Value="">
+                                                                 Value="">
                                                         <Setter Property="Visibility"
-                            Value="Collapsed"/>
+                                                                Value="Collapsed"/>
                                                     </DataTrigger>
 
                                                 </Style.Triggers>
@@ -442,7 +443,8 @@
                         </DataGridTemplateColumn>
 
                         <DataGridTextColumn Header="Message"
-                                            Width="2*"
+                                            Width="SizeToCells"
+                                            MinWidth="420"
                                             Binding="{Binding Message}"/>
 
                     </DataGrid.Columns>

@@ -131,6 +131,12 @@ namespace SmartGridSuite.Api.Controllers
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
+            var includeBlankStatusAsNeedsReview =
+                statuses.Any(x =>
+                    x.Equals(
+                        "Needs Review",
+                        StringComparison.OrdinalIgnoreCase));
+
             var query = _db.Tickets
                 .Include(t => t.TaskCategory)
                 .AsNoTracking()
@@ -145,12 +151,28 @@ namespace SmartGridSuite.Api.Controllers
                 }
                 else
                 {
-                    query = query.Where(t => statuses.Contains(t.Status));
+                    query = query.Where(t =>
+                        statuses.Contains(t.Status) ||
+                        (
+                            includeBlankStatusAsNeedsReview &&
+                            (
+                                t.Status == null ||
+                                t.Status.Trim() == ""
+                            )
+                        ));
                 }
             }
             else if (statuses.Count > 0)
             {
-                query = query.Where(t => statuses.Contains(t.Status));
+                query = query.Where(t =>
+                    statuses.Contains(t.Status) ||
+                    (
+                        includeBlankStatusAsNeedsReview &&
+                        (
+                            t.Status == null ||
+                            t.Status.Trim() == ""
+                        )
+                    ));
             }
 
             // Tech filter
@@ -255,7 +277,7 @@ namespace SmartGridSuite.Api.Controllers
             var totalCount = await query.CountAsync(ct);
 
             var rows = await query
-                .OrderByDescending(t => t.LastActivityAt)
+                .OrderByDescending(t => t.CreatedAt)
                 .ThenByDescending(t => t.Id)
                 .Skip(skip)
                 .Take(take)
@@ -266,7 +288,9 @@ namespace SmartGridSuite.Api.Controllers
                 t.Site,
                 t.NotificationName ?? "",
                 t.Notification ?? "",
-                t.Status,
+                string.IsNullOrWhiteSpace(t.Status)
+                    ? "Needs Review"
+                    : t.Status,
                 t.TaskCategoryId,
                 t.TaskCategory != null ? t.TaskCategory.Name : null,
                 t.ActionRequiredOverride,
@@ -337,6 +361,237 @@ namespace SmartGridSuite.Api.Controllers
                     })
                     .ToList()
             });
+        }
+
+        [HttpPost("summary/query")]
+        public async Task<ActionResult<TicketSummaryDto>> QueryTicketSummary(
+            [FromBody] TicketQueryRequest req,
+            CancellationToken ct)
+        {
+            req ??= new TicketQueryRequest();
+
+            var query =
+                _db.Tickets
+                    .AsNoTracking()
+                    .AsQueryable();
+
+            /*
+             * Intentionally DO NOT apply req.Statuses here.
+             *
+             * Summary cards describe the full filtered population
+             * across every status. The status checkboxes only control
+             * which rows are visible in the ticket grid.
+             */
+
+            // Technician filter.
+            var cleanTech =
+                (req.AssignedTech ?? string.Empty).Trim();
+
+            if (!string.IsNullOrWhiteSpace(cleanTech) &&
+                !cleanTech.Equals(
+                    "All",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                if (cleanTech.Equals(
+                        "(Unassigned)",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(t =>
+                        string.IsNullOrWhiteSpace(t.AssignedTech) ||
+                        t.AssignedTech == "(Unassigned)");
+                }
+                else
+                {
+                    query = query.Where(
+                        t => t.AssignedTech == cleanTech);
+                }
+            }
+
+            // Quick filter.
+            var quickFilter =
+                (req.QuickFilter ?? string.Empty).Trim();
+
+            if (quickFilter.Equals(
+                    "MissingProblems",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(
+                    t => string.IsNullOrWhiteSpace(t.Problem));
+            }
+            else if (quickFilter.Equals(
+                         "Unassigned",
+                         StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(t =>
+                    string.IsNullOrWhiteSpace(t.AssignedTech) ||
+                    t.AssignedTech == "(Unassigned)");
+            }
+            else if (quickFilter.Equals(
+                         "MissingWorkOrderType",
+                         StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(t =>
+                    !string.IsNullOrWhiteSpace(t.CurrentWorkOrder) &&
+                    string.IsNullOrWhiteSpace(t.WorkOrderClass));
+            }
+            else if (quickFilter.Equals(
+                         "Assigned",
+                         StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(
+                    t => t.Status == "Assigned");
+            }
+
+            // Date filter.
+            var dateField =
+                (req.DateField ?? "LastActivity").Trim();
+
+            if (req.From.HasValue)
+            {
+                var from =
+                    req.From.Value;
+
+                if (dateField.Equals(
+                        "Created",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(
+                        t => t.CreatedAt >= from);
+                }
+                else
+                {
+                    query = query.Where(
+                        t => t.LastActivityAt >= from);
+                }
+            }
+
+            if (req.To.HasValue)
+            {
+                var toExclusive =
+                    req.To.Value.Date.AddDays(1);
+
+                if (dateField.Equals(
+                        "Created",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(
+                        t => t.CreatedAt < toExclusive);
+                }
+                else
+                {
+                    query = query.Where(
+                        t => t.LastActivityAt < toExclusive);
+                }
+            }
+
+            // Search filter.
+            var search =
+                (req.Search ?? string.Empty).Trim();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(t =>
+                    (t.Site != null &&
+                     t.Site.Contains(search)) ||
+
+                    (t.NotificationName != null &&
+                     t.NotificationName.Contains(search)) ||
+
+                    (t.Notification != null &&
+                     t.Notification.Contains(search)) ||
+
+                    (t.CurrentWorkOrder != null &&
+                     t.CurrentWorkOrder.Contains(search)) ||
+
+                    (t.WorkOrderClass != null &&
+                     t.WorkOrderClass.Contains(search)) ||
+
+                    (t.GroupCode != null &&
+                     t.GroupCode.Contains(search)) ||
+
+                    (t.Status != null &&
+                     t.Status.Contains(search)) ||
+
+                    (t.AssignedTech != null &&
+                     t.AssignedTech.Contains(search)) ||
+
+                    (t.Problem != null &&
+                     t.Problem.Contains(search)) ||
+
+                    (t.Summary != null &&
+                     t.Summary.Contains(search)) ||
+
+                    (t.Notes != null &&
+                     t.Notes.Contains(search)) ||
+
+                    (t.DispatchNotes != null &&
+                     t.DispatchNotes.Contains(search)) ||
+
+                    (t.CreatedBy != null &&
+                     t.CreatedBy.Contains(search)));
+            }
+
+            var configuredStatuses =
+                await _db.TicketStatuses
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.IsActive &&
+                        x.IncludeInSummary)
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.Name)
+                    .Select(x => new
+                    {
+                        x.Name,
+                        x.SortOrder
+                    })
+                    .ToListAsync(ct);
+
+            var countsByStatus =
+                await query
+                    .GroupBy(x =>
+                        string.IsNullOrWhiteSpace(x.Status)
+                            ? "Needs Review"
+                            : x.Status)
+                    .Select(g => new
+                    {
+                        Status = g.Key,
+                        Count = g.Count()
+                    })
+                    .ToDictionaryAsync(
+                        x => x.Status,
+                        x => x.Count,
+                        StringComparer.OrdinalIgnoreCase,
+                        ct);
+
+            var totalCount =
+                await query.CountAsync(ct);
+
+            return Ok(
+                new TicketSummaryDto
+                {
+                    TotalCount =
+                        totalCount,
+
+                    Statuses =
+                        configuredStatuses
+                            .Select(x =>
+                                new TicketSummaryStatusDto
+                                {
+                                    Status =
+                                        x.Name,
+
+                                    SortOrder =
+                                        x.SortOrder,
+
+                                    Count =
+                                        countsByStatus.TryGetValue(
+                                            x.Name,
+                                            out var count)
+                                            ? count
+                                            : 0
+                                })
+                            .ToList()
+                });
         }
 
         [HttpGet("filter-statuses")]
@@ -3762,16 +4017,13 @@ namespace SmartGridSuite.Api.Controllers
                 if (missingFromSap)
                 {
                     reasons.Add(
-                        $"Existing SmartGridSuite notification {notif} " +
-                        "is not present in the current SAP Queue export.");
+                        "Missing from SAP Queue.");
                 }
 
-                if (sameSiteConflict &&
-                    siteNotifications != null)
+                if (sameSiteConflict && siteNotifications != null)
                 {
                     reasons.Add(
-                        $"Site {cleanSite} is associated with multiple " +
-                        $"active/incoming notifications: " +
+                        $"Multiple notifications for {cleanSite}: " +
                         $"{string.Join(", ", siteNotifications)}.");
                 }
 
@@ -3786,9 +4038,8 @@ namespace SmartGridSuite.Api.Controllers
 
                 var message =
                     reviewReason +
-                    $" Current status: " +
-                    $"{(string.IsNullOrWhiteSpace(currentStatus) ? "Unknown" : currentStatus)}. " +
-                    "Choose Keep As Is or change this ticket's status.";
+                    $" Status: " +
+                    $"{(string.IsNullOrWhiteSpace(currentStatus) ? "Unknown" : currentStatus)}.";
 
                 result.Add(
                     new SapQueueImportPreviewResultRow(
@@ -4532,6 +4783,52 @@ namespace SmartGridSuite.Api.Controllers
                         "keepcurrent" or
                         "keepasis")
                     {
+                        var currentStatus =
+                            (ticket.Status ?? string.Empty)
+                                .Trim();
+
+                        /*
+                         * A ticket with no status must never be preserved as-is.
+                         *
+                         * Blank statuses disappear from the normal Dispatch status filters,
+                         * so reconciliation automatically repairs them to Needs Review.
+                         */
+                        if (string.IsNullOrWhiteSpace(currentStatus))
+                        {
+                            if (!activeStatusByName.TryGetValue(
+                                    "Needs Review",
+                                    out var needsReviewStatus))
+                            {
+                                return BadRequest(
+                                    "Status 'Needs Review' is missing or inactive. " +
+                                    "A ticket with a blank status cannot be safely reconciled.");
+                            }
+
+                            ticket.Status =
+                                needsReviewStatus;
+
+                            ticket.LastActivityAt =
+                                importTime;
+
+                            var blankStatusRepairAuditEntry =
+                                $"[{importTime:MM-dd-yyyy HH:mm}] " +
+                                $"SAP Queue reconciliation by {createdBy}" +
+                                Environment.NewLine +
+                                $"Status: Unknown → {needsReviewStatus}";
+
+                            ticket.DispatchNotes =
+                                string.IsNullOrWhiteSpace(ticket.DispatchNotes)
+                                    ? blankStatusRepairAuditEntry
+                                    : ticket.DispatchNotes.Trim()
+                                      + Environment.NewLine
+                                      + Environment.NewLine
+                                      + blankStatusRepairAuditEntry;
+
+                            existingStatusChanged++;
+
+                            continue;
+                        }
+
                         existingKept++;
                         continue;
                     }

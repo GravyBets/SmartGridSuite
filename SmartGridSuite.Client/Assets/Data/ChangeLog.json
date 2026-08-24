@@ -1,5 +1,21 @@
 [
   {
+    "version": "3.1.0.4",
+    "date": "August 24, 2026",
+    "title": "Dispatch filtering, SAP review, and scrolling improvements",
+    "changes": [
+      "Updated Dispatch Tickets summary cards to reflect active date, technician, search, and quick filters.",
+      "Changed Dispatch Tickets default ordering to newest Created Date first.",
+      "Improved SAP Queue reconciliation to prevent blank ticket statuses and surface affected tickets as Needs Review.",
+      "Improved SAP Queue Import Preview horizontal scrolling and shortened reconciliation messages.",
+      "Added vertical scrolling to Truck Assignments while preserving the existing 3-by-3 truck card sizing.",
+      "Improved mouse-wheel scrolling over truck cards and assigned technician cards.",
+      "Improved Field Technician task details scrolling for long Dispatch Notes and Site Notes.",
+      "Added the associated TOP Radio A IP address to Site Dashboard write-up ping statistics."
+    ]
+  },
+
+  {
     "version": "3.1.0.3",
     "date": "August 19, 2026",
     "title": "Multi-crew assignments and SAP reconciliation",

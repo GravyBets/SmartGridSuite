@@ -606,17 +606,28 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private string AppendAssociatedTopToPingStats(string pingStats)
         {
-            var top = (TopAccessTitleTextBlock.Text ?? string.Empty).Trim();
+            var top =
+                (TopAccessTitleTextBlock.Text ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(top) ||
-                top.Equals("TOP Access", StringComparison.OrdinalIgnoreCase))
+                top.Equals(
+                    "TOP Access",
+                    StringComparison.OrdinalIgnoreCase))
             {
                 return pingStats;
             }
 
+            var radioAIp =
+                (TopIpATextBox.Text ?? string.Empty).Trim();
+
+            var associatedTop =
+                string.IsNullOrWhiteSpace(radioAIp)
+                    ? top
+                    : $"{top} ({radioAIp})";
+
             return pingStats.TrimEnd() +
-               Environment.NewLine +
-               $"Database says Associated TOP: {top}. Please update if incorrect.";
+                Environment.NewLine +
+                $"Database says Associated TOP: {associatedTop}. Please update if incorrect.";
         }
 
         private static string RemoveSpaceBeforeSnmpRatioSuffix(string? value)

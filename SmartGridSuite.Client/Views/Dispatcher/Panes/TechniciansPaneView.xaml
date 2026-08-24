@@ -9,6 +9,7 @@
     <UserControl.Resources>
 
         <local:LeadStarBrushConverter x:Key="LeadStarBrushConverter"/>
+        <local:TruckBoardRowHeightConverter x:Key="TruckBoardRowHeightConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
 
         <!-- Tech assigned to a truck card -->
@@ -176,7 +177,7 @@
     <Grid PreviewMouseDown="RootGrid_PreviewMouseDown">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -273,7 +274,7 @@
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="320"/>
-                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
@@ -359,18 +360,16 @@
 
             <!-- Truck board -->
             <Border x:Name="TruckBoardCard"
-        Grid.Column="2"
-        Style="{StaticResource Card}"
-        Padding="10">
+                    Grid.Column="2"
+                    Style="{StaticResource Card}"
+                    Padding="10">
 
                 <Grid ClipToBounds="True">
                     <Grid.RowDefinitions>
                         <!-- Header and buttons -->
                         <RowDefinition Height="Auto"/>
-
                         <!-- Spacing -->
-                        <RowDefinition Height="8"/>
-
+                        <RowDefinition Height="4"/>
                         <!-- Truck cards -->
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
@@ -384,131 +383,150 @@
 
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="Trucks"
-                           Style="{StaticResource SectionHeaderTextStyle}"/>
+                                       Style="{StaticResource SectionHeaderTextStyle}"/>
 
                             <TextBlock Text="Drag/drop technicians into trucks. Star sets Lead Tech."
-                           Margin="0,3,0,0"
-                           Style="{StaticResource PaneSubtitleTextStyle}"/>
+                                       Margin="0,3,0,0"
+                                       Style="{StaticResource PaneSubtitleTextStyle}"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1"
-                        Orientation="Horizontal"
-                        VerticalAlignment="Top"
-                        HorizontalAlignment="Right">
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Top"
+                                    HorizontalAlignment="Right">
 
                             <Button Content="Clear All"
-                        Height="32"
-                        MinWidth="90"
-                        Margin="0,0,8,0"
-                        IsEnabled="{Binding CanEditBoard}"
-                        Click="ClearAll_Click"/>
+                                    Height="32"
+                                    MinWidth="90"
+                                    Margin="0,0,4,0"
+                                    IsEnabled="{Binding CanEditBoard}"
+                                    Click="ClearAll_Click"/>
 
                             <Button Content="Set Home"
-                        Height="32"
-                        MinWidth="90"
-                        Margin="0,0,8,0"
-                        IsEnabled="{Binding CanEditBoard}"
-                        Click="SetHome_Click"/>
+                                    Height="32"
+                                    MinWidth="90"
+                                    Margin="0,0,4,0"
+                                    IsEnabled="{Binding CanEditBoard}"
+                                    Click="SetHome_Click"/>
 
                             <Button Content="Cancel"
-                        Height="32"
-                        MinWidth="90"
-                        Margin="0,0,8,0"
-                        IsEnabled="{Binding CanDiscardChanges}"
-                        Click="DiscardChanges_Click"/>
+                                    Height="32"
+                                    MinWidth="90"
+                                    Margin="0,0,4,0"
+                                    IsEnabled="{Binding CanDiscardChanges}"
+                                    Click="DiscardChanges_Click"/>
 
                             <Button Content="{Binding CommitButtonText}"
-                        Height="32"
-                        MinWidth="90"
-                        Style="{StaticResource PrimaryButtonStyle}"
-                        IsEnabled="{Binding CanCommitChanges}"
-                        Click="CommitChanges_Click"/>
+                                    Height="32"
+                                    MinWidth="90"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    IsEnabled="{Binding CanCommitChanges}"
+                                    Click="CommitChanges_Click"/>
                         </StackPanel>
                     </Grid>
-
+                    
                     <!-- Truck cards -->
-                    <ItemsControl Grid.Row="2"
-                      ItemsSource="{Binding Board.Trucks}"
-                      MinHeight="0"
-                      ClipToBounds="True">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <UniformGrid Rows="3"
-                                             Columns="3"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
+                    <ScrollViewer x:Name="TruckBoardScrollViewer"
+                                  Grid.Row="2"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  CanContentScroll="False"
+                                  PreviewMouseWheel="TruckBoardScrollViewer_PreviewMouseWheel">
 
-                        <ItemsControl.ItemContainerStyle>
-                            <Style TargetType="ContentPresenter">
-                                <Setter Property="HorizontalAlignment" Value="Stretch"/>
-                                <Setter Property="VerticalAlignment" Value="Stretch"/>
-                                <Setter Property="Margin" Value="0,0,8,8"/>
-                            </Style>
-                        </ItemsControl.ItemContainerStyle>
+                        <ItemsControl ItemsSource="{Binding Board.Trucks}"
+                                      MinHeight="0"
+                                      ClipToBounds="True">
 
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Style="{StaticResource TruckCardStyle}"
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="3"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="HorizontalAlignment"
+                                            Value="Stretch"/>
+
+                                    <Setter Property="VerticalAlignment"
+                                            Value="Stretch"/>
+
+                                    <Setter Property="Margin"
+                                            Value="0,0,8,8"/>
+
+                                    <Setter Property="Height">
+                                        <Setter.Value>
+                                            <Binding Path="ViewportHeight"
+                                                     RelativeSource="{RelativeSource AncestorType=ScrollViewer}"
+                                                     Converter="{StaticResource TruckBoardRowHeightConverter}"/>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
+
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource TruckCardStyle}"
                                         HorizontalAlignment="Stretch"
                                         VerticalAlignment="Stretch"
                                         AllowDrop="True"
                                         Tag="{Binding}"
                                         DragOver="TruckCard_DragOver"
                                         Drop="TruckCard_Drop">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="8"/>
-                                            <RowDefinition Height="*"/>
-                                        </Grid.RowDefinitions>
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="8"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
 
-                                        <!-- Truck header -->
-                                        <Grid Grid.Row="0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
+                                            <!-- Truck header -->
+                                            <Grid Grid.Row="0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
 
-                                            <!-- Left: truck number/style -->
-                                            <StackPanel Grid.Column="0">
-                                                <TextBlock FontSize="17"
+                                                <!-- Left: truck number/style -->
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock FontSize="17"
                                                            FontWeight="Bold"
                                                            Foreground="{DynamicResource TextPrimary}">
                                                     <Run Text="Truck "/>
                                                     <Run Text="{Binding Truck.TruckNumber}"/>
-                                                </TextBlock>
+                                                    </TextBlock>
 
-                                                <TextBlock Text="{Binding Truck.TruckStyleName}"
+                                                    <TextBlock Text="{Binding Truck.TruckStyleName}"
                                                            Margin="0,-2,0,0"
                                                            TextWrapping="Wrap"
                                                            Foreground="{DynamicResource TextSecondary}"/>
-                                            </StackPanel>
+                                                </StackPanel>
 
-                                            <!-- Right: count + lead -->
-                                            <StackPanel Grid.Column="1"
+                                                <!-- Right: count + lead -->
+                                                <StackPanel Grid.Column="1"
                                                         Margin="12,2,0,0"
                                                         HorizontalAlignment="Right"
                                                         VerticalAlignment="Top">
 
-                                                <TextBlock Text="{Binding Technicians.Count, StringFormat={}{0} techs}"
+                                                    <TextBlock Text="{Binding Technicians.Count, StringFormat={}{0} techs}"
                                                            FontSize="12"
                                                            Foreground="{DynamicResource TextSecondary}"
                                                            HorizontalAlignment="Right"
                                                            TextAlignment="Right"/>
 
-                                                <TextBlock Text="{Binding LeadText}"
+                                                    <TextBlock Text="{Binding LeadText}"
                                                            Margin="0,3,0,0"
                                                            FontSize="12"
                                                            FontWeight="SemiBold"
                                                            Foreground="{DynamicResource TextSecondary}"
                                                            HorizontalAlignment="Right"
                                                            TextAlignment="Right"/>
-                                            </StackPanel>
-                                        </Grid>
+                                                </StackPanel>
+                                            </Grid>
 
-                                        <!-- Assigned techs -->
-                                        <Grid Grid.Row="2">
-                                            <ListBox ItemsSource="{Binding Technicians}"
+                                            <!-- Assigned techs -->
+                                            <Grid Grid.Row="2">
+                                                <ListBox ItemsSource="{Binding Technicians}"
                                                      ItemTemplate="{StaticResource AssignedTechnicianTemplate}"
                                                      ItemContainerStyle="{StaticResource BoardListBoxItemStyle}"
                                                      Style="{StaticResource BoardListBoxStyle}"
@@ -516,29 +534,30 @@
                                                      PreviewMouseLeftButtonDown="TechCardList_PreviewMouseLeftButtonDown"
                                                      PreviewMouseMove="TechCardList_PreviewMouseMove"/>
 
-                                            <TextBlock Text="No technicians assigned yet."
+                                                <TextBlock Text="No technicians assigned yet."
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
                                                        Foreground="{DynamicResource TextSecondary}"
                                                        FontStyle="Italic"
                                                        IsHitTestVisible="False">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Technicians.Count}" Value="0">
-                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Technicians.Count}" Value="0">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Grid>
                                         </Grid>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
 
                     <!-- Commit overlay -->
                     <Border Grid.RowSpan="3"

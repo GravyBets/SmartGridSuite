@@ -1220,6 +1220,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 ? new List<int> { singleId }
                 : new List<int>();
         }
+
+        private void TruckBoardScrollViewer_PreviewMouseWheel(
+            object sender,
+            MouseWheelEventArgs e)
+        {
+            if (sender is not ScrollViewer scrollViewer)
+                return;
+
+            scrollViewer.ScrollToVerticalOffset(
+                scrollViewer.VerticalOffset - e.Delta);
+
+            e.Handled = true;
+        }
     }
 
     public sealed class TruckBoardVm
@@ -1375,6 +1388,41 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return parsed;
 
             return null;
+        }
+    }
+
+    public sealed class TruckBoardRowHeightConverter : IValueConverter
+    {
+        public object Convert(
+            object value,
+            Type targetType,
+            object parameter,
+            CultureInfo culture)
+        {
+            if (value is not double viewportHeight ||
+                viewportHeight <= 0)
+            {
+                return 1.0;
+            }
+
+            /*
+             * The board historically shows exactly three equal-height rows.
+             *
+             * Each ContentPresenter also has an 8px bottom margin,
+             * so subtract that from the usable card height.
+             */
+            return Math.Max(
+                1.0,
+                (viewportHeight / 3.0) - 8.0);
+        }
+
+        public object ConvertBack(
+            object value,
+            Type targetType,
+            object parameter,
+            CultureInfo culture)
+        {
+            return Binding.DoNothing;
         }
     }
 }

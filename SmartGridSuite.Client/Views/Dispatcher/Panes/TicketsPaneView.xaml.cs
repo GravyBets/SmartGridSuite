@@ -623,7 +623,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 _filtersInitialized = true;
 
-                await LoadSummaryFromApiAsync();
                 await LoadTicketsFromApiAsync();
 
                 _hasLoadedOnce = true;
@@ -724,7 +723,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 var req = BuildTicketQueryRequest();
 
-                var response = await _ticketsApi.QueryTicketsAsync(req, queryCt);
+                /*
+                 * Load the ticket page and its matching summary together.
+                 *
+                 * The API intentionally ignores the Status checkbox selection
+                 * when calculating the summary, while still honoring the other
+                 * active filters such as date, technician, search, and quick filter.
+                 */
+                var ticketsTask =
+                    _ticketsApi.QueryTicketsAsync(
+                        req,
+                        queryCt);
+
+                var summaryTask =
+                    _ticketsApi.QuerySummaryAsync(
+                        req,
+                        queryCt);
+
+                await Task.WhenAll(
+                    ticketsTask,
+                    summaryTask);
+
+                var response =
+                    await ticketsTask;
+
+                var summary =
+                    await summaryTask;
 
                 /*
                  * A delete, status change, or filter change could leave the current page
@@ -770,6 +794,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 _totalMatchingTicketCount =
                     response.TotalCount;
+
+                SummaryStatuses.Clear();
+
+                foreach (var status in summary.Statuses
+                             .OrderBy(x => x.SortOrder)
+                             .ThenBy(x => x.Status))
+                {
+                    SummaryStatuses.Add(
+                        status);
+                }
 
                 RefreshTicketPagingBindings();
 
@@ -1262,8 +1296,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 await LoadStatusOptionsFromApiAsync(
                     preserveSelections: true);
 
-                await LoadSummaryFromApiAsync();
-                await LoadTicketsFromApiAsync();
+                await LoadTicketsFromApiAsync(
+                    resetPage: true);
             }
             finally
             {

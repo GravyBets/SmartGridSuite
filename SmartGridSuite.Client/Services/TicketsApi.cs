@@ -79,6 +79,19 @@ namespace SmartGridSuite.Client.Services
                    ?? new TicketSummaryDto();
         }
 
+        public async Task<TicketSummaryDto> QuerySummaryAsync(
+            TicketQueryRequest req,
+            CancellationToken ct = default)
+        {
+            return await _api.PostAsync<
+                       TicketQueryRequest,
+                       TicketSummaryDto>(
+                           "api/tickets/summary/query",
+                           req,
+                           ct)
+                   ?? new TicketSummaryDto();
+        }
+
         public async Task<TicketQueryResponse> QueryTicketsAsync(TicketQueryRequest req, CancellationToken ct = default)
         {
             return await _api.PostAsync<TicketQueryRequest, TicketQueryResponse>(
