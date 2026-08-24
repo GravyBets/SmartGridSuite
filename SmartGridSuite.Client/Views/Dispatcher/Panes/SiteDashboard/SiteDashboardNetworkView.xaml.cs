@@ -1393,17 +1393,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     IgsdSecondaryRtuIpTextBox.Text);
             }
 
-            if (TryAddPingWriteUpBlock(
-                    lines,
-                    SecondaryPingLabel,
-                    SecondaryIpTextBox.Text,
-                    SecondarySummaryTextBlock.Text))
-            {
-                hasAnyPingStats = true;
-
-                AddReferenceIpLine(lines, "Secondary Comms Eth IP", IgsdSecondaryCommsEthernetIpTextBox.Text);
-                AddReferenceIpLine(lines, "Secondary RTU IP", IgsdSecondaryRtuIpTextBox.Text);
-            }
+            
 
             return hasAnyPingStats
                 ? string.Join(Environment.NewLine, lines)
