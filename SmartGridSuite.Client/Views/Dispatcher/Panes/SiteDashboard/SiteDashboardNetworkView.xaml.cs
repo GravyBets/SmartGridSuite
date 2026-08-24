@@ -20,6 +20,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private bool? _secondaryTestSuccessful;
 
         public bool IsIgsdMode { get; set; }
+        public bool IsDacsMode { get; set; }
 
         public SiteDashboardNetworkView()
         {
@@ -33,26 +34,91 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         {
             if (IsIgsdMode)
             {
-                LanSectionBorder.Visibility = Visibility.Collapsed;
-                PrimaryRtuReferenceSectionBorder.Visibility = Visibility.Visible;
-                SecondaryReferenceSectionBorder.Visibility = Visibility.Visible;
+                LanSectionBorder.Visibility =
+                    Visibility.Collapsed;
 
-                PrimarySectionRow.Height = new GridLength(1, GridUnitType.Star);
-                MiddleSectionRow.Height = GridLength.Auto;
-                SecondarySectionRow.Height = new GridLength(1, GridUnitType.Star);
-                BottomReferenceRow.Height = GridLength.Auto;
+                PrimaryRtuReferenceSectionBorder.Visibility =
+                    Visibility.Visible;
+
+                SecondaryReferenceSectionBorder.Visibility =
+                    Visibility.Visible;
+
+                DacsRtuReferenceSectionBorder.Visibility =
+                    Visibility.Collapsed;
+
+                PrimarySectionRow.Height =
+                    new GridLength(1, GridUnitType.Star);
+
+                MiddleSectionRow.Height =
+                    GridLength.Auto;
+
+                SecondarySectionRow.Height =
+                    new GridLength(1, GridUnitType.Star);
+
+                BottomReferenceRow.Height =
+                    GridLength.Auto;
+
+                return;
             }
-            else
+
+            if (IsDacsMode)
             {
-                LanSectionBorder.Visibility = Visibility.Visible;
-                PrimaryRtuReferenceSectionBorder.Visibility = Visibility.Collapsed;
-                SecondaryReferenceSectionBorder.Visibility = Visibility.Collapsed;
+                /*
+                 * DACS:
+                 * Primary = pingable
+                 * Gateway = pingable
+                 * RTU = reference only
+                 */
+                LanSectionBorder.Visibility =
+                    Visibility.Visible;
 
-                PrimarySectionRow.Height = new GridLength(1, GridUnitType.Star);
-                MiddleSectionRow.Height = new GridLength(1, GridUnitType.Star);
-                SecondarySectionRow.Height = new GridLength(1, GridUnitType.Star);
-                BottomReferenceRow.Height = new GridLength(0);
+                PrimaryRtuReferenceSectionBorder.Visibility =
+                    Visibility.Collapsed;
+
+                SecondaryReferenceSectionBorder.Visibility =
+                    Visibility.Collapsed;
+
+                DacsRtuReferenceSectionBorder.Visibility =
+                    Visibility.Visible;
+
+                PrimarySectionRow.Height =
+                    new GridLength(1, GridUnitType.Star);
+
+                MiddleSectionRow.Height =
+                    new GridLength(1, GridUnitType.Star);
+
+                SecondarySectionRow.Height =
+                    new GridLength(0);
+
+                BottomReferenceRow.Height =
+                    GridLength.Auto;
+
+                return;
             }
+
+            LanSectionBorder.Visibility =
+                Visibility.Visible;
+
+            PrimaryRtuReferenceSectionBorder.Visibility =
+                Visibility.Collapsed;
+
+            SecondaryReferenceSectionBorder.Visibility =
+                Visibility.Collapsed;
+
+            DacsRtuReferenceSectionBorder.Visibility =
+                Visibility.Collapsed;
+
+            PrimarySectionRow.Height =
+                new GridLength(1, GridUnitType.Star);
+
+            MiddleSectionRow.Height =
+                new GridLength(1, GridUnitType.Star);
+
+            SecondarySectionRow.Height =
+                new GridLength(1, GridUnitType.Star);
+
+            BottomReferenceRow.Height =
+                new GridLength(0);
         }
 
         public string SiteHeader
@@ -120,6 +186,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public void ResetDisplay()
         {
             IsIgsdMode = false;
+            IsDacsMode = false;
 
             PrimaryPingLabel =
                 "Primary";
@@ -585,60 +652,61 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
         }
 
-        private async void PingAllButton_Click(object sender, RoutedEventArgs e)
+        private async void PingAllButton_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             var ownerState =
                 _pingState;
 
-            if (IsAnyPingRunning(
-                    ownerState))
+            if (IsAnyPingRunning(ownerState))
             {
-                StopPingSession(
-                    ownerState);
-
+                StopPingSession(ownerState);
                 return;
             }
 
             GetPingSessionState();
 
             ownerState.Primary.Ip =
-                SnapshotIp(
-                    PrimaryIp);
+                SnapshotIp(PrimaryIp);
 
             ownerState.Lan.Ip =
-                SnapshotIp(
-                    LanIp);
+                SnapshotIp(LanIp);
 
             ownerState.Secondary.Ip =
-                SnapshotIp(
-                    SecondaryIp);
-
-            var includeLan =
-                !IsIgsdMode;
+                SnapshotIp(SecondaryIp);
 
             var tasks =
                 new List<Task>
                 {
             RunSinglePingAsync(
                 ownerState,
-                ownerState.Primary),
-
-            RunSinglePingAsync(
-                ownerState,
-                ownerState.Secondary)
+                ownerState.Primary)
                 };
 
-            if (includeLan)
+            /*
+             * IG does not use the normal LAN target.
+             */
+            if (!IsIgsdMode)
             {
-                tasks.Insert(
-                    1,
+                tasks.Add(
                     RunSinglePingAsync(
                         ownerState,
                         ownerState.Lan));
             }
 
-            await Task.WhenAll(
-                tasks);
+            /*
+             * DACS RTU IP is reference-only and cannot be pinged.
+             */
+            if (!IsDacsMode)
+            {
+                tasks.Add(
+                    RunSinglePingAsync(
+                        ownerState,
+                        ownerState.Secondary));
+            }
+
+            await Task.WhenAll(tasks);
         }
 
         private void ClearAllButton_Click(object sender, RoutedEventArgs e)
@@ -1294,7 +1362,35 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                         LanSummaryTextBlock.Text))
                 {
                     hasAnyPingStats = true;
+
+                    if (IsDacsMode)
+                    {
+                        AddReferenceIpLine(
+                            lines,
+                            "RTU IP",
+                            SecondaryIpTextBox.Text);
+                    }
                 }
+            }
+
+            if (!IsDacsMode &&
+                TryAddPingWriteUpBlock(
+                    lines,
+                    SecondaryPingLabel,
+                    SecondaryIpTextBox.Text,
+                    SecondarySummaryTextBlock.Text))
+            {
+                hasAnyPingStats = true;
+
+                AddReferenceIpLine(
+                    lines,
+                    "Secondary Comms Eth IP",
+                    IgsdSecondaryCommsEthernetIpTextBox.Text);
+
+                AddReferenceIpLine(
+                    lines,
+                    "Secondary RTU IP",
+                    IgsdSecondaryRtuIpTextBox.Text);
             }
 
             if (TryAddPingWriteUpBlock(
@@ -1359,17 +1455,42 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         public Task RunQuickReachabilityTestForAllAsync()
         {
+            if (IsDacsMode)
+            {
+                return Task.WhenAll(
+                    RunQuickReachabilityTestAsync(
+                        PrimaryIpTextBox,
+                        PrimarySummaryTextBlock),
+
+                    RunQuickReachabilityTestAsync(
+                        LanIpTextBox,
+                        LanSummaryTextBlock));
+            }
+
             if (IsIgsdMode)
             {
                 return Task.WhenAll(
-                    RunQuickReachabilityTestAsync(PrimaryIpTextBox, PrimarySummaryTextBlock),
-                    RunQuickReachabilityTestAsync(SecondaryIpTextBox, SecondarySummaryTextBlock));
+                    RunQuickReachabilityTestAsync(
+                        PrimaryIpTextBox,
+                        PrimarySummaryTextBlock),
+
+                    RunQuickReachabilityTestAsync(
+                        SecondaryIpTextBox,
+                        SecondarySummaryTextBlock));
             }
 
             return Task.WhenAll(
-                RunQuickReachabilityTestAsync(PrimaryIpTextBox, PrimarySummaryTextBlock),
-                RunQuickReachabilityTestAsync(LanIpTextBox, LanSummaryTextBlock),
-                RunQuickReachabilityTestAsync(SecondaryIpTextBox, SecondarySummaryTextBlock));
+                RunQuickReachabilityTestAsync(
+                    PrimaryIpTextBox,
+                    PrimarySummaryTextBlock),
+
+                RunQuickReachabilityTestAsync(
+                    LanIpTextBox,
+                    LanSummaryTextBlock),
+
+                RunQuickReachabilityTestAsync(
+                    SecondaryIpTextBox,
+                    SecondarySummaryTextBlock));
         }
 
         private async void TestAllButton_Click(object sender, RoutedEventArgs e)

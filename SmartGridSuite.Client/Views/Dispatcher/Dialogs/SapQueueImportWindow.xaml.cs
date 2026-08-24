@@ -331,7 +331,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
                 PreviewRows.Clear();
 
-                foreach (var row in preview.OrderBy(r => r.RowNumber))
+                foreach (var row in preview
+                     .OrderByDescending(r => r.RequiresReview)
+                     .ThenBy(r => r.RowNumber))
                 {
                     var displayRow =
                         new SapQueuePreviewDisplayRow

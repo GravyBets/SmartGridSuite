@@ -1,5 +1,18 @@
 [
   {
+    "version": "3.1.0.5",
+    "date": "August 24, 2026",
+    "title": "DACS network and SAP reconciliation fixes",
+    "changes": [
+      "Changed DACS RTU IP to a reference-only field because the RTU address is not directly pingable.",
+      "Removed DACS RTU from Ping All, Test All, and ping-stat testing.",
+      "Fixed SAP Queue Import status controls displaying stale values after scrolling.",
+      "Hidden New Status controls when no dispatcher status selection is required.",
+      "Moved SAP reconciliation rows requiring review or action to the top of the Import Preview."
+    ]
+  },
+
+  {
     "version": "3.1.0.4",
     "date": "August 24, 2026",
     "title": "Dispatch filtering, SAP review, and scrolling improvements",

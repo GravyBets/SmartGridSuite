@@ -186,7 +186,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     SiteDashboardKinds.Igsd,
                     StringComparison.OrdinalIgnoreCase);
 
-                NetworkView.IsIgsdMode = isIgsd;
+                var isDacs = string.Equals(
+                    session.DashboardKind,
+                    SiteDashboardKinds.Dacs,
+                    StringComparison.OrdinalIgnoreCase);
+
+                NetworkView.IsIgsdMode =
+                    isIgsd;
+
+                NetworkView.IsDacsMode =
+                    isDacs;
 
                 NetworkView.PrimaryIp = session.PrimaryIp;
                 NetworkView.LanIp = session.LanIp;
