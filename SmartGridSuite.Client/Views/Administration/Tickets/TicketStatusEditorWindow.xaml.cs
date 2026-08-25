@@ -18,8 +18,7 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
         public bool IncludeInSummary => IncludeInSummaryCheckBox.IsChecked == true;
         public bool SendToDispatchTasks => SendToDispatchTasksCheckBox.IsChecked == true;
         public bool IsWriteUpSubmitTarget => IsWriteUpSubmitTargetCheckBox.IsChecked == true;
-        public bool IsAssignmentPublishTarget => IsAssignmentPublishTargetCheckBox.IsChecked == true;
-        public bool IsUnassignmentTarget => IsUnassignmentTargetCheckBox.IsChecked == true;
+
         private const int StatusNameMaxLength = 100;
 
         public TicketStatusEditorWindow()
@@ -48,8 +47,6 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
             IncludeInSummaryCheckBox.IsChecked = existing.IncludeInSummary;
             SendToDispatchTasksCheckBox.IsChecked = existing.SendToDispatchTasks;
             IsWriteUpSubmitTargetCheckBox.IsChecked = existing.IsWriteUpSubmitTarget;
-            IsAssignmentPublishTargetCheckBox.IsChecked = existing.IsAssignmentPublishTarget;
-            IsUnassignmentTargetCheckBox.IsChecked = existing.IsUnassignmentTarget;
 
             ApplySystemRequiredProtection();
         }
@@ -59,9 +56,6 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
             var clean = (statusName ?? "").Trim();
 
             return clean.Equals("Open", StringComparison.OrdinalIgnoreCase)
-                || clean.Equals("Assigned", StringComparison.OrdinalIgnoreCase)
-                || clean.Equals("In Progress", StringComparison.OrdinalIgnoreCase)
-                || clean.Equals("Waiting Dispatch", StringComparison.OrdinalIgnoreCase)
                 || clean.Equals("Needs Review", StringComparison.OrdinalIgnoreCase)
                 || clean.Equals("Closed", StringComparison.OrdinalIgnoreCase);
         }
@@ -104,13 +98,10 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
                 return;
             }
 
-            if (!StatusIsActive &&
-                (IsWriteUpSubmitTarget ||
-                 IsAssignmentPublishTarget ||
-                 IsUnassignmentTarget))
+            if (!StatusIsActive && IsWriteUpSubmitTarget)
             {
                 MessageBox.Show(
-                    "A status must be active before it can be selected as a workflow target.",
+                    "A status must be active before it can be selected as the Write-Up Target.",
                     "Validation",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);

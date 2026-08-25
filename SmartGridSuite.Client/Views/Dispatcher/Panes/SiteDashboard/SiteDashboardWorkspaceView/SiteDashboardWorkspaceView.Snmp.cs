@@ -138,36 +138,88 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private void ApplySnmpTargetChoices(List<SnmpTargetChoice> targets, string? targetIp)
         {
-            var cleanTargetIp = (targetIp ?? string.Empty).Trim();
+            var cleanTargetIp =
+                (targetIp ?? string.Empty).Trim();
+
+            /*
+             * Preserve the logical selection (Primary / LAN / Secondary)
+             * before rebuilding the choices.
+             *
+             * This is more important than preserving the old IP string because
+             * NetworkView may now contain a manually edited IP for that target.
+             */
+            var selectedKey =
+                (SnmpTargetComboBox.SelectedItem as SnmpTargetChoice)?
+                .Key?
+                .Trim();
 
             _syncingSnmpTargetCombo = true;
 
             SnmpTargetComboBox.ItemsSource = null;
-            SnmpTargetComboBox.DisplayMemberPath = nameof(SnmpTargetChoice.DisplayLabel);
-            SnmpTargetComboBox.SelectedValuePath = nameof(SnmpTargetChoice.Key);
-            SnmpTargetComboBox.ItemsSource = targets;
+            SnmpTargetComboBox.DisplayMemberPath =
+                nameof(SnmpTargetChoice.DisplayLabel);
 
-            SnmpTargetChoice? selected = null;
+            SnmpTargetComboBox.SelectedValuePath =
+                nameof(SnmpTargetChoice.Key);
 
-            if (!string.IsNullOrWhiteSpace(cleanTargetIp))
+            SnmpTargetComboBox.ItemsSource =
+                targets;
+
+            SnmpTargetChoice? selected =
+                null;
+
+            /*
+             * First preserve Primary / LAN / Secondary if one was selected.
+             */
+            if (!string.IsNullOrWhiteSpace(selectedKey))
             {
-                selected = targets.FirstOrDefault(x =>
-                    !string.IsNullOrWhiteSpace(x.IpAddress) &&
-                    string.Equals(x.IpAddress, cleanTargetIp, StringComparison.OrdinalIgnoreCase));
-            }
-            else
-            {
-                selected = targets.FirstOrDefault(x =>
-                    !string.IsNullOrWhiteSpace(x.IpAddress));
+                selected =
+                    targets.FirstOrDefault(x =>
+                        string.Equals(
+                            x.Key,
+                            selectedKey,
+                            StringComparison.OrdinalIgnoreCase));
             }
 
-            SnmpTargetComboBox.SelectedItem = selected;
+            /*
+             * Otherwise try to identify the selection from the current target IP.
+             */
+            if (selected is null &&
+                !string.IsNullOrWhiteSpace(cleanTargetIp))
+            {
+                selected =
+                    targets.FirstOrDefault(x =>
+                        !string.IsNullOrWhiteSpace(x.IpAddress) &&
+                        string.Equals(
+                            x.IpAddress,
+                            cleanTargetIp,
+                            StringComparison.OrdinalIgnoreCase));
+            }
+
+            /*
+             * Only default to the first available target when there is no
+             * existing/manual target IP to preserve.
+             */
+            if (selected is null &&
+                string.IsNullOrWhiteSpace(cleanTargetIp))
+            {
+                selected =
+                    targets.FirstOrDefault(x =>
+                        !string.IsNullOrWhiteSpace(x.IpAddress));
+            }
+
+            SnmpTargetComboBox.SelectedItem =
+                selected;
 
             _syncingSnmpTargetCombo = false;
 
-            SnmpTargetTextBox.Text = !string.IsNullOrWhiteSpace(cleanTargetIp)
-                ? cleanTargetIp
-                : selected?.IpAddress ?? string.Empty;
+            /*
+             * If Primary/LAN/Secondary is selected, its CURRENT IP wins.
+             * Otherwise preserve a manually entered SNMP target.
+             */
+            SnmpTargetTextBox.Text =
+                selected?.IpAddress ??
+                cleanTargetIp;
         }
 
         public void SetSnmpProfiles(IEnumerable<SnmpProfileListItemDto> profiles, ulong? selectedProfileId)

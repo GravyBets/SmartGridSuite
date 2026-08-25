@@ -21,9 +21,5 @@
         public bool IncludeInSummary { get; set; } = true;
 
         public bool IsWriteUpSubmitTarget { get; set; }
-
-        public bool IsAssignmentPublishTarget { get; set; }
-
-        public bool IsUnassignmentTarget { get; set; }
     }
 }

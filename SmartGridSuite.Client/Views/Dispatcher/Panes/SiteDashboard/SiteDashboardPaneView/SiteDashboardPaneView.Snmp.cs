@@ -9,25 +9,84 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
     {
         private readonly LocalSnmpService _localSnmpService = new();
 
-        private async void WorkspaceView_RefreshSnmpRequested(object? sender, EventArgs e)
+        private void NetworkView_NetworkTestRequested(
+            object? sender,
+            EventArgs e)
         {
-            var session = GetSelectedSession();
+            var session =
+                GetSelectedSession();
+
+            if (session is null)
+                return;
+
+            SyncLiveNetworkIpsToSnmp(
+                session);
+        }
+
+        private void SyncLiveNetworkIpsToSnmp(
+            SiteDashboardTabSession session)
+        {
+            /*
+             * NetworkView contains the technician's current/manual IP values.
+             *
+             * Do NOT copy these into session.PrimaryIp / LanIp / SecondaryIp.
+             * Those session values remain the originally loaded values so the
+             * write-up can still detect and report IP changes.
+             */
+            WorkspaceView.SetSnmpContext(
+                session.SnmpSupported,
+                session.SnmpSupportMessage,
+                session.SnmpDeviceFamily,
+                session.SnmpProfileName,
+                NetworkView.PrimaryIp,
+                NetworkView.LanIp,
+                NetworkView.SecondaryIp,
+                session.SnmpTargetIp);
+
+            /*
+             * After rebuilding the choices, capture the effective target so
+             * subsequent SNMP operations use the newly selected/manual IP.
+             */
+            session.SnmpTargetIp =
+                WorkspaceView.GetSnmpTargetIp();
+        }
+
+        private async void WorkspaceView_RefreshSnmpRequested(
+            object? sender,
+            EventArgs e)
+        {
+            var session =
+                GetSelectedSession();
+
             if (session is null)
                 return;
 
             try
             {
-                TopBarView.StatusText = "Refreshing SNMP configuration...";
-                await RefreshSnmpConfigAsync(session, CancellationToken.None);
+                /*
+                 * Pull any manually edited NetworkView IPs into the SNMP target
+                 * choices before refreshing the profile/configuration.
+                 */
+                SyncLiveNetworkIpsToSnmp(
+                    session);
+
+                TopBarView.StatusText =
+                    "Refreshing SNMP configuration...";
+
+                await RefreshSnmpConfigAsync(
+                    session,
+                    CancellationToken.None);
 
                 if (session.SessionKey == _selectedSessionKey)
                     RenderSnmpOnly(session);
 
-                TopBarView.StatusText = "SNMP configuration refreshed.";
+                TopBarView.StatusText =
+                    "SNMP configuration refreshed.";
             }
             catch (Exception ex)
             {
-                TopBarView.StatusText = $"SNMP configuration refresh failed: {ex.Message}";
+                TopBarView.StatusText =
+                    $"SNMP configuration refresh failed: {ex.Message}";
             }
         }
 
@@ -715,14 +774,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         //Handler to fix the "Refresh SNMP Config" button refreshing the WHOLE dashboard
         private void RenderSnmpOnly(SiteDashboardTabSession session)
         {
+            var useLiveNetworkIps = session.SessionKey == _selectedSessionKey;
+
             WorkspaceView.SetSnmpContext(
                 session.SnmpSupported,
                 session.SnmpSupportMessage,
                 session.SnmpDeviceFamily,
                 session.SnmpProfileName,
-                session.PrimaryIp,
-                session.LanIp,
-                session.SecondaryIp,
+                useLiveNetworkIps
+                    ? NetworkView.PrimaryIp
+                    : session.PrimaryIp,
+                useLiveNetworkIps
+                    ? NetworkView.LanIp
+                    : session.LanIp,
+                useLiveNetworkIps
+                    ? NetworkView.SecondaryIp
+                    : session.SecondaryIp,
                 session.SnmpTargetIp);
 
             WorkspaceView.SetSnmpProfiles(session.SnmpProfiles, session.SnmpProfileId);

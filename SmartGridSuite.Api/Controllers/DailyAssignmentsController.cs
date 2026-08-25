@@ -1033,6 +1033,58 @@ namespace SmartGridSuite.Api.Controllers
                     removedBy;
             }
 
+            /*
+             * Removing a ticket from Daily Assignments must also keep the
+             * ticket's assignment display in sync.
+             *
+             * Only clear AssignedTech / AssignedCrewId when the ticket has
+             * no other active Daily Assignment rows remaining.
+             *
+             * Ticket Status is intentionally left unchanged.
+             */
+            var removedAssignmentIds =
+                assignments
+                    .Select(x => x.Id)
+                    .ToList();
+
+            var stillAssignedTicketIds =
+                await _db.DailyTicketAssignments
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.AssignmentDate == workDate &&
+                        x.AssignmentStatus == AssignmentStatusActive &&
+                        removedTicketIds.Contains(x.TicketId) &&
+                        !removedAssignmentIds.Contains(x.Id))
+                    .Select(x => x.TicketId)
+                    .Distinct()
+                    .ToListAsync(ct);
+
+            var nowUnassignedTicketIds =
+                removedTicketIds
+                    .Except(stillAssignedTicketIds)
+                    .ToList();
+
+            if (nowUnassignedTicketIds.Count > 0)
+            {
+                var ticketsNowUnassigned =
+                    await _db.Tickets
+                        .Where(x =>
+                            nowUnassignedTicketIds.Contains(x.Id))
+                        .ToListAsync(ct);
+
+                foreach (var ticket in ticketsNowUnassigned)
+                {
+                    ticket.AssignedTech =
+                        "(Unassigned)";
+
+                    ticket.AssignedCrewId =
+                        null;
+
+                    ticket.LastActivityAt =
+                        now;
+                }
+            }
+
             await _db.SaveChangesAsync(ct);
 
             return Ok(
@@ -1752,11 +1804,6 @@ namespace SmartGridSuite.Api.Controllers
                 .Select(x => x.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            var assignmentTargetStatuses = statusRows
-                .Where(x => x.IsAssignmentPublishTarget)
-                .Select(x => x.Name)
-                .ToList();
-
             /*
              * Technician route ownership is by TechnicianId only.
              * TruckId is current crew/display context and must not split the route.
@@ -1784,15 +1831,6 @@ namespace SmartGridSuite.Api.Controllers
                 .Select(x => x.TicketId)
                 .Distinct()
                 .ToList();
-
-            if (currentTicketIds.Count > 0 && assignmentTargetStatuses.Count != 1)
-            {
-                return BadRequest(
-                    "Exactly one active ticket status must be configured as the Assignment Target. " +
-                    "Go to Administration > Tickets and select the status used when Daily Assignments are published.");
-            }
-
-            var assignmentTargetStatusName = assignmentTargetStatuses.SingleOrDefault();
 
             /*
              * Look up the previous active route snapshot for this target using the same
@@ -1909,20 +1947,6 @@ namespace SmartGridSuite.Api.Controllers
                 .Where(id => !protectedStatusNames.Contains(ticketsById[id].Status ?? ""))
                 .ToList();
 
-            var unassignmentTargetStatuses = statusRows
-                .Where(x => x.IsUnassignmentTarget)
-                .Select(x => x.Name)
-                .ToList();
-
-            if (ticketsToUnassign.Count > 0 && unassignmentTargetStatuses.Count != 1)
-            {
-                return BadRequest(
-                    "Exactly one active ticket status must be configured as the Unassignment Target. " +
-                    "Go to Administration > Tickets and select the status used when a published ticket becomes unassigned.");
-            }
-
-            var unassignmentTargetStatusName = unassignmentTargetStatuses.SingleOrDefault();
-
             /*
              * Load display context for published assignments.
              * Technician targets with TruckId use crew names for Assigned To.
@@ -2020,13 +2044,11 @@ namespace SmartGridSuite.Api.Controllers
                 var ticket = ticketsById[assignment.TicketId];
 
                 /*
-                 * Do not push a completed/closed ticket back into Assigned just
-                 * because its work list is republished.
+                 * Publishing a Daily Assignment changes assignment ownership only.
+                 * Ticket status is independent from technician/crew assignment.
                  */
                 if (!protectedStatusNames.Contains(ticket.Status ?? ""))
                 {
-                    ticket.Status = assignmentTargetStatusName!;
-
                     ticket.AssignedTech = BuildPublishedAssignedTechText(
                         assignment,
                         trucksById,
@@ -2069,7 +2091,6 @@ namespace SmartGridSuite.Api.Controllers
             {
                 var ticket = ticketsById[ticketId];
 
-                ticket.Status = unassignmentTargetStatusName!;
                 ticket.AssignedTech = "(Unassigned)";
                 ticket.AssignedCrewId = null;
                 ticket.LastActivityAt = now;

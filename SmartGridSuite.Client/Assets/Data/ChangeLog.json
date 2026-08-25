@@ -1,5 +1,18 @@
 [
   {
+    "version": "3.1.0.6",
+    "date": "August 25, 2026",
+    "title": "Daily Assignment workflow and SNMP synchronization hotfix",
+    "changes": [
+      "Changed Daily Assignments so publishing or removing technician and crew assignments no longer changes ticket workflow status.",
+      "Removed obsolete Assigned, In Progress, and Waiting Dispatch ticket-status workflow dependencies.",
+      "Fixed Daily Assignment removal so ticket assignment fields are cleared when no active assignment remains.",
+      "Improved write-up participant resolution so current crew members are included even when crew assignments change after Field Technician is opened.",
+      "Updated SNMP target IP synchronization so manually edited Network View IP addresses are used by the matching SNMP target after Test or Refresh SNMP Config."
+    ]
+  },
+
+  {
     "version": "3.1.0.5",
     "date": "August 24, 2026",
     "title": "DACS network and SAP reconciliation fixes",

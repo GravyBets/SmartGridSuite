@@ -19,6 +19,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private bool? _lanTestSuccessful;
         private bool? _secondaryTestSuccessful;
 
+        public event EventHandler? NetworkTestRequested;
+
         public bool IsIgsdMode { get; set; }
         public bool IsDacsMode { get; set; }
 
@@ -1031,14 +1033,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             set => IgsdSecondaryRtuIpTextBox.Text = NormalizeDisplay(value);
         }
 
-        private int? ParsePingCount()
-        {
-            return ParsePingCount(
-                PingCountTextBox.Text);
-        }
-
-        private static int? ParsePingCount(
-            string? rawValue)
+        private static int? ParsePingCount(string? rawValue)
         {
             var raw =
                 rawValue?.Trim();
@@ -1110,12 +1105,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             return value < 999999;
         }
 
-        private void StopAllPings()
-        {
-            StopPingSession(
-                _pingState);
-        }
-
         public void StopPingSession(
             NetworkPingSessionState? state)
         {
@@ -1179,16 +1168,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private static string NormalizeDisplay(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
-        }
-
-        private static void AppendResult(TextBox textBox, string line)
-        {
-            if (string.IsNullOrWhiteSpace(textBox.Text))
-                textBox.Text = line;
-            else
-                textBox.AppendText(Environment.NewLine + line);
-
-            textBox.ScrollToEnd();
         }
 
         private void RefreshPingButtonStates()
@@ -1485,6 +1464,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private async void TestAllButton_Click(object sender, RoutedEventArgs e)
         {
+            /*
+             * Treat the values currently typed into NetworkView as the live
+             * diagnostic IPs for tools such as SNMP.
+             *
+             * This does NOT overwrite the originally loaded site IP values.
+             */
+            NetworkTestRequested?.Invoke(
+                this,
+                EventArgs.Empty);
+
             await RunQuickReachabilityTestForAllAsync();
         }
     }

@@ -21,9 +21,6 @@ namespace SmartGridSuite.Api.Controllers
         private static readonly string[] RequiredTicketStatuses =
         {
             "Open",
-            "Assigned",
-            "In Progress",
-            "Waiting Dispatch",
             "Needs Review",
             "Closed"
         };
@@ -65,9 +62,7 @@ namespace SmartGridSuite.Api.Controllers
                     ShowInFilter = x.ShowInFilter,
                     IncludeInSummary = x.IncludeInSummary,
                     SendToDispatchTasks = x.SendToDispatchTasks,
-                    IsWriteUpSubmitTarget = x.IsWriteUpSubmitTarget,
-                    IsAssignmentPublishTarget = x.IsAssignmentPublishTarget,
-                    IsUnassignmentTarget = x.IsUnassignmentTarget
+                    IsWriteUpSubmitTarget = x.IsWriteUpSubmitTarget
                 })
                 .ToListAsync(ct);
 
@@ -112,13 +107,10 @@ namespace SmartGridSuite.Api.Controllers
             if (exists)
                 return Conflict($"A ticket status named '{name}' already exists.");
 
-            if (!request.IsActive &&
-                (request.IsWriteUpSubmitTarget ||
-                 request.IsAssignmentPublishTarget ||
-                 request.IsUnassignmentTarget))
+            if (!request.IsActive && request.IsWriteUpSubmitTarget)
             {
                 return BadRequest(
-                    "A status must be active before it can be selected as a workflow target.");
+                    "A status must be active before it can be selected as the Write-Up Target.");
             }
 
             var nextSortOrder =
@@ -135,8 +127,6 @@ namespace SmartGridSuite.Api.Controllers
                 IncludeInSummary = request.IncludeInSummary,
                 SendToDispatchTasks = request.SendToDispatchTasks,
                 IsWriteUpSubmitTarget = request.IsWriteUpSubmitTarget,
-                IsAssignmentPublishTarget = request.IsAssignmentPublishTarget,
-                IsUnassignmentTarget = request.IsUnassignmentTarget,
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
@@ -145,18 +135,11 @@ namespace SmartGridSuite.Api.Controllers
             await _db.SaveChangesAsync(ct);
 
             if (entity.IsWriteUpSubmitTarget)
-                await ClearOtherWriteUpSubmitTargetsAsync(entity.Id, ct);
-
-            if (entity.IsAssignmentPublishTarget)
-                await ClearOtherAssignmentPublishTargetsAsync(entity.Id, ct);
-
-            if (entity.IsUnassignmentTarget)
-                await ClearOtherUnassignmentTargetsAsync(entity.Id, ct);
-
-            if (entity.IsWriteUpSubmitTarget ||
-                entity.IsAssignmentPublishTarget ||
-                entity.IsUnassignmentTarget)
             {
+                await ClearOtherWriteUpSubmitTargetsAsync(
+                    entity.Id,
+                    ct);
+
                 await _db.SaveChangesAsync(ct);
             }
 
@@ -220,13 +203,10 @@ namespace SmartGridSuite.Api.Controllers
             if (duplicateExists)
                 return Conflict($"A ticket status named '{name}' already exists.");
 
-            if (!request.IsActive &&
-                (request.IsWriteUpSubmitTarget ||
-                 request.IsAssignmentPublishTarget ||
-                 request.IsUnassignmentTarget))
+            if (!request.IsActive && request.IsWriteUpSubmitTarget)
             {
                 return BadRequest(
-                    "A status must be active before it can be selected as a workflow target.");
+                    "A status must be active before it can be selected as the Write-Up Target.");
             }
 
             entity.Name = name;
@@ -237,18 +217,14 @@ namespace SmartGridSuite.Api.Controllers
             entity.IncludeInSummary = request.IncludeInSummary;
             entity.SendToDispatchTasks = request.SendToDispatchTasks;
             entity.IsWriteUpSubmitTarget = request.IsWriteUpSubmitTarget;
-            entity.IsAssignmentPublishTarget = request.IsAssignmentPublishTarget;
-            entity.IsUnassignmentTarget = request.IsUnassignmentTarget;
             entity.UpdatedAt = DateTime.Now;
 
             if (entity.IsWriteUpSubmitTarget)
-                await ClearOtherWriteUpSubmitTargetsAsync(entity.Id, ct);
-
-            if (entity.IsAssignmentPublishTarget)
-                await ClearOtherAssignmentPublishTargetsAsync(entity.Id, ct);
-
-            if (entity.IsUnassignmentTarget)
-                await ClearOtherUnassignmentTargetsAsync(entity.Id, ct);
+            {
+                await ClearOtherWriteUpSubmitTargetsAsync(
+                    entity.Id,
+                    ct);
+            }
 
             await _db.SaveChangesAsync(ct);
 
@@ -323,8 +299,6 @@ namespace SmartGridSuite.Api.Controllers
             entity.IncludeInSummary = false;
             entity.SendToDispatchTasks = false;
             entity.IsWriteUpSubmitTarget = false;
-            entity.IsAssignmentPublishTarget = false;
-            entity.IsUnassignmentTarget = false;
             entity.UpdatedAt = DateTime.Now;
 
             await _db.SaveChangesAsync(ct);
@@ -486,9 +460,7 @@ namespace SmartGridSuite.Api.Controllers
                 ShowInFilter = entity.ShowInFilter,
                 IncludeInSummary = entity.IncludeInSummary,
                 SendToDispatchTasks = entity.SendToDispatchTasks,
-                IsWriteUpSubmitTarget = entity.IsWriteUpSubmitTarget,
-                IsAssignmentPublishTarget = entity.IsAssignmentPublishTarget,
-                IsUnassignmentTarget = entity.IsUnassignmentTarget
+                IsWriteUpSubmitTarget = entity.IsWriteUpSubmitTarget
             };
         }
 
@@ -500,26 +472,6 @@ namespace SmartGridSuite.Api.Controllers
 
             foreach (var status in otherTargets)
                 status.IsWriteUpSubmitTarget = false;
-        }
-
-        private async Task ClearOtherAssignmentPublishTargetsAsync(ulong currentStatusId, CancellationToken ct)
-        {
-            var otherTargets = await _db.TicketStatuses
-                .Where(x => x.Id != currentStatusId && x.IsAssignmentPublishTarget)
-                .ToListAsync(ct);
-
-            foreach (var status in otherTargets)
-                status.IsAssignmentPublishTarget = false;
-        }
-
-        private async Task ClearOtherUnassignmentTargetsAsync(ulong currentStatusId, CancellationToken ct)
-        {
-            var otherTargets = await _db.TicketStatuses
-                .Where(x => x.Id != currentStatusId && x.IsUnassignmentTarget)
-                .ToListAsync(ct);
-
-            foreach (var status in otherTargets)
-                status.IsUnassignmentTarget = false;
         }
     }
 }

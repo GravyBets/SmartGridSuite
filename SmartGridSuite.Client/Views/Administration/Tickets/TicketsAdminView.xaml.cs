@@ -146,9 +146,7 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
                     ShowInFilter = dialog.ShowInFilter,
                     IncludeInSummary = dialog.IncludeInSummary,
                     SendToDispatchTasks = dialog.SendToDispatchTasks,
-                    IsWriteUpSubmitTarget = dialog.IsWriteUpSubmitTarget,
-                    IsAssignmentPublishTarget = dialog.IsAssignmentPublishTarget,
-                    IsUnassignmentTarget = dialog.IsUnassignmentTarget
+                    IsWriteUpSubmitTarget = dialog.IsWriteUpSubmitTarget
                 });
 
                 await LoadAsync(created.Id);
@@ -193,9 +191,7 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
                     ShowInFilter = dialog.ShowInFilter,
                     IncludeInSummary = dialog.IncludeInSummary,
                     SendToDispatchTasks = dialog.SendToDispatchTasks,
-                    IsWriteUpSubmitTarget = dialog.IsWriteUpSubmitTarget,
-                    IsAssignmentPublishTarget = dialog.IsAssignmentPublishTarget,
-                    IsUnassignmentTarget = dialog.IsUnassignmentTarget
+                    IsWriteUpSubmitTarget = dialog.IsWriteUpSubmitTarget
                 });
 
                 await LoadAsync(selectedId);
@@ -295,9 +291,6 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
             var clean = (statusName ?? "").Trim();
 
             return clean.Equals("Open", StringComparison.OrdinalIgnoreCase)
-                || clean.Equals("Assigned", StringComparison.OrdinalIgnoreCase)
-                || clean.Equals("In Progress", StringComparison.OrdinalIgnoreCase)
-                || clean.Equals("Waiting Dispatch", StringComparison.OrdinalIgnoreCase)
                 || clean.Equals("Needs Review", StringComparison.OrdinalIgnoreCase)
                 || clean.Equals("Closed", StringComparison.OrdinalIgnoreCase);
         }

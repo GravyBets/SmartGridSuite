@@ -6051,17 +6051,43 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             /*
-             * A technician-owned assignment carrying TruckId represents a crew route.
-             * Snapshot everybody rostered to that truck on the submission date.
+             * Resolve the CURRENT truck context at submission time.
+             *
+             * A published technician-owned assignment may not have TruckId populated
+             * if Dispatch established or changed the crew after the route was originally
+             * published. In that case, recover the assigned technician's truck from the
+             * current roster for the submission date.
+             *
+             * This ensures write-up participants reflect the crew that actually exists
+             * when the write-up is submitted, even if Field Tech has been open all day.
              */
-            if (publishedTarget?.TruckId is uint assignedTruckId)
+            uint? assignedTruckId =
+                publishedTarget?.TruckId;
+
+            if (!assignedTruckId.HasValue &&
+                publishedTarget?.TechnicianId is uint publishedTechnicianId)
             {
+                assignedTruckId =
+                    await _db.TruckRosters
+                        .AsNoTracking()
+                        .Where(x =>
+                            x.WorkDate == submittedDate.Date &&
+                            x.TechnicianId == publishedTechnicianId)
+                        .Select(x => (uint?)x.TruckId)
+                        .FirstOrDefaultAsync(ct);
+            }
+
+            if (assignedTruckId.HasValue)
+            {
+                var crewTruckId =
+                    assignedTruckId.Value;
+
                 var assignedCrew = await (
                     from roster in _db.TruckRosters.AsNoTracking()
                     join tech in _db.Technicians.AsNoTracking()
                         on roster.TechnicianId equals tech.Id
                     where roster.WorkDate == submittedDate.Date
-                          && roster.TruckId == assignedTruckId
+                          && roster.TruckId == crewTruckId
                           && tech.IsActive
                           && tech.TechnicianRoles.Any(
                               role => role.Role.Code == TechnicianRoleCode)

@@ -68,6 +68,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             WorkspaceView.WriteUpSubmitRequested -= WorkspaceView_WriteUpSubmitRequested;
             WorkspaceView.WriteUpSubmitRequested += WorkspaceView_WriteUpSubmitRequested;
 
+            NetworkView.NetworkTestRequested += NetworkView_NetworkTestRequested;
+
             WorkspaceView.PingStatsProvider = () => NetworkView.GetPingStatsForWriteUp();
 
             WorkspaceView.IpChangeWriteUpLinesProvider =

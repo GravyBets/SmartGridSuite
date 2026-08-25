@@ -175,20 +175,6 @@
                                     <TextBlock Text="Only one status can be the Write-Up Target. Selecting this option clears it from all other statuses."
                                                Style="{StaticResource WorkflowHelpTextStyle}"/>
 
-                                    <CheckBox x:Name="IsAssignmentPublishTargetCheckBox"
-                                              Style="{StaticResource EditorCheckBoxStyle}"
-                                              Content="Use this status when Daily Assignments are published"/>
-
-                                    <TextBlock Text="Only one status can be the Assignment Target. Tickets move to this status when published to a crew or technician."
-                                               Style="{StaticResource WorkflowHelpTextStyle}"/>
-
-                                    <CheckBox x:Name="IsUnassignmentTargetCheckBox"
-                                              Style="{StaticResource EditorCheckBoxStyle}"
-                                              Content="Use this status when a published ticket becomes unassigned"/>
-
-                                    <TextBlock Text="Only one status can be the Unassignment Target. Tickets move to this status when removed from all published work lists."
-                                               Style="{StaticResource WorkflowHelpTextStyle}"/>
-
                                     <TextBlock x:Name="SystemRequiredTextBlock"
                                                Margin="0,4,0,0"
                                                Text="System-required status. Name, Active, and Closed behavior are protected because SmartGridSuite depends on them."

@@ -248,9 +248,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     session.SnmpSupportMessage,
                     session.SnmpDeviceFamily,
                     session.SnmpProfileName,
-                    session.PrimaryIp,
-                    session.LanIp,
-                    session.SecondaryIp,
+                    NetworkView.PrimaryIp,
+                    NetworkView.LanIp,
+                    NetworkView.SecondaryIp,
                     session.SnmpTargetIp);
 
                 if (string.Equals(session.DashboardKind, SiteDashboardKinds.Tower, StringComparison.OrdinalIgnoreCase))
