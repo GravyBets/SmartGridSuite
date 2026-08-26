@@ -528,10 +528,56 @@
                                             Binding="{Binding CompletedAt, StringFormat={}{0:ddd\, MM/dd/yy HH:mm}}"
                                             ElementStyle="{StaticResource HistoryTrimCellText}"/>
 
-                        <DataGridTextColumn Header="Site"
-                                            Width="80"
-                                            Binding="{Binding Site}"
-                                            ElementStyle="{StaticResource HistoryTrimCellText}"/>
+                        <DataGridTemplateColumn Header="Site"
+                                                Width="110">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="28"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding Site}"
+                                                   Style="{StaticResource HistoryTrimCellText}"/>
+
+                                        <Button Grid.Column="1"
+                                                Width="24"
+                                                Height="24"
+                                                Margin="4,0,0,0"
+                                                Tag="{Binding Site}"
+                                                ToolTip="Copy site"
+                                                Click="CopyGridValue_Click">
+
+                                            <Button.Style>
+                                                <Style TargetType="Button"
+                                                       BasedOn="{StaticResource FlatCopyIconButton}">
+                                                    <Setter Property="Visibility"
+                                                            Value="Visible"/>
+
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Site}"
+                                                                     Value="">
+                                                            <Setter Property="Visibility"
+                                                                    Value="Collapsed"/>
+                                                        </DataTrigger>
+
+                                                        <DataTrigger Binding="{Binding Site}"
+                                                                     Value="{x:Null}">
+                                                            <Setter Property="Visibility"
+                                                                    Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+
+                                            <TextBlock Style="{StaticResource CopyGlyph}"/>
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
                         <DataGridTextColumn Header="Notification Name"
                                             Width="2*"

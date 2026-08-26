@@ -209,6 +209,15 @@ namespace SmartGridSuite.Api.Controllers
                     "A status must be active before it can be selected as the Write-Up Target.");
             }
 
+            var statusNameChanged =
+    !string.Equals(
+        existingName,
+        name,
+        StringComparison.Ordinal);
+
+            await using var transaction =
+                await _db.Database.BeginTransactionAsync(ct);
+
             entity.Name = name;
             entity.IsActive = request.IsActive;
             entity.IsClosed = request.IsClosed;
@@ -219,14 +228,32 @@ namespace SmartGridSuite.Api.Controllers
             entity.IsWriteUpSubmitTarget = request.IsWriteUpSubmitTarget;
             entity.UpdatedAt = DateTime.Now;
 
-            if (entity.IsWriteUpSubmitTarget)
+            /*
+             * Ticket status is currently stored as the status name on each ticket.
+             * If an administrator renames a configurable status, migrate every
+             * existing ticket using the old name so those tickets do not become
+             * orphaned from the configured status list.
+             *
+             * This is a metadata rename, not ticket activity, so do not change
+             * LastActivityAt or add Dispatch Notes.
+             */
+            if (statusNameChanged)
             {
-                await ClearOtherWriteUpSubmitTargetsAsync(
-                    entity.Id,
-                    ct);
+                await _db.Tickets
+                    .Where(x => x.Status == existingName)
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(
+                                x => x.Status,
+                                name),
+                        ct);
             }
 
+            if (entity.IsWriteUpSubmitTarget)
+                await ClearOtherWriteUpSubmitTargetsAsync(entity.Id, ct);
+
             await _db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
 
             return Ok(MapStatusDto(entity));
         }

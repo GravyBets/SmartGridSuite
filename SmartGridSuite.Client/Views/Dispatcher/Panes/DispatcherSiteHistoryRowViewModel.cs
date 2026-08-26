@@ -30,10 +30,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         public string EditedBy { get; init; } = "";
 
-        public bool CanEditWriteUp =>
+        public bool IsSmartGridSuiteWriteUp =>
             SubmissionId.HasValue &&
             SubmissionId.Value > 0 &&
-            SourceType.Equals("SmartGridSuite", StringComparison.OrdinalIgnoreCase);
+            SourceType.Equals(
+                "SmartGridSuite",
+                StringComparison.OrdinalIgnoreCase);
+
+        public bool CanEditHistory =>
+            HistoryId > 0;
+
+        public bool CanDeleteHistory =>
+            IsSmartGridSuiteWriteUp;
 
         public string EditedText =>
             EditedAt.HasValue && !string.IsNullOrWhiteSpace(EditedBy)

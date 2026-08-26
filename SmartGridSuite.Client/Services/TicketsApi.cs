@@ -391,6 +391,24 @@ namespace SmartGridSuite.Client.Services
                    ?? new List<SiteHistoryPreviewDto>();
         }
 
+        public async Task<SiteHistoryPreviewDto> UpdateSiteHistoryAsync(
+            long historyId,
+            UpdateSiteHistoryRequest request,
+            CancellationToken ct = default)
+        {
+            if (historyId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(historyId));
+
+            return await _api.PostAsync<
+                           UpdateSiteHistoryRequest,
+                           SiteHistoryPreviewDto>(
+                               $"api/tickets/site-history/{historyId}/update",
+                               request,
+                               ct)
+                   ?? throw new InvalidOperationException(
+                       "The API did not return the updated Site History entry.");
+        }
+
         public async Task<SubmittedWriteUpMutationResponse> UpdateSubmittedWriteUpAsync(long submissionId,
             UpdateSubmittedWriteUpRequest request, CancellationToken ct = default)
         {

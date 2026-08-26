@@ -302,9 +302,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             IssueTextBox.Text = _originalIssue;
             NarrativeTextBox.Text = _originalNarrative;
 
-            SelectedHintTextBlock.Text = SelectedHistoryRow.CanEditWriteUp
-                ? "SmartGridSuite write-up selected. Dispatch may edit the techs, issue/body, or soft-delete this entry."
-                : "Legacy or imported history selected. This entry is read-only.";
+            SelectedHintTextBlock.Text =
+                SelectedHistoryRow.IsSmartGridSuiteWriteUp
+                    ? "SmartGridSuite write-up selected. Dispatch may edit the techs, issue/body, or soft-delete this entry."
+                    : "Legacy or imported history selected. Dispatch may correct the techs, issue, or write-up body.";
 
             EditAuditTextBlock.Text = SelectedHistoryRow.EditedText;
 
@@ -323,7 +324,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private void Edit_Click(object sender, RoutedEventArgs e)
         {
-            if (SelectedHistoryRow?.CanEditWriteUp != true)
+            if (SelectedHistoryRow?.CanEditHistory != true)
                 return;
 
             SetEditMode(true);
@@ -333,18 +334,24 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void Save_Click(object sender, RoutedEventArgs e)
         {
-            if (SelectedHistoryRow?.CanEditWriteUp != true ||
-                !SelectedHistoryRow.SubmissionId.HasValue)
-            {
+            if (SelectedHistoryRow?.CanEditHistory != true)
                 return;
-            }
 
             var primaryTech = GetSelectedComboText(Tech1ComboBox);
             var secondaryTech = GetSelectedComboText(Tech2ComboBox);
             var issueText = (IssueTextBox.Text ?? string.Empty).Trim();
             var narrative = (NarrativeTextBox.Text ?? string.Empty).Trim();
 
-            if (string.IsNullOrWhiteSpace(narrative))
+            /*
+             * SmartGridSuite-submitted write-ups require narrative text because
+             * the submitted write-up record must remain valid.
+             *
+             * Legacy/imported history may have incomplete historical data, so
+             * Dispatch can still correct fields such as Issue without requiring
+             * a narrative.
+             */
+            if (SelectedHistoryRow.IsSmartGridSuiteWriteUp &&
+                string.IsNullOrWhiteSpace(narrative))
             {
                 MessageBox.Show(
                     Window.GetWindow(this),
@@ -357,22 +364,41 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
             }
 
-            ShowBusyOverlay("Saving site history write-up...");
+            ShowBusyOverlay("Saving site history...");
 
             try
             {
                 SaveButton.IsEnabled = false;
 
-                await _ticketsApi.UpdateSubmittedWriteUpAsync(
-                    SelectedHistoryRow.SubmissionId.Value,
-                    new UpdateSubmittedWriteUpRequest
-                    {
-                        Narrative = narrative,
-                        IssueText = issueText,
-                        PrimaryTech = primaryTech,
-                        SecondaryTech = secondaryTech,
-                        UpdatedBy = GetWindowsEmployeeId()
-                    });
+                var updatedBy = GetWindowsEmployeeId();
+
+                if (SelectedHistoryRow.IsSmartGridSuiteWriteUp &&
+                    SelectedHistoryRow.SubmissionId.HasValue)
+                {
+                    await _ticketsApi.UpdateSubmittedWriteUpAsync(
+                        SelectedHistoryRow.SubmissionId.Value,
+                        new UpdateSubmittedWriteUpRequest
+                        {
+                            Narrative = narrative,
+                            IssueText = issueText,
+                            PrimaryTech = primaryTech,
+                            SecondaryTech = secondaryTech,
+                            UpdatedBy = updatedBy
+                        });
+                }
+                else
+                {
+                    await _ticketsApi.UpdateSiteHistoryAsync(
+                        SelectedHistoryRow.HistoryId,
+                        new UpdateSiteHistoryRequest
+                        {
+                            Narrative = narrative,
+                            IssueText = issueText,
+                            PrimaryTech = primaryTech,
+                            SecondaryTech = secondaryTech,
+                            UpdatedBy = updatedBy
+                        });
+                }
 
                 _originalPrimaryTech = primaryTech;
                 _originalSecondaryTech = secondaryTech;
@@ -385,7 +411,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 MessageBox.Show(
                     Window.GetWindow(this),
-                    "Write-up updated.",
+                    "Site History entry updated.",
                     "Site History",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -428,7 +454,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void Delete_Click(object sender, RoutedEventArgs e)
         {
-            if (SelectedHistoryRow?.CanEditWriteUp != true ||
+            if (SelectedHistoryRow?.CanDeleteHistory != true ||
                 !SelectedHistoryRow.SubmissionId.HasValue)
             {
                 return;
@@ -559,7 +585,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 return;
 
             var canEdit =
-                SelectedHistoryRow?.CanEditWriteUp == true;
+                SelectedHistoryRow?.CanEditHistory == true;
+
+            var canDelete =
+                SelectedHistoryRow?.CanDeleteHistory == true;
 
             var isDirty =
                 _isEditing &&
@@ -582,7 +611,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 !_isLoading;
 
             DeleteButton.IsEnabled =
-                canEdit &&
+                canDelete &&
                 !_isEditing &&
                 !_isLoading;
         }

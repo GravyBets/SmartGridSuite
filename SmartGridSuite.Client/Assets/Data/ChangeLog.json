@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.1.0.7",
+    "date": "August 26, 2026",
+    "title": "Orphaned Ticket Status Rescued",
+    "changes": [
+      "Added support for editing legacy/imported Site History entries while preserving the original imported source data.",
+      "Fixed Ticket Status renames so existing tickets automatically update to the new status name.",
+      "Fixed the Dispatch Tickets “All / Include Closed” status filter so it truly includes tickets with any status, including legacy or inactive statuses.",
+      "Added a copy-to-clipboard button beside Site numbers in Field Technician History, with the same temporary checkmark feedback used for Notifications and Work Orders."
+    ]
+  },
+
+  {
     "version": "3.1.0.6",
     "date": "August 25, 2026",
     "title": "Daily Assignment workflow and SNMP synchronization hotfix",

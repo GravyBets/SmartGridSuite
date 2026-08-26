@@ -835,28 +835,55 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         {
             var (from, to) = GetLastActivityDateRangeFromUi();
 
-            var selectedDateField = DateFieldFilter?.SelectedItem as string ?? "Last Activity";
+            var selectedDateField =
+                DateFieldFilter?.SelectedItem as string ??
+                "Last Activity";
 
-            var apiDateField = selectedDateField.Equals("Created Date", StringComparison.OrdinalIgnoreCase)
-                ? "Created"
-                : "LastActivity";
+            var apiDateField =
+                selectedDateField.Equals(
+                    "Created Date",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "Created"
+                    : "LastActivity";
+
+            var selectedStatuses =
+                GetSelectedStatuses();
+
+            /*
+             * If every configured status is selected, that means truly ALL
+             * ticket statuses.
+             *
+             * Do not send a status list in that case. This allows tickets with
+             * legacy, renamed, deactivated, or otherwise unconfigured status
+             * values to remain visible instead of silently disappearing.
+             */
+            var allStatusesSelected =
+                StatusOptions.Count > 0 &&
+                selectedStatuses.Count == StatusOptions.Count;
 
             return new TicketQueryRequest
             {
                 Search = SearchBox?.Text?.Trim(),
-                Statuses = GetSelectedStatuses()
-                    .OrderBy(x => x)
-                    .ToList(),
 
-                ApplyStatusFilter = true,
+                Statuses = allStatusesSelected
+                    ? new List<string>()
+                    : selectedStatuses
+                        .OrderBy(x => x)
+                        .ToList(),
 
-                AssignedTech = TechFilter?.SelectedItem as string ?? "All",
+                ApplyStatusFilter =
+                    !allStatusesSelected,
+
+                AssignedTech =
+                    TechFilter?.SelectedItem as string ??
+                    "All",
 
                 DateField = apiDateField,
                 From = from,
                 To = to,
 
-                QuickFilter = GetActiveQuickFilterApiValue(),
+                QuickFilter =
+                    GetActiveQuickFilterApiValue(),
 
                 Skip =
                     _currentTicketPageIndex *

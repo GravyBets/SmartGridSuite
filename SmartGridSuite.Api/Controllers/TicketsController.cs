@@ -6500,6 +6500,111 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(result);
         }
 
+        [HttpPost("site-history/{historyId:long}/update")]
+        public async Task<ActionResult<SiteHistoryPreviewDto>> UpdateSiteHistory(
+            long historyId,
+            [FromBody] UpdateSiteHistoryRequest req,
+            CancellationToken ct)
+        {
+            if (historyId <= 0)
+                return BadRequest("A valid Site History ID is required.");
+
+            req ??= new UpdateSiteHistoryRequest();
+
+            var history = await _db.SiteHistory
+                .FirstOrDefaultAsync(
+                    x => x.HistoryId == historyId,
+                    ct);
+
+            if (history == null)
+                return NotFound();
+
+            if (history.IsDeleted)
+            {
+                return BadRequest(
+                    "This Site History entry has been deleted and cannot be edited.");
+            }
+
+            /*
+             * SmartGridSuite-submitted write-ups have additional linked records
+             * that must remain synchronized. Those continue to use the existing
+             * write-up edit endpoint.
+             *
+             * This direct endpoint is for legacy/imported Site History rows that
+             * do not have a TicketWriteUpSubmission.
+             */
+            var hasWriteUpSubmission = await _db.TicketWriteUpSubmissions
+                .AsNoTracking()
+                .AnyAsync(
+                    x =>
+                        !x.IsDeleted &&
+                        x.SiteHistoryId.HasValue &&
+                        x.SiteHistoryId.Value == historyId,
+                    ct);
+
+            if (hasWriteUpSubmission)
+            {
+                return BadRequest(
+                    "SmartGridSuite write-ups must be edited through the submitted write-up endpoint.");
+            }
+
+            var updatedBy =
+                string.IsNullOrWhiteSpace(req.UpdatedBy)
+                    ? "Unknown"
+                    : req.UpdatedBy.Trim();
+
+            var now = DateTime.Now;
+
+            history.Narrative =
+                (req.Narrative ?? string.Empty).Trim();
+
+            history.IssueText =
+                NormalizeEditableSiteHistoryText(
+                    req.IssueText);
+
+            history.PrimaryTech =
+                TrimForColumn(
+                    NormalizeEditableSiteHistoryText(
+                        req.PrimaryTech),
+                    100);
+
+            history.SecondaryTech =
+                TrimForColumn(
+                    NormalizeEditableSiteHistoryText(
+                        req.SecondaryTech),
+                    100);
+
+            history.EditedAt = now;
+
+            history.EditedBy =
+                TrimForColumn(
+                    updatedBy,
+                    100);
+
+            await _db.SaveChangesAsync(ct);
+
+            return Ok(
+                new SiteHistoryPreviewDto
+                {
+                    HistoryId = history.HistoryId,
+                    SubmissionId = null,
+
+                    SiteId = history.SiteId ?? "",
+                    SourceType = history.SourceType ?? "",
+
+                    VisitDate = history.VisitDate,
+                    SubmittedAt = null,
+
+                    PrimaryTech = history.PrimaryTech,
+                    SecondaryTech = history.SecondaryTech,
+                    IssueText = history.IssueText,
+                    Narrative = history.Narrative,
+
+                    EditedAt = history.EditedAt,
+                    EditedBy = history.EditedBy
+                });
+        }
+
         private static List<string> BuildTicketSiteHistoryMatchKeys(params string?[] values)
         {
             var keys =
