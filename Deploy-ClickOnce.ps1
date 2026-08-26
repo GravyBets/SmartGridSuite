@@ -101,6 +101,47 @@ Write-Host "Using MSBuild:"
 Write-Host $MSBuildPath
 
 Write-Host ""
+Write-Host "Preparing ClickOnce publish destination..."
+
+$PublishOutput =
+    $PublishRoot.TrimEnd("\") + "\"
+
+$ExpectedVersionFolderName =
+    "SmartGridSuite.Client_" +
+    ($ExpectedVersion -replace "\.", "_")
+
+$ExpectedVersionFolder =
+    Join-Path `
+        (Join-Path $PublishRoot "Application Files") `
+        $ExpectedVersionFolderName
+
+# Remove only files/folder that this release is about to regenerate.
+# Historical ClickOnce versions remain untouched.
+Remove-Item `
+    (Join-Path $PublishRoot "SmartGridSuite.Client.application") `
+    -Force `
+    -ErrorAction SilentlyContinue
+
+Remove-Item `
+    (Join-Path $PublishRoot "setup.exe") `
+    -Force `
+    -ErrorAction SilentlyContinue
+
+Remove-Item `
+    (Join-Path $PublishRoot "Publish.html") `
+    -Force `
+    -ErrorAction SilentlyContinue
+
+Remove-Item `
+    $ExpectedVersionFolder `
+    -Recurse `
+    -Force `
+    -ErrorAction SilentlyContinue
+
+Write-Host "Publish destination:"
+Write-Host $PublishOutput
+
+Write-Host ""
 Write-Host "Publishing ClickOnce..."
 
 & $MSBuildPath `
@@ -113,7 +154,9 @@ Write-Host "Publishing ClickOnce..."
     /p:SelfContained=true `
     "/p:PublishProfile=$PublishProfile" `
     "/p:ApplicationVersion=$ExpectedVersion" `
-    /p:IsRevisionIncremented=false
+    /p:IsRevisionIncremented=false `
+    "/p:PublishDir=$PublishOutput" `
+    "/p:PublishUrl=$PublishOutput"
 
 if ($LASTEXITCODE -ne 0)
 {
@@ -137,14 +180,18 @@ $PublishHtmlPath =
 
 foreach ($RequiredFile in @(
     $ManifestPath,
-    $SetupPath,
-    $PublishHtmlPath
+    $SetupPath
 ))
 {
     if (-not (Test-Path $RequiredFile))
     {
         throw "Required ClickOnce file was not found: $RequiredFile"
     }
+}
+
+if (-not (Test-Path $PublishHtmlPath))
+{
+    Write-Host "Publish.html was not generated; skipping it."
 }
 
 # ------------------------------------------------------------
@@ -217,14 +264,13 @@ Make sure Visual Studio Publish completed successfully.
 }
 
 # ------------------------------------------------------------
-# Build a SMALL staging folder containing only:
+# Build a SMALL staging folder containing:
 #
 #   SmartGridSuite.Client.application
 #   setup.exe
-#   Publish.html
 #   Application Files\<CURRENT VERSION>
 #
-# Historical ClickOnce versions are intentionally excluded.
+# Publish.html is included only when MSBuild generates it.
 # ------------------------------------------------------------
 
 $PublishParent =
@@ -267,9 +313,12 @@ Copy-Item `
     $SetupPath `
     $StageRoot
 
-Copy-Item `
-    $PublishHtmlPath `
-    $StageRoot
+if (Test-Path $PublishHtmlPath)
+{
+    Copy-Item `
+        $PublishHtmlPath `
+        $StageRoot
+}
 
 Copy-Item `
     $VersionFolder `
