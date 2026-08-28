@@ -214,6 +214,19 @@ namespace SmartGridSuite.Client.Services
                 ct);
         }
 
+        public async Task<TicketWriteUpHistoryResponse> GetWriteUpHistoryAsync(
+            long ticketId,
+            CancellationToken ct = default)
+        {
+            if (ticketId <= 0)
+                return new TicketWriteUpHistoryResponse();
+
+            return await _api.GetAsync<TicketWriteUpHistoryResponse>(
+                       $"api/tickets/{ticketId}/write-up-history",
+                       ct)
+                   ?? new TicketWriteUpHistoryResponse();
+        }
+
         public async Task<long> CloseDispatchTaskAsync(long ticketId, CancellationToken ct = default)
         {
             var res = await _api.PostAsync<object, UpdateTicketResponse>(

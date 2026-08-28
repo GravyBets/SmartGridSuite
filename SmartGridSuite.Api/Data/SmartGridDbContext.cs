@@ -33,6 +33,8 @@ namespace SmartGridSuite.Api.Data
 
         public DbSet<EmailLogEntity> EmailLogs => Set<EmailLogEntity>();
 
+        public DbSet<ClientPresenceEntity> ClientPresence => Set<ClientPresenceEntity>();
+
         public DbSet<SiteNoteEntity> SiteNotes => Set<SiteNoteEntity>();
 
         public DbSet<SiteHistoryEntity> SiteHistory => Set<SiteHistoryEntity>();
@@ -537,6 +539,62 @@ namespace SmartGridSuite.Api.Data
 
                 e.HasIndex(x => x.RelatedTicketId)
                     .HasDatabaseName("ix_email_logs_related_ticket");
+            });
+
+            modelBuilder.Entity<ClientPresenceEntity>(e =>
+            {
+                e.ToTable("client_presence");
+
+                e.HasKey(x => x.Id);
+
+                e.Property(x => x.Id)
+                    .HasColumnName("id");
+
+                e.Property(x => x.EmployeeId)
+                    .HasColumnName("employee_id")
+                    .HasMaxLength(32);
+
+                e.Property(x => x.DisplayName)
+                    .HasColumnName("display_name")
+                    .HasMaxLength(128);
+
+                e.Property(x => x.WindowsUser)
+                    .HasColumnName("windows_user")
+                    .HasMaxLength(128);
+
+                e.Property(x => x.MachineName)
+                    .HasColumnName("machine_name")
+                    .HasMaxLength(128)
+                    .IsRequired();
+
+                e.Property(x => x.ClientVersion)
+                    .HasColumnName("client_version")
+                    .HasMaxLength(32)
+                    .IsRequired();
+
+                e.Property(x => x.CurrentModule)
+                    .HasColumnName("current_module")
+                    .HasMaxLength(64)
+                    .IsRequired();
+
+                e.Property(x => x.FirstSeenAtUtc)
+                    .HasColumnName("first_seen_at_utc");
+
+                e.Property(x => x.LastSeenAtUtc)
+                    .HasColumnName("last_seen_at_utc");
+
+                e.HasIndex(x => x.MachineName)
+                    .IsUnique()
+                    .HasDatabaseName(
+                        "uq_client_presence_machine_name");
+
+                e.HasIndex(x => x.LastSeenAtUtc)
+                    .HasDatabaseName(
+                        "ix_client_presence_last_seen");
+
+                e.HasIndex(x => x.ClientVersion)
+                    .HasDatabaseName(
+                        "ix_client_presence_client_version");
             });
 
             modelBuilder.Entity<CommunicationDeviceTypeEntity>(entity =>

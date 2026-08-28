@@ -81,6 +81,57 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             set => SetValue(CanManageSiteNotesProperty, value);
         }
 
+        private SiteDashboardAccessMode _accessMode =
+    SiteDashboardAccessMode.Full;
+
+        public SiteDashboardAccessMode AccessMode
+        {
+            get => _accessMode;
+
+            set
+            {
+                if (_accessMode == value)
+                    return;
+
+                _accessMode = value;
+
+                ApplyDashboardFeatureVisibility();
+
+                /*
+                 * If the previous/full dashboard was sitting on a tab that
+                 * Lineman is not allowed to use, move safely back to Main.
+                 */
+                if (_accessMode == SiteDashboardAccessMode.Lineman &&
+                    !IsLinemanAllowedWorkspaceTab(SelectedWorkspaceTabKey))
+                {
+                    SetSelectedWorkspaceTab("TopWriteUp");
+                }
+            }
+        }
+
+        private bool IsLinemanAccessMode =>
+            _accessMode == SiteDashboardAccessMode.Lineman;
+
+        private static bool IsLinemanAllowedWorkspaceTab(
+            string? tabKey)
+        {
+            return
+                string.Equals(
+                    tabKey,
+                    "TopWriteUp",
+                    StringComparison.OrdinalIgnoreCase) ||
+
+                string.Equals(
+                    tabKey,
+                    "SiteHistory",
+                    StringComparison.OrdinalIgnoreCase) ||
+
+                string.Equals(
+                    tabKey,
+                    "Portal",
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
         public string CurrentSiteId { get; private set; } = "";
 
         public string CurrentCnpTechName { get; set; } = string.Empty;

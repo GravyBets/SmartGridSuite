@@ -29,6 +29,7 @@ namespace SmartGridSuite.Api.Controllers
 
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
         private const string TechnicianRoleCode = "TECHNICIAN";
+        private const string LinemanRoleCode = "LINEMAN";
 
         private const string AssignmentStatusActive = "Active";
         private const string AssignmentStatusCompleted = "Completed";
@@ -214,7 +215,9 @@ namespace SmartGridSuite.Api.Controllers
             }
             else if (quickFilter.Equals("Assigned", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(t => t.Status == "Assigned");
+                query = query.Where(t =>
+                    !string.IsNullOrWhiteSpace(t.AssignedTech) &&
+                    t.AssignedTech != "(Unassigned)");
             }
 
             // Date filter
@@ -435,11 +438,12 @@ namespace SmartGridSuite.Api.Controllers
                     string.IsNullOrWhiteSpace(t.WorkOrderClass));
             }
             else if (quickFilter.Equals(
-                         "Assigned",
-                         StringComparison.OrdinalIgnoreCase))
+                 "Assigned",
+                 StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(
-                    t => t.Status == "Assigned");
+                query = query.Where(t =>
+                    !string.IsNullOrWhiteSpace(t.AssignedTech) &&
+                    t.AssignedTech != "(Unassigned)");
             }
 
             // Date filter.
@@ -614,41 +618,106 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpGet("dispatch-tasks")]
-        public async Task<ActionResult<List<DispatchTaskListItemDto>>> GetDispatchTasks(CancellationToken ct)
+        public async Task<ActionResult<List<DispatchTaskListItemDto>>>GetDispatchTasks(CancellationToken ct)
         {
-            var dispatchStatuses = await _db.TicketStatuses
-                .AsNoTracking()
-                .Where(x => x.IsActive && x.SendToDispatchTasks)
-                .OrderBy(x => x.SortOrder)
-                .Select(x => x.Name)
-                .ToListAsync(ct);
+            var dispatchStatuses =
+                await _db.TicketStatuses
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.IsActive &&
+                        x.SendToDispatchTasks)
+                    .OrderBy(x => x.SortOrder)
+                    .Select(x => x.Name)
+                    .ToListAsync(ct);
 
             if (dispatchStatuses.Count == 0)
-                return Ok(new List<DispatchTaskListItemDto>());
+            {
+                return Ok(
+                    new List<DispatchTaskListItemDto>());
+            }
 
-            var reviewCategory = await _db.TicketTaskCategories
-                .AsNoTracking()
-                .Where(x => x.IsActive && x.Name == "Review")
-                .Select(x => new
-                {
-                    x.Name,
-                    x.DefaultActionRequired
-                })
-                .FirstOrDefaultAsync(ct);
+            var reviewCategory =
+                await _db.TicketTaskCategories
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.IsActive &&
+                        x.Name == "Review")
+                    .Select(x => new
+                    {
+                        x.Name,
+                        x.DefaultActionRequired
+                    })
+                    .FirstOrDefaultAsync(ct);
 
-            var fallbackCategoryName = reviewCategory?.Name ?? "Review";
-            var fallbackActionRequired = reviewCategory?.DefaultActionRequired ?? "Review and update ticket";
+            var fallbackCategoryName =
+                reviewCategory?.Name ??
+                "Review";
 
-            var tickets = await _db.Tickets
-                .Include(t => t.TaskCategory)
-                .AsNoTracking()
-                .Where(t => dispatchStatuses.Contains(t.Status))
-                .OrderByDescending(t => t.LastActivityAt)
-                .ToListAsync(ct);
+            var fallbackActionRequired =
+                reviewCategory?.DefaultActionRequired ??
+                "Review and update ticket";
 
-            var items = tickets
-                .Select(t => MapToDispatchTask(t, fallbackCategoryName, fallbackActionRequired))
-                .ToList();
+            var tickets =
+                await _db.Tickets
+                    .Include(t => t.TaskCategory)
+                    .AsNoTracking()
+                    .Where(t =>
+                        dispatchStatuses.Contains(
+                            t.Status))
+                    .OrderByDescending(
+                        t => t.LastActivityAt)
+                    .ToListAsync(ct);
+
+            /*
+             * Build employee-ID -> display-name lookup so
+             * Maintenance / Capital requests can show the
+             * technician's actual name instead of employee ID.
+             */
+            var technicianRows =
+                await _db.Technicians
+                    .AsNoTracking()
+                    .Select(x => new
+                    {
+                        x.EmployeeId,
+                        x.FirstName,
+                        x.LastName
+                    })
+                    .ToListAsync(ct);
+
+            var technicianDisplayByEmployeeId =
+                technicianRows
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(
+                            x.EmployeeId))
+                    .GroupBy(
+                        x => x.EmployeeId.Trim(),
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        group =>
+                            group.Key,
+
+                        group =>
+                        {
+                            var tech =
+                                group.First();
+
+                            return FormatTechnicianName(
+                                tech.FirstName,
+                                tech.LastName,
+                                tech.EmployeeId);
+                        },
+
+                        StringComparer.OrdinalIgnoreCase);
+
+            var items =
+                tickets
+                    .Select(t =>
+                        MapToDispatchTask(
+                            t,
+                            fallbackCategoryName,
+                            fallbackActionRequired,
+                            technicianDisplayByEmployeeId))
+                    .ToList();
 
             return Ok(items);
         }
@@ -749,14 +818,57 @@ namespace SmartGridSuite.Api.Controllers
                 .Take(take)
                 .ToListAsync(ct);
 
+            var technicianRows = await _db.Technicians
+                .AsNoTracking()
+                .Select(x => new
+                {
+                    x.EmployeeId,
+                    x.FirstName,
+                    x.LastName
+                })
+                .ToListAsync(ct);
+
+            var technicianDisplayByEmployeeId =
+                technicianRows
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(
+                            x.EmployeeId))
+                    .GroupBy(
+                        x => x.EmployeeId.Trim(),
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        group =>
+                            group.Key,
+
+                        group =>
+                        {
+                            var tech =
+                                group.First();
+
+                            return FormatTechnicianName(
+                                tech.FirstName,
+                                tech.LastName,
+                                tech.EmployeeId);
+                        },
+
+                        StringComparer.OrdinalIgnoreCase);
+
             var items = rows
-                 .Select(MapToDispatchTaskQueryItem)
-                 .ToList();
+                .Select(ticket =>
+                    MapToDispatchTaskQueryItem(
+                        ticket,
+                        technicianDisplayByEmployeeId))
+                .ToList();
 
             /*
-             * Attach metadata from each ticket's latest non-deleted write-up
-             * submission. This is deliberately batched for the current page so
-             * the client does not issue a separate request for every task.
+             * Dispatch Tasks represents the CURRENT field-work event for a ticket.
+             *
+             * A ticket may have many historical write-up submissions because it can
+             * be reopened and dispatched again later.
+             *
+             * Only the latest non-deleted submission belongs in Dispatch Tasks.
+             * Older submissions remain permanent history and can be displayed in
+             * Edit Ticket, but they must not be copied into SAP again.
              */
             var ticketIds = items
                 .Select(x => x.TicketId)
@@ -785,34 +897,39 @@ namespace SmartGridSuite.Api.Controllers
                         .ToListAsync(ct);
 
                 /*
- * A ticket may now have write-ups from more than one crew.
- *
- * Dispatch still gets ONE task per ticket, but that task must include
- * every active/non-deleted write-up submitted against the ticket.
- */
-                var submissionsByTicket =
+                 * One current submission per ticket.
+                 *
+                 * SubmittedAt is authoritative. Id breaks ties if two rows were
+                 * created with the same timestamp.
+                 */
+                var latestSubmissionByTicket =
                     submissionCandidates
                         .GroupBy(x => x.TicketId)
                         .ToDictionary(
                             group => group.Key,
                             group => group
-                                .OrderBy(x => x.SubmittedAt)
-                                .ThenBy(x => x.Id)
-                                .ToList());
+                                .OrderByDescending(x => x.SubmittedAt)
+                                .ThenByDescending(x => x.Id)
+                                .First());
 
-                var allSubmissionIds =
-                    submissionCandidates
+                var latestSubmissionIds =
+                    latestSubmissionByTicket
+                        .Values
                         .Select(x => x.Id)
                         .Distinct()
                         .ToList();
 
-                if (allSubmissionIds.Count > 0)
+                if (latestSubmissionIds.Count > 0)
                 {
+                    /*
+                     * Load metadata ONLY for the submission currently being
+                     * reviewed by Dispatch.
+                     */
                     var submittedFlags =
                         await _db.TicketWriteUpSubmissionFlags
                             .AsNoTracking()
                             .Where(x =>
-                                allSubmissionIds.Contains(
+                                latestSubmissionIds.Contains(
                                     x.SubmissionId))
                             .OrderBy(x => x.WriteUpFlagId)
                             .Select(x => new
@@ -828,7 +945,7 @@ namespace SmartGridSuite.Api.Controllers
                             .TicketWriteUpSubmissionReferToOptions
                             .AsNoTracking()
                             .Where(x =>
-                                allSubmissionIds.Contains(
+                                latestSubmissionIds.Contains(
                                     x.SubmissionId))
                             .OrderBy(x => x.ReferToOptionId)
                             .Select(x => new
@@ -843,7 +960,7 @@ namespace SmartGridSuite.Api.Controllers
                             .TicketWriteUpSubmissionCloseoutItems
                             .AsNoTracking()
                             .Where(x =>
-                                allSubmissionIds.Contains(
+                                latestSubmissionIds.Contains(
                                     x.SubmissionId))
                             .OrderBy(x => x.SortOrderSnapshot)
                             .ThenBy(x => x.DisplayNameSnapshot)
@@ -933,223 +1050,68 @@ namespace SmartGridSuite.Api.Controllers
 
                     foreach (var item in items)
                     {
-                        if (!submissionsByTicket.TryGetValue(
+                        if (!latestSubmissionByTicket.TryGetValue(
                                 item.TicketId,
-                                out var submissions) ||
-                            submissions.Count == 0)
+                                out var latestSubmission))
                         {
                             continue;
                         }
 
                         /*
-                         * Keep the latest submission in the legacy single-submission
-                         * fields so existing client behavior remains compatible.
+                         * Everything displayed in Dispatch Tasks now belongs to
+                         * exactly this submission.
                          */
-                        var latestSubmission =
-                            submissions.Last();
-
                         item.SubmissionId =
                             latestSubmission.Id;
 
                         item.SubmittedAt =
                             latestSubmission.SubmittedAt;
 
-                        var submittedByNames =
-                            submissions
-                                .Select(x =>
-                                    (x.SubmittedByName ?? string.Empty)
-                                        .Trim())
-                                .Where(x =>
-                                    !string.IsNullOrWhiteSpace(x))
-                                .Distinct(
-                                    StringComparer.OrdinalIgnoreCase)
-                                .ToList();
-
                         item.SubmittedByName =
-                            submittedByNames.Count == 0
+                            string.IsNullOrWhiteSpace(
+                                latestSubmission.SubmittedByName)
                                 ? "Unknown"
-                                : string.Join(
-                                    ", ",
-                                    submittedByNames);
+                                : latestSubmission
+                                    .SubmittedByName
+                                    .Trim();
 
-                        /*
-                         * Preserve the old appearance when there is only one
-                         * submission.
-                         *
-                         * For multi-crew work, combine the narratives in chronological
-                         * order and identify who submitted each one.
-                         */
-                        if (submissions.Count == 1)
-                        {
-                            item.SubmittedWriteUp =
-                                latestSubmission.SubmittedNarrative
-                                ?? string.Empty;
-                        }
-                        else
-                        {
-                            item.SubmittedWriteUp =
-                                string.Join(
-                                    Environment.NewLine +
-                                    Environment.NewLine,
+                        item.SubmittedWriteUp =
+                            latestSubmission.SubmittedNarrative
+                            ?? string.Empty;
 
-                                    submissions.Select(
-                                        submission =>
-                                        {
-                                            var submittedBy =
-                                                string.IsNullOrWhiteSpace(
-                                                    submission.SubmittedByName)
-                                                    ? "Unknown"
-                                                    : submission
-                                                        .SubmittedByName
-                                                        .Trim();
-
-                                            var narrative =
-                                                (submission.SubmittedNarrative
-                                                 ?? string.Empty)
-                                                .Trim();
-
-                                            return
-                                                $"[{submission.SubmittedAt:MM-dd-yyyy HH:mm}] " +
-                                                $"{submittedBy}" +
-                                                Environment.NewLine +
-                                                narrative;
-                                        }));
-                        }
-
-                        /*
-                         * Combine flags from ALL submissions.
-                         *
-                         * If multiple crews triggered the same flag, only show the
-                         * identical label once.
-                         */
                         item.WriteUpFlags =
-                            submissions
-                                .SelectMany(
-                                    submission =>
-                                        flagsBySubmission.TryGetValue(
-                                            submission.Id,
-                                            out var flags)
-                                            ? flags
-                                            : Enumerable.Empty<string>())
-                                .Where(x =>
-                                    !string.IsNullOrWhiteSpace(x))
-                                .Distinct(
-                                    StringComparer.OrdinalIgnoreCase)
-                                .ToList();
+                            flagsBySubmission.TryGetValue(
+                                latestSubmission.Id,
+                                out var flags)
+                                ? flags
+                                : new List<string>();
 
-                        /*
-                         * Refer-To selections are also ticket-wide for Dispatch review.
-                         */
                         item.ReferToOptions =
-                            submissions
-                                .SelectMany(
-                                    submission =>
-                                        referToBySubmission.TryGetValue(
-                                            submission.Id,
-                                            out var referToOptions)
-                                            ? referToOptions
-                                            : Enumerable.Empty<string>())
-                                .Where(x =>
-                                    !string.IsNullOrWhiteSpace(x))
-                                .Distinct(
-                                    StringComparer.OrdinalIgnoreCase)
-                                .ToList();
+                            referToBySubmission.TryGetValue(
+                                latestSubmission.Id,
+                                out var referToOptions)
+                                ? referToOptions
+                                : new List<string>();
 
-                        var rawCloseoutItems =
-    submissions
-        .SelectMany(
-            submission =>
-                closeoutItemsBySubmission.TryGetValue(
-                    submission.Id,
-                    out var closeoutItems)
-                    ? closeoutItems
-                    : Enumerable.Empty<
-                        DispatchCloseoutChecklistItemDto>())
-        .ToList();
-
-                        /*
-                         * Closeout requirements are ticket-wide.
-                         *
-                         * Multiple crews may submit separate write-ups that generate the
-                         * same Dispatch checklist definition. Show that requirement once.
-                         *
-                         * DefinitionId is the preferred identity. The fallback key protects
-                         * older/null-definition rows.
-                         */
-                        var combinedCloseoutItems =
-                            rawCloseoutItems
-                                .GroupBy(x =>
-                                    x.DefinitionId.HasValue
-                                        ? $"DEF:{x.DefinitionId.Value}"
-                                        : $"FALLBACK:" +
-                                          $"{x.ConditionType}|" +
-                                          $"{x.WriteUpFlagId}|" +
-                                          $"{x.ReferToOptionId}|" +
-                                          $"{x.DisplayName}",
-                                    StringComparer.OrdinalIgnoreCase)
-                                .Select(group =>
-                                {
-                                    var rows =
-                                        group
-                                            .OrderBy(x => x.SortOrder)
-                                            .ThenBy(x => x.Id)
-                                            .ToList();
-
-                                    var representative =
-                                        rows[0];
-
-                                    /*
-                                     * A logical requirement is complete only when every
-                                     * underlying submission copy is complete.
-                                     */
-                                    representative.IsRequired =
-                                        rows.Any(x => x.IsRequired);
-
-                                    representative.IsCompleted =
-                                        rows.All(x => x.IsCompleted);
-
-                                    representative.CompletedBy =
-                                        representative.IsCompleted
-                                            ? rows
-                                                .Where(x =>
-                                                    !string.IsNullOrWhiteSpace(
-                                                        x.CompletedBy))
-                                                .OrderByDescending(x =>
-                                                    x.CompletedAt)
-                                                .Select(x => x.CompletedBy)
-                                                .FirstOrDefault()
-                                                ?? ""
-                                            : "";
-
-                                    representative.CompletedAt =
-                                        representative.IsCompleted
-                                            ? rows
-                                                .Where(x =>
-                                                    x.CompletedAt.HasValue)
-                                                .Select(x => x.CompletedAt)
-                                                .Max()
-                                            : null;
-
-                                    return representative;
-                                })
-                                .OrderBy(x => x.SortOrder)
-                                .ThenBy(x => x.DisplayName)
-                                .ThenBy(x => x.Id)
-                                .ToList();
+                        var closeoutItems =
+                            closeoutItemsBySubmission.TryGetValue(
+                                latestSubmission.Id,
+                                out var submissionCloseoutItems)
+                                ? submissionCloseoutItems
+                                : new List<
+                                    DispatchCloseoutChecklistItemDto>();
 
                         item.CloseoutChecklistItems =
-                            combinedCloseoutItems;
+                            closeoutItems;
 
                         item.RequiredChecklistRemaining =
-                            combinedCloseoutItems.Count(
-                                x =>
-                                    x.IsRequired &&
-                                    !x.IsCompleted);
+                            closeoutItems.Count(x =>
+                                x.IsRequired &&
+                                !x.IsCompleted);
 
                         item.CanMarkClosed =
                             item.RequiredChecklistRemaining == 0;
                     }
-                
                 }
             }
 
@@ -1512,6 +1474,86 @@ namespace SmartGridSuite.Api.Controllers
                 ticket.CreatedBy,
                 ticket.DispatchNotes ?? ""
             ));
+        }
+
+        [HttpGet("{id:long}/write-up-history")]
+        public async Task<ActionResult<TicketWriteUpHistoryResponse>> GetWriteUpHistory(
+            long id,
+            CancellationToken ct)
+        {
+            var ticketExists =
+                await _db.Tickets
+                    .AsNoTracking()
+                    .AnyAsync(
+                        x => x.Id == id,
+                        ct);
+
+            if (!ticketExists)
+                return NotFound("Ticket was not found.");
+
+            var submissions =
+                await _db.TicketWriteUpSubmissions
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.TicketId == id &&
+                        !x.IsDeleted)
+                    .OrderBy(x => x.SubmittedAt)
+                    .ThenBy(x => x.Id)
+                    .Select(x => new
+                    {
+                        x.SubmittedAt,
+                        x.SubmittedByName,
+                        x.SubmittedNarrative
+                    })
+                    .ToListAsync(ct);
+
+            if (submissions.Count == 0)
+            {
+                return Ok(
+                    new TicketWriteUpHistoryResponse
+                    {
+                        HasSubmissionHistory = false,
+                        Text = ""
+                    });
+            }
+
+            const string separator =
+                "----------------------------------------";
+
+            var text =
+                string.Join(
+                    Environment.NewLine +
+                    Environment.NewLine +
+                    separator +
+                    Environment.NewLine +
+                    Environment.NewLine,
+
+                    submissions.Select(x =>
+                    {
+                        var submittedBy =
+                            string.IsNullOrWhiteSpace(
+                                x.SubmittedByName)
+                                ? "Unknown"
+                                : x.SubmittedByName.Trim();
+
+                        var narrative =
+                            (x.SubmittedNarrative ?? "")
+                                .Trim();
+
+                        return
+                            $"[{x.SubmittedAt:MM-dd-yyyy HH:mm}]" +
+                            Environment.NewLine +
+                            $"Write-up submitted by {submittedBy}" +
+                            Environment.NewLine +
+                            narrative;
+                    }));
+
+            return Ok(
+                new TicketWriteUpHistoryResponse
+                {
+                    HasSubmissionHistory = true,
+                    Text = text
+                });
         }
 
         // Loads expandable field-row details on demand so Tasks and History stay
@@ -2058,7 +2100,9 @@ namespace SmartGridSuite.Api.Controllers
                 .AsNoTracking()
                 .Where(t =>
                     t.IsActive &&
-                    t.TechnicianRoles.Any(tr => tr.Role.Code == TechnicianRoleCode));
+                    t.TechnicianRoles.Any(tr =>
+                        tr.Role.Code == TechnicianRoleCode ||
+                        tr.Role.Code == LinemanRoleCode));
         }
 
         private async Task<TechnicianEntity?> ResolveLeadTechnicianForTruckAsync(DateTime workDate, uint truckId, CancellationToken ct)
@@ -2384,57 +2428,39 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPut("{ticketId:long}/dispatch-closeout-items/{itemId:long}")]
-        public async Task<ActionResult<DispatchCloseoutChecklistItemDto>>UpdateDispatchCloseoutChecklistItem(
-            long ticketId,
-            long itemId,
-            [FromBody] UpdateDispatchCloseoutChecklistItemRequest req,
-            CancellationToken ct)
+        public async Task<ActionResult<DispatchCloseoutChecklistItemDto>> UpdateDispatchCloseoutChecklistItem(
+                long ticketId,
+                long itemId,
+                [FromBody] UpdateDispatchCloseoutChecklistItemRequest req,
+                CancellationToken ct)
         {
-            var ticketExists =
-                await _db.Tickets
-                    .AsNoTracking()
-                    .AnyAsync(
-                        x => x.Id == ticketId,
-                        ct);
-
-            if (!ticketExists)
-                return NotFound("Ticket was not found.");
-
             /*
-             * A ticket may have multiple write-up submissions when more than
-             * one crew worked the same Daily Assignment.
+             * Closeout checklist state belongs to a WRITE-UP SUBMISSION,
+             * not globally to the ticket.
              *
-             * Dispatch treats matching closeout requirements as ONE logical
-             * ticket-wide checklist item.
-             */
-            var activeSubmissionIds =
-                await _db.TicketWriteUpSubmissions
-                    .AsNoTracking()
-                    .Where(x =>
-                        x.TicketId == ticketId &&
-                        !x.IsDeleted)
-                    .Select(x => x.Id)
-                    .ToListAsync(ct);
-
-            if (activeSubmissionIds.Count == 0)
-            {
-                return NotFound(
-                    "This ticket does not have an active submitted write-up.");
-            }
-
-            /*
-             * itemId is the representative row sent to the client.
-             * Make sure it actually belongs to this ticket.
+             * A reopened ticket may receive another write-up later. That
+             * later submission must receive its own fresh checklist while
+             * preserving the completion history of earlier submissions.
              */
             var item =
-                await _db
-                    .TicketWriteUpSubmissionCloseoutItems
-                    .FirstOrDefaultAsync(
-                        x =>
-                            x.Id == itemId &&
-                            activeSubmissionIds.Contains(
-                                x.SubmissionId),
-                        ct);
+                await (
+                    from closeoutItem in
+                        _db.TicketWriteUpSubmissionCloseoutItems
+
+                    join submission in
+                        _db.TicketWriteUpSubmissions
+
+                        on closeoutItem.SubmissionId
+                        equals submission.Id
+
+                    where
+                        closeoutItem.Id == itemId &&
+                        submission.TicketId == ticketId &&
+                        !submission.IsDeleted
+
+                    select closeoutItem
+                )
+                .FirstOrDefaultAsync(ct);
 
             if (item is null)
             {
@@ -2451,84 +2477,26 @@ namespace SmartGridSuite.Api.Controllers
                     150)
                 ?? "Dispatcher";
 
-            /*
-             * Find every underlying copy of the same logical checklist
-             * requirement.
-             *
-             * DefinitionId is the preferred identity because each submission
-             * snapshots the same configured Dispatch checklist definition.
-             *
-             * The fallback protects older rows that may not have DefinitionId.
-             */
-            var matchingItemsQuery =
-                _db.TicketWriteUpSubmissionCloseoutItems
-                    .Where(x =>
-                        activeSubmissionIds.Contains(
-                            x.SubmissionId));
+            item.IsCompleted =
+                req.IsCompleted;
 
-            if (item.DefinitionId.HasValue)
-            {
-                matchingItemsQuery =
-                    matchingItemsQuery.Where(
-                        x =>
-                            x.DefinitionId ==
-                            item.DefinitionId);
-            }
-            else
-            {
-                matchingItemsQuery =
-                    matchingItemsQuery.Where(
-                        x =>
-                            x.DefinitionId == null &&
-                            x.DisplayNameSnapshot ==
-                                item.DisplayNameSnapshot &&
-                            x.ConditionTypeSnapshot ==
-                                item.ConditionTypeSnapshot &&
-                            x.WriteUpFlagId ==
-                                item.WriteUpFlagId &&
-                            x.ReferToOptionId ==
-                                item.ReferToOptionId);
-            }
+            item.CompletedBy =
+                req.IsCompleted
+                    ? updatedBy
+                    : null;
 
-            var matchingItems =
-                await matchingItemsQuery
-                    .ToListAsync(ct);
-
-            if (matchingItems.Count == 0)
-            {
-                return NotFound(
-                    "No matching Dispatch checklist items were found.");
-            }
-
-            var completedAt =
+            item.CompletedAt =
                 req.IsCompleted
                     ? DateTime.Now
-                    : (DateTime?)null;
-
-            foreach (var matchingItem in matchingItems)
-            {
-                matchingItem.IsCompleted =
-                    req.IsCompleted;
-
-                matchingItem.CompletedBy =
-                    req.IsCompleted
-                        ? updatedBy
-                        : null;
-
-                matchingItem.CompletedAt =
-                    completedAt;
-            }
+                    : null;
 
             await _db.SaveChangesAsync(ct);
 
-            /*
-             * Return the representative row the client originally clicked,
-             * but reflect the ticket-wide logical completion state.
-             */
             return Ok(
                 new DispatchCloseoutChecklistItemDto
                 {
-                    Id = item.Id,
+                    Id =
+                        item.Id,
 
                     SubmissionId =
                         item.SubmissionId,
@@ -2543,8 +2511,7 @@ namespace SmartGridSuite.Api.Controllers
                         item.SortOrderSnapshot,
 
                     IsRequired =
-                        matchingItems.Any(x =>
-                            x.IsRequired),
+                        item.IsRequired,
 
                     ConditionType =
                         item.ConditionTypeSnapshot,
@@ -2556,15 +2523,13 @@ namespace SmartGridSuite.Api.Controllers
                         item.ReferToOptionId,
 
                     IsCompleted =
-                        req.IsCompleted,
+                        item.IsCompleted,
 
                     CompletedBy =
-                        req.IsCompleted
-                            ? updatedBy
-                            : "",
+                        item.CompletedBy ?? "",
 
                     CompletedAt =
-                        completedAt
+                        item.CompletedAt
                 });
         }
 
@@ -2691,7 +2656,12 @@ namespace SmartGridSuite.Api.Controllers
             return Ok(new UpdateTicketResponse(entity.Id));
         }
 
-        private static DispatchTaskListItemDto MapToDispatchTask(TicketEntity t, string fallbackCategoryName, string fallbackActionRequired)
+        private static DispatchTaskListItemDto MapToDispatchTask(
+            TicketEntity t,
+            string fallbackCategoryName,
+            string fallbackActionRequired,
+            IReadOnlyDictionary<string, string>
+                technicianDisplayByEmployeeId)
         {
             var hasActiveAssignedCategory =
                 t.TaskCategory != null &&
@@ -2720,12 +2690,13 @@ namespace SmartGridSuite.Api.Controllers
                 WorkOrderType = NormalizeWorkOrderType(t.WorkOrderClass),
                 ActionRequired = actionRequired,
                 Notes = FirstNonBlank(t.DispatchNotes, t.Notes, t.Summary, t.Problem, t.NotificationName),
+                DispatchRequestDetails = BuildDispatchRequestDetails(t.DispatchNotes, technicianDisplayByEmployeeId),
                 Status = string.IsNullOrWhiteSpace(t.Status) ? "Open" : t.Status,
                 Category = categoryName
             };
         }
 
-        private static DispatchTaskListItemDto MapToDispatchTaskQueryItem(TicketEntity ticket)
+        private static DispatchTaskListItemDto MapToDispatchTaskQueryItem(TicketEntity ticket, IReadOnlyDictionary<string, string>technicianDisplayByEmbloyeeId)
         {
             var actionRequired = FirstNonBlank(
                 ticket.ActionRequiredOverride,
@@ -2756,6 +2727,8 @@ namespace SmartGridSuite.Api.Controllers
                     ticket.Notes,
                     ticket.Problem,
                     ticket.NotificationName),
+
+                DispatchRequestDetails = BuildDispatchRequestDetails(ticket.DispatchNotes, technicianDisplayByEmbloyeeId),
 
                 Status = string.IsNullOrWhiteSpace(ticket.Status)
                     ? "Open"
@@ -2879,9 +2852,15 @@ namespace SmartGridSuite.Api.Controllers
                 Environment.NewLine +
                 cleanWriteUp;
 
+            const string writeUpSeparator =
+                "----------------------------------------";
+
             return string.IsNullOrWhiteSpace(cleanExisting)
                 ? entry
                 : cleanExisting +
+                  Environment.NewLine +
+                  Environment.NewLine +
+                  writeUpSeparator +
                   Environment.NewLine +
                   Environment.NewLine +
                   entry;
@@ -2908,6 +2887,140 @@ namespace SmartGridSuite.Api.Controllers
                 return entry;
 
             return cleanExisting + Environment.NewLine + entry;
+        }
+
+        private static string BuildDispatchRequestDetails(
+            string? dispatchNotes,
+            IReadOnlyDictionary<string, string>
+                technicianDisplayByEmployeeId)
+        {
+            var text =
+                (dispatchNotes ?? string.Empty)
+                .Trim();
+
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            var requestLines =
+                text.Split(
+                        new[] { "\r\n", "\n" },
+                        StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.Trim())
+                    .Where(x =>
+                        x.StartsWith(
+                            "Capital requested by ",
+                            StringComparison.OrdinalIgnoreCase) ||
+                        x.StartsWith(
+                            "Maintenance requested by ",
+                            StringComparison.OrdinalIgnoreCase))
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase)
+                    .Select(x =>
+                        FormatDispatchRequestDetails(
+                            x,
+                            technicianDisplayByEmployeeId))
+                    .ToList();
+
+            return requestLines.Count == 0
+                ? string.Empty
+                : string.Join(
+                    Environment.NewLine +
+                    Environment.NewLine,
+                    requestLines);
+        }
+
+        private static string FormatDispatchRequestDetails(
+            string requestLine,
+            IReadOnlyDictionary<string, string>
+                technicianDisplayByEmployeeId)
+        {
+            var match =
+                Regex.Match(
+                    requestLine,
+                    @"^(?<type>Capital|Maintenance)\s+requested by\s+(?<requestedBy>.*?)\s+Reason:\s+'(?<reason>.*)'$",
+                    RegexOptions.IgnoreCase);
+
+            if (!match.Success)
+                return requestLine;
+
+            var requestType =
+                match.Groups["type"]
+                    .Value
+                    .Trim();
+
+            var requestedBy =
+                match.Groups["requestedBy"]
+                    .Value
+                    .Trim();
+
+            var reason =
+                match.Groups["reason"]
+                    .Value
+                    .Trim();
+
+            requestedBy =
+                ResolveTechnicianDisplayName(
+                    requestedBy,
+                    technicianDisplayByEmployeeId);
+
+            return
+                $"{requestType} Request" +
+                Environment.NewLine +
+                $"Requested By: {requestedBy}" +
+                Environment.NewLine +
+                $"Reason: {reason}";
+        }
+
+        private static string ResolveTechnicianDisplayName(
+            string requestedBy,
+            IReadOnlyDictionary<string, string>
+                technicianDisplayByEmployeeId)
+        {
+            var cleanRequestedBy =
+                (requestedBy ?? string.Empty)
+                .Trim();
+
+            if (string.IsNullOrWhiteSpace(
+                    cleanRequestedBy))
+            {
+                return "Unknown";
+            }
+
+            /*
+             * Handle values such as:
+             *
+             * 00232505
+             * CNP\00232505
+             */
+            var employeeId =
+                cleanRequestedBy;
+
+            var slashIndex =
+                employeeId.LastIndexOf('\\');
+
+            if (slashIndex >= 0 &&
+                slashIndex < employeeId.Length - 1)
+            {
+                employeeId =
+                    employeeId[(slashIndex + 1)..]
+                        .Trim();
+            }
+
+            if (technicianDisplayByEmployeeId
+                .TryGetValue(
+                    employeeId,
+                    out var displayName) &&
+                !string.IsNullOrWhiteSpace(
+                    displayName))
+            {
+                return displayName;
+            }
+
+            /*
+             * Don't destroy the original value if this is
+             * an older/deactivated person we can't resolve.
+             */
+            return cleanRequestedBy;
         }
 
         [HttpPost]
@@ -3378,33 +3491,6 @@ namespace SmartGridSuite.Api.Controllers
                     ? "(Unassigned)"
                     : req.AssignedTech.Trim();
 
-            var isUnassigning =
-                assignedTech.Equals(
-                    "(Unassigned)",
-                    StringComparison.OrdinalIgnoreCase);
-
-            var requestedStatus =
-                isUnassigning
-                    ? "Open"
-                    : "Assigned";
-
-            var requestedStatusLower =
-                requestedStatus.ToLower();
-
-            var statusEntity = await _db.TicketStatuses
-                .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    x =>
-                        x.IsActive &&
-                        x.Name.ToLower() == requestedStatusLower,
-                    ct);
-
-            if (statusEntity == null)
-            {
-                return BadRequest(
-                    $"Status '{requestedStatus}' is missing or inactive.");
-            }
-
             var now = DateTime.Now;
 
             var tickets = await _db.Tickets
@@ -3414,7 +3500,6 @@ namespace SmartGridSuite.Api.Controllers
             foreach (var ticket in tickets)
             {
                 ticket.AssignedTech = assignedTech;
-                ticket.Status = statusEntity.Name;
                 ticket.LastActivityAt = now;
             }
 
@@ -6090,7 +6175,7 @@ namespace SmartGridSuite.Api.Controllers
                           && roster.TruckId == crewTruckId
                           && tech.IsActive
                           && tech.TechnicianRoles.Any(
-                              role => role.Role.Code == TechnicianRoleCode)
+                              role => role.Role.Code == TechnicianRoleCode || role.Role.Code == LinemanRoleCode)
                     select tech)
                     .ToListAsync(ct);
 

@@ -139,7 +139,7 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="6"/>
+                    <RowDefinition Height="8"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -147,24 +147,31 @@
                     <TextBlock Grid.Row="0"
                                Text="Workspaces"
                                FontSize="18"
+                               HorizontalAlignment="Center"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimary}"/>
-                
-                <!-- Centered vertical module stack -->
+
+                <!-- Workspace tiles -->
                 <Grid Grid.Row="2"
                       Width="560"
                       HorizontalAlignment="Center">
+
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="4"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="88"/>
-                        <RowDefinition Height="6"/>
-                        <RowDefinition Height="88"/>
+                        <RowDefinition Height="132"/>
                         <RowDefinition Height="4"/>
-                        <RowDefinition Height="88"/>
+                        <RowDefinition Height="132"/>
                     </Grid.RowDefinitions>
 
                     <!-- Field Technician -->
                     <Button x:Name="TechTile"
                             Grid.Row="0"
+                            Grid.Column="0"
                             HorizontalAlignment="Stretch"
                             Padding="0"
                             HorizontalContentAlignment="Stretch"
@@ -172,33 +179,61 @@
                             Style="{StaticResource PrimaryTileButton}"
                             Click="Tech_Click">
 
-                        <Grid>
-                            <StackPanel HorizontalAlignment="Center"
-                                        VerticalAlignment="Center">
-                                <TextBlock Text="Field Technician"
-                                           FontSize="21"
-                                           FontWeight="SemiBold"
-                                           Foreground="White"
-                                           HorizontalAlignment="Center"
-                                           TextAlignment="Center"/>
+                        <StackPanel HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="Field Technician"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"/>
 
-                                <TextBlock Text="Site Dashboard • My Tasks • History"
-                                           FontSize="13"
-                                           FontWeight="SemiBold"
-                                           Foreground="#DCE7FF"
-                                           Margin="0,6,0,0"
-                                           HorizontalAlignment="Center"
-                                           TextAlignment="Center"/>
-                            </StackPanel>
-                        </Grid>
+                            <TextBlock Text="Site Dashboard • My Tasks • History"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="#DCE7FF"
+                                       Margin="0,6,0,0"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Lineman -->
+                    <Button x:Name="LinemanTile"
+                            Grid.Row="0"
+                            Grid.Column="2"
+                            HorizontalAlignment="Stretch"
+                            Padding="0"
+                            HorizontalContentAlignment="Stretch"
+                            VerticalContentAlignment="Stretch"
+                            Style="{StaticResource PrimaryTileButton}"
+                            Click="Lineman_Click">
+
+                        <StackPanel HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="Lineman"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"/>
+
+                            <TextBlock Text="Site Lookup • My Tasks • History"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="#DCE7FF"
+                                       Margin="0,6,0,0"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
                     </Button>
 
                     <!-- Dispatcher -->
                     <Button x:Name="DispatchTile"
                             Grid.Row="2"
+                            Grid.Column="0"
                             HorizontalAlignment="Stretch"
                             Style="{StaticResource TileButton}"
                             Click="Dispatch_Click">
+
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Dispatcher"
                                        FontSize="18"
@@ -216,10 +251,12 @@
 
                     <!-- Administration -->
                     <Button x:Name="AdminTile"
-                            Grid.Row="4"
+                            Grid.Row="2"
+                            Grid.Column="2"
                             HorizontalAlignment="Stretch"
                             Style="{StaticResource TileButton}"
                             Click="Admin_Click">
+
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Administration"
                                        FontSize="18"
@@ -234,6 +271,7 @@
                                        HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Button>
+
                 </Grid>
             </Grid>
         </Border>

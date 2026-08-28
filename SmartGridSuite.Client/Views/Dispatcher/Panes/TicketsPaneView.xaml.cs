@@ -53,6 +53,45 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
+        public sealed class TicketSummaryCardViewModel : INotifyPropertyChanged
+        {
+            public event PropertyChangedEventHandler? PropertyChanged;
+
+            public string Status { get; }
+
+            public int Count { get; }
+
+            public int SortOrder { get; }
+
+            private bool _isSelected;
+
+            public bool IsSelected
+            {
+                get => _isSelected;
+
+                set
+                {
+                    if (_isSelected == value)
+                        return;
+
+                    _isSelected = value;
+
+                    PropertyChanged?.Invoke(
+                        this,
+                        new PropertyChangedEventArgs(
+                            nameof(IsSelected)));
+                }
+            }
+
+            public TicketSummaryCardViewModel(
+                TicketSummaryStatusDto dto)
+            {
+                Status = dto.Status ?? "";
+                Count = dto.Count;
+                SortOrder = dto.SortOrder;
+            }
+        }
+
         private readonly ObservableCollection<DispatchTicket> _tickets = new();
         private readonly TicketsApi _ticketsApi = new TicketsApi(ClientAppSettings.CreateApiClient());
         private readonly TechniciansApi _techniciansApi;        
@@ -163,7 +202,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        public ObservableCollection<TicketSummaryStatusDto> SummaryStatuses { get; } = new();
+        public ObservableCollection<TicketSummaryCardViewModel>SummaryStatuses { get; } = new();
+        private string? _selectedSummaryCardStatus;
 
         private int _totalLoadedTicketCount;
         public int TotalLoadedTicketCount
@@ -678,8 +718,28 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                     if (!string.IsNullOrWhiteSpace(displayName))
                     {
-                        _knownTechs.Add(displayName);
+                        var isAssignableFieldWorker =
+                            tech.IsActive &&
+                            tech.RoleCodes != null &&
+                            tech.RoleCodes.Any(role =>
+                                string.Equals(
+                                    role,
+                                    "TECHNICIAN",
+                                    StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(
+                                    role,
+                                    "LINEMAN",
+                                    StringComparison.OrdinalIgnoreCase));
 
+                        if (isAssignableFieldWorker)
+                        {
+                            _knownTechs.Add(displayName);
+                        }
+
+                        /*
+                         * Keep identity aliases for everyone so tickets created or edited
+                         * by Dispatch/Admin users can still resolve their display names.
+                         */
                         AddCreatedByDisplayAlias(displayName, displayName);
                         AddCreatedByDisplayAlias(userId, displayName);
                         AddCreatedByDisplayAlias(employeeId, displayName);
@@ -801,8 +861,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                              .OrderBy(x => x.SortOrder)
                              .ThenBy(x => x.Status))
                 {
-                    SummaryStatuses.Add(
-                        status);
+                    var card =
+                        new TicketSummaryCardViewModel(
+                            status);
+
+                    card.IsSelected =
+                        !string.IsNullOrWhiteSpace(
+                            _selectedSummaryCardStatus) &&
+                        card.Status.Equals(
+                            _selectedSummaryCardStatus,
+                            StringComparison.OrdinalIgnoreCase);
+
+                    SummaryStatuses.Add(card);
                 }
 
                 RefreshTicketPagingBindings();
@@ -914,8 +984,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             SummaryStatuses.Clear();
 
-            foreach (var status in summary.Statuses.OrderBy(x => x.SortOrder).ThenBy(x => x.Status))
-                SummaryStatuses.Add(status);
+            foreach (var status in summary.Statuses
+                         .OrderBy(x => x.SortOrder)
+                         .ThenBy(x => x.Status))
+            {
+                var card =
+                    new TicketSummaryCardViewModel(
+                        status);
+
+                card.IsSelected =
+                    !string.IsNullOrWhiteSpace(
+                        _selectedSummaryCardStatus) &&
+                    card.Status.Equals(
+                        _selectedSummaryCardStatus,
+                        StringComparison.OrdinalIgnoreCase);
+
+                SummaryStatuses.Add(card);
+            }
         }
 
         private async Task LoadStatusOptionsFromApiAsync(
@@ -1136,6 +1221,92 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return new HashSet<string>(
                 _appliedStatusNames,
                 StringComparer.OrdinalIgnoreCase);
+        }
+
+        private async void SummaryStatusCard_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_filtersInitialized)
+                return;
+
+            if (sender is not Button button)
+                return;
+
+            var selectedStatus =
+                button.Tag?.ToString()?.Trim();
+
+            if (string.IsNullOrWhiteSpace(selectedStatus))
+                return;
+
+            /*
+             * Remember which summary card was clicked so the
+             * selected border survives the ticket reload.
+             */
+            _selectedSummaryCardStatus =
+                selectedStatus;
+
+            foreach (var card in SummaryStatuses)
+            {
+                card.IsSelected =
+                    card.Status.Equals(
+                        selectedStatus,
+                        StringComparison.OrdinalIgnoreCase);
+            }
+
+            var matchingOption =
+                StatusOptions.FirstOrDefault(
+                    x => x.Name.Equals(
+                        selectedStatus,
+                        StringComparison.OrdinalIgnoreCase));
+
+            if (matchingOption == null)
+                return;
+
+            _syncingStatusSelection =
+                true;
+
+            try
+            {
+                /*
+                 * A Summary Card is a single-status shortcut.
+                 *
+                 * Leave search/date/tech/quick filters untouched;
+                 * only replace the currently applied status selection.
+                 */
+                _appliedStatusNames.Clear();
+
+                foreach (var option in StatusOptions)
+                {
+                    option.IsSelected =
+                        option.Name.Equals(
+                            selectedStatus,
+                            StringComparison.OrdinalIgnoreCase);
+
+                    if (option.IsSelected)
+                    {
+                        _appliedStatusNames.Add(
+                            option.Name);
+                    }
+                }
+            }
+            finally
+            {
+                _syncingStatusSelection =
+                    false;
+            }
+
+            OnPropertyChanged(
+                nameof(SelectedStatusesSummary));
+
+            OnPropertyChanged(
+                nameof(StagedStatusesSummary));
+
+            UpdateStatusBulkToggleText();
+
+            StatusPopup.IsOpen =
+                false;
+
+            await LoadTicketsFromApiAsync(
+                resetPage: true);
         }
 
         private (DateTime? from, DateTime? to) GetLastActivityDateRangeFromUi()
@@ -1557,30 +1728,52 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private async void ClearFilters_Click(object sender, RoutedEventArgs e)
         {
             _suppressFilterEvents = true;
+
             try
             {
-                _activeQuickFilter = TicketQuickFilter.None;
+                _activeQuickFilter =
+                    TicketQuickFilter.None;
 
-                SearchBox.Text = string.Empty;
-                DateFieldFilter.SelectedIndex = 0;
-                DateRangeFilter.SelectedIndex = 0;
-                TechFilter.SelectedItem = "All";
-                QuickFilterComboBox.SelectedItem = "All Tickets";
+                SearchBox.Text =
+                    string.Empty;
 
-                FromDatePicker.SelectedDate = null;
-                ToDatePicker.SelectedDate = null;
+                DateFieldFilter.SelectedIndex =
+                    0;
+
+                DateRangeFilter.SelectedIndex =
+                    0;
+
+                TechFilter.SelectedItem =
+                    "All";
+
+                QuickFilterComboBox.SelectedItem =
+                    "All Tickets";
+
+                FromDatePicker.SelectedDate =
+                    null;
+
+                ToDatePicker.SelectedDate =
+                    null;
 
                 SetDefaultStatusSelectionWithoutRefresh();
+
+                // Clear the clicked Summary Card selection.
+                _selectedSummaryCardStatus =
+                    null;
             }
             finally
             {
-                _suppressFilterEvents = false;
+                _suppressFilterEvents =
+                    false;
             }
 
             UpdateCustomDateVisibility();
-            OnPropertyChanged(nameof(SelectedStatusesSummary));
 
-            await LoadTicketsFromApiAsync(resetPage: true);
+            OnPropertyChanged(
+                nameof(SelectedStatusesSummary));
+
+            await LoadTicketsFromApiAsync(
+                resetPage: true);
         }
 
         private async void CopyGridValue_Click(object sender, RoutedEventArgs e)
@@ -1983,7 +2176,21 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 .OrderBy(x => x)
                 .ToList();
 
-            var win = new NewTicketWindow(_ticketsApi, techSuggestions, ticketToEdit)
+            /*
+             * Edit Ticket displays the complete authoritative technician
+             * write-up history from individual submission records.
+             *
+             * Dispatch Tasks intentionally shows only the latest submission.
+             */
+            var writeUpHistory =
+                await _ticketsApi.GetWriteUpHistoryAsync(
+                    editingId);
+
+            var win = new NewTicketWindow(
+                _ticketsApi,
+                techSuggestions,
+                ticketToEdit,
+                writeUpHistory)
             {
                 Owner = Window.GetWindow(this)
             };

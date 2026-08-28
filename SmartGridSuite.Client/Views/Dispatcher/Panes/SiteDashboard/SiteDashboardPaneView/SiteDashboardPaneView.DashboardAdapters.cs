@@ -201,10 +201,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     dashboardKind,
                     SiteDashboardKinds.Igsd,
                     StringComparison.OrdinalIgnoreCase) ||
+
                 string.Equals(
                     dashboardKind,
                     SiteDashboardKinds.Dacs,
-                    StringComparison.OrdinalIgnoreCase);
+                    StringComparison.OrdinalIgnoreCase) ||
+
+                (
+                    _accessMode == SiteDashboardAccessMode.Lineman &&
+                    string.Equals(
+                        dashboardKind,
+                        SiteDashboardKinds.AmsMr,
+                        StringComparison.OrdinalIgnoreCase)
+                );
 
             if (!showPingScreen)
             {

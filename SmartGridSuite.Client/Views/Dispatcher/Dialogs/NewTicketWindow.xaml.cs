@@ -52,7 +52,11 @@ public partial class NewTicketWindow : Window
 
     private NewTicketDraft Draft => (NewTicketDraft)DataContext;
 
-    public NewTicketWindow(TicketsApi ticketsApi, IEnumerable<string>? techNames = null, DispatchTicket? existingTicket = null)
+    public NewTicketWindow(
+        TicketsApi ticketsApi,
+        IEnumerable<string>? techNames = null,
+        DispatchTicket? existingTicket = null,
+        TicketWriteUpHistoryResponse? writeUpHistory = null)
     {
         InitializeComponent();
 
@@ -128,7 +132,11 @@ public partial class NewTicketWindow : Window
             string.IsNullOrWhiteSpace(existingTicket?.ActionRequiredOverride)
                 ? null
                 : existingTicket.ActionRequiredOverride.Trim();
-        _preservedNotes = existingTicket?.Notes ?? "";
+        _preservedNotes = existingTicket == null
+            ? ""
+            : writeUpHistory?.HasSubmissionHistory == true
+                ? writeUpHistory.Text
+                : existingTicket.Notes ?? "";
 
         if (existingTicket != null)
         {

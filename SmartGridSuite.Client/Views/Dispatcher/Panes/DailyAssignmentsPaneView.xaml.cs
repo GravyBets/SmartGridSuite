@@ -798,10 +798,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                             StringComparer.OrdinalIgnoreCase)
                         .ToList();
 
+                var writeUpHistory =
+                    await _ticketsApi.GetWriteUpHistoryAsync(
+                        ticket.TicketId);
+
                 var win = new NewTicketWindow(
                     _ticketsApi,
                     techSuggestions,
-                    ticketToEdit)
+                    ticketToEdit,
+                    writeUpHistory)
                 {
                     Owner = Window.GetWindow(this)
                 };

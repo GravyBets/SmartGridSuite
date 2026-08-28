@@ -26,6 +26,7 @@ namespace SmartGridSuite.Api.Controllers
         private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
 
         private const string TechnicianRoleCode = "TECHNICIAN";
+        private const string LinemanRoleCode = "LINEMAN";
 
         private const string AssignmentStatusActive = "Active";
         private const string AssignmentStatusCompleted = "Completed";
@@ -2331,7 +2332,9 @@ namespace SmartGridSuite.Api.Controllers
                 .AsNoTracking()
                 .Where(t =>
                     t.IsActive &&
-                    t.TechnicianRoles.Any(tr => tr.Role.Code == TechnicianRoleCode));
+                    t.TechnicianRoles.Any(tr =>
+                        tr.Role.Code == TechnicianRoleCode ||
+                        tr.Role.Code == LinemanRoleCode));
         }
 
         private static TechnicianEntity? PickLeadTechnician(IReadOnlyList<TechnicianEntity> technicians, uint truckId, uint? crewLeadTechnicianId)

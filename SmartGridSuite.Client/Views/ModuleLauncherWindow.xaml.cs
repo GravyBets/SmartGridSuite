@@ -1,6 +1,7 @@
 ﻿using SmartGridSuite.Client.Services;
 using SmartGridSuite.Client.Views.FieldTechnician;
 using SmartGridSuite.Client.Views.Administration;
+using SmartGridSuite.Client.Views.Lineman;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Controls;
@@ -16,6 +17,8 @@ namespace SmartGridSuite.Client.Views
             ThemeService.ApplySavedTheme();
 
             InitializeComponent();
+
+            ClientPresenceService.Start("Module Launcher");
 
             // Keep the Module Launcher at its original fixed size.
             // Dispatcher, Field Technician, Administration, and other
@@ -220,6 +223,60 @@ namespace SmartGridSuite.Client.Views
             }
         }
 
+        private async void Lineman_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryBeginModuleOpen())
+                return;
+
+            try
+            {
+                if (!await CanOpenModulesForCurrentVersionAsync())
+                    return;
+
+                var existingWindow =
+                    Application.Current.Windows
+                        .OfType<LinemanShellWindow>()
+                        .FirstOrDefault();
+
+                if (existingWindow != null)
+                {
+                    TrackModuleWindow(existingWindow);
+                    BringExistingWindowForward(existingWindow);
+                    Hide();
+                    return;
+                }
+
+                if (!await CurrentUserHasRequiredRoleAsync(
+                        "LINEMAN",
+                        "Lineman"))
+                {
+                    return;
+                }
+
+                existingWindow =
+                    Application.Current.Windows
+                        .OfType<LinemanShellWindow>()
+                        .FirstOrDefault();
+
+                if (existingWindow != null)
+                {
+                    TrackModuleWindow(existingWindow);
+                    BringExistingWindowForward(existingWindow);
+                    Hide();
+                    return;
+                }
+
+                var wnd =
+                    new LinemanShellWindow();
+
+                OpenModuleWindow(wnd);
+            }
+            finally
+            {
+                EndModuleOpen();
+            }
+        }
+
         private async void Dispatch_Click(object sender, RoutedEventArgs e)
         {
             if (!TryBeginModuleOpen())
@@ -360,6 +417,7 @@ namespace SmartGridSuite.Client.Views
             _isOpeningModule = true;
 
             TechTile.IsEnabled = false;
+            LinemanTile.IsEnabled = false;
             DispatchTile.IsEnabled = false;
             AdminTile.IsEnabled = false;
 
@@ -373,6 +431,7 @@ namespace SmartGridSuite.Client.Views
             _isOpeningModule = false;
 
             TechTile.IsEnabled = true;
+            LinemanTile.IsEnabled = true;
             DispatchTile.IsEnabled = true;
             AdminTile.IsEnabled = true;
 
@@ -381,6 +440,8 @@ namespace SmartGridSuite.Client.Views
 
         private static void BringExistingWindowForward(Window window)
         {
+            ClientPresenceService.SetCurrentModule(GetPresenceModuleName(window));
+
             if (window.WindowState == WindowState.Minimized)
                 window.WindowState = WindowState.Normal;
 
@@ -403,9 +464,33 @@ namespace SmartGridSuite.Client.Views
         {
             TrackModuleWindow(window);
 
+            ClientPresenceService.SetCurrentModule(
+                GetPresenceModuleName(window));
+
             window.Show();
 
             Hide();
+        }
+
+        private static string GetPresenceModuleName(Window window)
+        {
+            return window.GetType().Name switch
+            {
+                "DispatcherShellWindow" =>
+                    "Dispatcher",
+
+                "FieldTechnicianShellWindow" =>
+                    "Field Technician",
+
+                "LinemanShellWindow" =>
+                    "Lineman",
+
+                "AdministrationShellWindow" =>
+                    "Administration",
+
+                _ =>
+                    "Module Launcher"
+            };
         }
 
         private void TrackModuleWindow(Window window)
@@ -452,6 +537,8 @@ namespace SmartGridSuite.Client.Views
             {
                 return;
             }
+
+            ClientPresenceService.SetCurrentModule("Module Launcher");
 
             if (WindowState == WindowState.Minimized)
                 WindowState = WindowState.Normal;

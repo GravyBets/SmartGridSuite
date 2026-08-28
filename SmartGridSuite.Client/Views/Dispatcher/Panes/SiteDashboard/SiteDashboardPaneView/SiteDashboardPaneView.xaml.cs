@@ -26,6 +26,50 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             set => WorkspaceView.CanManageSiteNotes = value;
         }
 
+        private SiteDashboardAccessMode _accessMode = SiteDashboardAccessMode.Full;
+
+        public SiteDashboardAccessMode AccessMode
+        {
+            get => _accessMode;
+
+            set
+            {
+                if (_accessMode == value)
+                    return;
+
+                _accessMode = value;
+
+                WorkspaceView.AccessMode = value;
+
+                ApplyAccessMode();
+            }
+        }
+
+        private void ApplyAccessMode()
+        {
+            var isLineman =
+                _accessMode == SiteDashboardAccessMode.Lineman;
+
+            /*
+             * Lineman does not receive the network diagnostics pane.
+             * Give the workspace the full available width instead.
+             */
+            NetworkView.Visibility =
+                isLineman
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+
+            NetworkColumn.Width =
+                isLineman
+                    ? new GridLength(0)
+                    : new GridLength(340);
+
+            NetworkGapColumn.Width =
+                isLineman
+                    ? new GridLength(0)
+                    : new GridLength(4);
+        }
+
         private readonly List<SiteDashboardTabSession> _sessions = new();
         private string? _selectedSessionKey;
         private bool _renderingSession;

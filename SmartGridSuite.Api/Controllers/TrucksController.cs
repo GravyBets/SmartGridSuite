@@ -18,6 +18,7 @@ public sealed class TrucksController : ControllerBase
     private readonly TruckBoardInitializationService _truckBoardInitialization;
 
     private const string TechnicianRoleCode = "TECHNICIAN";
+    private const string LinemanRoleCode = "LINEMAN";
 
     public TrucksController(
         SmartGridDbContext db,
@@ -583,7 +584,7 @@ public sealed class TrucksController : ControllerBase
             .AnyAsync(t => t.Id == techId);
 
         if (!techExists)
-            return NotFound($"Technician {req.TechnicianId} was not found, is inactive, or does not have the Technician role.");
+            return NotFound($"Technician {req.TechnicianId} was not found, is inactive, or does not have the Technician or Lineman role.");
 
         if (toTruckId != null)
         {
@@ -658,7 +659,7 @@ public sealed class TrucksController : ControllerBase
             .FirstOrDefaultAsync(t => t.Id == technicianId);
 
         if (technician == null)
-            return NotFound($"Technician {req.TechnicianId} was not found, is inactive, or does not have the Technician role.");
+            return NotFound($"Technician {req.TechnicianId} was not found, is inactive, or does not have the Technician or Lineman role.");
 
         var rosterRows = await _db.Set<TruckRosterEntity>()
             .Where(r => r.WorkDate == workDate && r.TruckId == truckId)
@@ -982,7 +983,9 @@ public sealed class TrucksController : ControllerBase
             .AsNoTracking()
             .Where(t =>
                 t.IsActive &&
-                t.TechnicianRoles.Any(tr => tr.Role.Code == TechnicianRoleCode));
+                t.TechnicianRoles.Any(tr =>
+                    tr.Role.Code == TechnicianRoleCode ||
+                    tr.Role.Code == LinemanRoleCode));
     }
 
     private static DateTime ParseDateOrToday(string? date)

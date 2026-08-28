@@ -137,6 +137,7 @@ namespace SmartGridSuite.Client.Views.Administration
             var roles = row.RoleCodes.Select(x => (x ?? "").Trim().ToUpperInvariant()).ToHashSet();
 
             RoleTechnicianCheckBox.IsChecked = roles.Contains("TECHNICIAN");
+            RoleLinemanCheckBox.IsChecked = roles.Contains("LINEMAN");
             RoleDispatchCheckBox.IsChecked = roles.Contains("DISPATCH");
             RoleAdminCheckBox.IsChecked = roles.Contains("ADMIN");
         }
@@ -157,6 +158,9 @@ namespace SmartGridSuite.Client.Views.Administration
 
             if (RoleTechnicianCheckBox.IsChecked == true)
                 roles.Add("TECHNICIAN");
+
+            if (RoleLinemanCheckBox.IsChecked == true)
+                roles.Add("LINEMAN");
 
             if (RoleDispatchCheckBox.IsChecked == true)
                 roles.Add("DISPATCH");

@@ -644,6 +644,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 ActionRequired = dto.ActionRequired ?? "",
                 Notes = dto.Notes ?? "",
 
+                DispatchRequestDetails = dto.DispatchRequestDetails ?? "",
+
                 Status = dto.Status ?? "",
 
                 SubmissionId = dto.SubmissionId,
@@ -1154,11 +1156,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     .Cast<string>()
                     .ToList();
 
+                var writeUpHistory =
+                    await _ticketsApi.GetWriteUpHistoryAsync(
+                        SelectedTask.TicketId);
+
                 var win =
                     new NewTicketWindow(
                         _ticketsApi,
                         techNames,
-                        ticket)
+                        ticket,
+                        writeUpHistory)
                     {
                         Owner = Window.GetWindow(this)
                     };

@@ -230,10 +230,22 @@
                 </GroupBox>
 
                 <GroupBox Header="Roles">
-                    <UniformGrid Columns="3" Margin="10">
-                        <CheckBox x:Name="RoleTechnicianCheckBox" Content="Technician" Margin="0,4"/>
-                        <CheckBox x:Name="RoleDispatchCheckBox" Content="Dispatch" Margin="0,4"/>
-                        <CheckBox x:Name="RoleAdminCheckBox" Content="Admin" Margin="0,4"/>
+                    <UniformGrid Columns="4" Margin="10">
+                        <CheckBox x:Name="RoleTechnicianCheckBox"
+                                  Content="Technician"
+                                  Margin="0,4"/>
+
+                        <CheckBox x:Name="RoleLinemanCheckBox"
+                                  Content="Lineman"
+                                  Margin="0,4"/>
+
+                        <CheckBox x:Name="RoleDispatchCheckBox"
+                                  Content="Dispatch"
+                                  Margin="0,4"/>
+
+                        <CheckBox x:Name="RoleAdminCheckBox"
+                                  Content="Admin"
+                                  Margin="0,4"/>
                     </UniformGrid>
                 </GroupBox>
             </StackPanel>

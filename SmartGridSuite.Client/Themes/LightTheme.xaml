@@ -133,6 +133,32 @@
     <SolidColorBrush x:Key="NetworkPingOutputText"
                  Color="#0F172A"/>
 
+    <!-- Semantic status badges -->
+
+    <!-- Success: Online / Current -->
+    <SolidColorBrush x:Key="StatusSuccessBg"
+                 Color="#E8F5E9"/>
+    <SolidColorBrush x:Key="StatusSuccessBorder"
+                 Color="#4CAF50"/>
+    <SolidColorBrush x:Key="StatusSuccessText"
+                 Color="#12381E"/>
+
+    <!-- Neutral: Offline -->
+    <SolidColorBrush x:Key="StatusNeutralBg"
+                 Color="#EEF2F7"/>
+    <SolidColorBrush x:Key="StatusNeutralBorder"
+                 Color="#D7DCE3"/>
+    <SolidColorBrush x:Key="StatusNeutralText"
+                 Color="#475569"/>
+
+    <!-- Warning: Outdated -->
+    <SolidColorBrush x:Key="StatusWarningBg"
+                 Color="#FFF4D6"/>
+    <SolidColorBrush x:Key="StatusWarningBorder"
+                 Color="#D48A13"/>
+    <SolidColorBrush x:Key="StatusWarningText"
+                 Color="#6B4100"/>
+
     <!-- Overlays / Misc -->
     <SolidColorBrush x:Key="HoverOverlay" Color="#14000000"/>
     <SolidColorBrush x:Key="PressedOverlay" Color="#22000000"/>

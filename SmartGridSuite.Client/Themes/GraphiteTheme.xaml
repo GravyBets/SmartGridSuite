@@ -57,6 +57,28 @@
 
     <SolidColorBrush x:Key="NetworkPingOutputText"
                  Color="#F7F9FB"/>
+    <!-- Semantic status badges -->
+
+    <SolidColorBrush x:Key="StatusSuccessBg"
+                 Color="#1B3328"/>
+    <SolidColorBrush x:Key="StatusSuccessBorder"
+                 Color="#4ADE80"/>
+    <SolidColorBrush x:Key="StatusSuccessText"
+                 Color="#E9FFF2"/>
+
+    <SolidColorBrush x:Key="StatusNeutralBg"
+                 Color="#222A34"/>
+    <SolidColorBrush x:Key="StatusNeutralBorder"
+                 Color="#3B4654"/>
+    <SolidColorBrush x:Key="StatusNeutralText"
+                 Color="#C7D0DA"/>
+
+    <SolidColorBrush x:Key="StatusWarningBg"
+                 Color="#3B2F18"/>
+    <SolidColorBrush x:Key="StatusWarningBorder"
+                 Color="#D9A441"/>
+    <SolidColorBrush x:Key="StatusWarningText"
+                 Color="#FFE0A3"/>
 
     <!-- Surfaces -->
     <SolidColorBrush x:Key="SurfaceBg"

@@ -353,6 +353,43 @@
                                              Style="{StaticResource TaskSelectableValueText}"/>
                                 </StackPanel>
 
+                                <!-- Maintenance / Capital request information -->
+                                <StackPanel Margin="0,0,0,14">
+
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+
+                                            <Setter Property="Visibility"
+                    Value="Visible"/>
+
+                                            <Style.Triggers>
+
+                                                <DataTrigger Binding="{Binding DispatchRequestDetails}"
+                             Value="">
+                                                    <Setter Property="Visibility"
+                            Value="Collapsed"/>
+                                                </DataTrigger>
+
+                                                <DataTrigger Binding="{Binding DispatchRequestDetails}"
+                             Value="{x:Null}">
+                                                    <Setter Property="Visibility"
+                            Value="Collapsed"/>
+                                                </DataTrigger>
+
+                                            </Style.Triggers>
+
+                                        </Style>
+                                    </StackPanel.Style>
+
+                                    <TextBlock Text="Requested Work"
+                                               Style="{StaticResource TaskExpandedLabelText}"/>
+
+                                    <TextBox Text="{Binding DispatchRequestDetails,
+                                                Mode=OneWay}"
+                                             Style="{StaticResource TaskSelectableValueText}"/>
+
+                                </StackPanel>
+
                                 <StackPanel Margin="0,0,0,14">
                                     <StackPanel.Style>
                                         <Style TargetType="StackPanel">

@@ -255,7 +255,9 @@
             <TabItem x:Name="RxOverviewTabItem" Header="Range Extender" Tag="RxOverview" Visibility="Collapsed"/>
             <TabItem x:Name="PortalTabItem" Header="PingScreen" Tag="Portal" Visibility="Collapsed"/>
             <TabItem Header="Site History" Tag="SiteHistory"/>
-            <TabItem Header="Equipment" Tag="Equipment"/>
+            <TabItem x:Name="EquipmentTabItem"
+                     Header="Equipment"
+                     Tag="Equipment"/>
             <TabItem x:Name="SnmpTabItem" Header="SNMP Tool" Tag="SNMPTool" Height="33" Margin="-4,0,0,0" VerticalAlignment="Top"/>
         </TabControl>
 

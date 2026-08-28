@@ -11,6 +11,7 @@ namespace SmartGridSuite.Api.Services
         private readonly SmartGridDbContext _db;
 
         private const string TechnicianRoleCode = "TECHNICIAN";
+        private const string LinemanRoleCode = "LINEMAN";
 
         /*
          * Truck Board and Daily Assignments may both load at application start.
@@ -344,7 +345,9 @@ namespace SmartGridSuite.Api.Services
                 .AsNoTracking()
                 .Where(t =>
                     t.IsActive &&
-                    t.TechnicianRoles.Any(tr => tr.Role.Code == TechnicianRoleCode));
+                    t.TechnicianRoles.Any(tr =>
+                        tr.Role.Code == TechnicianRoleCode ||
+                        tr.Role.Code == LinemanRoleCode));
         }
 
         private static TechnicianEntity? PickLeadTechnician(

@@ -3,6 +3,7 @@ using SmartGridSuite.Client.Views.Administration.GeneralSettings;
 using SmartGridSuite.Client.Views.Administration.SNMP;
 using SmartGridSuite.Client.Views.Administration.Tickets;
 using SmartGridSuite.Client.Views.Administration.WriteUpWorkflow;
+using SmartGridSuite.Client.Views.Administration.ConnectedClients;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,6 +21,7 @@ namespace SmartGridSuite.Client.Views.Administration
         private readonly GeneralSettingsAdminView _generalSettingsView;
         private readonly WriteUpWorkflowAdminView _writeUpWorkflowView;
         private readonly SnmpAdminView _snmpView;
+        private readonly ConnectedClientsAdminView _connectedClientsView;
 
         private bool _navCollapsed;
         private bool _syncingNav;
@@ -41,6 +43,7 @@ namespace SmartGridSuite.Client.Views.Administration
             _generalSettingsView = new GeneralSettingsAdminView(_api);
             _writeUpWorkflowView = new WriteUpWorkflowAdminView(_api);
             _snmpView = new SnmpAdminView(_api);
+            _connectedClientsView = new ConnectedClientsAdminView(_api);
 
             _navCollapsed = true;
             ApplyNavState();
@@ -164,6 +167,10 @@ namespace SmartGridSuite.Client.Views.Administration
 
                 case "SNMP":
                     ShowView(_snmpView);
+                    break;
+
+                case "ConnectedClients":
+                    ShowView(_connectedClientsView);
                     break;
 
                 default:

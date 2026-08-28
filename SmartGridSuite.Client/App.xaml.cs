@@ -51,6 +51,8 @@ namespace SmartGridSuite.Client
 
         protected override void OnExit(ExitEventArgs e)
         {
+            ClientPresenceService.Stop();
+
             if (_ownsSingleInstanceMutex &&
                 _singleInstanceMutex != null)
             {

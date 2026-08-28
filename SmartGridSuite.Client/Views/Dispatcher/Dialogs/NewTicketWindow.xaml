@@ -397,12 +397,12 @@
                             Margin="0,10,0,0"
                             Visibility="Collapsed">
 
-                    <TextBlock Text="Technician Notes / Write-Ups"
+                    <TextBlock Text="Technician Write-Up History"
                                Margin="2,0,0,2"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimary}"/>
 
-                    <TextBlock Text="Submitted technician write-up. Dispatch may edit this text before closing the ticket. Editing this does NOT change Site History."
+                    <TextBlock Text="Complete technician write-up history for this ticket. Each field-work submission is shown chronologically and separated below."
                                Margin="2,0,0,6"
                                FontSize="11"
                                Foreground="{DynamicResource TextSecondary}"

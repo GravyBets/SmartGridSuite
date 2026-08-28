@@ -7,10 +7,10 @@
     <UseWPF>true</UseWPF>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <ApplicationIcon>Assets\Branding\SmartGridSuite_Icon.ico</ApplicationIcon>
-        <Version>3.1.0.7</Version>
-        <AssemblyVersion>3.1.0.7</AssemblyVersion>
-        <FileVersion>3.1.0.7</FileVersion>
-        <InformationalVersion>3.1.0.7</InformationalVersion>
+        <Version>3.2.0.1</Version>
+        <AssemblyVersion>3.2.0.1</AssemblyVersion>
+        <FileVersion>3.2.0.1</FileVersion>
+        <InformationalVersion>3.2.0.1</InformationalVersion>
         <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 	<ItemGroup>
@@ -51,5 +51,10 @@
     <Resource Include="Assets\Branding\SmartGridSuite_Logo.png">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Views\Lineman\LinemanShellWindow.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
 </Project>

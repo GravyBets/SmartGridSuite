@@ -107,25 +107,125 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private void ApplyDashboardFeatureVisibility()
         {
-            var isRx = IsRangeExtenderDashboard;
+            var isRx =
+                IsRangeExtenderDashboard;
 
-            var isTower = string.Equals(
-                EquipmentDashboardKind,
-                SmartGridSuite.Contracts.SiteDashboard.SiteDashboardKinds.Tower,
-                StringComparison.OrdinalIgnoreCase);
+            var isTower =
+                string.Equals(
+                    EquipmentDashboardKind,
+                    SmartGridSuite.Contracts.SiteDashboard
+                        .SiteDashboardKinds.Tower,
+                    StringComparison.OrdinalIgnoreCase);
 
+            /*
+             * LINEMAN MODE
+             *
+             * Lineman uses an allow-list:
+             *
+             *   Main
+             *   Site History
+             *   Portal / PingScreen
+             *
+             * Everything diagnostic or equipment-related stays hidden,
+             * regardless of what kind of site was loaded.
+             */
+            if (IsLinemanAccessMode)
+            {
+                if (RxOverviewTabItem is not null)
+                    RxOverviewTabItem.Visibility =
+                        Visibility.Collapsed;
+
+                if (TowerOverviewTabItem is not null)
+                    TowerOverviewTabItem.Visibility =
+                        Visibility.Collapsed;
+
+                if (EquipmentTabItem is not null)
+                    EquipmentTabItem.Visibility =
+                        Visibility.Collapsed;
+
+                if (SnmpTabItem is not null)
+                    SnmpTabItem.Visibility =
+                        Visibility.Collapsed;
+
+                /*
+                 * These controls belong to the diagnostic portions of
+                 * the write-up workflow and are not useful to Lineman.
+                 */
+                if (IncludePingStatsCheckBox is not null)
+                {
+                    IncludePingStatsCheckBox.Visibility =
+                        Visibility.Collapsed;
+
+                    IncludePingStatsCheckBox.IsChecked =
+                        false;
+                }
+
+                if (IncludeSnmpStatsCheckBox is not null)
+                {
+                    IncludeSnmpStatsCheckBox.Visibility =
+                        Visibility.Collapsed;
+
+                    IncludeSnmpStatsCheckBox.IsChecked =
+                        false;
+                }
+
+                if (SnmpCategoryOptionsPanel is not null)
+                {
+                    SnmpCategoryOptionsPanel.Visibility =
+                        Visibility.Collapsed;
+                }
+
+                if (!IsLinemanAllowedWorkspaceTab(
+                        SelectedWorkspaceTabKey))
+                {
+                    SetSelectedWorkspaceTab(
+                        "TopWriteUp");
+                }
+
+                return;
+            }
+
+            /*
+             * FULL DASHBOARD MODE
+             *
+             * Preserve existing Dispatcher / Field Technician behavior.
+             */
             if (RxOverviewTabItem is not null)
-                RxOverviewTabItem.Visibility = isRx ? Visibility.Visible : Visibility.Collapsed;
+            {
+                RxOverviewTabItem.Visibility =
+                    isRx
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+            }
 
             if (TowerOverviewTabItem is not null)
-                TowerOverviewTabItem.Visibility = isTower ? Visibility.Visible : Visibility.Collapsed;
+            {
+                TowerOverviewTabItem.Visibility =
+                    isTower
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+            }
+
+            if (EquipmentTabItem is not null)
+            {
+                EquipmentTabItem.Visibility =
+                    Visibility.Visible;
+            }
 
             if (SnmpTabItem is not null)
-                SnmpTabItem.Visibility = isRx ? Visibility.Collapsed : Visibility.Visible;
+            {
+                SnmpTabItem.Visibility =
+                    isRx
+                        ? Visibility.Collapsed
+                        : Visibility.Visible;
+            }
 
             if (IncludePingStatsCheckBox is not null)
             {
-                IncludePingStatsCheckBox.Visibility = isRx ? Visibility.Collapsed : Visibility.Visible;
+                IncludePingStatsCheckBox.Visibility =
+                    isRx
+                        ? Visibility.Collapsed
+                        : Visibility.Visible;
 
                 if (isRx)
                     IncludePingStatsCheckBox.IsChecked = false;
@@ -133,32 +233,54 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             if (IncludeSnmpStatsCheckBox is not null)
             {
-                IncludeSnmpStatsCheckBox.Visibility = isRx ? Visibility.Collapsed : Visibility.Visible;
+                IncludeSnmpStatsCheckBox.Visibility =
+                    isRx
+                        ? Visibility.Collapsed
+                        : Visibility.Visible;
 
                 if (isRx)
                     IncludeSnmpStatsCheckBox.IsChecked = false;
             }
 
-            if (SnmpCategoryOptionsPanel is not null && isRx)
-                SnmpCategoryOptionsPanel.Visibility = Visibility.Collapsed;
+            if (SnmpCategoryOptionsPanel is not null &&
+                isRx)
+            {
+                SnmpCategoryOptionsPanel.Visibility =
+                    Visibility.Collapsed;
+            }
 
             if (isRx)
             {
-                var selectedKey = SelectedWorkspaceTabKey;
+                var selectedKey =
+                    SelectedWorkspaceTabKey;
 
-                if (string.Equals(selectedKey, "SNMPTool", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(selectedKey, "TopWriteUp", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(
+                        selectedKey,
+                        "SNMPTool",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(
+                        selectedKey,
+                        "TopWriteUp",
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    SetSelectedWorkspaceTab("RxOverview");
+                    SetSelectedWorkspaceTab(
+                        "RxOverview");
                 }
             }
 
             if (isTower)
             {
-                var selectedKey = SelectedWorkspaceTabKey;
+                var selectedKey =
+                    SelectedWorkspaceTabKey;
 
-                if (string.Equals(selectedKey, "TopWriteUp", StringComparison.OrdinalIgnoreCase))
-                    SetSelectedWorkspaceTab("TowerOverview");
+                if (string.Equals(
+                        selectedKey,
+                        "TopWriteUp",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    SetSelectedWorkspaceTab(
+                        "TowerOverview");
+                }
             }
         }
 

@@ -28,6 +28,8 @@ namespace SmartGridSuite.Contracts.Dispatcher
 
         public string Status { get; set; } = "";
 
+        public string DispatchRequestDetails { get; set; } = "";
+
         public long? SubmissionId { get; set; }
 
         public DateTime? SubmittedAt { get; set; }

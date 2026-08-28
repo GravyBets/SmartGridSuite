@@ -22,6 +22,27 @@ namespace SmartGridSuite.Client.Models.Dispatcher
             return value?.Trim() ?? "";
         }
 
+        private string _dispatchRequestDetails = "";
+
+        public string DispatchRequestDetails
+        {
+            get => _dispatchRequestDetails;
+
+            set
+            {
+                var cleaned =
+                    value?.Trim() ?? "";
+
+                if (_dispatchRequestDetails == cleaned)
+                    return;
+
+                _dispatchRequestDetails =
+                    cleaned;
+
+                OnPropertyChanged();
+            }
+        }
+
         private long _ticketId;
         public long TicketId
         {

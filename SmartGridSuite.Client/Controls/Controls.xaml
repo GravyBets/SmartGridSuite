@@ -1653,14 +1653,14 @@
 
     <!-- Tile Button-->
     <Style x:Key="TileButton" TargetType="Button">
-        <Setter Property="Height" Value="78"/>
+        <Setter Property="Height" Value="128"/>
         <Setter Property="FontSize" Value="18"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
         <Setter Property="Background" Value="{DynamicResource TileFill}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
         <Setter Property="BorderThickness" Value="2"/>
-        <Setter Property="Padding" Value="18,0"/>
+        <Setter Property="Padding" Value="10,0"/>
         <Setter Property="Cursor" Value="Hand"/>
 
         <Setter Property="Template">
