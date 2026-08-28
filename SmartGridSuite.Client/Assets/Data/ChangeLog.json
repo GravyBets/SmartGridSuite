@@ -1,5 +1,18 @@
 [
   {
+    "version": "3.2.0.2",
+    "date": "August 28, 2026",
+    "title": "Summary Cards, Dispatch Tasks Capital Requests",
+    "changes": [
+      "Added Maintenance/Capital request details to Dispatch → Tasks.",
+      "Requested Work now shows technician name and request reason.",
+      "Made Dispatch → Tickets summary cards clickable to filter by status.",
+      "Added selected-state border to the active summary card.",
+      "Clear Filters now clears the summary card selection."
+    ]
+  },
+
+  {
     "version": "3.2.0.1",
     "date": "August 27, 2026",
     "title": "Lineman Role - Double Write-up Handling",
@@ -26,7 +39,7 @@
     "changes": [
       "Added support for editing legacy/imported Site History entries while preserving the original imported source data.",
       "Fixed Ticket Status renames so existing tickets automatically update to the new status name.",
-      "Fixed the Dispatch Tickets â€œAll / Include Closedâ€ status filter so it truly includes tickets with any status, including legacy or inactive statuses.",
+      "Fixed the Dispatch Tickets Ã¢â‚¬Å“All / Include ClosedÃ¢â‚¬Â status filter so it truly includes tickets with any status, including legacy or inactive statuses.",
       "Added a copy-to-clipboard button beside Site numbers in Field Technician History, with the same temporary checkmark feedback used for Notifications and Work Orders."
     ]
   },
