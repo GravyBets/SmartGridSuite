@@ -10,6 +10,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
 
 namespace SmartGridSuite.Api.Services.SiteDashboard
 {
@@ -53,13 +54,17 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
         private readonly ParentSyncService _parentSyncService;
         private readonly ILogger<SiteDashboardCacheRefreshService> _logger;
 
+        private readonly ParentDatabaseHealthService _parentDatabaseHealth;
+
         public SiteDashboardCacheRefreshService(
             SmartGridDbContext db,
             ParentSyncService parentSyncService,
+            ParentDatabaseHealthService parentDatabaseHealth,
             ILogger<SiteDashboardCacheRefreshService> logger)
         {
             _db = db;
             _parentSyncService = parentSyncService;
+            _parentDatabaseHealth = parentDatabaseHealth;
             _logger = logger;
         }
 
@@ -76,9 +81,25 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
              * transaction. If the Parent DB query fails, the existing cache
              * remains untouched.
              */
-            var snapshot =
-                await _parentSyncService.GetCacheSnapshotAsync(
-                    cancellationToken);
+            ParentCacheSnapshot snapshot;
+
+            try
+            {
+                snapshot =
+                    await _parentSyncService.GetCacheSnapshotAsync(
+                        cancellationToken);
+
+                _parentDatabaseHealth.RecordSuccess(
+                    "Parent DB cache refresh");
+            }
+            catch (SqlException ex)
+            {
+                _parentDatabaseHealth.RecordFailure(
+                    ex,
+                    "Parent DB cache refresh");
+
+                throw;
+            }
 
             var syncedAtUtc = DateTime.UtcNow;
 

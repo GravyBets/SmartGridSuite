@@ -170,6 +170,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 if (!ShouldShowDashboardBody(session))
                 {
                     NetworkView.ResetDisplay();
+
+                    /*
+                     * A Blank tab still needs its own Network state object.
+                     * Otherwise the shared NetworkView remains attached to the
+                     * previously selected site's state and clears that site when
+                     * switching back.
+                     */
+                    session.NetworkPingState ??=
+                        new NetworkPingSessionState();
+
+                    NetworkView.RestorePingSessionState(
+                        session.NetworkPingState);
+
                     WorkspaceView.Reset();
                     return;
                 }
@@ -207,7 +220,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 NetworkView.IgsdSecondaryRtuIp = session.IgsdSecondaryRtuIp;
 
                 NetworkView.ApplyLayoutMode();
-                NetworkView.RestorePingSessionState(session.NetworkPingState);
+
+                /*
+                 * Every Site Dashboard tab owns its own Network state—even a
+                 * brand-new site whose Parent DB fields are completely blank.
+                 */
+                session.NetworkPingState ??=
+                    new NetworkPingSessionState();
+
+                NetworkView.RestorePingSessionState(
+                    session.NetworkPingState);
 
                 //Main Workspace
                 WorkspaceView.Reset();

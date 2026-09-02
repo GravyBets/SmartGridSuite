@@ -113,6 +113,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             WorkspaceView.WriteUpSubmitRequested += WorkspaceView_WriteUpSubmitRequested;
 
             NetworkView.NetworkTestRequested += NetworkView_NetworkTestRequested;
+            NetworkView.NetworkSessionStateChanged += NetworkView_NetworkSessionStateChanged;
 
             WorkspaceView.PingStatsProvider = () => NetworkView.GetPingStatsForWriteUp();
 
@@ -148,6 +149,25 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             EnsureInitialBlankTab();
             RenderSelectedSession();
+        }
+
+        private void NetworkView_NetworkSessionStateChanged(object? sender, EventArgs e)
+        {
+            /*
+             * Ignore values being populated programmatically while switching
+             * or rendering tabs. Only capture actual technician edits.
+             */
+            if (_renderingSession)
+                return;
+
+            var session =
+                GetSelectedSession();
+
+            if (session is null)
+                return;
+
+            session.NetworkPingState =
+                NetworkView.GetPingSessionState();
         }
 
         private void ShowSiteLoadOverlay(string message)

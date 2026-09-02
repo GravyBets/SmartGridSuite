@@ -37,15 +37,18 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
 
         private readonly ParentSyncService _parentSyncService;
         private readonly SiteDashboardCacheService _cacheService;
+        private readonly ParentDatabaseHealthService _parentDatabaseHealth;
         private readonly ILogger<SiteDashboardLookupService> _logger;
 
         public SiteDashboardLookupService(
             ParentSyncService parentSyncService,
             SiteDashboardCacheService cacheService,
+            ParentDatabaseHealthService parentDatabaseHealth,
             ILogger<SiteDashboardLookupService> logger)
         {
             _parentSyncService = parentSyncService;
             _cacheService = cacheService;
+            _parentDatabaseHealth = parentDatabaseHealth;
             _logger = logger;
         }
 
@@ -65,6 +68,8 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                         siteId,
                         liveLookupCancellation.Token);
 
+                _parentDatabaseHealth.RecordSuccess("site dashboard lookup");
+
                 if (liveDashboard is null)
                 {
                     return new SiteDashboardLookupResult
@@ -83,13 +88,9 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                 when (!cancellationToken.IsCancellationRequested &&
                       liveLookupCancellation.IsCancellationRequested)
             {
-                _logger.LogWarning(
+                _parentDatabaseHealth.RecordFailure(
                     ex,
-                    "Parent database lookup timed out after {TimeoutSeconds} " +
-                    "seconds for site {SiteId}. Attempting to use cached " +
-                    "site information.",
-                    LiveLookupTimeout.TotalSeconds,
-                    siteId);
+                    "site dashboard lookup");
 
                 return await GetCachedSiteAsync(
                     siteId,
@@ -98,11 +99,9 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
             catch (SqlException ex)
                 when (!cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning(
+                _parentDatabaseHealth.RecordFailure(
                     ex,
-                    "Parent database lookup failed for site {SiteId}. " +
-                    "Attempting to use cached site information.",
-                    siteId);
+                    "site dashboard lookup");
 
                 return await GetCachedSiteAsync(
                     siteId,
@@ -165,22 +164,24 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
 
             try
             {
-                return await _parentSyncService
-                    .FindAssociatedSiteBySerialAsync(
-                        query,
-                        liveLookupCancellation.Token);
+                var result =
+                    await _parentSyncService
+                        .FindAssociatedSiteBySerialAsync(
+                            query,
+                            liveLookupCancellation.Token);
+
+                _parentDatabaseHealth.RecordSuccess(
+                    "serial-number lookup");
+
+                return result;
             }
             catch (OperationCanceledException ex)
                 when (!cancellationToken.IsCancellationRequested &&
                       liveLookupCancellation.IsCancellationRequested)
             {
-                _logger.LogWarning(
+                _parentDatabaseHealth.RecordFailure(
                     ex,
-                    "Parent database serial lookup timed out after " +
-                    "{TimeoutSeconds} seconds for {SearchValue}. " +
-                    "Attempting cached site lookup.",
-                    LiveLookupTimeout.TotalSeconds,
-                    query);
+                    "serial-number lookup");
 
                 return await _parentSyncService
                     .FindAssociatedSiteBySerialFromCacheAsync(
@@ -190,11 +191,9 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
             catch (SqlException ex)
                 when (!cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning(
+                _parentDatabaseHealth.RecordFailure(
                     ex,
-                    "Parent database serial lookup failed for " +
-                    "{SearchValue}. Attempting cached site lookup.",
-                    query);
+                    "serial-number lookup");
 
                 return await _parentSyncService
                     .FindAssociatedSiteBySerialFromCacheAsync(
@@ -216,22 +215,24 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
 
             try
             {
-                return await _parentSyncService
-                    .FindAssociatedSiteByIpAsync(
-                        ip,
-                        liveLookupCancellation.Token);
+                var result =
+                    await _parentSyncService
+                        .FindAssociatedSiteByIpAsync(
+                            ip,
+                            liveLookupCancellation.Token);
+
+                _parentDatabaseHealth.RecordSuccess(
+                    "reverse-IP lookup");
+
+                return result;
             }
             catch (OperationCanceledException ex)
                 when (!cancellationToken.IsCancellationRequested &&
                       liveLookupCancellation.IsCancellationRequested)
             {
-                _logger.LogWarning(
+                _parentDatabaseHealth.RecordFailure(
                     ex,
-                    "Parent database reverse-IP lookup timed out after " +
-                    "{TimeoutSeconds} seconds for IP {IpAddress}. " +
-                    "Attempting cached site lookup.",
-                    LiveLookupTimeout.TotalSeconds,
-                    ip);
+                    "reverse-IP lookup");
 
                 return await _parentSyncService
                     .FindAssociatedSiteByIpFromCacheAsync(
@@ -241,11 +242,9 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
             catch (SqlException ex)
                 when (!cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning(
+                _parentDatabaseHealth.RecordFailure(
                     ex,
-                    "Parent database reverse-IP lookup failed for " +
-                    "{IpAddress}. Attempting cached site lookup.",
-                    ip);
+                    "reverse-IP lookup");
 
                 return await _parentSyncService
                     .FindAssociatedSiteByIpFromCacheAsync(
@@ -271,6 +270,8 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                         topNameId,
                         liveLookupCancellation.Token);
 
+                _parentDatabaseHealth.RecordSuccess("tower dashboard lookup");
+
                 if (liveDashboard is null)
                 {
                     return new SiteDashboardLookupResult
@@ -286,16 +287,12 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                 };
             }
             catch (OperationCanceledException ex)
-                when (!cancellationToken.IsCancellationRequested &&
-                      liveLookupCancellation.IsCancellationRequested)
+            when (!cancellationToken.IsCancellationRequested &&
+                  liveLookupCancellation.IsCancellationRequested)
             {
-                _logger.LogWarning(
+                _parentDatabaseHealth.RecordFailure(
                     ex,
-                    "Parent database tower lookup timed out after " +
-                    "{TimeoutSeconds} seconds for tower {TopNameId}. " +
-                    "Attempting to use cached tower information.",
-                    LiveLookupTimeout.TotalSeconds,
-                    topNameId);
+                    "tower dashboard lookup");
 
                 return await GetCachedTowerAsync(
                     topNameId,
@@ -304,11 +301,9 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
             catch (SqlException ex)
                 when (!cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning(
+                _parentDatabaseHealth.RecordFailure(
                     ex,
-                    "Parent database lookup failed for tower {TopNameId}. " +
-                    "Attempting to use cached tower information.",
-                    topNameId);
+                    "tower dashboard lookup");
 
                 return await GetCachedTowerAsync(
                     topNameId,
@@ -361,6 +356,8 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                         take,
                         liveLookupCancellation.Token);
 
+                _parentDatabaseHealth.RecordSuccess("tower search");
+
                 if (liveRows.Count > 0)
                 {
                     return new TowerSearchLookupResult
@@ -384,13 +381,9 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                 when (!cancellationToken.IsCancellationRequested &&
                       liveLookupCancellation.IsCancellationRequested)
             {
-                _logger.LogWarning(
+                _parentDatabaseHealth.RecordFailure(
                     ex,
-                    "Parent database tower search timed out after " +
-                    "{TimeoutSeconds} seconds for {SearchTerm}. " +
-                    "Attempting to use cached tower information.",
-                    LiveLookupTimeout.TotalSeconds,
-                    term);
+                    "tower search");
 
                 return await SearchCachedTowersAsync(
                     term,
@@ -400,11 +393,9 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
             catch (SqlException ex)
                 when (!cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning(
+                _parentDatabaseHealth.RecordFailure(
                     ex,
-                    "Parent database tower search failed for {SearchTerm}. " +
-                    "Attempting to use cached tower information.",
-                    term);
+                    "tower search");
 
                 return await SearchCachedTowersAsync(
                     term,

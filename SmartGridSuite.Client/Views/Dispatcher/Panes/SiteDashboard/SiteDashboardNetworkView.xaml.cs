@@ -20,6 +20,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private bool? _secondaryTestSuccessful;
 
         public event EventHandler? NetworkTestRequested;
+        public event EventHandler? NetworkSessionStateChanged;
 
         public bool IsIgsdMode { get; set; }
         public bool IsDacsMode { get; set; }
@@ -27,8 +28,29 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public SiteDashboardNetworkView()
         {
             InitializeComponent();
-            DataObject.AddPastingHandler(PingCountTextBox, PingCountTextBox_Pasting);
+
+            PingCountTextBox.TextChanged += NetworkSessionTextBox_TextChanged;
+            PrimaryIpTextBox.TextChanged += NetworkSessionTextBox_TextChanged;
+            LanIpTextBox.TextChanged += NetworkSessionTextBox_TextChanged;
+            SecondaryIpTextBox.TextChanged += NetworkSessionTextBox_TextChanged;
+
+            IgsdPrimaryRtuIpTextBox.TextChanged += NetworkSessionTextBox_TextChanged;
+            IgsdPrimaryCommsEthernetIpTextBox.TextChanged += NetworkSessionTextBox_TextChanged;
+            IgsdSecondaryCommsEthernetIpTextBox.TextChanged += NetworkSessionTextBox_TextChanged;
+            IgsdSecondaryRtuIpTextBox.TextChanged += NetworkSessionTextBox_TextChanged;
+
+            DataObject.AddPastingHandler(
+                PingCountTextBox,
+                PingCountTextBox_Pasting);
+
             Reset();
+        }
+
+        private void NetworkSessionTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            NetworkSessionStateChanged?.Invoke(
+                this,
+                EventArgs.Empty);
         }
 
         //Layout Helper

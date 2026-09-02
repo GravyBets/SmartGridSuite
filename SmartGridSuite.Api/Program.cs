@@ -4,6 +4,8 @@ using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Services;
 using SmartGridSuite.Api.Services.ParentSync;
 using SmartGridSuite.Api.Services.SiteDashboard;
+using Serilog;
+using Serilog.Events;
 
 namespace SmartGridSuite.Api
 {
@@ -12,6 +14,49 @@ namespace SmartGridSuite.Api
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            var logFilePath = builder.Configuration["Logging:FilePath"];
+
+            if (string.IsNullOrWhiteSpace(logFilePath))
+            {
+                logFilePath = Path.Combine(
+                    AppContext.BaseDirectory,
+                    "logs",
+                    "api-.log");
+            }
+
+            builder.Services.AddSerilog(
+                (services, loggerConfiguration) =>
+                {
+                    loggerConfiguration
+                        .MinimumLevel.Information()
+                        .MinimumLevel.Override(
+                            "Microsoft",
+                            LogEventLevel.Warning)
+                        .MinimumLevel.Override(
+                            "Microsoft.Hosting.Lifetime",
+                            LogEventLevel.Information)
+                        .Enrich.FromLogContext()
+                        .Enrich.WithProperty(
+                            "Application",
+                            "SmartGridSuite.Api")
+                        .WriteTo.Console()
+                        .WriteTo.File(
+                            logFilePath,
+                            rollingInterval:
+                                RollingInterval.Day,
+                            retainedFileCountLimit: 60,
+                            fileSizeLimitBytes:
+                                50 * 1024 * 1024,
+                            rollOnFileSizeLimit: true,
+                            shared: true,
+                            flushToDiskInterval:
+                                TimeSpan.FromSeconds(1),
+                            outputTemplate:
+                                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} " +
+                                "[{Level:u3}] {SourceContext} " +
+                                "{Message:lj}{NewLine}{Exception}");
+                });
 
             // Add services to the container.
 
@@ -32,6 +77,8 @@ namespace SmartGridSuite.Api
 
             builder.Services.Configure<ClientVersionOptions>(
                 builder.Configuration.GetSection(ClientVersionOptions.SectionName));
+
+            builder.Services.AddSingleton<ParentDatabaseHealthService>();
 
             builder.Services.AddScoped<ParentDatabaseConnectionFactory>();
 
@@ -58,6 +105,7 @@ namespace SmartGridSuite.Api
             builder.Services.AddScoped<DailyAssignmentEmailSequenceService>();
 
             var app = builder.Build();
+            app.UseSerilogRequestLogging();
 
             if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
             {

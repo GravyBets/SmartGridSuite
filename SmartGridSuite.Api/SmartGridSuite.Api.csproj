@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="Lextm.SharpSnmpLib" Version="12.5.7" />
+	<PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+	<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.8">
       <PrivateAssets>all</PrivateAssets>
