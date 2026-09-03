@@ -27,7 +27,6 @@ namespace SmartGridSuite.Api.Controllers
 
         private readonly ILogger<TicketsController> _logger;
 
-        private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
         private const string TechnicianRoleCode = "TECHNICIAN";
         private const string LinemanRoleCode = "LINEMAN";
 
@@ -1625,7 +1624,7 @@ namespace SmartGridSuite.Api.Controllers
                 return Ok(new FieldTechTasksResponseDto());
 
             var rosterDate = DateTime.Today.Date;
-            var assignmentDate = ActiveAssignmentDate;
+            var assignmentDate = rosterDate;
 
             /*
              * Field Technician Tasks may be the first workflow opened in the morning.
@@ -5910,7 +5909,7 @@ namespace SmartGridSuite.Api.Controllers
                 await _db.DailyTicketAssignments
                     .FirstOrDefaultAsync(
                         x =>
-                            x.AssignmentDate == ActiveAssignmentDate &&
+                            x.AssignmentDate == completedAt.Date &&
                             x.TicketId == ticketId &&
                             x.AssignmentStatus == AssignmentStatusActive,
                         ct);
@@ -6100,7 +6099,9 @@ namespace SmartGridSuite.Api.Controllers
              */
             var publishedTarget = await _db.DailyTicketAssignmentPublished
                 .AsNoTracking()
-                .Where(x => x.TicketId == ticket.Id)
+                .Where(x =>
+                    x.AssignmentDate == submittedDate.Date &&
+                    x.TicketId == ticket.Id)
                 .OrderByDescending(x => x.PublishedAt)
                 .ThenByDescending(x => x.PublishedVersion)
                 .ThenByDescending(x => x.Id)
@@ -6121,7 +6122,7 @@ namespace SmartGridSuite.Api.Controllers
                 publishedTarget = await _db.DailyTicketAssignments
                     .AsNoTracking()
                     .Where(x =>
-                        x.AssignmentDate == ActiveAssignmentDate &&
+                        x.AssignmentDate == submittedDate.Date &&
                         x.TicketId == ticket.Id)
                     .OrderByDescending(x => x.IsPublished)
                     .ThenByDescending(x => x.UpdatedAt)
@@ -6392,8 +6393,7 @@ namespace SmartGridSuite.Api.Controllers
 
         // Adds a technician to the participant snapshot while preventing duplicate
         // employee entries and preserving the submitter flag.
-        private static void AddSubmittedParticipant(
-                    IDictionary<string, SubmittedParticipantInfo> participants,
+        private static void AddSubmittedParticipant(IDictionary<string, SubmittedParticipantInfo> participants,
             TechnicianEntity technician,
             bool isSubmitter)
         {
@@ -6417,8 +6417,7 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         // Adds or updates one participant using employee ID as the stable snapshot key.
-        private static void AddSubmittedParticipant(
-            IDictionary<string, SubmittedParticipantInfo> participants,
+        private static void AddSubmittedParticipant(IDictionary<string, SubmittedParticipantInfo> participants,
             uint? technicianId,
             string employeeId,
             string technicianName,
@@ -6473,8 +6472,7 @@ namespace SmartGridSuite.Api.Controllers
 
         // Splits the AssignedTech display value used for direct or older assignments.
         // Crew strings such as "Alex Smith, Pat Jones & Lee Brown" become exact names.
-        private static HashSet<string> ParseAssignedTechnicianDisplayNames(
-            string? assignedTech)
+        private static HashSet<string> ParseAssignedTechnicianDisplayNames(string? assignedTech)
         {
             var value = (assignedTech ?? string.Empty).Trim();
 
@@ -7220,19 +7218,29 @@ namespace SmartGridSuite.Api.Controllers
         {
             try
             {
-                var assignmentDate = ActiveAssignmentDate;
-                var emailDate = DateTime.Today.Date;
+                var today = DateTime.Today.Date;
                 var changedAt = DateTime.Now;
 
                 var publishedTarget = await _db.DailyTicketAssignmentPublished
                     .AsNoTracking()
                     .Where(x =>
-                        x.AssignmentDate == assignmentDate &&
-                        x.TicketId == ticketId)
-                    .OrderByDescending(x => x.PublishedAt)
+                        x.AssignmentDate >= today &&
+                        x.TicketId == ticketId &&
+                        x.SourceAssignment != null &&
+                        x.SourceAssignment.AssignmentStatus ==
+                            AssignmentStatusActive &&
+                        x.SourceAssignment.IsPublished)
+                    .OrderBy(x => x.AssignmentDate)
                     .ThenByDescending(x => x.PublishedVersion)
+                    .ThenByDescending(x => x.PublishedAt)
                     .ThenByDescending(x => x.Id)
                     .FirstOrDefaultAsync(ct);
+
+                var assignmentDate =
+                    publishedTarget?.AssignmentDate.Date
+                    ?? today;
+
+                var emailDate = assignmentDate;
 
                 if (publishedTarget == null)
                 {
@@ -7952,7 +7960,7 @@ namespace SmartGridSuite.Api.Controllers
             var publishedTarget = await _db.DailyTicketAssignmentPublished
                 .AsNoTracking()
                 .Where(x =>
-                    x.AssignmentDate == ActiveAssignmentDate &&
+                    x.AssignmentDate == workDate.Date &&
                     x.TicketId == ticketId)
                 .OrderByDescending(x => x.PublishedAt)
                 .ThenByDescending(x => x.PublishedVersion)
@@ -7988,7 +7996,7 @@ namespace SmartGridSuite.Api.Controllers
                 var activeTarget = await _db.DailyTicketAssignments
                     .AsNoTracking()
                     .Where(x =>
-                        x.AssignmentDate == ActiveAssignmentDate &&
+                        x.AssignmentDate == workDate.Date &&
                         x.TicketId == ticketId)
                     .OrderByDescending(x => x.UpdatedAt)
                     .ThenByDescending(x => x.Id)

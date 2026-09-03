@@ -278,6 +278,30 @@
                         </Grid>
                     </ListBoxItem>
 
+                    <ListBoxItem Tag="SystemHealth">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="36"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <Path Style="{StaticResource NavRailPathIconStyle}"
+                  Data="M3 5H21V19H3V5ZM5 7V17H19V7H5ZM6 12H9L10.5 9L13 15L14.5 12H18V14H15.8L12.8 18L10.3 12L9.8 14H6V12Z"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1"
+                    Margin="10,0,0,0"
+                    VerticalAlignment="Center">
+                                <TextBlock Text="System Health"
+                       Style="{StaticResource NavRailItemTitleTextStyle}"/>
+
+                                <TextBlock Text="API, databases, and backups"
+                       Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
+                            </StackPanel>
+                        </Grid>
+                    </ListBoxItem>
+
                     <ListBoxItem Tag="GeneralSettings">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -402,6 +426,14 @@
                         <Border Style="{StaticResource NavBadgeStyle}">
                             <Path Style="{StaticResource NavRailPathIconStyle}"
                                   Data="M4 4H20V20H4V4ZM6 6V18H18V6H6ZM8 9L9.5 10.5L12 8L13 9L9.5 12.5L7 10L8 9ZM14 9H17V11H14V9ZM8 14L9.5 15.5L12 13L13 14L9.5 17.5L7 15L8 14ZM14 14H17V16H14V14Z"/>
+                        </Border>
+                    </ListBoxItem>
+
+                    <ListBoxItem Tag="SystemHealth"
+                                 ToolTip="System Health">
+                        <Border Style="{StaticResource NavBadgeStyle}">
+                            <Path Style="{StaticResource NavRailPathIconStyle}"
+                                  Data="M3 5H21V19H3V5ZM5 7V17H19V7H5ZM6 12H9L10.5 9L13 15L14.5 12H18V14H15.8L12.8 18L10.3 12L9.8 14H6V12Z"/>
                         </Border>
                     </ListBoxItem>
 

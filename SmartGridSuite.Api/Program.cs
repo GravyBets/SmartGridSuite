@@ -4,6 +4,7 @@ using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Services;
 using SmartGridSuite.Api.Services.ParentSync;
 using SmartGridSuite.Api.Services.SiteDashboard;
+using SmartGridSuite.Api.Services.SystemHealth;
 using Serilog;
 using Serilog.Events;
 
@@ -83,6 +84,12 @@ namespace SmartGridSuite.Api
             builder.Services.AddScoped<ParentDatabaseConnectionFactory>();
 
             builder.Services.AddScoped<ParentSyncService>();
+
+            builder.Services.AddSingleton<ApplicationRuntimeHealthService>();
+
+            builder.Services.AddSingleton<ServerHealthProbeService>();
+
+            builder.Services.AddScoped<SystemHealthService>();
 
             builder.Services.AddScoped<SiteDashboardCacheService>();
 

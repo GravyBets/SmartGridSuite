@@ -1,5 +1,6 @@
 ﻿using SmartGridSuite.Contracts.Settings;
 using SmartGridSuite.Contracts.SiteDashboard;
+using SmartGridSuite.Contracts.Administration;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Net;
@@ -415,6 +416,13 @@ namespace SmartGridSuite.Client.Services
             return await GetAsync<SiteDashboardResponseDto>(
                 $"api/site-dashboard/tower-dashboard/{topNameId}",
                 ct);
+        }
+
+        public Task<SystemHealthDto?> GetSystemHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return GetAsync<SystemHealthDto>(
+                "api/admin/system-health",
+                cancellationToken);
         }
 
         // Executes every API request through one connection/error boundary so weak or

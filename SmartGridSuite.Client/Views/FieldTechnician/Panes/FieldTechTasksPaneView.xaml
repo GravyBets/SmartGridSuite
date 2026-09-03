@@ -476,7 +476,8 @@
                            FontWeight="Bold"
                            Foreground="{DynamicResource TextPrimary}"/>
 
-                <TextBlock Text="Published route work first, followed by other active tickets assigned to you."
+                <TextBlock x:Name="PaneSubtitleTextBlock"
+                           Text="Published route work first, followed by other active tickets assigned to you."
                            Margin="0,4,0,0"
                            Foreground="{DynamicResource TextSecondary}"/>
             </StackPanel>
@@ -492,7 +493,8 @@
         </Grid>
 
         <!-- Daily Assignments card -->
-        <Border Grid.Row="2"
+        <Border x:Name="DailyAssignmentsCard"
+                Grid.Row="2"
                 Style="{StaticResource Card}"
                 Padding="14">
 
@@ -528,14 +530,16 @@
 
                     <StackPanel Orientation="Horizontal"
                                 VerticalAlignment="Center">
-                        <TextBlock Text="Daily Assignments"
+                        <TextBlock x:Name="DailyAssignmentsTitleTextBlock"
+                                   Text="Daily Assignments"
                                    Margin="2,0,0,0"
                                    FontSize="13"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextPrimary}"
                                    VerticalAlignment="Center"/>
 
-                        <TextBlock Text="Published route order from Dispatch"
+                        <TextBlock x:Name="DailyAssignmentsSubtitleTextBlock"
+                                   Text="Published route order from Dispatch"
                                    Margin="12,0,0,0"
                                    FontSize="12"
                                    Foreground="{DynamicResource TextSecondary}"
@@ -616,7 +620,8 @@
         </Border>
 
         <!-- Other Assigned Tickets card -->
-        <Border Grid.Row="4"
+        <Border x:Name="OtherAssignmentsCard"
+                Grid.Row="4"
                 Style="{StaticResource Card}"
                 Padding="14">
 
@@ -639,14 +644,16 @@
 
                     <StackPanel Orientation="Horizontal"
                                 VerticalAlignment="Center">
-                        <TextBlock Text="Other Assigned Tickets"
+                        <TextBlock x:Name="OtherAssignmentsTitleTextBlock"
+                                   Text="Other Assigned Tickets"
                                    Margin="2,0,0,0"
                                    FontSize="13"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextPrimary}"
                                    VerticalAlignment="Center"/>
 
-                        <TextBlock Text="Not included in today's published route"
+                        <TextBlock x:Name="OtherAssignmentsSubtitleTextBlock"
+                                   Text="Not included in today's published route"
                                    Margin="12,0,0,0"
                                    FontSize="12"
                                    Foreground="{DynamicResource TextSecondary}"

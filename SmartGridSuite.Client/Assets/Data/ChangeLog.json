@@ -1,12 +1,30 @@
 [
   {
+    "version": "3.3.0.1",
+    "date": "September 3, 2026",
+    "title": "Future Scheduling, Lineman Workflow, and System Reliability",
+    "changes": [
+      "Added future-dated Daily Assignments so Dispatch can prepare work for upcoming weekdays, weekends, and overtime.",
+      "Made Truck Board technician and crew arrangements date-specific so planning one day cannot overwrite another day.",
+      "Added previous-day, today, next-day, and calendar navigation to Daily Assignments and Truck Board.",
+      "Updated only the Lineman Tasks view so Other Assignments is the primary work area while preserving the existing Field Technician layout.",
+      "Added Range Extender Site Dashboard access for Linemen, including the Equipment tab for Range Extender sites.",
+      "Added a dedicated Bug / Feature Request recipient setting while preserving delivery to the main email recipient.",
+      "Fixed Site Dashboard tabs so manually entered IP addresses, ping results, and unsaved write-ups remain isolated to their original site tab.",
+      "Added automatic Parent DB recovery after temporary network interruptions and structured API diagnostics logging.",
+      "Added Administration System Health monitoring for the API, SmartGridSuite database, Parent DB connectivity, fallback cache, encrypted backups, and server storage.",
+      "Added encrypted nightly SmartGridSuite backups with retention, integrity checks, restore verification, and failure notifications."
+    ]
+  },
+
+  {
     "version": "3.2.0.2",
     "date": "August 28, 2026",
     "title": "Summary Cards, Dispatch Tasks Capital Requests",
     "changes": [
-      "Added Maintenance/Capital request details to Dispatch → Tasks.",
+      "Added Maintenance/Capital request details to Dispatch â†’ Tasks.",
       "Requested Work now shows technician name and request reason.",
-      "Made Dispatch → Tickets summary cards clickable to filter by status.",
+      "Made Dispatch â†’ Tickets summary cards clickable to filter by status.",
       "Added selected-state border to the active summary card.",
       "Clear Filters now clears the summary card selection."
     ]
@@ -39,7 +57,7 @@
     "changes": [
       "Added support for editing legacy/imported Site History entries while preserving the original imported source data.",
       "Fixed Ticket Status renames so existing tickets automatically update to the new status name.",
-      "Fixed the Dispatch Tickets Ã¢â‚¬Å“All / Include ClosedÃ¢â‚¬Â status filter so it truly includes tickets with any status, including legacy or inactive statuses.",
+      "Fixed the Dispatch Tickets ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œAll / Include ClosedÃƒÂ¢Ã¢â€šÂ¬Ã‚Â status filter so it truly includes tickets with any status, including legacy or inactive statuses.",
       "Added a copy-to-clipboard button beside Site numbers in Field Technician History, with the same temporary checkmark feedback used for Notifications and Work Orders."
     ]
   },

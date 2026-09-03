@@ -43,6 +43,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private int _busyOverlayDepth;
 
+        private DateTime _selectedWorkDate = DateTime.Today;
+        private bool _syncingWorkDate;
+
+        public DateTime SelectedWorkDate
+        {
+            get => _selectedWorkDate;
+
+            set
+            {
+                var normalizedDate =
+                    (value == default
+                        ? DateTime.Today
+                        : value).Date;
+
+                if (_selectedWorkDate == normalizedDate)
+                    return;
+
+                _selectedWorkDate = normalizedDate;
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(BoardSubtitle));
+            }
+        }
+
+        public string BoardSubtitle => $"Build crews for {SelectedWorkDate:dddd, MMMM d, yyyy}.";
+
         public TruckBoardVm Board { get; private set; } = new();
 
         public int OnDutyCount => Board.AllTechnicians.Count(t => t.IsOnShift);
@@ -145,10 +171,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 SetStatus("Loading board...");
 
-                var d = DateTime.Today.ToString("yyyy-MM-dd");
-                var dto = await _http.GetFromJsonAsync<TruckBoardDto>($"api/trucks/board?date={d}");
+                var d = SelectedWorkDate.ToString("yyyy-MM-dd");
+
+                var dto =
+                    await _http.GetFromJsonAsync<TruckBoardDto>(
+                        $"api/trucks/board?date={d}");
 
                 Board = TruckBoardVm.FromDto(dto);
+                if (dto != null && dto.WorkDate != default)
+                {
+                    SelectedWorkDate =
+                        dto.WorkDate.Date;
+                }
                 NormalizeTruckAssignments();
                 RecalculateLocalLeads();
                 HasUnsavedChanges = false;
@@ -232,6 +266,133 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             finally
             {
                 _busyLoading = false;
+            }
+        }
+
+        private async void PreviousDay_Click(object sender, RoutedEventArgs e)
+        {
+            await ChangeWorkDateAsync(
+                SelectedWorkDate.AddDays(-1));
+        }
+
+        private async void Today_Click(object sender, RoutedEventArgs e)
+        {
+            await ChangeWorkDateAsync(
+                DateTime.Today);
+        }
+
+        private async void NextDay_Click(object sender, RoutedEventArgs e)
+        {
+            await ChangeWorkDateAsync(
+                SelectedWorkDate.AddDays(1));
+        }
+
+        private async void WorkDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_syncingWorkDate ||
+                !IsLoaded ||
+                WorkDatePicker.SelectedDate is not DateTime selectedDate)
+            {
+                return;
+            }
+
+            await ChangeWorkDateAsync(
+                selectedDate);
+        }
+
+        private async Task ChangeWorkDateAsync(DateTime requestedDate)
+        {
+            var newDate =
+                requestedDate.Date;
+
+            if (newDate == SelectedWorkDate)
+            {
+                RestoreWorkDatePicker();
+                return;
+            }
+
+            if (_busyLoading ||
+                IsCommitting)
+            {
+                RestoreWorkDatePicker();
+                return;
+            }
+
+            if (HasUnsavedChanges)
+            {
+                var result = MessageBox.Show(
+                    $"You have unsaved truck board changes for " +
+                    $"{SelectedWorkDate:dddd, MMMM d, yyyy}.\n\n" +
+                    $"Do you want to save them before switching dates?\n\n" +
+                    "Yes = Save and switch dates\n" +
+                    "No = Discard and switch dates\n" +
+                    "Cancel = Stay on the current date",
+                    "Unsaved Truck Board Changes",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Cancel)
+                {
+                    RestoreWorkDatePicker();
+                    return;
+                }
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    var saved =
+                        await CommitBoardChangesAsync(
+                            showConfirmation: false);
+
+                    if (!saved)
+                    {
+                        RestoreWorkDatePicker();
+                        return;
+                    }
+                }
+                else
+                {
+                    HasUnsavedChanges = false;
+                }
+            }
+
+            _syncingWorkDate = true;
+
+            try
+            {
+                SelectedWorkDate = newDate;
+                WorkDatePicker.SelectedDate = newDate;
+            }
+            finally
+            {
+                _syncingWorkDate = false;
+            }
+
+            _busyLoading = true;
+
+            try
+            {
+                await LoadBoardAsync(
+                    $"Loading truck board for " +
+                    $"{SelectedWorkDate:dddd, MMMM d, yyyy}...");
+            }
+            finally
+            {
+                _busyLoading = false;
+            }
+        }
+
+        private void RestoreWorkDatePicker()
+        {
+            _syncingWorkDate = true;
+
+            try
+            {
+                WorkDatePicker.SelectedDate =
+                    SelectedWorkDate;
+            }
+            finally
+            {
+                _syncingWorkDate = false;
             }
         }
 
@@ -439,7 +600,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (showConfirmation)
             {
                 var confirm = MessageBox.Show(
-                    $"Commit today's truck board changes?\n\n" +
+                    $"Commit the truck board for " +
+                    $"{SelectedWorkDate:dddd, MMMM d, yyyy}?\n\n" +
                     $"Assigned technicians: {assignments.Count}\n" +
                     $"Lead overrides: {leadOverrides.Count}\n\n" +
                     "This will save the current truck/crew layout to the server.",
@@ -459,7 +621,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 var req = new CommitTruckBoardRequest
                 {
-                    WorkDate = DateTime.Today,
+                    WorkDate = SelectedWorkDate,
                     Assignments = assignments,
                     LeadOverrides = leadOverrides
                 };

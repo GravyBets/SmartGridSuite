@@ -17,6 +17,8 @@ namespace SmartGridSuite.Contracts.Settings
         public string TestRecipientOverride { get; set; } = "";
 
         public string AllEmailsAddress { get; set; } = "";
+
+        public string BugFeatureRequestRecipient { get; set; } = "";
     }
 
     public sealed class UpdateEmailSettingsRequest
@@ -34,6 +36,8 @@ namespace SmartGridSuite.Contracts.Settings
         public string TestRecipientOverride { get; set; } = "";
 
         public string AllEmailsAddress { get; set; } = "";
+
+        public string BugFeatureRequestRecipient { get; set; } = "";
     }
 
     public sealed class SendTestEmailRequest

@@ -56,6 +56,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private bool _syncingTicketSelection;
         private bool _includeAssignedTickets;
 
+        private DateTime _selectedWorkDate = DateTime.Today;
+        private bool _syncingWorkDate;
+
         private string _statusText = "Ready.";
         private string _ticketSearchText = "";
 
@@ -123,7 +126,28 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         public bool HasSelectedTargetAssignedTickets => SelectedTarget?.AssignedTicketCount > 0;
 
-        public string HeaderSubtitle => $"Assign tickets for {Board.WorkDate:dddd, MMMM d, yyyy}.";
+        public DateTime SelectedWorkDate
+        {
+            get => _selectedWorkDate;
+
+            set
+            {
+                var normalizedDate =
+                    (value == default
+                        ? DateTime.Today
+                        : value).Date;
+
+                if (_selectedWorkDate == normalizedDate)
+                    return;
+
+                _selectedWorkDate = normalizedDate;
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HeaderSubtitle));
+            }
+        }
+
+        public string HeaderSubtitle => $"Planning {SelectedWorkDate:dddd, MMMM d, yyyy}.";
 
         public string SelectedTargetSubtitle =>
             SelectedTarget == null
@@ -231,6 +255,57 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             await LoadBoardAsync();
         }
 
+        private async void PreviousDay_Click(object sender, RoutedEventArgs e)
+        {
+            await ChangeWorkDateAsync(
+                SelectedWorkDate.AddDays(-1));
+        }
+
+        private async void Today_Click(object sender, RoutedEventArgs e)
+        {
+            await ChangeWorkDateAsync(
+                DateTime.Today);
+        }
+
+        private async void NextDay_Click(object sender, RoutedEventArgs e)
+        {
+            await ChangeWorkDateAsync(
+                SelectedWorkDate.AddDays(1));
+        }
+
+        private async void WorkDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!_hasLoaded ||
+                _syncingWorkDate ||
+                WorkDatePicker.SelectedDate is not DateTime selectedDate)
+            {
+                return;
+            }
+
+            SelectedWorkDate =
+                selectedDate.Date;
+
+            await LoadBoardAsync();
+        }
+
+        private async Task ChangeWorkDateAsync(DateTime workDate)
+        {
+            _syncingWorkDate = true;
+
+            try
+            {
+                SelectedWorkDate =
+                    workDate.Date;
+            }
+            finally
+            {
+                _syncingWorkDate = false;
+            }
+
+            if (_hasLoaded)
+                await LoadBoardAsync();
+        }
+
         private async void NewTicket_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -284,14 +359,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 StatusText = "Loading daily assignments...";
                 ShowBusyOverlay(StatusText);
 
-                var date = DateTime.Today.ToString("yyyy-MM-dd");
+                var requestedDate = SelectedWorkDate.Date;
 
-                var dto = await _api.GetAsync<DailyAssignmentsBoardDto>(
-                    $"api/daily-assignments/board?date={date}");
+                var date = requestedDate.ToString("yyyy-MM-dd");
+
+                var dto =
+                    await _api.GetAsync<DailyAssignmentsBoardDto>(
+                        $"api/daily-assignments/board?date={date}");
 
                 Board = dto ?? new DailyAssignmentsBoardDto
                 {
-                    WorkDate = DateTime.Today
+                    WorkDate = requestedDate
                 };
 
                 StatusText =

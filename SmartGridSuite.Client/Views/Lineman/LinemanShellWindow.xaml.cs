@@ -31,7 +31,7 @@ namespace SmartGridSuite.Client.Views.Lineman
         /*
          * Lineman intentionally reuses the shared Site Dashboard engine.
          * The dashboard will be placed into restricted Lineman mode so only
-         * Main, Site History, and Portal are exposed.
+         * Main, Site History, Range Extender, and Portal are exposed.
          */
         private SiteDashboardPaneView? _siteDashboardPaneView;
 
@@ -77,17 +77,14 @@ namespace SmartGridSuite.Client.Views.Lineman
             }
         }
 
-        private static string? GetNavKey(
-            ListBoxItem item)
+        private static string? GetNavKey(ListBoxItem item)
         {
             return item.Tag?.ToString()
                    ?? item.ToolTip?.ToString()
                    ?? item.Content?.ToString();
         }
 
-        private void NavList_SelectionChanged(
-            object sender,
-            SelectionChangedEventArgs e)
+        private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_syncingNav)
                 return;
@@ -110,8 +107,7 @@ namespace SmartGridSuite.Client.Views.Lineman
             ShowPane(item);
         }
 
-        private void ShowPane(
-            ListBoxItem item)
+        private void ShowPane(ListBoxItem item)
         {
             switch (GetNavKey(item))
             {
@@ -148,9 +144,7 @@ namespace SmartGridSuite.Client.Views.Lineman
             }
         }
 
-        private void ToggleNav_Click(
-            object sender,
-            RoutedEventArgs e)
+        private void ToggleNav_Click(object sender, RoutedEventArgs e)
         {
             _navCollapsed =
                 !_navCollapsed;
@@ -228,9 +222,7 @@ namespace SmartGridSuite.Client.Views.Lineman
                     : "Collapse navigation";
         }
 
-        private void HomeButton_Click(
-            object sender,
-            RoutedEventArgs e)
+        private void HomeButton_Click(object sender, RoutedEventArgs e)
         {
             Close();
         }
@@ -241,7 +233,7 @@ namespace SmartGridSuite.Client.Views.Lineman
                 return _tasksPaneView;
 
             _tasksPaneView =
-                new FieldTechTasksPaneView();
+                new FieldTechTasksPaneView(isLinemanMode: true);
 
             _tasksPaneView.OpenTicketRequested +=
                 async ticket =>
@@ -288,8 +280,7 @@ namespace SmartGridSuite.Client.Views.Lineman
                 cleanTickets);
         }
 
-        private SiteDashboardPaneView
-            GetOrCreateSiteDashboardPane()
+        private SiteDashboardPaneView GetOrCreateSiteDashboardPane()
         {
             if (_siteDashboardPaneView != null)
                 return _siteDashboardPaneView;
@@ -303,9 +294,7 @@ namespace SmartGridSuite.Client.Views.Lineman
             return _siteDashboardPaneView;
         }
 
-        private void ConnectivityService_StateChanged(
-            object? sender,
-            ConnectivityChangedEventArgs e)
+        private void ConnectivityService_StateChanged(object? sender, ConnectivityChangedEventArgs e)
         {
             if (!Dispatcher.CheckAccess())
             {
@@ -322,9 +311,7 @@ namespace SmartGridSuite.Client.Views.Lineman
                 e.Message);
         }
 
-        private void ApplyConnectivityState(
-            ConnectivityState state,
-            string message)
+        private void ApplyConnectivityState(ConnectivityState state, string message)
         {
             var shouldShow =
                 state == ConnectivityState.Offline ||
@@ -350,9 +337,7 @@ namespace SmartGridSuite.Client.Views.Lineman
                     : "Retry";
         }
 
-        private async void RetryConnectivity_Click(
-            object sender,
-            RoutedEventArgs e)
+        private async void RetryConnectivity_Click(object sender, RoutedEventArgs e)
         {
             ConnectivityService.BeginCheck();
 
@@ -384,17 +369,13 @@ namespace SmartGridSuite.Client.Views.Lineman
             }
         }
 
-        private void LinemanShellWindow_Closed(
-            object? sender,
-            EventArgs e)
+        private void LinemanShellWindow_Closed(object? sender, EventArgs e)
         {
             ConnectivityService.StateChanged -=
                 ConnectivityService_StateChanged;
         }
 
-        private void LinemanShellWindow_Closing(
-            object? sender,
-            CancelEventArgs e)
+        private void LinemanShellWindow_Closing(object? sender, CancelEventArgs e)
         {
             if (_siteDashboardPaneView is null)
                 return;

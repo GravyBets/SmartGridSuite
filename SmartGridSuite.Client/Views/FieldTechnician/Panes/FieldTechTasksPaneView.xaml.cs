@@ -23,6 +23,8 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
 
         private readonly ApiClient _api = ClientAppSettings.CreateApiClient();
 
+        private readonly bool _isLinemanMode;
+
         private bool _loadedOnce;
         private bool _busyLoading;
         private string _statusMessage = "Ready.";
@@ -55,8 +57,18 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
         }
 
         public FieldTechTasksPaneView()
+        : this(isLinemanMode: false)
         {
+        }
+
+        public FieldTechTasksPaneView(bool isLinemanMode)
+        {
+            _isLinemanMode = isLinemanMode;
+
             InitializeComponent();
+
+            ApplyDisplayMode();
+
             DataContext = this;
 
             Loaded += async (_, __) =>
@@ -67,6 +79,39 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
                 _loadedOnce = true;
                 await LoadTasksAsync();
             };
+        }
+
+        private void ApplyDisplayMode()
+        {
+            if (!_isLinemanMode)
+                return;
+
+            PaneSubtitleTextBlock.Text =
+                "Other assignments first, followed by published assignments from Dispatch.";
+
+            DailyAssignmentsTitleTextBlock.Text =
+                "Assignments";
+
+            DailyAssignmentsSubtitleTextBlock.Text =
+                "Published assignments from Dispatch";
+
+            OtherAssignmentsTitleTextBlock.Text =
+                "Other Assignments";
+
+            OtherAssignmentsSubtitleTextBlock.Text =
+                "Active tickets assigned directly to you";
+
+            /*
+             * Row 2 is the larger 3* area. Row 4 is the smaller 2* area.
+             * Only Lineman mode reverses the two cards.
+             */
+            Grid.SetRow(
+                OtherAssignmentsCard,
+                2);
+
+            Grid.SetRow(
+                DailyAssignmentsCard,
+                4);
         }
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)

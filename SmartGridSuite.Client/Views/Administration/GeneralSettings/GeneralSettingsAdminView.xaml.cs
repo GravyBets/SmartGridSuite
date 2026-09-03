@@ -45,6 +45,7 @@ namespace SmartGridSuite.Client.Views.Administration.GeneralSettings
             EmailWriteUpsCheckBox.IsEnabled = !isBusy;
             EmailBccSenderCheckBox.IsEnabled = !isBusy;
             EmailAllEmailsAddressTextBox.IsEnabled = !isBusy;
+            EmailBugFeatureRequestRecipientTextBox.IsEnabled = !isBusy;
             EmailTestRecipientOverrideTextBox.IsEnabled = !isBusy;
             EmailTestRecipientTextBox.IsEnabled = !isBusy;
             ReloadEmailSettingsButton.IsEnabled = !isBusy;
@@ -97,6 +98,7 @@ namespace SmartGridSuite.Client.Views.Administration.GeneralSettings
                 EmailWriteUpsCheckBox.IsChecked = dto.WriteUpsEnabled;
                 EmailBccSenderCheckBox.IsChecked = dto.BccSender;
                 EmailAllEmailsAddressTextBox.Text = dto.AllEmailsAddress ?? string.Empty;
+                EmailBugFeatureRequestRecipientTextBox.Text = dto.BugFeatureRequestRecipient ?? string.Empty;
                 EmailTestRecipientOverrideTextBox.Text = dto.TestRecipientOverride ?? string.Empty;
 
                 EmailSettingsStatusTextBlock.Text = "Email settings loaded.";
@@ -133,6 +135,7 @@ namespace SmartGridSuite.Client.Views.Administration.GeneralSettings
                         WriteUpsEnabled = EmailWriteUpsCheckBox.IsChecked == true,
                         BccSender = EmailBccSenderCheckBox.IsChecked == true,
                         AllEmailsAddress = (EmailAllEmailsAddressTextBox.Text ?? string.Empty).Trim(),
+                        BugFeatureRequestRecipient = (EmailBugFeatureRequestRecipientTextBox.Text ?? string.Empty).Trim(),
                         TestRecipientOverride = (EmailTestRecipientOverrideTextBox.Text ?? string.Empty).Trim()
                     });
 
@@ -144,6 +147,7 @@ namespace SmartGridSuite.Client.Views.Administration.GeneralSettings
                     EmailWriteUpsCheckBox.IsChecked = dto.WriteUpsEnabled;
                     EmailBccSenderCheckBox.IsChecked = dto.BccSender;
                     EmailAllEmailsAddressTextBox.Text = dto.AllEmailsAddress ?? string.Empty;
+                    EmailBugFeatureRequestRecipientTextBox.Text = dto.BugFeatureRequestRecipient ?? string.Empty;
                     EmailTestRecipientOverrideTextBox.Text = dto.TestRecipientOverride ?? string.Empty;
                 }
 

@@ -4,22 +4,22 @@ namespace SmartGridSuite.Api.Services.ParentSync
 {
     public sealed class ParentDatabaseHealthService
     {
-        private readonly ILogger<ParentDatabaseHealthService>
-            _logger;
+        private readonly ILogger<ParentDatabaseHealthService> _logger;
 
         private readonly object _stateLock = new();
 
         private DateTimeOffset? _unavailableSinceUtc;
+        private DateTimeOffset? _lastSuccessfulConnectionUtc;
+        private DateTimeOffset? _lastFailureUtc;
+        private string? _lastFailureOperation;
+        private string? _lastFailureMessage;
 
-        public ParentDatabaseHealthService(
-            ILogger<ParentDatabaseHealthService> logger)
+        public ParentDatabaseHealthService(ILogger<ParentDatabaseHealthService> logger)
         {
             _logger = logger;
         }
 
-        public void RecordFailure(
-            Exception exception,
-            string operation)
+        public void RecordFailure(Exception exception, string operation)
         {
             /*
              * A network interruption can leave unusable SQL Server
@@ -30,15 +30,18 @@ namespace SmartGridSuite.Api.Services.ParentSync
              */
             SqlConnection.ClearAllPools();
 
+            var failureUtc = DateTimeOffset.UtcNow;
             var becameUnavailable = false;
 
             lock (_stateLock)
             {
+                _lastFailureUtc = failureUtc;
+                _lastFailureOperation = operation;
+                _lastFailureMessage = exception.Message;
+
                 if (_unavailableSinceUtc is null)
                 {
-                    _unavailableSinceUtc =
-                        DateTimeOffset.UtcNow;
-
+                    _unavailableSinceUtc = failureUtc;
                     becameUnavailable = true;
                 }
             }
@@ -57,10 +60,13 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
         public void RecordSuccess(string operation)
         {
+            var successUtc = DateTimeOffset.UtcNow;
             DateTimeOffset? unavailableSinceUtc;
 
             lock (_stateLock)
             {
+                _lastSuccessfulConnectionUtc = successUtc;
+
                 unavailableSinceUtc =
                     _unavailableSinceUtc;
 
@@ -71,7 +77,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 return;
 
             var outageDuration =
-                DateTimeOffset.UtcNow -
+                successUtc -
                 unavailableSinceUtc.Value;
 
             _logger.LogInformation(
@@ -81,5 +87,47 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 operation,
                 outageDuration.TotalSeconds);
         }
+
+        public ParentDatabaseHealthSnapshot GetSnapshot()
+        {
+            lock (_stateLock)
+            {
+                return new ParentDatabaseHealthSnapshot
+                {
+                    IsUnavailable =
+                        _unavailableSinceUtc is not null,
+
+                    UnavailableSinceUtc =
+                        _unavailableSinceUtc,
+
+                    LastSuccessfulConnectionUtc =
+                        _lastSuccessfulConnectionUtc,
+
+                    LastFailureUtc =
+                        _lastFailureUtc,
+
+                    LastFailureOperation =
+                        _lastFailureOperation,
+
+                    LastFailureMessage =
+                        _lastFailureMessage
+                };
+            }
+        }
+    }
+
+    public sealed class ParentDatabaseHealthSnapshot
+    {
+        public bool IsUnavailable { get; init; }
+
+        public DateTimeOffset? UnavailableSinceUtc { get; init; }
+
+        public DateTimeOffset? LastSuccessfulConnectionUtc { get; init; }
+
+        public DateTimeOffset? LastFailureUtc { get; init; }
+
+        public string? LastFailureOperation { get; init; }
+
+        public string? LastFailureMessage { get; init; }
     }
 }

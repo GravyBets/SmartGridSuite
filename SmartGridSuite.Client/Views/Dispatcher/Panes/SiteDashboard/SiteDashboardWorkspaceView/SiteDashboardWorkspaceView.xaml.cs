@@ -128,6 +128,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
                 string.Equals(
                     tabKey,
+                    "RxOverview",
+                    StringComparison.OrdinalIgnoreCase) ||
+
+                string.Equals(
+                    tabKey,
+                    "Equipment",
+                    StringComparison.OrdinalIgnoreCase) ||
+
+                string.Equals(
+                    tabKey,
                     "Portal",
                     StringComparison.OrdinalIgnoreCase);
         }

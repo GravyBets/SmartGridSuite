@@ -152,33 +152,61 @@
                     </Border>
 
                     <!-- All emails address -->
-                    <StackPanel Grid.Row="4">
-                        <TextBlock Text="All Emails Address"
-                                   FontSize="11"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextSecondary}"
-                                   Margin="0,0,0,3"/>
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="4"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-                        <TextBox x:Name="EmailAllEmailsAddressTextBox"
-                                 Style="{StaticResource ModernTextBox}"
-                                 Height="34"
-                                 Padding="10,0"
-                                 VerticalContentAlignment="Center"/>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="All Emails Address"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Margin="0,0,0,3"/>
 
-                        <TextBlock Text="Daily Assignment and Modified Assignment emails CC this address. Write-up emails are sent to this address."
-                                   Margin="0,4,0,0"
-                                   FontSize="12"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextSecondary}"/>
-                    </StackPanel>
+                            <TextBox x:Name="EmailAllEmailsAddressTextBox"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Height="34"
+                                     Padding="10,0"
+                                     VerticalContentAlignment="Center"/>
+
+                            <TextBlock Text="Daily Assignment and Modified Assignment emails CC this address. Write-up and bug/feature request emails are sent to this address."
+                                       Margin="0,4,0,0"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Bug / Feature Request Recipient"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Margin="0,0,0,3"/>
+
+                            <TextBox x:Name="EmailBugFeatureRequestRecipientTextBox"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Height="34"
+                                     Padding="10,0"
+                                     VerticalContentAlignment="Center"/>
+
+                            <TextBlock Text="Bug and feature request emails are also sent here. Leave blank to use only the All Emails Address."
+                                       Margin="0,4,0,0"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondary}"/>
+                        </StackPanel>
+                    </Grid>
 
                     <!-- Test recipient override -->
                     <Grid Grid.Row="6">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="4"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="4"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
 

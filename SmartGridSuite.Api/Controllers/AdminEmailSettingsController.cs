@@ -21,6 +21,7 @@ namespace SmartGridSuite.Api.Controllers
         private const string BccSenderKey = "Email.BccSender";
         private const string TestRecipientOverrideKey = "Email.TestRecipientOverride";
         private const string AllEmailsAddressKey = "Email.AllEmailsAddress";
+        private const string BugFeatureRequestRecipientKey = "Email.BugFeatureRequestRecipient";
 
         private static readonly string[] EmailSettingKeys =
         {
@@ -30,7 +31,8 @@ namespace SmartGridSuite.Api.Controllers
             WriteUpsEnabledKey,
             BccSenderKey,
             TestRecipientOverrideKey,
-            AllEmailsAddressKey
+            AllEmailsAddressKey,
+            BugFeatureRequestRecipientKey
         };
 
         public AdminEmailSettingsController(SmartGridDbContext db, EmailService emailService)
@@ -83,6 +85,11 @@ namespace SmartGridSuite.Api.Controllers
             await UpsertSettingAsync(
                 AllEmailsAddressKey,
                 CleanSwaggerPlaceholder(req.AllEmailsAddress),
+                ct);
+
+            await UpsertSettingAsync(
+                BugFeatureRequestRecipientKey,
+                CleanSwaggerPlaceholder(req.BugFeatureRequestRecipient),
                 ct);
 
             await _db.SaveChangesAsync(ct);
@@ -201,8 +208,14 @@ namespace SmartGridSuite.Api.Controllers
                     AllEmailsAddressKey,
                     out var allEmailsAddress)
                         ? allEmailsAddress ?? ""
+                        : "",
+
+                BugFeatureRequestRecipient = values.TryGetValue(
+                    BugFeatureRequestRecipientKey,
+                    out var bugFeatureRecipient)
+                        ? bugFeatureRecipient ?? ""
                         : ""
-                            };
+            };
         }
 
         private async Task UpsertSettingAsync(string key, string value, CancellationToken ct)

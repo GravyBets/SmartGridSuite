@@ -23,8 +23,6 @@ namespace SmartGridSuite.Api.Controllers
 
         private readonly ILogger<DailyAssignmentsController> _logger;
 
-        private static readonly DateTime ActiveAssignmentDate = new(2000, 1, 1);
-
         private const string TechnicianRoleCode = "TECHNICIAN";
         private const string LinemanRoleCode = "LINEMAN";
 
@@ -58,7 +56,7 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<DailyAssignmentsBoardDto>> GetBoard([FromQuery] string? date = null, CancellationToken ct = default)
         {
             var rosterDate = ParseDateOrToday(date);
-            var assignmentDate = ActiveAssignmentDate;
+            var assignmentDate = rosterDate;
 
             /*
              * Daily Assignments may be the first dispatch pane opened in the morning.
@@ -350,8 +348,12 @@ namespace SmartGridSuite.Api.Controllers
         [HttpPost("assign")]
         public async Task<ActionResult<AssignDailyTicketsResponse>> AssignTickets([FromBody] AssignDailyTicketsRequest req, CancellationToken ct)
         {
-            var rosterDate = (req.WorkDate == default ? DateTime.Today : req.WorkDate).Date;
-            var workDate = ActiveAssignmentDate;
+            var rosterDate =
+            (req.WorkDate == default
+                ? DateTime.Today
+                : req.WorkDate).Date;
+
+            var workDate = rosterDate;
 
             var cleanTargetType = (req.TargetType ?? string.Empty).Trim();
 
@@ -933,7 +935,10 @@ namespace SmartGridSuite.Api.Controllers
             [FromBody] RemoveDailyTicketAssignmentsRequest req,
             CancellationToken ct)
         {
-            var workDate = ActiveAssignmentDate;
+            var workDate =
+                (req.WorkDate == default
+                    ? DateTime.Today
+                    : req.WorkDate).Date;
 
             var assignmentIds =
                 (req.AssignmentIds ?? new List<ulong>())
@@ -1110,7 +1115,7 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<IActionResult> MigrateTruckTargetAssignmentsToLeadTechs([FromQuery] string? date = null, CancellationToken ct = default)
         {
             var rosterDate = ParseDateOrToday(date);
-            var assignmentDate = ActiveAssignmentDate;
+            var assignmentDate = rosterDate;
             var now = DateTime.Now;
 
             var truckAssignments = await _db.DailyTicketAssignments
@@ -1242,7 +1247,10 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<ReorderDailyTicketAssignmentsResponse>> ReorderAssignments([FromBody] ReorderDailyTicketAssignmentsRequest req, 
             CancellationToken ct)
         {
-            var workDate = ActiveAssignmentDate;
+            var workDate =
+                (req.WorkDate == default
+                    ? DateTime.Today
+                    : req.WorkDate).Date;
 
             var cleanTargetType = (req.TargetType ?? string.Empty).Trim();
 
@@ -1719,8 +1727,12 @@ namespace SmartGridSuite.Api.Controllers
         public async Task<ActionResult<PublishDailyAssignmentTargetResponse>> PublishTargetAssignments([FromBody] PublishDailyAssignmentTargetRequest req,
             CancellationToken ct)
         {
-            var rosterDate = (req.WorkDate == default ? DateTime.Today : req.WorkDate).Date;
-            var workDate = ActiveAssignmentDate;
+            var rosterDate =
+                (req.WorkDate == default
+                    ? DateTime.Today
+                    : req.WorkDate).Date;
+
+            var workDate = rosterDate;
 
             var cleanTargetType = NormalizeTargetType(req.TargetType);
 

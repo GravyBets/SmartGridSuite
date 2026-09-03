@@ -500,17 +500,89 @@
                                    Style="{StaticResource PaneSubtitleTextStyle}"/>
                     </StackPanel>
 
-                    <Button x:Name="RefreshAssignmentsButton"
-                            Grid.Column="1"
-                            Content="Refresh"
-                            Height="34"
-                            MinWidth="100"
-                            Click="Refresh_Click"/>
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+
+                        <Button Width="36"
+                                Height="34"
+                                Margin="0,0,4,0"
+                                Padding="0"
+                                ToolTip="Previous day"
+                                Click="PreviousDay_Click">
+
+                            <Viewbox Width="10"
+                                     Height="12">
+                                <Path Data="M 8,1 L 3,6 L 8,11"
+                                      Stroke="{DynamicResource TextPrimary}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"/>
+                            </Viewbox>
+                        </Button>
+
+                        <Border Width="86"
+                                Height="34"
+                                Margin="0,0,4,0"
+                                CornerRadius="10"
+                                Background="{DynamicResource ControlInputBg}"
+                                BorderBrush="{DynamicResource ControlInputBorder}"
+                                BorderThickness="1.5">
+
+                            <TextBlock Text="{Binding SelectedWorkDate,
+                                             StringFormat={}{0:dddd}}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ControlInputText}"/>
+                        </Border>
+
+                        <DatePicker x:Name="WorkDatePicker"
+                                    Style="{DynamicResource ModernDatePicker}"
+                                    Width="135"
+                                    Height="34"
+                                    Margin="0,0,4,0"
+                                    VerticalContentAlignment="Center"
+                                    Text="{Binding SelectedWorkDate,
+                                           Mode=OneWay,
+                                           StringFormat={}{0:ddd M/d/yyyy}}"
+                                    SelectedDate="{Binding SelectedWorkDate,
+                                                   Mode=TwoWay,
+                                                   UpdateSourceTrigger=PropertyChanged}"
+                                    SelectedDateChanged="WorkDatePicker_SelectedDateChanged"/>
+
+                        <Button Width="36"
+                                Height="34"
+                                Margin="0,0,22,0"
+                                Padding="0"
+                                ToolTip="Next day"
+                                Click="NextDay_Click">
+
+                            <Viewbox Width="10"
+                                     Height="12">
+                                <Path Data="M 3,1 L 8,6 L 3,11"
+                                      Stroke="{DynamicResource TextPrimary}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"/>
+                            </Viewbox>
+                        </Button>
+
+                        <Button x:Name="RefreshAssignmentsButton"
+                                Style="{DynamicResource PrimaryButtonStyle}"
+                                Content="Refresh"
+                                Height="34"
+                                MinWidth="100"
+                                Click="Refresh_Click"/>
+                    </StackPanel>
                 </Grid>
 
                 <ListBox x:Name="AssignmentTargetListBox"
                          Grid.Row="2"
-                         MaxHeight="190"
+                         MaxHeight="196"
                          ItemsSource="{Binding AssignmentTargets}"
                          SelectedItem="{Binding SelectedTarget, Mode=TwoWay}"
                          ItemTemplate="{StaticResource AssignmentTargetCardTemplate}"

@@ -1977,7 +1977,7 @@
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="54"/>
+                                <ColumnDefinition Width="56"/>
                             </Grid.ColumnDefinitions>
 
                             <DatePickerTextBox x:Name="PART_TextBox"
@@ -1990,6 +1990,8 @@
                             <Button x:Name="PART_Button"
                                     Grid.Column="1"
                                     Margin="2"
+                                    Width="48"
+                                    Height="28"
                                     Background="Transparent"
                                     BorderThickness="0"
                                     Focusable="False"
@@ -1998,7 +2000,7 @@
                                         Background="{DynamicResource TileFill}"
                                         BorderBrush="{DynamicResource SurfaceBorder}"
                                         BorderThickness="0"
-                                        CornerRadius="10">
+                                        CornerRadius="8">
                                     <Viewbox Width="15"
                                              Height="15"
                                              HorizontalAlignment="Center"

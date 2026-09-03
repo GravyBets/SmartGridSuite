@@ -202,7 +202,7 @@
                         <TextBlock Text="Daily Truck Board"
                                    Style="{StaticResource PaneTitleTextStyle}"/>
 
-                        <TextBlock Text="Build today’s crews by assigning technicians to trucks."
+                        <TextBlock Text="{Binding BoardSubtitle}"
                                    Margin="0,4,0,0"
                                    Style="{StaticResource PaneSubtitleTextStyle}"/>
                     </StackPanel>
@@ -218,7 +218,78 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextSecondary}"/>
 
+                        <Button Width="34"
+                                Height="32"
+                                Margin="0,0,4,0"
+                                Padding="0"
+                                ToolTip="Previous day"
+                                IsEnabled="{Binding CanEditBoard}"
+                                Click="PreviousDay_Click">
+
+                            <Viewbox Width="10"
+                                     Height="12">
+                                <Path Data="M 8,1 L 3,6 L 8,11"
+                                      Stroke="{DynamicResource TextPrimary}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"/>
+                            </Viewbox>
+                        </Button>
+
+                        <Border Width="86"
+                                Height="32"
+                                Margin="0,0,4,0"
+                                CornerRadius="10"
+                                Background="{DynamicResource ControlInputBg}"
+                                BorderBrush="{DynamicResource ControlInputBorder}"
+                                BorderThickness="1.5">
+
+                            <TextBlock Text="{Binding SelectedWorkDate,
+                                              StringFormat={}{0:dddd}}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ControlInputText}"/>
+                        </Border>
+
+                        <DatePicker x:Name="WorkDatePicker"
+                                    Style="{DynamicResource ModernDatePicker}"
+                                    Width="175"
+                                    Height="32"
+                                    Margin="0,0,4,0"
+                                    VerticalContentAlignment="Center"
+                                    ToolTip="Truck board date"
+                                    IsEnabled="{Binding CanEditBoard}"
+                                    Text="{Binding SelectedWorkDate,
+                                           Mode=OneWay,
+                                           StringFormat={}{0:ddd M/d/yyyy}}"
+                                    SelectedDate="{Binding SelectedWorkDate,
+                                                           Mode=OneWay}"
+                                    SelectedDateChanged="WorkDatePicker_SelectedDateChanged"/>
+
+                        <Button Width="34"
+                                Height="32"
+                                Margin="0,0,22,0"
+                                Padding="0"
+                                ToolTip="Next day"
+                                IsEnabled="{Binding CanEditBoard}"
+                                Click="NextDay_Click">
+
+                            <Viewbox Width="10"
+                                     Height="12">
+                                <Path Data="M 3,1 L 8,6 L 3,11"
+                                      Stroke="{DynamicResource TextPrimary}"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"/>
+                            </Viewbox>
+                        </Button>
+
                         <Button x:Name="RefreshBoardButton"
+                                Style="{DynamicResource PrimaryButtonStyle}"
                                 Content="Refresh"
                                 Height="32"
                                 MinWidth="90"

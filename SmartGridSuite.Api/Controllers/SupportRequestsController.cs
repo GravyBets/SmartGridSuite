@@ -11,8 +11,9 @@ namespace SmartGridSuite.Api.Controllers
     [Route("api/support-requests")]
     public sealed class SupportRequestsController : ControllerBase
     {
-        private const string AllEmailsAddressKey =
-            "Email.AllEmailsAddress";
+        private const string AllEmailsAddressKey = "Email.AllEmailsAddress";
+
+        private const string BugFeatureRequestRecipientKey = "Email.BugFeatureRequestRecipient";
 
         private readonly SmartGridDbContext _db;
         private readonly EmailService _emailService;
@@ -26,8 +27,7 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPost("bug-feature")]
-        public async Task<ActionResult<SubmitBugFeatureResponse>>
-            SubmitBugFeatureRequest(
+        public async Task<ActionResult<SubmitBugFeatureResponse>>SubmitBugFeatureRequest(
                 [FromBody] SubmitBugFeatureRequest req,
                 CancellationToken ct)
         {
@@ -82,23 +82,53 @@ namespace SmartGridSuite.Api.Controllers
                 applicationVersion = "Unknown";
 
             /*
-             * The destination is controlled by Administration ->
-             * General Settings -> All Emails Address.
+             * Every bug/feature request goes to the main All Emails
+             * Address. An optional dedicated recipient can receive an
+             * additional copy.
              */
-            var recipientRow = await _db.AppSettings
+            var recipientValues = await _db.AppSettings
                 .AsNoTracking()
-                .FirstOrDefaultAsync(
-                    x => x.SettingKey == AllEmailsAddressKey,
+                .Where(x =>
+                    x.SettingKey == AllEmailsAddressKey ||
+                    x.SettingKey ==
+                        BugFeatureRequestRecipientKey)
+                .ToDictionaryAsync(
+                    x => x.SettingKey,
+                    x => x.SettingValue ?? "",
+                    StringComparer.OrdinalIgnoreCase,
                     ct);
 
-            var recipient = CleanSettingValue(
-                recipientRow?.SettingValue);
+            var allEmailsAddress =
+                recipientValues.TryGetValue(
+                    AllEmailsAddressKey,
+                    out var mainRecipient)
+                        ? CleanSettingValue(mainRecipient)
+                        : string.Empty;
 
-            if (string.IsNullOrWhiteSpace(recipient))
+            if (string.IsNullOrWhiteSpace(
+                    allEmailsAddress))
             {
                 return BadRequest(
                     "No All Emails Address is configured in General Settings.");
             }
+
+            var bugFeatureRecipient =
+                recipientValues.TryGetValue(
+                    BugFeatureRequestRecipientKey,
+                    out var dedicatedRecipient)
+                        ? CleanSettingValue(dedicatedRecipient)
+                        : string.Empty;
+
+            var recipients = new[]
+            {
+                allEmailsAddress,
+                bugFeatureRecipient
+            }
+                .Where(x =>
+                    !string.IsNullOrWhiteSpace(x))
+                .Distinct(
+                    StringComparer.OrdinalIgnoreCase)
+                .ToArray();
 
             var subject = TrimTo(
                 $"[SmartGridSuite {requestType}] " +
@@ -128,10 +158,11 @@ namespace SmartGridSuite.Api.Controllers
                 {
                     EmailType = "BugFeatureRequest",
 
-                    ToAddresses = new[]
-                    {
-                        recipient
-                    },
+                    /*
+                     * EmailService also splits comma/semicolon lists and
+                     * removes duplicate addresses case-insensitively.
+                     */
+                    ToAddresses = recipients,
 
                     Subject = subject,
                     Body = body,

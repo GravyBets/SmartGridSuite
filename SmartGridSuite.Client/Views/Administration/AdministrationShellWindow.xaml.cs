@@ -4,6 +4,7 @@ using SmartGridSuite.Client.Views.Administration.SNMP;
 using SmartGridSuite.Client.Views.Administration.Tickets;
 using SmartGridSuite.Client.Views.Administration.WriteUpWorkflow;
 using SmartGridSuite.Client.Views.Administration.ConnectedClients;
+using SmartGridSuite.Client.Views.Administration.SystemHealth;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -22,6 +23,8 @@ namespace SmartGridSuite.Client.Views.Administration
         private readonly WriteUpWorkflowAdminView _writeUpWorkflowView;
         private readonly SnmpAdminView _snmpView;
         private readonly ConnectedClientsAdminView _connectedClientsView;
+
+        private readonly SystemHealthAdminView _systemHealthView;
 
         private bool _navCollapsed;
         private bool _syncingNav;
@@ -44,6 +47,7 @@ namespace SmartGridSuite.Client.Views.Administration
             _writeUpWorkflowView = new WriteUpWorkflowAdminView(_api);
             _snmpView = new SnmpAdminView(_api);
             _connectedClientsView = new ConnectedClientsAdminView(_api);
+            _systemHealthView = new SystemHealthAdminView(_api);
 
             _navCollapsed = true;
             ApplyNavState();
@@ -159,6 +163,10 @@ namespace SmartGridSuite.Client.Views.Administration
 
                 case "WriteUpWorkflow":
                     ShowView(_writeUpWorkflowView);
+                    break;
+
+                case "SystemHealth":
+                    ShowView(_systemHealthView);
                     break;
 
                 case "GeneralSettings":

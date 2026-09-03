@@ -124,6 +124,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
              *
              *   Main
              *   Site History
+             *   Range Extender / RX
+             *   Equipment - RX sites only
              *   Portal / PingScreen
              *
              * Everything diagnostic or equipment-related stays hidden,
@@ -132,16 +134,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             if (IsLinemanAccessMode)
             {
                 if (RxOverviewTabItem is not null)
-                    RxOverviewTabItem.Visibility =
-                        Visibility.Collapsed;
+                {
+                    RxOverviewTabItem.Visibility = isRx
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+                }
 
                 if (TowerOverviewTabItem is not null)
                     TowerOverviewTabItem.Visibility =
                         Visibility.Collapsed;
 
                 if (EquipmentTabItem is not null)
+                {
                     EquipmentTabItem.Visibility =
-                        Visibility.Collapsed;
+                        isRx
+                            ? Visibility.Visible
+                            : Visibility.Collapsed;
+                }
 
                 if (SnmpTabItem is not null)
                     SnmpTabItem.Visibility =
@@ -175,11 +184,39 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                         Visibility.Collapsed;
                 }
 
-                if (!IsLinemanAllowedWorkspaceTab(
-                        SelectedWorkspaceTabKey))
+                var selectedKey = SelectedWorkspaceTabKey;
+
+                var isRxOnlyLinemanTab =
+                    string.Equals(
+                        selectedKey,
+                        "RxOverview",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(
+                        selectedKey,
+                        "Equipment",
+                        StringComparison.OrdinalIgnoreCase);
+
+                if (!isRx &&
+                    isRxOnlyLinemanTab)
                 {
                     SetSelectedWorkspaceTab(
                         "TopWriteUp");
+                }
+                else if (!IsLinemanAllowedWorkspaceTab(
+                             selectedKey))
+                {
+                    SetSelectedWorkspaceTab(
+                        "TopWriteUp");
+                }
+
+                if (isRx &&
+                    string.Equals(
+                        SelectedWorkspaceTabKey,
+                        "TopWriteUp",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    SetSelectedWorkspaceTab(
+                        "RxOverview");
                 }
 
                 return;
