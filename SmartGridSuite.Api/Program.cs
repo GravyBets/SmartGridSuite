@@ -107,9 +107,24 @@ namespace SmartGridSuite.Api
 
             builder.Services.AddScoped<TruckBoardInitializationService>();
 
+            builder.Services.AddScoped<DailyAssignmentRolloverService>();
+
+            /*
+             * Production performs Daily Assignment rollover at
+             * 5:00 AM server-local time. Development is excluded
+             * because local API sessions use the production DB.
+             */
+            if (!builder.Environment.IsDevelopment())
+            {
+                builder.Services.AddHostedService<
+                    DailyAssignmentRolloverHostedService>();
+            }
+
             builder.Services.AddScoped<EmailService>();
 
             builder.Services.AddScoped<DailyAssignmentEmailSequenceService>();
+
+            builder.Services.AddScoped<DailyAssignmentRolloverEmailService>();
 
             var app = builder.Build();
             app.UseSerilogRequestLogging();

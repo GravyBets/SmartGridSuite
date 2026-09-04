@@ -26,9 +26,6 @@ namespace SmartGridSuite.Api.Services
             var date =
                 workDate.Date;
 
-            var nextDate =
-                date.AddDays(1);
-
             var dateText =
                 date.ToString("MM/dd/yyyy");
 
@@ -54,8 +51,6 @@ namespace SmartGridSuite.Api.Services
                             x.Status == "Sent" ||
                             x.Status == "DryRun"
                         ) &&
-                        x.CreatedAt >= date &&
-                        x.CreatedAt < nextDate &&
                         x.Subject.StartsWith(subjectPrefix) &&
                         x.Subject.EndsWith(subjectSuffix))
                     .CountAsync(ct);

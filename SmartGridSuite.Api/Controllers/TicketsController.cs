@@ -20,6 +20,7 @@ namespace SmartGridSuite.Api.Controllers
     {
         private readonly SmartGridDbContext _db;
         private readonly TruckBoardInitializationService _truckBoardInitialization;
+        private readonly DailyAssignmentRolloverService _dailyAssignmentRollover;
         private readonly EmailService _emailService;
 
         private readonly DailyAssignmentEmailSequenceService
@@ -45,6 +46,7 @@ namespace SmartGridSuite.Api.Controllers
         public TicketsController(
             SmartGridDbContext db,
             TruckBoardInitializationService truckBoardInitialization,
+            DailyAssignmentRolloverService dailyAssignmentRollover,
             EmailService emailService,
             DailyAssignmentEmailSequenceService dailyAssignmentEmailSequence,
             ILogger<TicketsController> logger)
@@ -54,6 +56,9 @@ namespace SmartGridSuite.Api.Controllers
 
             _truckBoardInitialization =
                 truckBoardInitialization;
+
+            _dailyAssignmentRollover =
+                dailyAssignmentRollover;
 
             _emailService =
                 emailService;
@@ -1632,6 +1637,7 @@ namespace SmartGridSuite.Api.Controllers
              * the technician's published crew route.
              */
             await _truckBoardInitialization.EnsureBoardInitializedAsync(rosterDate, ct);
+            await _dailyAssignmentRollover.EnsureCurrentDayRolloverAsync(assignmentDate, ct);
 
             var statusRows = await _db.TicketStatuses
                 .AsNoTracking()

@@ -16,6 +16,7 @@ namespace SmartGridSuite.Api.Controllers
     {
         private readonly SmartGridDbContext _db;
         private readonly TruckBoardInitializationService _truckBoardInitialization;
+        private readonly DailyAssignmentRolloverService _dailyAssignmentRollover;
         private readonly EmailService _emailService;
 
         private readonly DailyAssignmentEmailSequenceService
@@ -33,6 +34,7 @@ namespace SmartGridSuite.Api.Controllers
         public DailyAssignmentsController(
             SmartGridDbContext db,
             TruckBoardInitializationService truckBoardInitialization,
+            DailyAssignmentRolloverService dailyAssignmentRollover,
             EmailService emailService,
             DailyAssignmentEmailSequenceService dailyAssignmentEmailSequence,
             ILogger<DailyAssignmentsController> logger)
@@ -41,6 +43,9 @@ namespace SmartGridSuite.Api.Controllers
 
             _truckBoardInitialization =
                 truckBoardInitialization;
+
+            _dailyAssignmentRollover =
+                dailyAssignmentRollover;
 
             _emailService =
                 emailService;
@@ -63,6 +68,7 @@ namespace SmartGridSuite.Api.Controllers
              * Ensure today's truck roster and crews exist before building assignment targets.
              */
             await _truckBoardInitialization.EnsureBoardInitializedAsync(rosterDate, ct);
+            await _dailyAssignmentRollover.EnsureCurrentDayRolloverAsync(assignmentDate, ct);
 
             var statusRows = await _db.TicketStatuses
                  .AsNoTracking()
@@ -700,6 +706,7 @@ namespace SmartGridSuite.Api.Controllers
                         additionalAssignment);
 
                     await _db.SaveChangesAsync(ct);
+
 
                     assignmentIds.Add(
                         additionalAssignment.Id);
@@ -1394,332 +1401,34 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         [HttpPost("carryover")]
-        public async Task<ActionResult<CarryOverDailyAssignmentsResponse>> CarryOverAssignments([FromBody] CarryOverDailyAssignmentsRequest req,
+        public async Task<ActionResult<CarryOverDailyAssignmentsResponse>>CarryOverAssignments(
+            [FromBody] CarryOverDailyAssignmentsRequest req,
             CancellationToken ct)
         {
-            var workDate = (req.WorkDate == default ? DateTime.Today : req.WorkDate).Date;
+            var workDate =
+                (req.WorkDate == default
+                    ? DateTime.Today
+                    : req.WorkDate).Date;
 
-            var createdBy = string.IsNullOrWhiteSpace(req.CreatedBy)
-                ? "Dispatcher"
-                : req.CreatedBy.Trim();
-
-            DateTime? sourceDate = req.FromDate?.Date;
-
-            if (sourceDate == null)
+            if (workDate != DateTime.Today)
             {
-                sourceDate = await _db.DailyTicketAssignmentPublished
-                    .AsNoTracking()
-                    .Where(x => x.AssignmentDate < workDate)
-                    .OrderByDescending(x => x.AssignmentDate)
-                    .Select(x => (DateTime?)x.AssignmentDate)
-                    .FirstOrDefaultAsync(ct);
+                return BadRequest(
+                    "Daily Assignment rollover is automatic and " +
+                    "can only be evaluated for the current date.");
             }
 
-            if (sourceDate == null)
-            {
-                return Ok(new CarryOverDailyAssignmentsResponse
-                {
-                    WorkDate = workDate,
-                    SourceDate = null,
-                    SourcePublishedVersion = 0,
-                    Message = "No previous published assignment board was found."
-                });
-            }
-
-            var sourcePublishedVersion = await _db.DailyTicketAssignmentPublished
-                .AsNoTracking()
-                .Where(x => x.AssignmentDate == sourceDate.Value)
-                .Select(x => (int?)x.PublishedVersion)
-                .MaxAsync(ct) ?? 0;
-
-            if (sourcePublishedVersion == 0)
-            {
-                return Ok(new CarryOverDailyAssignmentsResponse
-                {
-                    WorkDate = workDate,
-                    SourceDate = sourceDate,
-                    SourcePublishedVersion = 0,
-                    Message = "The selected source date has no published assignments."
-                });
-            }
-
-            var statusRows = await _db.TicketStatuses
-                .AsNoTracking()
-                .Where(x => x.IsActive)
-                .Select(x => new
-                {
-                    x.Name,
-                    x.IsClosed,
-                    x.IsFieldComplete
-                })
-                .ToListAsync(ct);
-
-            var closedStatusNames = statusRows
-                .Where(x => x.IsClosed)
-                .Select(x => x.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            var fieldCompleteStatusNames = statusRows
-                .Where(x => x.IsFieldComplete)
-                .Select(x => x.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            var sourceRows = await _db.DailyTicketAssignmentPublished
-                .AsNoTracking()
-                .Include(x => x.Ticket)
-                .Where(x =>
-                    x.AssignmentDate == sourceDate.Value &&
-                    x.PublishedVersion == sourcePublishedVersion)
-                .OrderBy(x => x.TargetType)
-                .ThenBy(x => x.TruckId)
-                .ThenBy(x => x.TechnicianId)
-                .ThenBy(x => x.SortOrder)
-                .ThenBy(x => x.Id)
-                .ToListAsync(ct);
-
-            if (sourceRows.Count == 0)
-            {
-                return Ok(new CarryOverDailyAssignmentsResponse
-                {
-                    WorkDate = workDate,
-                    SourceDate = sourceDate,
-                    SourcePublishedVersion = sourcePublishedVersion,
-                    Message = "No assignments were found on the selected source board."
-                });
-            }
-
-            var existingTodayTicketIds = await _db.DailyTicketAssignments
-                .AsNoTracking()
-                .Where(x =>
-                    x.AssignmentDate == workDate &&
-                    x.AssignmentStatus == AssignmentStatusActive)
-                .Select(x => x.TicketId)
-                .ToListAsync(ct);
-
-            var existingTodayTicketIdSet = existingTodayTicketIds.ToHashSet();
-
-            var activeTrucks = await _db.Trucks
-                .AsNoTracking()
-                .Where(x => x.IsActive)
-                .Select(x => new
-                {
-                    x.Id,
-                    x.TruckNumber
-                })
-                .ToListAsync(ct);
-
-            var activeTruckIds = activeTrucks
-                .Select(x => x.Id)
-                .ToHashSet();
-
-            var truckNumberById = activeTrucks
-                .ToDictionary(x => x.Id, x => x.TruckNumber ?? "");
-
-            var activeTechnicianIds = await _db.Technicians
-                .AsNoTracking()
-                .Where(x => x.IsActive)
-                .Select(x => x.Id)
-                .ToListAsync(ct);
-
-            var activeTechnicianIdSet = activeTechnicianIds.ToHashSet();
-
-            var todayCrews = await _db.Crews
-                .AsNoTracking()
-                .Where(x => x.WorkDate == workDate)
-                .ToListAsync(ct);
-
-            var todayCrewByTruckNumber = todayCrews
-                .Select(c => new
-                {
-                    Crew = c,
-                    TruckNumber = (c.TruckNumber ?? string.Empty).Trim()
-                })
-                .Where(x => !string.IsNullOrWhiteSpace(x.TruckNumber))
-                .GroupBy(x => x.TruckNumber, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(
-                    g => g.Key,
-                    g => g.Select(x => x.Crew).OrderBy(x => x.Id).First(),
-                    StringComparer.OrdinalIgnoreCase);
-
-            var skippedAlreadyAssigned = 0;
-            var skippedCompletedOrClosed = 0;
-            var skippedInvalidTarget = 0;
-
-            var carryCandidates = new List<DailyTicketAssignmentPublishedEntity>();
-
-            foreach (var row in sourceRows)
-            {
-                if (existingTodayTicketIdSet.Contains(row.TicketId))
-                {
-                    skippedAlreadyAssigned++;
-                    continue;
-                }
-
-                var status = row.Ticket?.Status ?? "";
-
-                if (closedStatusNames.Contains(status) || fieldCompleteStatusNames.Contains(status))
-                {
-                    skippedCompletedOrClosed++;
-                    continue;
-                }
-
-                var targetType = NormalizeTargetType(row.TargetType);
-
-                if (targetType == "Truck")
-                {
-                    if (!row.TruckId.HasValue || !activeTruckIds.Contains(row.TruckId.Value))
-                    {
-                        skippedInvalidTarget++;
-                        continue;
-                    }
-                }
-                else if (targetType == "Technician")
-                {
-                    if (!row.TechnicianId.HasValue || !activeTechnicianIdSet.Contains(row.TechnicianId.Value))
-                    {
-                        skippedInvalidTarget++;
-                        continue;
-                    }
-                }
-                else
-                {
-                    skippedInvalidTarget++;
-                    continue;
-                }
-
-                carryCandidates.Add(row);
-                existingTodayTicketIdSet.Add(row.TicketId);
-            }
-
-            if (carryCandidates.Count == 0)
-            {
-                return Ok(new CarryOverDailyAssignmentsResponse
-                {
-                    WorkDate = workDate,
-                    SourceDate = sourceDate,
-                    SourcePublishedVersion = sourcePublishedVersion,
-                    SkippedAlreadyAssignedCount = skippedAlreadyAssigned,
-                    SkippedCompletedOrClosedCount = skippedCompletedOrClosed,
-                    SkippedInvalidTargetCount = skippedInvalidTarget,
-                    Message = "No tickets needed to be carried over."
-                });
-            }
-
-            var now = DateTime.Now;
-            var newRows = new List<DailyTicketAssignmentEntity>();
-
-            var groups = carryCandidates
-                .GroupBy(x => new
-                {
-                    TargetType = NormalizeTargetType(x.TargetType),
-                    x.TruckId,
-                    x.TechnicianId
-                })
-                .ToList();
-
-            foreach (var group in groups)
-            {
-                var targetType = group.Key.TargetType;
-                var truckId = group.Key.TruckId;
-                var technicianId = group.Key.TechnicianId;
-
-                var groupItems = group
-                    .OrderBy(x => x.SortOrder)
-                    .ThenBy(x => x.Id)
-                    .ToList();
-
-                var shiftAmount = groupItems.Count * 10;
-
-                var existingTargetRows = await _db.DailyTicketAssignments
-                    .Where(x =>
-                        x.AssignmentDate == workDate &&
-                        x.AssignmentStatus == AssignmentStatusActive &&
-                        x.TargetType == targetType &&
-                        x.TruckId == truckId &&
-                        x.TechnicianId == technicianId)
-                    .ToListAsync(ct);
-
-                foreach (var existing in existingTargetRows)
-                {
-                    existing.SortOrder += shiftAmount;
-                    existing.IsPublished = false;
-                    existing.UpdatedAt = now;
-                    existing.UpdatedBy = createdBy;
-                }
-
-                var sortOrder = 0;
-
-                foreach (var sourceRow in groupItems)
-                {
-                    sortOrder += 10;
-
-                    uint? crewId = null;
-
-                    if (targetType == "Truck" && sourceRow.TruckId.HasValue)
-                    {
-                        if (truckNumberById.TryGetValue(sourceRow.TruckId.Value, out var truckNumber) &&
-                            !string.IsNullOrWhiteSpace(truckNumber) &&
-                            todayCrewByTruckNumber.TryGetValue(truckNumber.Trim(), out var todayCrew))
-                        {
-                            crewId = todayCrew.Id;
-                        }
-                    }
-
-                    newRows.Add(new DailyTicketAssignmentEntity
-                    {
-                        AssignmentDate = workDate,
-                        TicketId = sourceRow.TicketId,
-
-                        TargetType = targetType,
-                        TruckId = targetType == "Truck" ? sourceRow.TruckId : null,
-                        TechnicianId = targetType == "Technician" ? sourceRow.TechnicianId : null,
-                        CrewId = crewId,
-
-                        SortOrder = sortOrder,
-
-                        IsPublished = false,
-                        PublishedVersion = 0,
-                        PublishedAt = null,
-                        PublishedBy = null,
-
-                        CarriedFromAssignmentId = sourceRow.SourceAssignmentId,
-
-                        AssignmentNotes = sourceRow.AssignmentNotes,
-
-                        CreatedAt = now,
-                        CreatedBy = createdBy,
-                        UpdatedAt = now,
-                        UpdatedBy = createdBy
-                    });
-                }
-            }
-
-            _db.DailyTicketAssignments.AddRange(newRows);
-
-            await _db.SaveChangesAsync(ct);
+            await _dailyAssignmentRollover
+                .EnsureCurrentDayRolloverAsync(
+                    workDate,
+                    ct);
 
             return Ok(new CarryOverDailyAssignmentsResponse
             {
                 WorkDate = workDate,
-                SourceDate = sourceDate,
-                SourcePublishedVersion = sourcePublishedVersion,
-
-                CarriedOverCount = newRows.Count,
-                SkippedAlreadyAssignedCount = skippedAlreadyAssigned,
-                SkippedCompletedOrClosedCount = skippedCompletedOrClosed,
-                SkippedInvalidTargetCount = skippedInvalidTarget,
-
-                CarriedOverTicketIds = newRows
-                    .Select(x => x.TicketId)
-                    .OrderBy(x => x)
-                    .ToList(),
-
-                NewAssignmentIds = newRows
-                    .Select(x => x.Id)
-                    .OrderBy(x => x)
-                    .ToList(),
-
-                Message = $"Carried over {newRows.Count} ticket(s)."
+                SourceDate = req.FromDate?.Date,
+                SourcePublishedVersion = 0,
+                Message =
+                    "Automatic current-day rollover was evaluated successfully."
             });
         }
 
@@ -2653,7 +2362,7 @@ namespace SmartGridSuite.Api.Controllers
 
                 var changeSummaryHtml =
                     isModifiedPublish
-                        ? BuildDailyAssignmentChangeSummaryHtml(
+                        ? DailyAssignmentEmailRenderer.BuildDailyAssignmentChangeSummaryHtml(
                             previousPublishedRows,
                             currentPublishedRows,
                             ticketsById)
@@ -2664,7 +2373,7 @@ namespace SmartGridSuite.Api.Controllers
                     $"{emailTitle} - " +
                     $"{workDate:MM/dd/yyyy}";
 
-                var body = BuildDailyAssignmentPublishedEmailBody(
+                var body = DailyAssignmentEmailRenderer.BuildDailyAssignmentPublishedEmailBody(
                     workDate,
                     targetDisplay,
                     truckNumberDisplay,
@@ -2796,334 +2505,6 @@ namespace SmartGridSuite.Api.Controllers
             return string.IsNullOrWhiteSpace(targetType)
                 ? "Daily Assignment Target"
                 : targetType;
-        }
-
-        private static string BuildDailyAssignmentPublishedEmailBody(
-            DateTime workDate,
-            string targetDisplay,
-            string truckNumberDisplay,
-            string publishedBy,
-            DateTime publishedAt,
-            string emailTitle,
-            string changeSummaryHtml,
-            IReadOnlyList<DailyTicketAssignmentPublishedEntity> publishedRows,
-            IReadOnlyDictionary<long, TicketEntity> ticketsById)
-        {
-            static string H(string? value)
-                => WebUtility.HtmlEncode((value ?? string.Empty).Trim());
-
-            static string DashIfBlank(string? value)
-            {
-                var clean = (value ?? string.Empty).Trim();
-
-                return string.IsNullOrWhiteSpace(clean)
-                    ? "—"
-                    : WebUtility.HtmlEncode(clean);
-            }
-            var truckRowHtml = string.IsNullOrWhiteSpace(truckNumberDisplay)
-                ? ""
-                : $$"""
-                        <tr>
-                        <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Truck</td>
-                        <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{H(truckNumberDisplay)}}</td>
-                        <td></td>
-                        <td></td>
-                        </tr>
-                    """;
-
-            var sb = new StringBuilder();
-
-            sb.AppendLine($$"""
-                <!DOCTYPE html>
-                <html>
-                <body style="margin:0; padding:0; background:#f3f4f6; font-family:Segoe UI, Arial, sans-serif; color:#111827;">
-                  <div style="max-width:1100px; margin:0 auto; padding:24px;">
-                    <div style="background:#ffffff; border:1px solid #d1d5db; border-radius:12px; overflow:hidden;">
-                      <div style="background:#1f2937; color:#ffffff; padding:18px 22px;">
-                        <div style="font-size:22px; font-weight:700;">{{H(emailTitle)}}</div>
-                      </div>
-                """);
-
-            sb.AppendLine($$"""
-                <div style="padding:18px 22px;">
-                <table cellpadding="0" cellspacing="0" style="width:100%; margin-bottom:18px; border-collapse:collapse;">
-                    <tr>
-                    <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Date</td>
-                    <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{workDate:MM/dd/yyyy}}</td>
-
-                    <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Assigned To</td>
-                    <td style="font-size:14px; font-weight:600; padding:3px 0;">{{H(targetDisplay)}}</td>
-                    </tr>
-                    <tr>
-                    <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Published By</td>
-                    <td style="font-size:14px; font-weight:600; padding:3px 24px 3px 0;">{{H(publishedBy)}}</td>
-
-                    <td style="font-size:13px; color:#6b7280; padding:3px 14px 3px 0;">Published At</td>
-                    <td style="font-size:14px; font-weight:600; padding:3px 0;">{{publishedAt:MM/dd/yyyy HH:mm}}</td>
-                    </tr>
-                    {{truckRowHtml}}
-                </table>
-
-                {{changeSummaryHtml}}
-
-                <div style="font-size:15px; font-weight:700; margin:0 0 8px 0;">Current Route</div>
-
-                <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #d1d5db;">
-                  <thead>
-                    <tr style="background:#e5e7eb;">
-                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">#</th>
-                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Site</th>
-                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Notification Name</th>
-                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Problem</th>
-                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Notification</th>
-                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Work Order</th>
-                      <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">WO Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                """);
-
-            var rowNumber = 0;
-
-            foreach (var assignment in publishedRows
-                         .OrderBy(x => x.SortOrder)
-                         .ThenBy(x => x.Id))
-            {
-                if (!ticketsById.TryGetValue(assignment.TicketId, out var ticket))
-                    continue;
-
-                rowNumber++;
-
-                var background = rowNumber % 2 == 0
-                    ? "#f9fafb"
-                    : "#ffffff";
-
-                sb.AppendLine($$"""
-                    <tr style="background:{{background}};">
-                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db; font-weight:600;">{{rowNumber}}</td>
-                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db; font-weight:700;">{{DashIfBlank(ticket.Site)}}</td>
-                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.NotificationName)}}</td>
-                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.Problem)}}</td>
-                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.Notification)}}</td>
-                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(ticket.CurrentWorkOrder)}}</td>
-                      <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{DashIfBlank(NormalizeWorkOrderType(ticket.WorkOrderClass))}}</td>
-                    </tr>
-                    """);
-
-                var assignmentNotes = (assignment.AssignmentNotes ?? string.Empty).Trim();
-
-                if (!string.IsNullOrWhiteSpace(assignmentNotes))
-                {
-                    sb.AppendLine($$"""
-                        <tr style="background:{{background}};">
-                            <td style="font-size:12px; padding:8px 10px; border:1px solid #d1d5db;"></td>
-                            <td colspan="6" style="font-size:12px; padding:8px 10px; border:1px solid #d1d5db; color:#374151;">
-                            <strong>Assignment Notes:</strong> {{H(assignmentNotes)}}
-                            </td>
-                        </tr>
-                        """);
-                }
-            }
-
-            if (rowNumber == 0)
-            {
-                sb.AppendLine("""
-                    <tr>
-                        <td colspan="7" style="font-size:13px; padding:14px 10px; border:1px solid #d1d5db; color:#6b7280; font-style:italic;">
-                        No ticket details were available.
-                        </td>
-                    </tr>
-                    """);
-            }
-
-            sb.AppendLine("""
-                          </tbody>
-                        </table>
-
-                        <div style="font-size:12px; color:#6b7280; margin-top:16px;">
-                          This message was generated by SmartGridSuite.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </body>
-                </html>
-                """);
-
-            return sb.ToString();
-        }
-
-        private static string BuildDailyAssignmentChangeSummaryHtml(
-            IReadOnlyList<DailyTicketAssignmentPublishedEntity> previousRows,
-            IReadOnlyList<DailyTicketAssignmentPublishedEntity> currentRows,
-            IReadOnlyDictionary<long, TicketEntity> ticketsById)
-        {
-            static string H(string? value)
-                => WebUtility.HtmlEncode((value ?? string.Empty).Trim());
-
-            static string TicketLabel(
-                long ticketId,
-                IReadOnlyDictionary<long, TicketEntity> ticketsById)
-            {
-                if (!ticketsById.TryGetValue(ticketId, out var ticket))
-                    return $"Ticket {ticketId}";
-
-                var site = (ticket.Site ?? string.Empty).Trim();
-                var notificationName = (ticket.NotificationName ?? string.Empty).Trim();
-
-                if (!string.IsNullOrWhiteSpace(site) &&
-                    !string.IsNullOrWhiteSpace(notificationName))
-                {
-                    return $"{site} - {notificationName}";
-                }
-
-                if (!string.IsNullOrWhiteSpace(site))
-                    return site;
-
-                if (!string.IsNullOrWhiteSpace(notificationName))
-                    return notificationName;
-
-                return $"Ticket {ticketId}";
-            }
-
-            static string FormatTicketList(
-                IEnumerable<long> ticketIds,
-                IReadOnlyDictionary<long, TicketEntity> ticketsById)
-            {
-                var labels = ticketIds
-                    .Select(id => H(TicketLabel(id, ticketsById)))
-                    .ToList();
-
-                return labels.Count == 0
-                    ? "—"
-                    : string.Join("<br/>", labels);
-            }
-
-            var previousOrdered = previousRows
-                .OrderBy(x => x.SortOrder)
-                .ThenBy(x => x.Id)
-                .GroupBy(x => x.TicketId)
-                .Select(g => g.First())
-                .ToList();
-
-            var currentOrdered = currentRows
-                .OrderBy(x => x.SortOrder)
-                .ThenBy(x => x.Id)
-                .GroupBy(x => x.TicketId)
-                .Select(g => g.First())
-                .ToList();
-
-            var previousTicketIds = previousOrdered
-                .Select(x => x.TicketId)
-                .ToList();
-
-            var currentTicketIds = currentOrdered
-                .Select(x => x.TicketId)
-                .ToList();
-
-            var previousTicketIdSet = previousTicketIds.ToHashSet();
-            var currentTicketIdSet = currentTicketIds.ToHashSet();
-
-            var addedTicketIds = currentTicketIds
-                .Where(id => !previousTicketIdSet.Contains(id))
-                .ToList();
-
-            var removedTicketIds = previousTicketIds
-                .Where(id => !currentTicketIdSet.Contains(id))
-                .ToList();
-
-            var previousIndexByTicketId = previousTicketIds
-                .Select((id, index) => new
-                {
-                    TicketId = id,
-                    RouteOrder = index + 1
-                })
-                .ToDictionary(x => x.TicketId, x => x.RouteOrder);
-
-            var currentIndexByTicketId = currentTicketIds
-                .Select((id, index) => new
-                {
-                    TicketId = id,
-                    RouteOrder = index + 1
-                })
-                .ToDictionary(x => x.TicketId, x => x.RouteOrder);
-
-            var reorderedTicketIds = currentTicketIds
-                .Where(id =>
-                    previousIndexByTicketId.ContainsKey(id) &&
-                    currentIndexByTicketId.ContainsKey(id) &&
-                    previousIndexByTicketId[id] != currentIndexByTicketId[id])
-                .ToList();
-
-            var rows = new List<(string Change, string Details)>();
-
-            if (addedTicketIds.Count > 0)
-            {
-                rows.Add((
-                    $"Added ({addedTicketIds.Count})",
-                    FormatTicketList(addedTicketIds, ticketsById)));
-            }
-
-            if (removedTicketIds.Count > 0)
-            {
-                rows.Add((
-                    $"Removed ({removedTicketIds.Count})",
-                    FormatTicketList(removedTicketIds, ticketsById)));
-            }
-
-            if (reorderedTicketIds.Count > 0)
-            {
-                var reorderedDetails = reorderedTicketIds
-                    .Select(id =>
-                        $"{H(TicketLabel(id, ticketsById))}: " +
-                        $"#{previousIndexByTicketId[id]} → #{currentIndexByTicketId[id]}")
-                    .ToList();
-
-                rows.Add((
-                    $"Route Order Changed ({reorderedTicketIds.Count})",
-                    string.Join("<br/>", reorderedDetails)));
-            }
-
-            if (rows.Count == 0)
-            {
-                rows.Add((
-                    "Republished",
-                    "No ticket additions, removals, or route-order changes were detected."));
-            }
-
-            var sb = new StringBuilder();
-
-            sb.AppendLine("""
-                <div style="margin-bottom:18px;">
-                  <div style="font-size:15px; font-weight:700; margin:0 0 8px 0;">Changes Since Previous Publish</div>
-
-                  <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; border:1px solid #d1d5db;">
-                    <thead>
-                      <tr style="background:#e5e7eb;">
-                        <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db; width:220px;">Change</th>
-                        <th style="text-align:left; font-size:12px; padding:9px 10px; border:1px solid #d1d5db;">Details</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                """);
-
-            foreach (var row in rows)
-            {
-                sb.AppendLine($$"""
-                      <tr>
-                        <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db; font-weight:700;">{{H(row.Change)}}</td>
-                        <td style="font-size:13px; padding:9px 10px; border:1px solid #d1d5db;">{{row.Details}}</td>
-                      </tr>
-                    """);
-            }
-
-            sb.AppendLine("""
-                    </tbody>
-                  </table>
-                </div>
-                """);
-
-            return sb.ToString();
         }
 
         private static IQueryable<DailyTicketAssignmentEntity> FilterDraftTargetRows(
