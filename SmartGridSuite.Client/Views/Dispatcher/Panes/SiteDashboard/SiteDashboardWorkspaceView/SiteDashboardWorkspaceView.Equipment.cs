@@ -81,10 +81,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 SmartGridSuite.Contracts.SiteDashboard.SiteDashboardKinds.Dacs,
                 StringComparison.OrdinalIgnoreCase);
 
+            var isTower = string.Equals(
+                EquipmentDashboardKind,
+                SmartGridSuite.Contracts.SiteDashboard.SiteDashboardKinds.Tower,
+                StringComparison.OrdinalIgnoreCase);
+
             var isRx = IsRangeExtenderDashboard;
 
             if (AccessSecurityCard is not null)
-                AccessSecurityCard.Visibility = (isRx || isDacs) ? Visibility.Collapsed : Visibility.Visible;
+                AccessSecurityCard.Visibility =
+                    (isRx || isDacs || isTower)
+                        ? Visibility.Collapsed
+                        : Visibility.Visible;
 
             if (isRx)
             {
@@ -93,6 +101,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     model: null,
                     serial: GetEquipmentValue("Range Extender SN", "Meter Number"),
                     swapLabel: "Range Extender");
+
+                return;
+            }
+
+            if (isTower)
+            {
+                AddSerializedDeviceSection(
+                    title: "Base Station",
+                    model: null,
+                    serial: null,
+                    swapLabel: "Base Station");
+
+                AddSerializedDeviceSection(
+                    title: "Duplexer",
+                    model: null,
+                    serial: null,
+                    swapLabel: "Duplexer");
 
                 return;
             }

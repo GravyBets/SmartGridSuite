@@ -93,6 +93,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     sessionKey,
                     StringComparison.Ordinal);
 
+            WorkspaceView.StopTowerPingSession(sessionToClose.TowerPingState);
+
             _sessions.RemoveAt(index);
 
             if (_sessions.Count == 0)

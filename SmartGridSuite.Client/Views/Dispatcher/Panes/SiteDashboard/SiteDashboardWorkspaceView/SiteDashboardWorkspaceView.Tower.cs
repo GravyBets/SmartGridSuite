@@ -3,6 +3,7 @@ using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Diagnostics;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 {
@@ -23,6 +24,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             public bool IsRunning { get; set; }
 
             public List<TowerPingEndpoint> Endpoints { get; set; } = new();
+
+            public TowerSectorPingSessionState? SessionState { get; set; }
         }
 
         private sealed class TowerPingEndpoint
@@ -44,6 +47,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             public bool? TestSuccessful { get; set; }
             public bool IsRunning { get; set; }
+
+            public TowerEndpointPingSessionState? SessionState { get; set; }
         }
 
         public void SetTowerSectors(IEnumerable<TowerSectorDto>? sectors)
@@ -286,8 +291,38 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             var top = new Grid();
-            top.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            top.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(
+                        1,
+                        GridUnitType.Star)
+                });
+
+            top.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(6)
+                });
+
+            top.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = GridLength.Auto
+                });
+
+            top.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = new GridLength(6)
+                });
+
+            top.ColumnDefinitions.Add(
+                new ColumnDefinition
+                {
+                    Width = GridLength.Auto
+                });
 
             top.Children.Add(new TextBlock
             {
@@ -296,6 +331,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 Foreground = TryFindResource("TextPrimary") as Brush,
                 VerticalAlignment = VerticalAlignment.Center
             });
+
+            var openButton = new Button
+            {
+                Content = "Open",
+                Style =
+                    (Style)FindResource(
+                        "SecondaryButtonStyle"),
+                Height = 24,
+                MinWidth = 58,
+                Padding =
+                    new Thickness(
+                        8,
+                        0,
+                        8,
+                        0),
+                Tag = endpoint
+            };
+
+            openButton.Click +=
+                OpenTowerEndpointButton_Click;
+
+            Grid.SetColumn(
+                openButton,
+                2);
+
+            top.Children.Add(
+                openButton);
 
             var pingButton = new Button
             {
@@ -311,7 +373,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             endpoint.PingButton = pingButton;
 
-            Grid.SetColumn(pingButton, 1);
+            Grid.SetColumn(pingButton, 4);
             top.Children.Add(pingButton);
 
             Grid.SetRow(top, 0);
@@ -320,17 +382,66 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             var ipBox = new TextBox
             {
                 Text = endpoint.IpAddress,
-                Style = (Style)FindResource("ModernTextBox"),
+                Style = (Style)FindResource("TowerIpTextBoxStyle"),
                 Height = 28,
-                Padding = new Thickness(10, 0, 10, 0),
+
+                // Keep the IP much closer to the left edge.
+                Padding = new Thickness(2, 0, 2, 0),
+
                 VerticalContentAlignment = VerticalAlignment.Center,
-                IsReadOnly = true
+
+                // Allow a technician to temporarily override a bad DB IP.
+                IsReadOnly = false
             };
 
             endpoint.IpTextBox = ipBox;
             endpoint.DefaultIpBorderBrush = ipBox.BorderBrush;
             endpoint.DefaultIpBackground = ipBox.Background;
             endpoint.DefaultIpForeground = ipBox.Foreground;
+
+            ipBox.TextChanged += (_, _) =>
+            {
+                var newIp =
+                    (ipBox.Text ?? string.Empty).Trim();
+
+                if (string.Equals(
+                        endpoint.IpAddress,
+                        newIp,
+                        StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                endpoint.IpAddress = newIp;
+
+                if (endpoint.SessionState is not null)
+                {
+                    endpoint.SessionState.IpAddress =
+                        newIp;
+
+                    endpoint.SessionState.Results =
+                        string.Empty;
+
+                    endpoint.SessionState.Summary =
+                        "Ready.";
+
+                    endpoint.SessionState.TestSuccessful =
+                        null;
+                }
+
+                /*
+                 * The previous Test result belonged to the old IP.
+                 * Once the technician changes the IP, clear that result
+                 * until the new IP is tested.
+                 */
+                ResetTowerIpStatus(endpoint);
+
+                if (endpoint.ResultTextBox is not null)
+                    endpoint.ResultTextBox.Text = string.Empty;
+
+                if (endpoint.SummaryTextBlock is not null)
+                    endpoint.SummaryTextBlock.Text = "Ready.";
+            };
 
             Grid.SetRow(ipBox, 2);
             root.Children.Add(ipBox);
@@ -371,6 +482,76 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             border.Child = root;
             return border;
+        }
+
+        private void OpenTowerEndpointButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag
+                is not TowerPingEndpoint endpoint)
+            {
+                return;
+            }
+
+            /*
+             * Use whatever is currently typed in the box,
+             * not necessarily the original Parent DB value.
+             */
+            var ip =
+                (endpoint.IpTextBox?.Text ??
+                 endpoint.IpAddress ??
+                 string.Empty)
+                .Trim();
+
+            if (string.IsNullOrWhiteSpace(ip))
+            {
+                MessageBox.Show(
+                    "There is no IP address to open.",
+                    "Open Tower IP",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                return;
+            }
+
+            var url =
+                $"https://{ip}";
+
+            if (!Uri.TryCreate(
+                    url,
+                    UriKind.Absolute,
+                    out var uri))
+            {
+                MessageBox.Show(
+                    $"'{ip}' is not a valid IP address.",
+                    "Open Tower IP",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                return;
+            }
+
+            try
+            {
+                Process.Start(
+                    new ProcessStartInfo
+                    {
+                        FileName =
+                            uri.AbsoluteUri,
+
+                        UseShellExecute =
+                            true
+                    });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Could not open {uri.AbsoluteUri}.{Environment.NewLine}{Environment.NewLine}{ex.Message}",
+                    "Open Tower IP",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         private bool TryGetTowerSectorPingCount(TowerSectorPingCard sector, out int pingCount, out bool continuous)
@@ -522,12 +703,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             var sector = endpoint.ParentSector;
 
-            if (endpoint.IsRunning || sector?.IsRunning == true)
+            var sectorState = sector?.SessionState;
+
+            var endpointState =
+                endpoint.SessionState;
+
+            if (endpointState?.IsRunning == true ||
+                sectorState?.IsRunning == true ||
+                sectorState?.PingCts is not null)
             {
                 if (sector is not null)
                     StopTowerSectorPings(sector);
 
-                RefreshTowerPingButtonStates();
                 return;
             }
 
@@ -536,127 +723,311 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private async Task RunSingleTowerEndpointPingAsync(TowerPingEndpoint endpoint)
         {
-            var sector = endpoint.ParentSector;
+            var sector =
+                endpoint.ParentSector;
 
-            if (sector is null)
+            var ownerState =
+                _towerPingSessionState;
+
+            var sectorState =
+                sector?.SessionState;
+
+            if (sector is null ||
+                ownerState is null ||
+                sectorState is null)
+            {
                 return;
+            }
 
-            if (!TryGetTowerSectorPingCount(sector, out var pingCount, out var continuous))
+            if (!TryGetTowerSectorPingCount(
+                    sector,
+                    out var pingCount,
+                    out var continuous))
+            {
                 return;
+            }
 
-            StopTowerSectorPings(sector);
+            StopTowerSectorPings(
+                sector);
 
-            var cts = new CancellationTokenSource();
-            sector.PingCts = cts;
-            sector.IsRunning = true;
+            var cts =
+                new CancellationTokenSource();
+
+            sectorState.PingCts =
+                cts;
+
+            sectorState.IsRunning =
+                true;
+
             RefreshTowerPingButtonStates();
 
             try
             {
-                await PingTowerEndpointAsync(endpoint, pingCount, continuous, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                // expected when stopped
+                await PingTowerEndpointAsync(
+                    ownerState,
+                    endpoint,
+                    pingCount,
+                    continuous,
+                    cts.Token);
             }
             finally
             {
-                if (ReferenceEquals(sector.PingCts, cts))
+                if (ReferenceEquals(
+                        sectorState.PingCts,
+                        cts))
                 {
-                    sector.PingCts.Dispose();
-                    sector.PingCts = null;
+                    sectorState.PingCts =
+                        null;
+
+                    cts.Dispose();
                 }
 
-                sector.IsRunning = false;
+                sectorState.IsRunning =
+                    false;
+
                 RefreshTowerPingButtonStates();
             }
         }
 
-        private async Task PingTowerEndpointAsync(TowerPingEndpoint endpoint, int pingCount, bool continuous, CancellationToken token)
+        private async Task PingTowerEndpointAsync(
+            TowerPingSessionState ownerState,
+            TowerPingEndpoint endpoint,
+            int pingCount,
+            bool continuous,
+            CancellationToken token)
         {
-            if (endpoint.IsRunning)
-                return;
+            var endpointState =
+                endpoint.SessionState;
 
-            endpoint.IsRunning = true;
-            RefreshTowerPingButtonStates();
+            if (endpointState is null ||
+                endpointState.IsRunning)
+            {
+                return;
+            }
+
+            endpointState.IsRunning = true;
 
             try
             {
-                var ip = (endpoint.IpAddress ?? string.Empty).Trim();
+                var ip =
+                    (endpointState.IpAddress ??
+                     endpoint.IpAddress ??
+                     string.Empty)
+                    .Trim();
 
                 if (string.IsNullOrWhiteSpace(ip))
                     return;
 
-                ResetTowerIpStatus(endpoint);
+                endpointState.IpAddress =
+                    ip;
 
-                if (endpoint.ResultTextBox is not null)
-                    endpoint.ResultTextBox.Text = string.Empty;
+                endpointState.Results =
+                    string.Empty;
 
-                if (endpoint.SummaryTextBlock is not null)
-                    endpoint.SummaryTextBlock.Text = "Testing...";
+                endpointState.Summary =
+                    "Testing...";
+
+                RenderTowerEndpointIfActive(
+                    ownerState,
+                    endpointState);
 
                 var sent = 0;
-                var received = 0;
-                var outputLines = new List<string>();
+                var lost = 0;
 
-                using var ping = new Ping();
+                var outputLines =
+                    new List<string>();
 
-                while (!token.IsCancellationRequested && (continuous || sent < pingCount))
+                using var ping =
+                    new Ping();
+
+                try
                 {
-                    sent++;
-
-                    try
+                    while (!token.IsCancellationRequested &&
+                           (continuous ||
+                            sent < pingCount))
                     {
-                        var reply = await ping.SendPingAsync(ip, 1000);
+                        string line;
 
-                        if (reply.Status == IPStatus.Success)
+                        try
                         {
-                            received++;
-                            outputLines.Add($"Reply from {ip}: Time={reply.RoundtripTime}ms");
-                            ApplyTowerIpStatus(endpoint, true);
+                            var reply =
+                                await ping.SendPingAsync(
+                                    ip,
+                                    1500);
+
+                            sent++;
+
+                            if (reply.Status ==
+                                IPStatus.Success)
+                            {
+                                line =
+                                    $"{DateTime.Now:HH:mm:ss} {ip}: " +
+                                    $"Time={reply.RoundtripTime} ms";
+                            }
+                            else
+                            {
+                                lost++;
+
+                                line =
+                                    $"{DateTime.Now:HH:mm:ss} {ip}: " +
+                                    $"{reply.Status}";
+                            }
                         }
-                        else
+                        catch (OperationCanceledException)
                         {
-                            outputLines.Add($"{ip}: {reply.Status}");
-                            ApplyTowerIpStatus(endpoint, false);
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            sent++;
+                            lost++;
+
+                            line =
+                                $"{DateTime.Now:HH:mm:ss} {ip}: " +
+                                $"{ex.Message}";
+                        }
+
+                        outputLines.Add(line);
+
+                        if (outputLines.Count > 150)
+                        {
+                            outputLines.RemoveRange(
+                                0,
+                                outputLines.Count - 150);
+                        }
+
+                        endpointState.Results =
+                            string.Join(
+                                Environment.NewLine,
+                                outputLines);
+
+                        var lossPercent =
+                            sent == 0
+                                ? 0
+                                : (int)Math.Round(
+                                    (double)lost * 100 /
+                                    sent);
+
+                        endpointState.Summary =
+                            $"Sent = {sent}, Lost = {lost} " +
+                            $"({lossPercent}% loss).";
+
+                        RenderTowerEndpointIfActive(
+                            ownerState,
+                            endpointState);
+
+                        /*
+                         * Same behavior as MR / IGSD:
+                         *
+                         * Blank = wait one second after each reply.
+                         * Count entered = immediately send the next ping
+                         * after the previous ping finishes.
+                         */
+                        if (continuous)
+                        {
+                            await Task.Delay(
+                                1000,
+                                token);
                         }
                     }
-                    catch (Exception ex)
+                }
+                catch (OperationCanceledException)
+                {
+                    if (sent == 0)
                     {
-                        outputLines.Add($"{ip}: {ex.Message}");
-                        ApplyTowerIpStatus(endpoint, false);
+                        endpointState.Summary =
+                            "Stopped.";
+
+                        RenderTowerEndpointIfActive(
+                            ownerState,
+                            endpointState);
                     }
-
-                    if (outputLines.Count > 150)
-                        outputLines.RemoveRange(0, outputLines.Count - 150);
-
-                    if (endpoint.ResultTextBox is not null)
-                    {
-                        endpoint.ResultTextBox.Text = string.Join(Environment.NewLine, outputLines);
-                        endpoint.ResultTextBox.ScrollToEnd();
-                    }
-
-                    var lost = sent - received;
-                    var lossPercent = sent == 0
-                        ? 0
-                        : (int)Math.Round((lost / (double)sent) * 100);
-
-                    if (endpoint.SummaryTextBlock is not null)
-                    {
-                        endpoint.SummaryTextBlock.Text = continuous
-                            ? $"Sent = {sent}, Lost = {lost} ({lossPercent}% loss) • Running..."
-                            : $"Sent = {sent}, Lost = {lost} ({lossPercent}% loss)";
-                    }
-
-                    var delayMs = continuous ? 1000 : 150;
-                    await Task.Delay(delayMs, token);
                 }
             }
             finally
             {
-                endpoint.IsRunning = false;
+                endpointState.IsRunning = false;
+
+                RenderTowerEndpointIfActive(
+                    ownerState,
+                    endpointState);
+
                 RefreshTowerPingButtonStates();
             }
+        }
+
+        private void RenderTowerEndpointIfActive(
+            TowerPingSessionState ownerState,
+            TowerEndpointPingSessionState endpointState)
+        {
+            /*
+             * Same idea used by MR / IGSD:
+             * background work updates its tab-owned state,
+             * but only touches controls when that tab is visible.
+             */
+            if (!ReferenceEquals(
+                    _towerPingSessionState,
+                    ownerState))
+            {
+                return;
+            }
+
+            var endpoint =
+                _towerPingCards
+                    .SelectMany(x => x.Endpoints)
+                    .FirstOrDefault(x =>
+                        ReferenceEquals(
+                            x.SessionState,
+                            endpointState));
+
+            if (endpoint is null)
+                return;
+
+            endpoint.IpAddress =
+                endpointState.IpAddress ??
+                string.Empty;
+
+            if (endpoint.IpTextBox is not null &&
+                !string.Equals(
+                    endpoint.IpTextBox.Text,
+                    endpointState.IpAddress,
+                    StringComparison.Ordinal))
+            {
+                endpoint.IpTextBox.Text =
+                    endpointState.IpAddress;
+            }
+
+            if (endpoint.ResultTextBox is not null)
+            {
+                endpoint.ResultTextBox.Text =
+                    endpointState.Results ??
+                    string.Empty;
+
+                endpoint.ResultTextBox.ScrollToEnd();
+            }
+
+            if (endpoint.SummaryTextBlock is not null)
+            {
+                endpoint.SummaryTextBlock.Text =
+                    endpointState.Summary ??
+                    "Ready.";
+            }
+
+            endpoint.TestSuccessful =
+                endpointState.TestSuccessful;
+
+            if (endpointState.TestSuccessful.HasValue)
+            {
+                ApplyTowerIpStatus(
+                    endpoint,
+                    endpointState.TestSuccessful.Value);
+            }
+            else
+            {
+                ResetTowerIpStatus(endpoint);
+            }
+
+            RefreshTowerPingButtonStates();
         }
 
         private async void PingTowerSectorButton_Click(object sender, RoutedEventArgs e)
@@ -664,10 +1035,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             if ((sender as FrameworkElement)?.Tag is not TowerSectorPingCard sector)
                 return;
 
-            if (sector.IsRunning || sector.PingCts is not null || sector.Endpoints.Any(x => x.IsRunning))
+            var sectorState = sector.SessionState;
+
+            if (sectorState?.IsRunning == true ||
+                sectorState?.PingCts is not null ||
+                sector.Endpoints.Any(
+                    x => x.SessionState?.IsRunning == true))
             {
                 StopTowerSectorPings(sector);
-                RefreshTowerPingButtonStates();
                 return;
             }
 
@@ -676,42 +1051,74 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private async Task RunTowerSectorPingAsync(TowerSectorPingCard sector)
         {
-            if (sector.IsRunning)
+            var ownerState =
+                _towerPingSessionState;
+
+            var sectorState =
+                sector.SessionState;
+
+            if (ownerState is null ||
+                sectorState is null ||
+                sectorState.IsRunning)
+            {
                 return;
+            }
 
-            if (!TryGetTowerSectorPingCount(sector, out var pingCount, out var continuous))
+            if (!TryGetTowerSectorPingCount(
+                    sector,
+                    out var pingCount,
+                    out var continuous))
+            {
                 return;
+            }
 
-            StopTowerSectorPings(sector);
+            StopTowerSectorPings(
+                sector);
 
-            var cts = new CancellationTokenSource();
-            sector.PingCts = cts;
-            sector.IsRunning = true;
+            var cts =
+                new CancellationTokenSource();
+
+            sectorState.PingCts =
+                cts;
+
+            sectorState.IsRunning =
+                true;
+
             RefreshTowerPingButtonStates();
 
             try
             {
-                var tasks = sector.Endpoints
-                    .Where(x => !x.IsRunning)
-                    .Select(x => PingTowerEndpointAsync(x, pingCount, continuous, cts.Token))
-                    .ToList();
+                var tasks =
+                    sector.Endpoints
+                        .Where(x =>
+                            x.SessionState?.IsRunning != true)
+                        .Select(x =>
+                            PingTowerEndpointAsync(
+                                ownerState,
+                                x,
+                                pingCount,
+                                continuous,
+                                cts.Token))
+                        .ToList();
 
                 if (tasks.Count > 0)
                     await Task.WhenAll(tasks);
             }
-            catch (OperationCanceledException)
-            {
-                // expected when stopped
-            }
             finally
             {
-                if (ReferenceEquals(sector.PingCts, cts))
+                if (ReferenceEquals(
+                        sectorState.PingCts,
+                        cts))
                 {
-                    sector.PingCts.Dispose();
-                    sector.PingCts = null;
+                    sectorState.PingCts =
+                        null;
+
+                    cts.Dispose();
                 }
 
-                sector.IsRunning = false;
+                sectorState.IsRunning =
+                    false;
+
                 RefreshTowerPingButtonStates();
             }
         }
@@ -740,26 +1147,57 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
                 if (endpoint.SummaryTextBlock is not null)
                     endpoint.SummaryTextBlock.Text = "Ready.";
+
+                if (endpoint.SessionState is not null)
+                {
+                    endpoint.SessionState.Results =
+                        string.Empty;
+
+                    endpoint.SessionState.Summary =
+                        "Ready.";
+
+                    endpoint.SessionState.TestSuccessful =
+                        null;
+                }
             }
         }
 
         private void StopTowerSectorPings(TowerSectorPingCard sector)
         {
-            try
+            var sectorState =
+                sector.SessionState;
+
+            var cts =
+                sectorState?.PingCts;
+
+            if (sectorState is not null)
             {
-                sector.PingCts?.Cancel();
-            }
-            catch
-            {
-                // ignore
+                sectorState.PingCts =
+                    null;
+
+                sectorState.IsRunning =
+                    false;
+
+                foreach (var endpointState
+                         in sectorState.Endpoints)
+                {
+                    endpointState.IsRunning =
+                        false;
+                }
             }
 
-            sector.PingCts?.Dispose();
-            sector.PingCts = null;
-            sector.IsRunning = false;
+            if (cts is not null)
+            {
+                try
+                {
+                    cts.Cancel();
+                }
+                catch
+                {
+                }
 
-            foreach (var endpoint in sector.Endpoints)
-                endpoint.IsRunning = false;
+                cts.Dispose();
+            }
 
             RefreshTowerPingButtonStates();
         }
@@ -797,6 +1235,30 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
                 RefreshTowerPingButtonStates();
             }
+        }
+
+        public void StopTowerTestAllOnly()
+        {
+            var cts =
+                _towerTestAllCts;
+
+            _towerTestAllCts =
+                null;
+
+            if (cts is null)
+                return;
+
+            try
+            {
+                cts.Cancel();
+            }
+            catch
+            {
+            }
+
+            cts.Dispose();
+
+            RefreshTowerPingButtonStates();
         }
 
         private async Task TestTowerSectorAsync(TowerSectorPingCard sector, CancellationToken token)
@@ -860,12 +1322,79 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
                 ApplyTowerIpStatus(endpoint, successAfterWarmup);
 
+                var testSummary =
+                    successAfterWarmup
+                        ? "Test Successful"
+                        : "Test Failed";
+
                 if (endpoint.SummaryTextBlock is not null)
-                    endpoint.SummaryTextBlock.Text = successAfterWarmup ? "Test Successful" : "Test Failed";
+                {
+                    endpoint.SummaryTextBlock.Text =
+                        testSummary;
+                }
+
+                /*
+                 * Persist the Test result into this Tower tab's runtime state.
+                 * Manual Ping / Ping Sector must not erase the green/red Test state.
+                 */
+                if (endpoint.SessionState is not null)
+                {
+                    endpoint.SessionState.TestSuccessful =
+                        successAfterWarmup;
+
+                    endpoint.SessionState.Summary =
+                        testSummary;
+                }
             }
             finally
             {
                 endpoint.IsRunning = false;
+                RefreshTowerPingButtonStates();
+            }
+        }
+
+        public void StopTowerPingSession(TowerPingSessionState? state)
+        {
+            if (state is null)
+                return;
+
+            foreach (var sectorState in state.Sectors)
+            {
+                var cts =
+                    sectorState.PingCts;
+
+                sectorState.PingCts =
+                    null;
+
+                sectorState.IsRunning =
+                    false;
+
+                foreach (var endpointState
+                         in sectorState.Endpoints)
+                {
+                    endpointState.IsRunning =
+                        false;
+                }
+
+                if (cts is null)
+                    continue;
+
+                try
+                {
+                    cts.Cancel();
+                }
+                catch
+                {
+                    // Ignore cancellation race.
+                }
+
+                cts.Dispose();
+            }
+
+            if (ReferenceEquals(
+                    _towerPingSessionState,
+                    state))
+            {
                 RefreshTowerPingButtonStates();
             }
         }
@@ -1006,11 +1535,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private bool IsAnyTowerPingRunning()
         {
-            return _towerTestAllCts is not null ||
-                   _towerPingCards.Any(x =>
-                       x.IsRunning ||
-                       x.PingCts is not null ||
-                       x.Endpoints.Any(y => y.IsRunning));
+            return
+                _towerTestAllCts is not null ||
+                _towerPingSessionState?.Sectors.Any(
+                    x =>
+                        x.PingCts is not null ||
+                        x.IsRunning ||
+                        x.Endpoints.Any(
+                            y => y.IsRunning)) == true;
         }
 
         private void RefreshTowerPingButtonStates()
@@ -1019,11 +1551,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             foreach (var sector in _towerPingCards)
             {
+                var sectorState = sector.SessionState;
+
                 var sectorManualPingRunning =
                     !testAllRunning &&
-                    (sector.IsRunning ||
-                     sector.PingCts is not null ||
-                     sector.Endpoints.Any(x => x.IsRunning));
+                    (sectorState?.IsRunning == true ||
+                     sectorState?.PingCts is not null ||
+                     sector.Endpoints.Any(
+                         x => x.SessionState?.IsRunning == true));
 
                 // Sector Ping button:
                 // - Red Stop only for manual sector/endpoint ping
@@ -1052,7 +1587,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 {
                     var endpointManualPingRunning =
                         !testAllRunning &&
-                        endpoint.IsRunning;
+                        endpoint.SessionState?.IsRunning == true;
 
                     // Endpoint Ping button:
                     // - Red Stop only for manual endpoint ping

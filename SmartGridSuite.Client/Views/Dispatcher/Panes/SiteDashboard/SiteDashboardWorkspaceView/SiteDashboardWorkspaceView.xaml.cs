@@ -62,6 +62,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public event EventHandler? OpenTopTunnelRequested;
 
         private readonly List<TowerSectorPingCard> _towerPingCards = new();
+        private TowerPingSessionState? _towerPingSessionState;
 
         private CancellationTokenSource? _towerTestAllCts;
 
@@ -81,8 +82,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             set => SetValue(CanManageSiteNotesProperty, value);
         }
 
-        private SiteDashboardAccessMode _accessMode =
-    SiteDashboardAccessMode.Full;
+        private SiteDashboardAccessMode _accessMode = SiteDashboardAccessMode.Full;
 
         public SiteDashboardAccessMode AccessMode
         {
@@ -109,8 +109,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
         }
 
-        private bool IsLinemanAccessMode =>
-            _accessMode == SiteDashboardAccessMode.Lineman;
+        private bool IsLinemanAccessMode => _accessMode == SiteDashboardAccessMode.Lineman;
 
         private static bool IsLinemanAllowedWorkspaceTab(
             string? tabKey)
@@ -295,7 +294,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         public void Reset()
         {
-            StopTowerPings();
+            /*
+             * Reset only detaches the shared Workspace UI from the previous
+             * site's Tower state.
+             *
+             * Manual Tower pings belong to that site's tab and are allowed
+             * to keep running in the background.
+             */
+            StopTowerTestAllOnly();
+            _towerPingSessionState = null;
 
             // Main workspace text/state
             TopInfoText = string.Empty;

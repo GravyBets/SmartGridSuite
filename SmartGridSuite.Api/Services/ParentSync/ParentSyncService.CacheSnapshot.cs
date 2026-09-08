@@ -7,11 +7,13 @@ namespace SmartGridSuite.Api.Services.ParentSync
     {
         private const int CacheSnapshotCommandTimeoutSeconds = 300;
 
-        public async Task<ParentCacheSnapshot> GetCacheSnapshotAsync(
-            CancellationToken cancellationToken = default)
+        private const int CacheSnapshotConnectTimeoutSeconds = 15;
+
+        private const int CacheSnapshotConnectAttempts = 3;
+
+        public async Task<ParentCacheSnapshot> GetCacheSnapshotAsync(CancellationToken cancellationToken = default)
         {
-            await using var conn = _parentDatabaseConnectionFactory.CreateConnection();
-            await conn.OpenAsync(cancellationToken);
+            await using var conn = await OpenCacheSnapshotConnectionAsync(cancellationToken);
 
             return new ParentCacheSnapshot
             {
@@ -37,10 +39,64 @@ namespace SmartGridSuite.Api.Services.ParentSync
             };
         }
 
-        private static async Task<List<AmsSiteDashboardRow>>
-            ReadAmsCacheRowsAsync(
-                SqlConnection conn,
-                CancellationToken cancellationToken)
+        private async Task<SqlConnection> OpenCacheSnapshotConnectionAsync(CancellationToken cancellationToken)
+        {
+            var connectionStringBuilder =
+                new SqlConnectionStringBuilder(
+                    _connectionString)
+                {
+                    ConnectTimeout =
+                        CacheSnapshotConnectTimeoutSeconds
+                };
+
+            for (var attempt = 1;
+                 attempt <= CacheSnapshotConnectAttempts;
+                 attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var conn =
+                    new SqlConnection(
+                        connectionStringBuilder.ConnectionString);
+
+                try
+                {
+                    await conn.OpenAsync(
+                        cancellationToken);
+
+                    return conn;
+                }
+                catch (SqlException)
+                    when (
+                        attempt < CacheSnapshotConnectAttempts &&
+                        !cancellationToken.IsCancellationRequested)
+                {
+                    await conn.DisposeAsync();
+
+                    var retryDelay =
+                        attempt == 1
+                            ? TimeSpan.FromSeconds(10)
+                            : TimeSpan.FromSeconds(30);
+
+                    await Task.Delay(
+                        retryDelay,
+                        cancellationToken);
+                }
+                catch
+                {
+                    await conn.DisposeAsync();
+                    throw;
+                }
+            }
+
+            throw new InvalidOperationException(
+                "Unable to open the Parent DB connection " +
+                "for the cache snapshot.");
+        }
+
+        private static async Task<List<AmsSiteDashboardRow>>ReadAmsCacheRowsAsync(
+            SqlConnection conn,
+            CancellationToken cancellationToken)
         {
             const string sql = """
                 SELECT
@@ -201,10 +257,9 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 .ToList();
         }
 
-        private static async Task<List<DacsSiteDashboardRow>>
-            ReadDacsCacheRowsAsync(
-                SqlConnection conn,
-                CancellationToken cancellationToken)
+        private static async Task<List<DacsSiteDashboardRow>>ReadDacsCacheRowsAsync(
+            SqlConnection conn,
+            CancellationToken cancellationToken)
         {
             const string sql = """
                 SELECT
@@ -325,10 +380,9 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 .ToList();
         }
 
-        private static async Task<List<IgsdSiteDashboardRow>>
-            ReadIgsdCacheRowsAsync(
-                SqlConnection conn,
-                CancellationToken cancellationToken)
+        private static async Task<List<IgsdSiteDashboardRow>>ReadIgsdCacheRowsAsync(
+            SqlConnection conn,
+            CancellationToken cancellationToken)
         {
             const string sql = """
                 SELECT
@@ -530,10 +584,9 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 .ToList();
         }
 
-        private static async Task<List<RxSiteDashboardRow>>
-            ReadRxCacheRowsAsync(
-                SqlConnection conn,
-                CancellationToken cancellationToken)
+        private static async Task<List<RxSiteDashboardRow>>ReadRxCacheRowsAsync(
+            SqlConnection conn,
+            CancellationToken cancellationToken)
         {
             const string sql = """
                 SELECT
@@ -633,10 +686,9 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 .ToList();
         }
 
-        private static async Task<List<TowerDashboardRow>>
-            ReadTowerCacheRowsAsync(
-                SqlConnection conn,
-                CancellationToken cancellationToken)
+        private static async Task<List<TowerDashboardRow>>ReadTowerCacheRowsAsync(
+            SqlConnection conn,
+            CancellationToken cancellationToken)
         {
             const string headerSql = """
                 SELECT

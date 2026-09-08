@@ -60,7 +60,7 @@ namespace SmartGridSuite.Client.Views.Administration
                 AdminTechGrid.SelectedItem = null;
                 UpdateSelectionButtons();
 
-                foreach (var t in techs.OrderBy(x => x.LastName).ThenBy(x => x.FirstName))
+                foreach (var t in techs.OrderBy(x => x.FirstName).ThenBy(x => x.LastName))
                 {
                     Items.Add(new AdminTechnicianRow
                     {

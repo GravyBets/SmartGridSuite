@@ -49,6 +49,13 @@
                                VerticalAlignment="Center"
                                Foreground="{DynamicResource TextSecondary}"/>
 
+                    <Button x:Name="ForgetClientButton"
+                            Content="Forget Client"
+                            Padding="12,5"
+                            Margin="0,0,8,0"
+                            IsEnabled="False"
+                            Click="ForgetClient_Click"/>
+
                     <Button x:Name="RefreshButton"
                             Content="Refresh"
                             Padding="12,5"
@@ -203,6 +210,7 @@
                           RowHeaderWidth="0"
                           HeadersVisibility="Column"
                           SelectionMode="Single"
+                          SelectionChanged="ClientsGrid_SelectionChanged"
                           RowHeight="42"
                           FontSize="14">
 

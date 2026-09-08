@@ -26,8 +26,7 @@ namespace SmartGridSuite.Client.Views.Administration.ConnectedClients
         public event PropertyChangedEventHandler?
             PropertyChanged;
 
-        public ObservableCollection<ConnectedClientRowViewModel>
-            Clients
+        public ObservableCollection<ConnectedClientRowViewModel> Clients
         { get; } = new();
 
         public ICollectionView ClientsView { get; }
@@ -77,8 +76,7 @@ namespace SmartGridSuite.Client.Views.Administration.ConnectedClients
             }
         }
 
-        private string _latestVersionText =
-            "Latest version: —";
+        private string _latestVersionText = "Latest version: —";
 
         public string LatestVersionText
         {
@@ -93,8 +91,7 @@ namespace SmartGridSuite.Client.Views.Administration.ConnectedClients
             }
         }
 
-        private string _statusMessage =
-            "Ready.";
+        private string _statusMessage = "Ready.";
 
         public string StatusMessage
         {
@@ -109,8 +106,7 @@ namespace SmartGridSuite.Client.Views.Administration.ConnectedClients
             }
         }
 
-        public ConnectedClientsAdminView(
-            ApiClient api)
+        public ConnectedClientsAdminView(ApiClient api)
         {
             InitializeComponent();
 
@@ -165,20 +161,14 @@ namespace SmartGridSuite.Client.Views.Administration.ConnectedClients
                 ConnectedClientsAdminView_Unloaded;
         }
 
-        private async void
-            ConnectedClientsAdminView_Loaded(
-                object sender,
-                RoutedEventArgs e)
+        private async void ConnectedClientsAdminView_Loaded(object sender, RoutedEventArgs e)
         {
             _refreshTimer.Start();
 
             await RefreshAsync();
         }
 
-        private void
-            ConnectedClientsAdminView_Unloaded(
-                object sender,
-                RoutedEventArgs e)
+        private void ConnectedClientsAdminView_Unloaded(object sender, RoutedEventArgs e)
         {
             _refreshTimer.Stop();
         }
@@ -195,6 +185,163 @@ namespace SmartGridSuite.Client.Views.Administration.ConnectedClients
             RoutedEventArgs e)
         {
             await RefreshAsync();
+        }
+
+        private void ClientsGrid_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e)
+        {
+            UpdateForgetClientButtonState();
+        }
+
+        private void UpdateForgetClientButtonState()
+        {
+            if (ForgetClientButton == null)
+                return;
+
+            ForgetClientButton.IsEnabled =
+                !_isLoading &&
+                ClientsGrid.SelectedItem is
+                    ConnectedClientRowViewModel client &&
+                !client.IsOnline;
+        }
+
+        private async void ForgetClient_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (_isLoading)
+                return;
+
+            if (ClientsGrid.SelectedItem is not
+                ConnectedClientRowViewModel selected)
+            {
+                return;
+            }
+
+            if (selected.IsOnline)
+            {
+                MessageBox.Show(
+                    "This client is currently online.\n\n" +
+                    "Close Smart Grid Suite on that computer and " +
+                    "wait a few minutes before trying again.",
+                    "Forget Client",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                return;
+            }
+
+            var result =
+                MessageBox.Show(
+                    $"Forget this Smart Grid Suite client?\n\n" +
+                    $"Computer: {selected.MachineName}\n" +
+                    $"User: {selected.DisplayName}\n" +
+                    $"Last seen: {selected.LastSeenText}\n\n" +
+                    "This removes the saved client record.\n\n" +
+                    "If this computer runs Smart Grid Suite again, " +
+                    "it will automatically register again.",
+                    "Forget Client",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.No);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                _isLoading = true;
+
+                RefreshButton.IsEnabled = false;
+                ForgetClientButton.IsEnabled = false;
+
+                StatusMessage =
+                    $"Forgetting {selected.MachineName}...";
+
+                await _api.DeleteAsync(
+                    $"api/client-presence/{selected.Id}");
+
+                /*
+                 * The API only permits forgetting offline clients.
+                 * Remove it immediately from the local collection,
+                 * then rebuild filter choices so stale machine/module/
+                 * version values disappear from the filter lists too.
+                 */
+                Clients.Remove(selected);
+
+                var selectedModule =
+                    ModuleFilterComboBox
+                        .SelectedItem?
+                        .ToString()
+                    ?? "All";
+
+                var selectedVersion =
+                    VersionFilterComboBox
+                        .SelectedItem?
+                        .ToString()
+                    ?? "All";
+
+                RebuildFilterOptions(
+                    selectedModule,
+                    selectedVersion);
+
+                ClientsView.Refresh();
+
+                StatusMessage =
+                    $"{selected.MachineName} was forgotten.";
+            }
+            catch (ApiClient.ApiConnectionException)
+            {
+                StatusMessage =
+                    "Offline — unable to forget the client.";
+
+                MessageBox.Show(
+                    "Smart Grid Suite could not contact the server.",
+                    "Forget Client",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                StatusMessage =
+                    $"Unable to forget client. " +
+                    $"Server error {ex.StatusCode}.";
+
+                var message =
+                    ex.StatusCode == 409
+                        ? "This client is currently online.\n\n" +
+                          "Close Smart Grid Suite on that computer " +
+                          "and wait a few minutes before trying again."
+                        : string.IsNullOrWhiteSpace(ex.Body)
+                            ? $"The server returned error {ex.StatusCode}."
+                            : ex.Body;
+
+                MessageBox.Show(
+                    message,
+                    "Forget Client",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                StatusMessage =
+                    $"Unable to forget client: {ex.Message}";
+
+                MessageBox.Show(
+                    $"Unable to forget the client.\n\n{ex.Message}",
+                    "Forget Client",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                _isLoading = false;
+
+                RefreshButton.IsEnabled = true;
+
+                UpdateForgetClientButtonState();
+            }
         }
 
         private async Task RefreshAsync()
@@ -293,6 +440,7 @@ namespace SmartGridSuite.Client.Views.Administration.ConnectedClients
                 _isLoading = false;
 
                 RefreshButton.IsEnabled = true;
+                UpdateForgetClientButtonState();
             }
         }
 

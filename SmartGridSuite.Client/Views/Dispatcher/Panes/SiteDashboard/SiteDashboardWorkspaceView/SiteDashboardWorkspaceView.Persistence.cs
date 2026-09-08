@@ -149,35 +149,110 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         public TowerPingSessionState GetTowerPingSessionState()
         {
-            var state = new TowerPingSessionState();
+            var state =
+                _towerPingSessionState ??=
+                    new TowerPingSessionState();
 
             foreach (var sector in _towerPingCards)
             {
-                var sectorState = new TowerSectorPingSessionState
+                var sectorState =
+                    sector.SessionState;
+
+                if (sectorState is null ||
+                    !state.Sectors.Contains(sectorState))
                 {
-                    Sector = sector.Sector ?? string.Empty,
-                    PingCount = sector.PingCountTextBox?.Text ?? string.Empty
-                };
+                    sectorState =
+                        state.Sectors.FirstOrDefault(x =>
+                            string.Equals(
+                                x.Sector,
+                                sector.Sector,
+                                StringComparison.OrdinalIgnoreCase));
+
+                    if (sectorState is null)
+                    {
+                        sectorState =
+                            new TowerSectorPingSessionState
+                            {
+                                Sector = sector.Sector ?? string.Empty
+                            };
+
+                        state.Sectors.Add(sectorState);
+                    }
+
+                    sector.SessionState = sectorState;
+                }
+
+                sectorState.Sector =
+                    sector.Sector ?? string.Empty;
+
+                sectorState.PingCount =
+                    sector.PingCountTextBox?.Text ??
+                    string.Empty;
 
                 foreach (var endpoint in sector.Endpoints)
                 {
-                    sectorState.Endpoints.Add(new TowerEndpointPingSessionState
-                    {
-                        Label = endpoint.Label ?? string.Empty,
-                        IpAddress = endpoint.IpAddress ?? string.Empty,
-                        Results = endpoint.ResultTextBox?.Text ?? string.Empty,
-                        Summary = NormalizeTowerSummaryForSnapshot(endpoint.SummaryTextBlock?.Text),
-                        TestSuccessful = endpoint.TestSuccessful
-                    });
-                }
+                    var endpointState =
+                        endpoint.SessionState;
 
-                if (!string.IsNullOrWhiteSpace(sectorState.PingCount) ||
-                    sectorState.Endpoints.Any(x =>
-                        !string.IsNullOrWhiteSpace(x.Results) ||
-                        !string.IsNullOrWhiteSpace(x.Summary) && !x.Summary.Equals("Ready.", StringComparison.OrdinalIgnoreCase) ||
-                        x.TestSuccessful.HasValue))
-                {
-                    state.Sectors.Add(sectorState);
+                    if (endpointState is null ||
+                        !sectorState.Endpoints.Contains(endpointState))
+                    {
+                        /*
+                         * Match by label rather than IP.
+                         *
+                         * The technician may have manually overridden the IP,
+                         * so IP A / IP B is the stable identity.
+                         */
+                        endpointState =
+                            sectorState.Endpoints.FirstOrDefault(x =>
+                                string.Equals(
+                                    x.Label,
+                                    endpoint.Label,
+                                    StringComparison.OrdinalIgnoreCase));
+
+                        if (endpointState is null)
+                        {
+                            endpointState =
+                                new TowerEndpointPingSessionState
+                                {
+                                    Label =
+                                        endpoint.Label ??
+                                        string.Empty
+                                };
+
+                            sectorState.Endpoints.Add(endpointState);
+                        }
+
+                        endpoint.SessionState =
+                            endpointState;
+                    }
+
+                    var currentIp =
+                        (endpoint.IpTextBox?.Text ??
+                         endpoint.IpAddress ??
+                         string.Empty)
+                        .Trim();
+
+                    endpoint.IpAddress =
+                        currentIp;
+
+                    endpointState.Label =
+                        endpoint.Label ??
+                        string.Empty;
+
+                    endpointState.IpAddress =
+                        currentIp;
+
+                    endpointState.Results =
+                        endpoint.ResultTextBox?.Text ??
+                        endpointState.Results;
+
+                    endpointState.Summary =
+                        NormalizeTowerSummaryForSnapshot(
+                            endpoint.SummaryTextBlock?.Text);
+
+                    endpointState.TestSuccessful =
+                        endpoint.TestSuccessful;
                 }
             }
 
@@ -186,56 +261,142 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         public void RestoreTowerPingSessionState(TowerPingSessionState? state)
         {
-            if (state is null || state.Sectors.Count == 0)
-                return;
+            _towerPingSessionState =
+                state ??
+                new TowerPingSessionState();
 
-            foreach (var sectorState in state.Sectors)
+            foreach (var sector in _towerPingCards)
             {
-                var sector = _towerPingCards.FirstOrDefault(x =>
-                    string.Equals(x.Sector, sectorState.Sector, StringComparison.OrdinalIgnoreCase));
+                var sectorState =
+                    _towerPingSessionState.Sectors
+                        .FirstOrDefault(x =>
+                            string.Equals(
+                                x.Sector,
+                                sector.Sector,
+                                StringComparison.OrdinalIgnoreCase));
 
-                if (sector is null)
-                    continue;
+                if (sectorState is null)
+                {
+                    sectorState =
+                        new TowerSectorPingSessionState
+                        {
+                            Sector =
+                                sector.Sector ??
+                                string.Empty
+                        };
+
+                    _towerPingSessionState.Sectors.Add(
+                        sectorState);
+                }
+
+                sector.SessionState =
+                    sectorState;
 
                 if (sector.PingCountTextBox is not null)
-                    sector.PingCountTextBox.Text = sectorState.PingCount ?? string.Empty;
-
-                foreach (var endpointState in sectorState.Endpoints)
                 {
-                    var endpoint = sector.Endpoints.FirstOrDefault(x =>
-                        string.Equals(x.Label, endpointState.Label, StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(x.IpAddress, endpointState.IpAddress, StringComparison.OrdinalIgnoreCase));
+                    sector.PingCountTextBox.Text =
+                        sectorState.PingCount ??
+                        string.Empty;
+                }
 
-                    if (endpoint is null)
+                foreach (var endpoint in sector.Endpoints)
+                {
+                    var endpointState =
+                        sectorState.Endpoints
+                            .FirstOrDefault(x =>
+                                string.Equals(
+                                    x.Label,
+                                    endpoint.Label,
+                                    StringComparison.OrdinalIgnoreCase));
+
+                    if (endpointState is null)
                     {
-                        endpoint = sector.Endpoints.FirstOrDefault(x =>
-                            string.Equals(x.Label, endpointState.Label, StringComparison.OrdinalIgnoreCase));
+                        endpointState =
+                            new TowerEndpointPingSessionState
+                            {
+                                Label =
+                                    endpoint.Label ??
+                                    string.Empty,
+
+                                IpAddress =
+                                    endpoint.IpAddress ??
+                                    string.Empty
+                            };
+
+                        sectorState.Endpoints.Add(
+                            endpointState);
                     }
 
-                    if (endpoint is null)
-                        continue;
+                    endpoint.SessionState =
+                        endpointState;
+
+                    /*
+                     * Preserve a technician's manually entered IP.
+                     */
+                    var restoredIp =
+                        (endpointState.IpAddress ??
+                         string.Empty)
+                        .Trim();
+
+                    if (string.IsNullOrWhiteSpace(restoredIp))
+                    {
+                        restoredIp =
+                            (endpoint.IpAddress ??
+                             string.Empty)
+                            .Trim();
+
+                        endpointState.IpAddress =
+                            restoredIp;
+                    }
+
+                    endpoint.IpAddress =
+                        restoredIp;
+
+                    if (endpoint.IpTextBox is not null &&
+                        !string.Equals(
+                            endpoint.IpTextBox.Text,
+                            restoredIp,
+                            StringComparison.Ordinal))
+                    {
+                        endpoint.IpTextBox.Text =
+                            restoredIp;
+                    }
 
                     if (endpoint.ResultTextBox is not null)
                     {
-                        endpoint.ResultTextBox.Text = endpointState.Results ?? string.Empty;
+                        endpoint.ResultTextBox.Text =
+                            endpointState.Results ??
+                            string.Empty;
+
                         endpoint.ResultTextBox.ScrollToEnd();
                     }
 
                     if (endpoint.SummaryTextBlock is not null)
                     {
-                        endpoint.SummaryTextBlock.Text = string.IsNullOrWhiteSpace(endpointState.Summary)
-                            ? "Ready."
-                            : endpointState.Summary;
+                        endpoint.SummaryTextBlock.Text =
+                            string.IsNullOrWhiteSpace(
+                                endpointState.Summary)
+                                ? "Ready."
+                                : endpointState.Summary;
                     }
 
-                    endpoint.TestSuccessful = endpointState.TestSuccessful;
+                    endpoint.TestSuccessful =
+                        endpointState.TestSuccessful;
 
                     if (endpointState.TestSuccessful.HasValue)
-                        ApplyTowerIpStatus(endpoint, endpointState.TestSuccessful.Value);
+                    {
+                        ApplyTowerIpStatus(
+                            endpoint,
+                            endpointState.TestSuccessful.Value);
+                    }
                     else
+                    {
                         ResetTowerIpStatus(endpoint);
+                    }
                 }
             }
+
+            RefreshTowerPingButtonStates();
         }
 
         private static string NormalizeTowerSummaryForSnapshot(string? summary)

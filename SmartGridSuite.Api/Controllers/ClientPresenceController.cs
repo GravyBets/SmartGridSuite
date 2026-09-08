@@ -145,11 +145,8 @@ namespace SmartGridSuite.Api.Controllers
          * than persisted so the database never contains stale status flags.
          */
         [HttpGet]
-        [ResponseCache(
-            NoStore = true,
-            Location = ResponseCacheLocation.None)]
-        public async Task<ActionResult<ConnectedClientsResponse>>
-            GetConnectedClients(
+        [ResponseCache(NoStore = true,Location = ResponseCacheLocation.None)]
+        public async Task<ActionResult<ConnectedClientsResponse>> GetConnectedClients(
                 CancellationToken ct)
         {
             var nowUtc =
@@ -268,6 +265,48 @@ namespace SmartGridSuite.Api.Controllers
                 };
 
             return Ok(response);
+        }
+
+        [HttpDelete("{id:long}")]
+        public async Task<IActionResult> ForgetClient(long id, CancellationToken ct)
+        {
+            if (id <= 0)
+            {
+                return BadRequest(
+                    "A valid client ID is required.");
+            }
+
+            var presence =
+                await _db.ClientPresence
+                    .FirstOrDefaultAsync(
+                        x => x.Id == id,
+                        ct);
+
+            if (presence == null)
+            {
+                return NotFound(
+                    "The client presence record was not found.");
+            }
+
+            var onlineCutoffUtc =
+                DateTime.UtcNow.Subtract(
+                    OnlineThreshold);
+
+            if (presence.LastSeenAtUtc >= onlineCutoffUtc)
+            {
+                return Conflict(
+                    $"Cannot forget {presence.MachineName} because " +
+                    "it is currently online. Close Smart Grid Suite " +
+                    "on that computer and wait a few minutes before " +
+                    "trying again.");
+            }
+
+            _db.ClientPresence.Remove(
+                presence);
+
+            await _db.SaveChangesAsync(ct);
+
+            return NoContent();
         }
 
         private static bool IsVersionOutdated(

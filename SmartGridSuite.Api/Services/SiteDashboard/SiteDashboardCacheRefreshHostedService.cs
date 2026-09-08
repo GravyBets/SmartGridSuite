@@ -6,10 +6,29 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
     public sealed class SiteDashboardCacheRefreshHostedService
         : BackgroundService
     {
+        /*
+         * Retry times are relative to the normal scheduled run.
+         *
+         * Normal run:  2:00 AM
+         * Retry #1:    2:15 AM
+         * Retry #2:    2:45 AM
+         * Retry #3:    4:00 AM
+         */
+        private static readonly TimeSpan[] RetryOffsets =
+        {
+            TimeSpan.FromMinutes(15),
+            TimeSpan.FromMinutes(45),
+            TimeSpan.FromHours(2)
+        };
+
         private readonly IServiceScopeFactory _scopeFactory;
-        private readonly IOptionsMonitor<SiteDashboardCacheRefreshOptions>
+
+        private readonly
+            IOptionsMonitor<SiteDashboardCacheRefreshOptions>
             _optionsMonitor;
-        private readonly ILogger<SiteDashboardCacheRefreshHostedService>
+
+        private readonly
+            ILogger<SiteDashboardCacheRefreshHostedService>
             _logger;
 
         public SiteDashboardCacheRefreshHostedService(
@@ -67,8 +86,82 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                     break;
                 }
 
+                /*
+                 * Run the normal scheduled refresh. If it fails, this method
+                 * owns the same-day retry sequence before we calculate the
+                 * next weekly run.
+                 */
+                if (!await RunScheduledRefreshWithRetriesAsync(
+                        nextRun,
+                        stoppingToken))
+                {
+                    break;
+                }
+            }
+        }
+
+        private async Task<bool>
+            RunScheduledRefreshWithRetriesAsync(
+                DateTimeOffset scheduledRun,
+                CancellationToken stoppingToken)
+        {
+            var totalAttempts =
+                RetryOffsets.Length + 1;
+
+            for (var attemptIndex = 0;
+                 attemptIndex < totalAttempts;
+                 attemptIndex++)
+            {
+                /*
+                 * attemptIndex 0 is the normal scheduled attempt.
+                 * Later attempts use the configured offsets from the
+                 * original scheduled run time.
+                 */
+                if (attemptIndex > 0)
+                {
+                    var retryNumber =
+                        attemptIndex;
+
+                    var retryAt =
+                        scheduledRun +
+                        RetryOffsets[attemptIndex - 1];
+
+                    var retryDelay =
+                        retryAt - DateTimeOffset.Now;
+
+                    _logger.LogWarning(
+                        "Site Dashboard cache refresh retry " +
+                        "{RetryNumber} of {RetryCount} is scheduled " +
+                        "for {RetryAtLocal}.",
+                        retryNumber,
+                        RetryOffsets.Length,
+                        retryAt);
+
+                    if (retryDelay > TimeSpan.Zero)
+                    {
+                        if (!await DelaySafelyAsync(
+                                retryDelay,
+                                stoppingToken))
+                        {
+                            return false;
+                        }
+                    }
+
+                    if (stoppingToken.IsCancellationRequested)
+                    {
+                        return false;
+                    }
+                }
+
                 try
                 {
+                    /*
+                     * Create a fresh scope for every attempt.
+                     *
+                     * This gives every retry a new scoped DbContext and
+                     * refresh service instead of reusing state from a failed
+                     * attempt.
+                     */
                     using var scope =
                         _scopeFactory.CreateScope();
 
@@ -77,49 +170,119 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                             .GetRequiredService<
                                 SiteDashboardCacheRefreshService>();
 
-                    _logger.LogInformation(
-                        "Starting the scheduled Site Dashboard cache refresh.");
+                    if (attemptIndex == 0)
+                    {
+                        _logger.LogInformation(
+                            "Starting the scheduled Site Dashboard " +
+                            "cache refresh.");
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "Starting Site Dashboard cache refresh " +
+                            "retry {RetryNumber} of {RetryCount}.",
+                            attemptIndex,
+                            RetryOffsets.Length);
+                    }
 
                     var result =
                         await refreshService.RefreshAsync(
                             stoppingToken);
 
-                    _logger.LogInformation(
-                        "Scheduled Site Dashboard cache refresh completed. " +
-                        "SyncRunId: {SyncRunId}; " +
-                        "AMS: {AmsCount}; " +
-                        "DACS: {DacsCount}; " +
-                        "IGSD: {IgsdCount}; " +
-                        "RX: {RxCount}; " +
-                        "Towers: {TowerCount}; " +
-                        "Tower sectors: {TowerSectorCount}; " +
-                        "Total sites: {TotalSiteCount}.",
-                        result.SyncRunId,
-                        result.AmsSiteCount,
-                        result.DacsSiteCount,
-                        result.IgsdSiteCount,
-                        result.RxSiteCount,
-                        result.TowerCount,
-                        result.TowerSectorCount,
-                        result.TotalSiteCount);
+                    if (attemptIndex == 0)
+                    {
+                        _logger.LogInformation(
+                            "Scheduled Site Dashboard cache refresh " +
+                            "completed. " +
+                            "SyncRunId: {SyncRunId}; " +
+                            "AMS: {AmsCount}; " +
+                            "DACS: {DacsCount}; " +
+                            "IGSD: {IgsdCount}; " +
+                            "RX: {RxCount}; " +
+                            "Towers: {TowerCount}; " +
+                            "Tower sectors: {TowerSectorCount}; " +
+                            "Total sites: {TotalSiteCount}.",
+                            result.SyncRunId,
+                            result.AmsSiteCount,
+                            result.DacsSiteCount,
+                            result.IgsdSiteCount,
+                            result.RxSiteCount,
+                            result.TowerCount,
+                            result.TowerSectorCount,
+                            result.TotalSiteCount);
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "Site Dashboard cache refresh retry " +
+                            "{RetryNumber} completed successfully. " +
+                            "SyncRunId: {SyncRunId}; " +
+                            "AMS: {AmsCount}; " +
+                            "DACS: {DacsCount}; " +
+                            "IGSD: {IgsdCount}; " +
+                            "RX: {RxCount}; " +
+                            "Towers: {TowerCount}; " +
+                            "Tower sectors: {TowerSectorCount}; " +
+                            "Total sites: {TotalSiteCount}.",
+                            attemptIndex,
+                            result.SyncRunId,
+                            result.AmsSiteCount,
+                            result.DacsSiteCount,
+                            result.IgsdSiteCount,
+                            result.RxSiteCount,
+                            result.TowerCount,
+                            result.TowerSectorCount,
+                            result.TotalSiteCount);
+                    }
+
+                    /*
+                     * One successful attempt ends the retry sequence.
+                     * The outer loop will then schedule next Sunday.
+                     */
+                    return true;
                 }
                 catch (OperationCanceledException)
                     when (stoppingToken.IsCancellationRequested)
                 {
-                    break;
+                    return false;
                 }
                 catch (Exception ex)
                 {
                     /*
-                     * RefreshAsync uses a MariaDB transaction, so a failed
-                     * scheduled refresh leaves the previous cache intact.
+                     * RefreshAsync preserves the prior cache when an
+                     * attempt fails. Every retry therefore remains safe.
                      */
-                    _logger.LogError(
-                        ex,
-                        "The scheduled Site Dashboard cache refresh failed. " +
-                        "The previous cache remains available.");
+                    if (attemptIndex < RetryOffsets.Length)
+                    {
+                        _logger.LogError(
+                            ex,
+                            "Site Dashboard cache refresh attempt " +
+                            "{AttemptNumber} of {TotalAttempts} failed. " +
+                            "The previous cache remains available. " +
+                            "Another retry will be attempted.",
+                            attemptIndex + 1,
+                            totalAttempts);
+                    }
+                    else
+                    {
+                        _logger.LogError(
+                            ex,
+                            "Site Dashboard cache refresh failed after " +
+                            "{TotalAttempts} attempts. " +
+                            "The previous cache remains available. " +
+                            "The next regular refresh will use the " +
+                            "configured weekly schedule.",
+                            totalAttempts);
+                    }
                 }
             }
+
+            /*
+             * All attempts failed, but the host itself is still healthy.
+             * Return true so the outer loop schedules the next normal
+             * weekly run.
+             */
+            return true;
         }
 
         private static DateTimeOffset CalculateNextRun(

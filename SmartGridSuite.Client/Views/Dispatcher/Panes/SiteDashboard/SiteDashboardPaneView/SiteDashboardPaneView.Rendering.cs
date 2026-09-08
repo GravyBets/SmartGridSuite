@@ -119,7 +119,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         //RENDER METHOD
         private void RenderSelectedSession()
         {
-            WorkspaceView.StopTowerPings();
+            /*
+             * Test All is a foreground quick test and can stop when
+             * switching sites.
+             *
+             * Manual Tower pings belong to their individual tab and
+             * continue in the background.
+             */
+            WorkspaceView.StopTowerTestAllOnly();
+
             EnsureInitialBlankTab();
 
             TopBarView.SetTabs(_sessions, _selectedSessionKey);
@@ -253,7 +261,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 WorkspaceView.TowerSummaryText = session.TowerSummaryText;
                 WorkspaceView.SetTowerSectors(session.TowerSectors);
-                WorkspaceView.RestoreTowerPingSessionState(session.TowerPingState);
+
+                if (string.Equals(
+                        session.DashboardKind,
+                        SiteDashboardKinds.Tower,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    session.TowerPingState ??=
+                        new TowerPingSessionState();
+                }
+
+                WorkspaceView.RestoreTowerPingSessionState(
+                    session.TowerPingState);
                 WorkspaceView.SetSelectedWorkspaceTab(session.SelectedWorkspaceTabKey);
 
 

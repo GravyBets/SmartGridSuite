@@ -162,7 +162,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
     {
         public string Sector { get; set; } = "";
         public string PingCount { get; set; } = "";
+
         public List<TowerEndpointPingSessionState> Endpoints { get; set; } = new();
+
+        /*
+         * Runtime-only manual ping state.
+         * This belongs to the Site Dashboard tab, not the shared WorkspaceView.
+         */
+        public CancellationTokenSource? PingCts { get; set; }
+
+        public bool IsRunning { get; set; }
     }
 
     public sealed class TowerEndpointPingSessionState
@@ -172,6 +181,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public string Results { get; set; } = "";
         public string Summary { get; set; } = "Ready.";
         public bool? TestSuccessful { get; set; }
+
+        public bool IsRunning { get; set; }
     }
 
 

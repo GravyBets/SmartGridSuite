@@ -229,6 +229,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _loadCts?.Dispose();
             _loadCts = null;
 
+            foreach (var session in _sessions)
+            {
+                WorkspaceView.StopTowerPingSession(
+                    session.TowerPingState);
+            }
+
             WorkspaceView.DisposePortal();
         }
     }

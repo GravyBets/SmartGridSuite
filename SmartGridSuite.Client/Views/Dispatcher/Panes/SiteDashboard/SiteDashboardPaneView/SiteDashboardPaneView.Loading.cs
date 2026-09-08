@@ -492,6 +492,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 NetworkView.StopPingSession(
                     selectedSession.NetworkPingState);
 
+                WorkspaceView.StopTowerPingSession(selectedSession.TowerPingState);
+
                 ResetSessionForNewSiteLoad(
                     selectedSession);
             }

@@ -397,7 +397,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             InitializeComponent();
             _searchDebounceTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(650)
+                Interval = TimeSpan.FromMilliseconds(1000)
             };
             _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
 

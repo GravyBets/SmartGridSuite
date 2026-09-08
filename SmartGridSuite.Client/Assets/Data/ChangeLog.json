@@ -1,5 +1,25 @@
 [
   {
+    "version": "3.3.0.2",
+    "date": "September 8, 2026",
+    "title": "Cache Backup Reliability / Tower View Updates",
+    "changes": [
+      "Improved Site Dashboard Parent Database cache refresh reliability and automatic retry handling.",
+      "Improved Parent Database connection handling during temporary connectivity issues.",
+      "Reduced unnecessary Dispatch Tickets refreshes while typing in search.",
+      "Administration Technicians are now sorted alphabetically by first name.",
+      "Improved Windows taskbar integration to prevent duplicate Smart Grid Suite icons.",
+      "Added \u0027Forget Client\u0027 in Connected Clients for old PCs.",
+      "Reworked Tower Equipment to show Base Station and Duplexer only.",
+      "Updated Tower pings to match MR/IGSD ping behavior, including continuous and counted ping modes.",
+      "Fixed Tower ping/test colors so status remains visible during hover and active pings.",
+      "Added editable Tower IP overrides for field diagnostics.",
+      "Added Open buttons to launch Tower IPs directly over HTTPS.",
+      "Fixed Tower pings so they continue running when switching between Site Dashboard tabs and restore their results when returning."
+    ]
+  },
+
+  {
     "version": "3.3.0.1",
     "date": "September 3, 2026",
     "title": "Future Scheduling, Lineman Workflow, and System Reliability",
@@ -22,9 +42,9 @@
     "date": "August 28, 2026",
     "title": "Summary Cards, Dispatch Tasks Capital Requests",
     "changes": [
-      "Added Maintenance/Capital request details to Dispatch â†’ Tasks.",
+      "Added Maintenance/Capital request details to Dispatch Ã¢â€ â€™ Tasks.",
       "Requested Work now shows technician name and request reason.",
-      "Made Dispatch â†’ Tickets summary cards clickable to filter by status.",
+      "Made Dispatch Ã¢â€ â€™ Tickets summary cards clickable to filter by status.",
       "Added selected-state border to the active summary card.",
       "Clear Filters now clears the summary card selection."
     ]
@@ -57,7 +77,7 @@
     "changes": [
       "Added support for editing legacy/imported Site History entries while preserving the original imported source data.",
       "Fixed Ticket Status renames so existing tickets automatically update to the new status name.",
-      "Fixed the Dispatch Tickets ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œAll / Include ClosedÃƒÂ¢Ã¢â€šÂ¬Ã‚Â status filter so it truly includes tickets with any status, including legacy or inactive statuses.",
+      "Fixed the Dispatch Tickets ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“All / Include ClosedÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â status filter so it truly includes tickets with any status, including legacy or inactive statuses.",
       "Added a copy-to-clipboard button beside Site numbers in Field Technician History, with the same temporary checkmark feedback used for Notifications and Work Orders."
     ]
   },
