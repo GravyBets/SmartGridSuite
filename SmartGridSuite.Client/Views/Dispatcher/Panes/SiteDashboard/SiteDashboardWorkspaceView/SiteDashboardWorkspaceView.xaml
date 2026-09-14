@@ -1704,18 +1704,28 @@
                         </Grid>
 
                         <Border Grid.Row="2"
-                                BorderBrush="{DynamicResource SurfaceBorder}"
-                                BorderThickness="1"
-                                CornerRadius="10"
-                                Background="{DynamicResource SurfaceBg}">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                                <TextBlock x:Name="NarrativeTextBlock"
-                               Padding="12"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource TextPrimary}"
-                               FontSize="14"/>
-                            </ScrollViewer>
+        BorderBrush="{DynamicResource SurfaceBorder}"
+        BorderThickness="1"
+        CornerRadius="10"
+        Background="{DynamicResource SurfaceBg}">
+                            <TextBox x:Name="NarrativeTextBlock"
+             Style="{x:Null}"
+             Padding="12"
+             IsReadOnly="True"
+             IsReadOnlyCaretVisible="True"
+             IsTabStop="False"
+             AcceptsReturn="True"
+             TextWrapping="Wrap"
+             Foreground="{DynamicResource TextPrimary}"
+             Background="Transparent"
+             BorderThickness="0"
+             FontSize="14"
+             HorizontalAlignment="Stretch"
+             VerticalAlignment="Stretch"
+             VerticalContentAlignment="Top"
+             HorizontalContentAlignment="Left"
+             VerticalScrollBarVisibility="Auto"
+             HorizontalScrollBarVisibility="Disabled"/>
                         </Border>
                     </Grid>
                 </Border>

@@ -68,6 +68,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 isLineman
                     ? new GridLength(0)
                     : new GridLength(4);
+
+            /*
+             * The shared dashboard is used by both the Field Tech and Lineman
+             * modules. The Site History narrative is selectable only in the
+             * Lineman module.
+             */
+            WorkspaceView.NarrativeTextBlock.IsHitTestVisible =
+                isLineman;
+
+            WorkspaceView.NarrativeTextBlock.Focusable =
+                isLineman;
+
+            WorkspaceView.NarrativeTextBlock.Cursor =
+                isLineman
+                    ? System.Windows.Input.Cursors.IBeam
+                    : System.Windows.Input.Cursors.Arrow;
         }
 
         private readonly List<SiteDashboardTabSession> _sessions = new();
@@ -91,6 +107,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         public SiteDashboardPaneView(ApiClient api)
         {
             InitializeComponent();
+            ApplyAccessMode();
             _api = api;
             _ticketsApi = new TicketsApi(_api);
 
