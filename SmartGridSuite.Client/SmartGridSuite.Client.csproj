@@ -51,6 +51,9 @@
     <Resource Include="Assets\Branding\SmartGridSuite_Logo.png">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
+    <Content Include="Assets\Sounds\MessageTone.mp3">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <Compile Update="Views\Lineman\LinemanShellWindow.xaml.cs">

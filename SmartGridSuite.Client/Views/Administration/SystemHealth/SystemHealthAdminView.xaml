@@ -192,6 +192,33 @@
                                    TextWrapping="Wrap"
                                    Foreground="{DynamicResource TextSecondary}"/>
 
+                        <!-- Restart and Test API buttons: initially hidden; shown by code-behind when Parent DB is not Connected -->
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,8,0,12"
+                                    HorizontalAlignment="Left"
+                                    SnapsToDevicePixels="True">
+                            <Button x:Name="RestartApiButton"
+                                    Content="Restart API"
+                                    Padding="8,4"
+                                    Width="110"
+                                    Height="30"
+                                    Click="RestartApiButton_Click"
+                                    Visibility="Visible"
+                                    ToolTip="Request the server to restart the API service" />
+
+                            <Button x:Name="TestApiButton"
+                                    Content="Test API"
+                                    Padding="8,4"
+                                    Width="90"
+                                    Height="30"
+                                    Margin="8,0,0,0"
+                                    Click="TestApiButton_Click"
+                                    Visibility="Visible"
+                                    ToolTip="Run a quick API test endpoint" />
+
+                        </StackPanel>
+
+
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="150"/>

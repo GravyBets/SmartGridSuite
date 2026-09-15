@@ -4,21 +4,26 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:local="clr-namespace:SmartGridSuite.Client.Views.Dispatcher.Panes"
+             xmlns:converters="clr-namespace:SmartGridSuite.Client.Converters"
              mc:Ignorable="d">
 
     <UserControl.Resources>
+        <!-- Converter for greying out unavailable techs -->
+        <converters:BoolToOpacityConverter x:Key="BoolToOpacityConverter"/>
         <!-- Crew / Technician selectable card -->
         <DataTemplate x:Key="AssignmentTargetCardTemplate">
             <Border Width="218"
                     MinHeight="78"
                     Margin="0,0,6,6"
                     Padding="9"
-                    CornerRadius="11">
+                    CornerRadius="11"
+                    IsEnabled="{Binding IsAvailable}"
+                    ToolTip="{Binding AvailabilityReason}">
 
                 <Border.Style>
                     <Style TargetType="Border">
-                        <Setter Property="Background" Value="{DynamicResource CardBackground}"/>
-                        <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
+                        <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceBorder}"/>
                         <Setter Property="BorderThickness" Value="1"/>
 
                         <Style.Triggers>
@@ -38,13 +43,13 @@
                     </Style>
                 </Border.Style>
 
-                <StackPanel>
+                <StackPanel Opacity="{Binding IsAvailable, Converter={StaticResource BoolToOpacityConverter}}">
                     <!-- Primary technician / first crew member -->
                     <TextBlock Text="{Binding PrimaryLine1}"
-                       FontSize="13"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource TextPrimary}"
-                       TextTrimming="CharacterEllipsis"/>
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextTrimming="CharacterEllipsis"/>
 
                     <!-- Second crew member -->
                     <TextBlock Text="{Binding PrimaryLine2}"
@@ -481,7 +486,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="4"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="6"/>
+                    <RowDefinition Height="4"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
@@ -502,10 +507,10 @@
 
                     <StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
-                                VerticalAlignment="Center">
+                                VerticalAlignment="Top">
 
                         <Button Width="36"
-                                Height="34"
+                                Height="32"
                                 Margin="0,0,4,0"
                                 Padding="0"
                                 ToolTip="Previous day"
@@ -523,7 +528,7 @@
                         </Button>
 
                         <Border Width="86"
-                                Height="34"
+                                Height="32"
                                 Margin="0,0,4,0"
                                 CornerRadius="10"
                                 Background="{DynamicResource ControlInputBg}"
@@ -542,7 +547,7 @@
                         <DatePicker x:Name="WorkDatePicker"
                                     Style="{DynamicResource ModernDatePicker}"
                                     Width="135"
-                                    Height="34"
+                                    Height="32"
                                     Margin="0,0,4,0"
                                     VerticalContentAlignment="Center"
                                     Text="{Binding SelectedWorkDate,
@@ -554,8 +559,8 @@
                                     SelectedDateChanged="WorkDatePicker_SelectedDateChanged"/>
 
                         <Button Width="36"
-                                Height="34"
-                                Margin="0,0,22,0"
+                                Height="32"
+                                Margin="0,0,4,0"
                                 Padding="0"
                                 ToolTip="Next day"
                                 Click="NextDay_Click">
@@ -574,8 +579,8 @@
                         <Button x:Name="RefreshAssignmentsButton"
                                 Style="{DynamicResource PrimaryButtonStyle}"
                                 Content="Refresh"
-                                Height="34"
-                                MinWidth="100"
+                                Height="32"
+                                MinWidth="90"
                                 Click="Refresh_Click"/>
                     </StackPanel>
                 </Grid>

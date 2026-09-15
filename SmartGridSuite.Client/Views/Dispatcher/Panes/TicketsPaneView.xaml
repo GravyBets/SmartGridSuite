@@ -141,12 +141,12 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="0,8,0,0">
+    <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="8"/>
+            <RowDefinition Height="4"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
@@ -166,7 +166,7 @@
                            Foreground="{DynamicResource TextPrimary}"/>
 
                 <TextBlock Text="Queue, filtering, and service history"
-                           Margin="0,4,0,0"
+                           Margin="0,0,0,0"
                            Foreground="{DynamicResource TextSecondary}"/>
             </StackPanel>
 
@@ -174,22 +174,26 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Top">
 
-                <Button x:Name="RefreshTicketsButton"
-                        Content="Refresh"
-                        Width="96"
-                        Margin="0,0,4,0"
-                        Click="Refresh_Click"/>
-
                 <Button x:Name="ImportSapQueueButton"
                         Content="Import SAP Queue"
+                        Height="32"
                         Margin="0,0,4,0"
                         Click="ImportSapQueue_Click"/>
 
                 <Button x:Name="NewTicketButton"
                         Content="New Ticket"
-                        Style="{StaticResource PrimaryButtonStyle}"
-                        Width="96"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Width="102"
+                        Height="32"
+                        Margin="0,0,4,0"
                         Click="NewTicket_Click"/>
+
+                <Button x:Name="RefreshTicketsButton"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Content="Refresh"
+                        Height="32"
+                        Width="96"
+                        Click="Refresh_Click"/>
             </StackPanel>
         </Grid>
 
@@ -197,7 +201,7 @@
         <Grid Grid.Row="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="6"/>
+                <RowDefinition Height="4"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
@@ -219,6 +223,7 @@
                 <ColumnDefinition Width="160"/>
                 <ColumnDefinition Width="4"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="4"/>
             </Grid.ColumnDefinitions>
 
             <!-- Labels -->
@@ -462,7 +467,7 @@
                 x:Name="SummaryPanel"
                 Style="{StaticResource Card}"
                 Padding="12"
-                Margin="0,0,0,12"
+                Margin="0,0,0,8"
                 Visibility="Visible">
 
             <ItemsControl ItemsSource="{Binding SummaryStatuses}">
@@ -475,7 +480,7 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Button Style="{StaticResource SummaryCardButtonStyle}"
-                                Margin="0,0,10,0"
+                                Margin="0,0,6,0"
                                 Tag="{Binding Status}"
                                 ToolTip="Show only tickets with this status"
                                 Click="SummaryStatusCard_Click">
@@ -495,7 +500,7 @@
         <!-- Main workspace -->
         <Border Grid.Row="5"
                 Style="{StaticResource Card}"
-                Padding="14">
+                Padding="10">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -509,7 +514,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="10"/>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="4"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
@@ -592,10 +597,10 @@
 
                         <!-- Title / quick filter / status -->
                         <StackPanel Orientation="Horizontal"
-                                    VerticalAlignment="Center">
+                                    VerticalAlignment="Top">
 
                             <TextBlock Text="Quick Filter"
-                                       Margin="2,0,6,0"
+                                       Margin="0,0,6,0"
                                        FontSize="11"
                                        FontWeight="Bold"
                                        Foreground="{DynamicResource TextSecondary}"

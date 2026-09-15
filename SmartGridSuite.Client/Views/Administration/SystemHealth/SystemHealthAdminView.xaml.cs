@@ -144,6 +144,8 @@ namespace SmartGridSuite.Client.Views.Administration.SystemHealth
                 ParentDatabaseStatusTextBlock,
                 health.ParentDatabase.Status);
 
+            // Buttons are always visible; no visibility toggling required.
+
             ParentDataSourceTextBlock.Text =
                 health.ParentDatabase.IsUsingCache
                     ? "Cached fallback data"
@@ -152,6 +154,7 @@ namespace SmartGridSuite.Client.Views.Administration.SystemHealth
                         .HasValue
                             ? "Live Parent DB"
                             : "No live check recorded";
+
 
             ParentLastSuccessTextBlock.Text =
                 FormatDateTime(
@@ -408,5 +411,126 @@ namespace SmartGridSuite.Client.Views.Administration.SystemHealth
                 ? "—"
                 : value.Trim();
         }
+
+        private async void RestartApiButton_Click(object? sender, RoutedEventArgs e)
+        {
+            // Confirm with the user before requesting a restart
+            var confirm = MessageBox.Show(
+                "Restarting the API will briefly interrupt service. Continue?",
+                "Restart API",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            try
+            {
+                // Disable buttons while working
+                RestartApiButton.IsEnabled = false;
+                TestApiButton.IsEnabled = false;
+                RefreshStatusTextBlock.Text = "Requesting API restart...";
+                _isRefreshing = true;
+
+                // Call the restart endpoint. Adjust path if your server uses a different route.
+                // Using generic PostAsync to avoid guessing typed DTOs.
+                // Option A — make the null explicitly nullable (resolves CS8625)
+                await _api.PostAsync<object, object>("api/admin/restart-api", null!);
+
+
+                RefreshStatusTextBlock.Text = "Restart requested. Waiting briefly before refreshing health...";
+
+                // Wait a short time to allow the service to restart, then refresh health
+                await Task.Delay(TimeSpan.FromSeconds(5));
+
+                // Allow RefreshAsync to run (it checks _isRefreshing). Clear the flag first.
+                _isRefreshing = false;
+                await RefreshAsync();
+
+
+                MessageBox.Show(
+                    "Restart request sent. Check system health for current status.",
+                    "Restart Requested",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                RefreshStatusTextBlock.Text = $"Restart failed: {ex.Body ?? ex.Message}";
+                MessageBox.Show(
+                    ex.Body ?? ex.Message,
+                    "Restart Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                RefreshStatusTextBlock.Text = "Restart failed: " + ex.Message;
+                MessageBox.Show(
+                    ex.Message,
+                    "Restart Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                RestartApiButton.IsEnabled = true;
+                TestApiButton.IsEnabled = true;
+                _isRefreshing = false;
+            }
+        }
+
+        private async void TestApiButton_Click(object? sender, RoutedEventArgs e)
+        {
+            try
+            {
+                RestartApiButton.IsEnabled = false;
+                TestApiButton.IsEnabled = false;
+                RefreshStatusTextBlock.Text = "Running API test...";
+                _isRefreshing = true;
+
+                // Call a lightweight test endpoint. Adjust path if your API exposes a different route.
+                await _api.GetAsync<object>("api/admin/system-health");
+
+                RefreshStatusTextBlock.Text = "API test completed.";
+
+                MessageBox.Show(
+                    "API test completed successfully.",
+                    "API Test",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+
+                // Refresh health to reflect any changes
+                // Clear the flag so RefreshAsync will actually perform the refresh.
+                _isRefreshing = false;
+                await RefreshAsync();
+
+            }
+            catch (ApiClient.ApiException ex)
+            {
+                RefreshStatusTextBlock.Text = $"API test failed: {ex.Body ?? ex.Message}";
+                MessageBox.Show(
+                    ex.Body ?? ex.Message,
+                    "API Test Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                RefreshStatusTextBlock.Text = "API test failed: " + ex.Message;
+                MessageBox.Show(
+                    ex.Message,
+                    "API Test Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                RestartApiButton.IsEnabled = true;
+                TestApiButton.IsEnabled = true;
+                _isRefreshing = false;
+            }
+        }
+
     }
 }

@@ -14,8 +14,6 @@ using SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard;
 using SmartGridSuite.Contracts.SiteNotes;
 using System.Security.Principal;
 using System.Windows.Threading;
-using System.Threading.Tasks;
-
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
@@ -25,16 +23,54 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
         private readonly ObservableCollection<DispatchTask> _tasks = new();
+
+        // Event raised when the in-memory pending task count changes.
+        // Shell subscribes to this so the badge can update immediately when TaskPane finishes loading.
+        public event EventHandler<int>? PendingTaskCountChanged;
+
         private readonly TicketsApi _ticketsApi;
         private readonly TicketAdminApi _ticketAdminApi;
 
         private readonly SiteNotesApi _siteNotesApi;
+
+        // Public helper used by the shell badge timer to get a current pending task count.
+        // Pending = not closed/completed/cancelled.
+        public int GetPendingTaskCount()
+        {
+            try
+            {
+                return _tasks.Count(t =>
+                {
+                    var status = (t?.Status ?? string.Empty).Trim();
+                    if (string.IsNullOrEmpty(status))
+                        return true; // treat unknown as pending
+
+                    if (status.Equals("Closed", StringComparison.OrdinalIgnoreCase) ||
+                        status.Equals("Completed", StringComparison.OrdinalIgnoreCase) ||
+                        status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) ||
+                        status.Equals("Canceled", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return false;
+                    }
+
+                    return true;
+                });
+            }
+            catch
+            {
+                return 0;
+            }
+        }
 
         private readonly TechniciansApi _techniciansApi;
 
         private bool _suppressFilterEvents;
         private bool _filtersInitialized;
         private bool _hasLoadedOnce;
+
+        // Expose whether the TaskPane has completed its initial load.
+        // Shell uses this to decide whether the in-memory task list is authoritative.
+        public bool HasLoadedOnce => _hasLoadedOnce;
 
         private readonly DispatcherTimer _searchDebounceTimer;
         private readonly DispatcherTimer _idleRefreshTimer;
@@ -56,7 +92,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private string _lastAppliedTaskStatus = "All";
 
         private int _busyOverlayDepth;
-
         public bool HasSelectedTask => SelectedTask != null;
 
         private readonly HashSet<long> _expandedTaskTicketIds = new();
@@ -519,6 +554,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 _lastAppliedTaskSearch = SearchBox?.Text?.Trim() ?? "";
                 _lastAppliedTaskStatus = StatusFilter?.SelectedItem as string ?? "All";
+
+                // Notify listeners (shell) of the current pending task count so the nav badge can update immediately.
+                try
+                {
+                    var pending = GetPendingTaskCount();
+                    PendingTaskCountChanged?.Invoke(this, pending);
+                }
+                catch
+                {
+                    // Swallow to avoid impacting task load flow.
+                }
+
             }
             catch (OperationCanceledException)
             {

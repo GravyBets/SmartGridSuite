@@ -928,6 +928,7 @@
                             </Grid.ColumnDefinitions>
 
                             <TextBox x:Name="WriteUpTextBox"
+                                     SpellCheck.IsEnabled="True"
                                      Grid.Column="0"
                                      MinHeight="260"
                                      Height="Auto"

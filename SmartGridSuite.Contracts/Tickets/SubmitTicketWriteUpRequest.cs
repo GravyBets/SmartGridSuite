@@ -30,8 +30,25 @@ namespace SmartGridSuite.Contracts.Tickets
 
         public List<uint> ReferToOptionIds { get; set; } = new();
 
+        /*
+         * Technicians selected in the Submit Write-Up preview.
+         *
+         * All crew technicians will be selected by default. The submitting
+         * technician may remove unavailable technicians before confirming.
+         */
+        public List<SubmitTicketWriteUpTechnician> SelectedTechnicians { get; set; } = new();
+
         public bool EquipmentWasSwapped { get; set; }
 
         public bool IpAddressWasChanged { get; set; }
+    }
+
+    public sealed class SubmitTicketWriteUpTechnician
+    {
+        public uint? TechnicianId { get; set; }
+
+        public string EmployeeId { get; set; } = "";
+
+        public string TechnicianName { get; set; } = "";
     }
 }

@@ -1,4 +1,12 @@
-<UserControl x:Class="SmartGridSuite.Client.Views.Dispatcher.Panes.TaskPaneView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d" d:DesignHeight="650" d:DesignWidth="1100" Loaded="UserControl_Loaded">
+<UserControl x:Class="SmartGridSuite.Client.Views.Dispatcher.Panes.TaskPaneView" 
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" 
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             mc:Ignorable="d" 
+             d:DesignHeight="650" 
+             d:DesignWidth="1100" 
+             Loaded="UserControl_Loaded">
 
     <UserControl.Resources>
         <!-- Copy glyph -->
@@ -821,19 +829,20 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="0,8,0,0">
+    <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="8" />
+            <RowDefinition Height="4" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="8" />
+            <RowDefinition Height="4" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!-- Header -->
         <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <StackPanel>
@@ -846,13 +855,25 @@
                            Margin="0,0,0,0"
                            Foreground="{DynamicResource TextSecondary}" />
             </StackPanel>
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Top">
+
+                <Button x:Name="RefreshTasksButton"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Content="Refresh"
+                        Height="32"
+                        Width="96"
+                        Click="Refresh_Click"/>
+            </StackPanel>
         </Grid>
 
         <!-- Filters -->
         <Grid Grid.Row="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="6" />
+                <RowDefinition Height="4" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
@@ -900,20 +921,8 @@
                     Grid.Column="4"
                     Content="Clear Filters"
                     Height="36"
-                    Width="104"
                     Padding="14,0"
                     Click="ClearTaskFilters_Click" />
-
-            <Button x:Name="RefreshTasksButton"
-                    Style="{DynamicResource PrimaryButtonStyle}"
-                    Grid.Row="2"
-                    Grid.Column="6"
-                    Content="Refresh"
-                    Height="36"
-                    Width="104"
-                    Padding="14,0"
-                    VerticalAlignment="Top"
-                    Click="Refresh_Click" />
         </Grid>
 
         <!-- Main workspace -->

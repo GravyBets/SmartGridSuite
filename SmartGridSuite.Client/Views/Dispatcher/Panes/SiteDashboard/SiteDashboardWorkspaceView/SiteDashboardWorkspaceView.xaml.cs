@@ -1,5 +1,6 @@
 ﻿using SmartGridSuite.Contracts.SiteDashboard;
 using SmartGridSuite.Contracts.Snmp;
+using SmartGridSuite.Contracts.Crews;
 using SmartGridSuite.Client.Services;
 using SmartGridSuite.Contracts.SiteNotes;
 using System.Collections.ObjectModel;
@@ -144,7 +145,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public string CurrentSiteId { get; private set; } = "";
 
         public string CurrentCnpTechName { get; set; } = string.Empty;
-                
+
+        public IReadOnlyList<CrewMemberDto> CurrentCrewMembers { get; set; } = Array.Empty<CrewMemberDto>();
+
         public Func<string>? PingStatsProvider { get; set; }
 
         public Func<IReadOnlyList<string>>? IpChangeWriteUpLinesProvider { get; set; }
