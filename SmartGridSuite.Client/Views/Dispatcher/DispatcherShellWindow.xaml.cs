@@ -9,6 +9,7 @@ using System.Windows.Data;
 using System.Globalization;
 using SmartGridSuite.Contracts.Dispatcher;
 using System.Media;
+using System.Threading;
 
 namespace SmartGridSuite.Client.Views
 {
@@ -32,7 +33,7 @@ namespace SmartGridSuite.Client.Views
 
         private readonly ApiClient _api = ClientAppSettings.CreateApiClient();
 
-        // Tickets API used by the shell fallback poll when TaskPaneView is not instantiated.
+        // Badge counts always come from the API, independently of the visible pane.
         private readonly TicketsApi _ticketsApi;
 
         // Sound playback helpers
@@ -41,7 +42,11 @@ namespace SmartGridSuite.Client.Views
         // When true, the next PendingTaskCount assignment will NOT play the notification sound.
         // Used when the shell reconciles with TaskPane in-memory state (no audible feedback desired).
         private bool _suppressNotificationSound = false;
-        private bool _suppressNextTaskPaneCountNotification;
+        private bool _hasTaskCountBaseline;
+        private bool _badgeRefreshInProgress;
+        private bool _badgeRefreshRequested;
+        private bool _isClosed;
+        private readonly CancellationTokenSource _badgeLifetime = new();
 
         // Example path: Assets/Sounds/MessageTone.mp3
         private const string NotificationSoundPackUri = "pack://application:,,,/Assets/Sounds/MessageTone.mp3";
@@ -159,12 +164,12 @@ namespace SmartGridSuite.Client.Views
             _navCollapsed = true;
             ApplyNavState();
 
+            // ShowPane can request a badge refresh during initial navigation.
+            _ticketsApi = new TicketsApi(_api);
+
             SelectNavIndex(1);
 
             DataContext = this;
-
-            // Initialize TicketsApi for shell-level polling fallback
-            _ticketsApi = new TicketsApi(_api);
 
             // Initialize and start the badge timer (60 seconds)
             _badgeTimer = new DispatcherTimer
@@ -262,11 +267,6 @@ namespace SmartGridSuite.Client.Views
                 case "Tasks":
                     _taskPaneView ??= new TaskPaneView();
 
-                    if (!_taskPaneView.HasLoadedOnce)
-                    {
-                        _suppressNextTaskPaneCountNotification = true;
-                    }
-
                     try
                     {
                         _taskPaneView.PendingTaskCountChanged -=
@@ -275,9 +275,8 @@ namespace SmartGridSuite.Client.Views
                         _taskPaneView.PendingTaskCountChanged +=
                             TaskPaneView_PendingTaskCountChanged;
 
-                        AssignPendingTaskCount(
-                            _taskPaneView.GetPendingTaskCount(),
-                            suppressSound: true);
+                        // Never replace the global count with the pane's filtered rows.
+                        _ = UpdatePendingTaskCountAsync();
                     }
                     catch
                     {
@@ -383,36 +382,23 @@ namespace SmartGridSuite.Client.Views
             Close();
         }
 
-        // Handler for TaskPaneView.PendingTaskCountChanged
+        // A pane reload signals that server data may have changed. Its count is
+        // intentionally ignored because the pane can be filtered by search/status.
         private void TaskPaneView_PendingTaskCountChanged(
             object? sender,
             int count)
         {
-            void ApplyCount()
-            {
-                if (_suppressNextTaskPaneCountNotification)
-                {
-                    _suppressNextTaskPaneCountNotification = false;
-
-                    AssignPendingTaskCount(
-                        count,
-                        suppressSound: true);
-
-                    return;
-                }
-
-                AssignPendingTaskCount(
-                    count,
-                    suppressSound: false);
-            }
+            if (_isClosed)
+                return;
 
             if (!Dispatcher.CheckAccess())
             {
-                Dispatcher.Invoke(ApplyCount);
+                Dispatcher.BeginInvoke(new Action(() =>
+                    _ = UpdatePendingTaskCountAsync()));
                 return;
             }
 
-            ApplyCount();
+            _ = UpdatePendingTaskCountAsync();
         }
 
         // Play the notification sound once (non-blocking) using MediaPlayer for MP3 resources.
@@ -504,45 +490,26 @@ namespace SmartGridSuite.Client.Views
             _ = UpdatePendingTaskCountAsync();
         }
         
-        // Update the PendingTaskCount property from available sources.
-        // Current implementation prefers the in-memory TaskPaneView if instantiated.
-        // This method is resilient to exceptions and will silently ignore transient failures.
+        // Use the API's unfiltered total, not the current grid or a capped page
+        // of rows. The API owns which configured statuses belong in Tasks.
         private async Task UpdatePendingTaskCountAsync()
         {
+            if (_isClosed)
+                return;
+
+            _badgeRefreshRequested = true;
+            if (_badgeRefreshInProgress)
+                return;
+
+            _badgeRefreshInProgress = true;
             try
             {
-                // Use TaskPane in-memory count only when the Task pane is the active content AND it has completed its initial load.
-                // If the Task pane exists but is not active, prefer the API fallback so the badge reflects new tasks arriving while the user is on other panes.
-                if (_taskPaneView != null && MainPaneHost?.Content == _taskPaneView && _taskPaneView.HasLoadedOnce)
+                // Coalesce refresh signals arriving during a request into one
+                // follow-up read so an older response cannot overwrite newer data.
+                while (_badgeRefreshRequested && !_isClosed)
                 {
-                    try
-                    {
-                        var inMemory = _taskPaneView.GetPendingTaskCount();
-                        System.Diagnostics.Debug.WriteLine($"[BadgeTimer] using TaskPane in-memory count (active pane) = {inMemory}");
-                        // When UpdatePendingTaskCountAsync is invoked (e.g., by Refresh), treat this as a live update
-                        // and do not suppress the notification sound so arrivals while on Tasks still play.
-                        AssignPendingTaskCount(inMemory, suppressSound: false);
-                        return;
+                    _badgeRefreshRequested = false;
 
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[BadgeTimer] TaskPane in-memory count failed: {ex.GetType().Name}: {ex.Message}");
-                        // Fall through to API fallback; do not crash the shell for badge updates.
-                    }
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("[BadgeTimer] TaskPane not active or not authoritative; using API fallback");
-                }
-
-
-
-
-                // 2) Fallback: query the server for a current task list and count pending items.
-                // Build a minimal query request similar to the TaskPane's request.
-                try
-                {
                     var request = new DispatchTaskQueryRequest
                     {
                         Search = null,
@@ -552,68 +519,55 @@ namespace SmartGridSuite.Client.Views
                         From = null,
                         To = null,
                         Skip = 0,
-                        Take = 2000
+                        Take = 1
                     };
 
-                    System.Diagnostics.Debug.WriteLine("[BadgeTimer] calling QueryDispatchTasksAsync...");
-                    var response = await _ticketsApi.QueryDispatchTasksAsync(request);
+                    var response = await _ticketsApi.QueryDispatchTasksAsync(
+                        request, _badgeLifetime.Token);
 
-                    if (response == null)
-                    {
-                        System.Diagnostics.Debug.WriteLine("[BadgeTimer] response == null");
-                    }
-                    else
-                    {
-                        var itemsCount = response.Items?.Count ?? 0;
-                        System.Diagnostics.Debug.WriteLine($"[BadgeTimer] API returned {itemsCount} items");
-                    }
+                    if (_isClosed)
+                        return;
 
-                    // If the API returns items, count pending ones (same logic as TaskPane).
-                    var items = response?.Items ?? new List<DispatchTaskListItemDto>();
-                    var pendingCount = items.Count(item =>
-                    {
-                        var status = (item?.Status ?? string.Empty).Trim();
-                        if (string.IsNullOrEmpty(status))
-                            return true;
-
-                        if (status.Equals("Closed", StringComparison.OrdinalIgnoreCase) ||
-                            status.Equals("Completed", StringComparison.OrdinalIgnoreCase) ||
-                            status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase) ||
-                            status.Equals("Canceled", StringComparison.OrdinalIgnoreCase))
-                        {
-                            return false;
-                        }
-
-                        return true;
-                    });
-
-                    System.Diagnostics.Debug.WriteLine($"[BadgeTimer] computed pendingCount = {pendingCount}");
-                    // API fallback represents live server state; play tone for increases.
-                    AssignPendingTaskCount(pendingCount, suppressSound: false);
-                    return;
-
+                    // First successful load establishes a silent baseline.
+                    // Only subsequent increases in the global count play a tone.
+                    AssignPendingTaskCount(
+                        response.TotalCount,
+                        suppressSound: !_hasTaskCountBaseline);
+                    _hasTaskCountBaseline = true;
                 }
-                catch (Exception ex)
-                {
-                    // Log the exception so we can see why the API call failed.
-                    System.Diagnostics.Debug.WriteLine($"[BadgeTimer] QueryDispatchTasksAsync failed: {ex.GetType().Name}: {ex.Message}");
-                    System.Diagnostics.Debug.WriteLine(ex.StackTrace);
-                }
-
             }
-            catch
+            catch (OperationCanceledException) when (_isClosed)
             {
-                // Swallow any unexpected exceptions to avoid impacting the shell UI.
+                // Closing the shell cancels its outstanding badge request.
             }
-
-            // Keep method async-friendly
-            await Task.CompletedTask;
+            catch (Exception ex)
+            {
+                // Preserve the last successful count on a connection failure.
+                // The next timer tick (or pane reload) will retry.
+                System.Diagnostics.Debug.WriteLine(
+                    $"[BadgeTimer] Task count refresh failed: {ex.Message}");
+            }
+            finally
+            {
+                _badgeRefreshInProgress = false;
+            }
         }
 
         private void DispatcherShellWindow_Closed(
             object? sender,
             EventArgs e)
         {
+            _isClosed = true;
+            _badgeLifetime.Cancel();
+            _badgeLifetime.Dispose();
+
+            if (_taskPaneView != null)
+                _taskPaneView.PendingTaskCountChanged -= TaskPaneView_PendingTaskCountChanged;
+
+            _notificationPlayer.MediaEnded -= NotificationPlayer_MediaEnded;
+            _notificationPlayer.MediaFailed -= NotificationPlayer_MediaFailed;
+            _notificationPlayer.Close();
+
             Closing -= DispatcherShellWindow_Closing;
             Closed -= DispatcherShellWindow_Closed;
             // Stop badge timer
