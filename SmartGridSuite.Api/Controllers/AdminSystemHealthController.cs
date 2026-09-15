@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using SmartGridSuite.Api.Services.ParentSync;
 using SmartGridSuite.Api.Services.SystemHealth;
 using SmartGridSuite.Contracts.Administration;
 
@@ -13,6 +14,13 @@ namespace SmartGridSuite.Api.Controllers
         public AdminSystemHealthController(SystemHealthService systemHealthService)
         {
             _systemHealthService = systemHealthService;
+        }
+
+        [HttpPost("test-parent-db")]
+        public async Task<ActionResult<ParentDatabaseTestResponse>> TestParentDatabase(
+            [FromServices] ParentDatabaseConnectionFactory factory, CancellationToken ct)
+        {
+            return Ok(await _systemHealthService.TestParentDatabaseAsync(factory, ct));
         }
 
         [HttpGet]

@@ -418,6 +418,34 @@ namespace SmartGridSuite.Client.Services
                 ct);
         }
 
+        public async Task<RestartApiResponse> RestartApiAsync(
+            RestartApiRequest request, CancellationToken ct = default)
+        {
+            if (_http.BaseAddress?.Scheme != Uri.UriSchemeHttps)
+                throw new InvalidOperationException(
+                    "Connect to the HTTPS API address before entering a restart password.");
+
+            // Do not follow redirects carrying a password to another URL or HTTP.
+            using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+            {
+                BaseAddress = _http.BaseAddress,
+                Timeout = TimeSpan.FromSeconds(10)
+            };
+            using var response = await client.PostAsJsonAsync(
+                "api/admin/restart-api", request, ct);
+            var result = await response.Content.ReadFromJsonAsync<RestartApiResponse>(
+                cancellationToken: ct);
+            if (!response.IsSuccessStatusCode)
+                throw new ApiException((int)response.StatusCode,
+                    result?.Message ?? "The API rejected the restart request.");
+            return result ?? throw new InvalidOperationException("The API returned no restart result.");
+        }
+
+        public Task<ParentDatabaseTestResponse?> TestParentDatabaseAsync(
+            CancellationToken ct = default)
+            => PostAsync<object, ParentDatabaseTestResponse>(
+                "api/admin/system-health/test-parent-db", new { }, ct);
+
         public Task<SystemHealthDto?> GetSystemHealthAsync(CancellationToken cancellationToken = default)
         {
             return GetAsync<SystemHealthDto>(

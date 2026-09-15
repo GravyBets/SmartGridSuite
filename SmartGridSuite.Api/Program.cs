@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Net;
 using SmartGridSuite.Api.Configuration;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Services;
@@ -15,6 +17,11 @@ namespace SmartGridSuite.Api
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            // Root-owned VM maintenance configuration, outside deployment swaps.
+            if (OperatingSystem.IsLinux())
+                builder.Configuration.AddJsonFile(
+                    "/etc/smartgridsuite/maintenance.json", optional: true, reloadOnChange: true);
 
             var logFilePath = builder.Configuration["Logging:FilePath"];
 
@@ -90,6 +97,7 @@ namespace SmartGridSuite.Api
             builder.Services.AddSingleton<ServerHealthProbeService>();
 
             builder.Services.AddScoped<SystemHealthService>();
+            builder.Services.AddSingleton<ApiRestartService>();
 
             builder.Services.AddScoped<SiteDashboardCacheService>();
 
@@ -127,6 +135,17 @@ namespace SmartGridSuite.Api
             builder.Services.AddScoped<DailyAssignmentRolloverEmailService>();
 
             var app = builder.Build();
+            // Only the local Apache proxy may assert that a request used HTTPS.
+            var forwarded = new ForwardedHeadersOptions
+            {
+                ForwardedHeaders = ForwardedHeaders.XForwardedProto,
+                ForwardLimit = 1
+            };
+            forwarded.KnownNetworks.Clear();
+            forwarded.KnownProxies.Clear();
+            forwarded.KnownProxies.Add(IPAddress.Loopback);
+            forwarded.KnownProxies.Add(IPAddress.IPv6Loopback);
+            app.UseForwardedHeaders(forwarded);
             app.UseSerilogRequestLogging();
 
             if (app.Environment.IsDevelopment() || app.Environment.IsStaging())

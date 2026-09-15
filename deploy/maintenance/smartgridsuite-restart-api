@@ -1,0 +1,35 @@
+#!/bin/bash
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+[[ "$(id -u)" == 0 ]] || { echo "Root required." >&2; exit 1; }
+[[ -x /etc/init.d/smartgridsuite-api ]] || { echo "SysV service not found." >&2; exit 1; }
+
+if [[ $# == 0 ]]; then
+    # The detached helper inherits this lock.
+    exec 9>/run/smartgridsuite-api-restart.lock
+    /usr/bin/flock -n 9 || exit 75
+    now=$(date +%s)
+    previous=0
+    if [[ -f /run/smartgridsuite-api-restart.timestamp ]]; then
+        read -r previous </run/smartgridsuite-api-restart.timestamp
+    fi
+    [[ "$previous" =~ ^[0-9]+$ ]] || exit 1
+    (( now - previous >= 60 )) || exit 75
+    printf '%s\n' "$now" >/run/smartgridsuite-api-restart.timestamp
+    # Fixed root-owned program; no request-supplied command or arguments.
+    /usr/bin/nohup /usr/bin/setsid --fork /bin/bash \
+        /usr/local/sbin/smartgridsuite-restart-api --run \
+        </dev/null >>/var/log/smartgridsuite-api-restart.log 2>&1 &
+    exit 0
+fi
+if [[ $# == 1 && "$1" == --run ]]; then
+    # Allow HTTP 202 to reach the caller before stopping the API.
+    sleep 5
+    echo "$(date -Is) Restarting smartgridsuite-api"
+    /usr/sbin/service smartgridsuite-api restart
+    echo "$(date -Is) Restart command completed"
+    sleep 10
+    exit 0
+fi
+echo "Unexpected arguments." >&2
+exit 2

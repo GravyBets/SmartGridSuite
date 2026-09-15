@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Compile Include="../../SmartGridSuite.Api/Services/SystemHealth/RestartPassword.cs" Link="RestartPassword.cs" />
+    <Compile Include="../../SmartGridSuite.Api/Services/SystemHealth/ApiRestartService.cs" Link="ApiRestartService.cs" />
+    <Compile Include="../../SmartGridSuite.Api/Services/SystemHealth/ApplicationRuntimeHealthService.cs" Link="ApplicationRuntimeHealthService.cs" />
+    <Compile Include="../../SmartGridSuite.Api/Controllers/AdminMaintenanceController.cs" Link="AdminMaintenanceController.cs" />
+    <Compile Include="../../SmartGridSuite.Contracts/Administration/AdminMaintenanceDto.cs" Link="AdminMaintenanceDto.cs" />
+    <Compile Include="../../SmartGridSuite.Contracts/Administration/SystemHealthDto.cs" Link="SystemHealthDto.cs" />
+  </ItemGroup>
+</Project>

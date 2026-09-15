@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Microsoft.Data.SqlClient;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
@@ -77,6 +78,48 @@ namespace SmartGridSuite.Api.Services.SystemHealth
                     };
 
             return result;
+        }
+
+        public async Task<ParentDatabaseTestResponse> TestParentDatabaseAsync(
+            ParentDatabaseConnectionFactory factory, CancellationToken ct)
+        {
+            const string operation = "Administrator Parent DB test";
+            var succeeded = false;
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(TimeSpan.FromSeconds(5));
+                await using var connection = factory.CreateConnection();
+                // Verify a new physical connection, not an old pooled session.
+                var settings = new SqlConnectionStringBuilder(connection.ConnectionString)
+                {
+                    Pooling = false,
+                    ConnectTimeout = 5
+                };
+                connection.ConnectionString = settings.ConnectionString;
+                await connection.OpenAsync(timeout.Token);
+                await using var command = connection.CreateCommand();
+                command.CommandText = "SELECT 1";
+                command.CommandTimeout = 5;
+                await command.ExecuteScalarAsync(timeout.Token);
+                _parentDatabaseHealth.RecordSuccess(operation);
+                succeeded = true;
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                _parentDatabaseHealth.RecordFailure(ex, operation);
+            }
+
+            // Both successful and failed live tests return a complete fresh snapshot.
+            // The client must inspect Succeeded; HTTP 200 alone isn't test success.
+            return new ParentDatabaseTestResponse
+            {
+                Succeeded = succeeded,
+                Message = succeeded
+                    ? "Parent DB connection test succeeded."
+                    : "Parent DB connection test failed. Review the updated failure details.",
+                Health = await GetAsync(ct)
+            };
         }
 
         private async Task<bool> CheckApplicationDatabaseAsync(
@@ -187,6 +230,8 @@ namespace SmartGridSuite.Api.Services.SystemHealth
         private async Task<ParentDatabaseCacheHealthDto>GetCacheHealthAsync(
                 CancellationToken cancellationToken)
         {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(3));
             try
             {
                 var siteCount =
@@ -194,21 +239,21 @@ namespace SmartGridSuite.Api.Services.SystemHealth
                         .AsNoTracking()
                         .CountAsync(
                             x => x.IsActive,
-                            cancellationToken);
+                            timeout.Token);
 
                 var towerCount =
                     await _db.CacheTowers
                         .AsNoTracking()
                         .CountAsync(
                             x => x.IsActive,
-                            cancellationToken);
+                            timeout.Token);
 
                 var sectorCount =
                     await _db.CacheTowerSectors
                         .AsNoTracking()
                         .CountAsync(
                             x => x.IsActive,
-                            cancellationToken);
+                            timeout.Token);
 
                 var siteMarker =
                     await _db.CacheSites
@@ -225,7 +270,7 @@ namespace SmartGridSuite.Api.Services.SystemHealth
                                     x.SyncRunId
                             })
                         .FirstOrDefaultAsync(
-                            cancellationToken);
+                            timeout.Token);
 
                 var towerMarker =
                     await _db.CacheTowers
@@ -242,7 +287,7 @@ namespace SmartGridSuite.Api.Services.SystemHealth
                                     x.SyncRunId
                             })
                         .FirstOrDefaultAsync(
-                            cancellationToken);
+                            timeout.Token);
 
                 var sectorMarker =
                     await _db.CacheTowerSectors
@@ -259,7 +304,7 @@ namespace SmartGridSuite.Api.Services.SystemHealth
                                     x.SyncRunId
                             })
                         .FirstOrDefaultAsync(
-                            cancellationToken);
+                            timeout.Token);
 
                 var markers =
                     new List<CacheRefreshMarker>();

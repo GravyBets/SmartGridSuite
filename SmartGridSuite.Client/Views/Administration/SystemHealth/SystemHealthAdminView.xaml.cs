@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Threading;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -13,6 +14,7 @@ namespace SmartGridSuite.Client.Views.Administration.SystemHealth
         private readonly DispatcherTimer _refreshTimer;
 
         private bool _isRefreshing;
+        private CancellationTokenSource? _maintenanceCts;
 
         public SystemHealthAdminView(ApiClient api)
         {
@@ -45,6 +47,7 @@ namespace SmartGridSuite.Client.Views.Administration.SystemHealth
             RoutedEventArgs e)
         {
             _refreshTimer.Stop();
+            _maintenanceCts?.Cancel();
         }
 
         private async void RefreshTimer_Tick(
@@ -66,8 +69,7 @@ namespace SmartGridSuite.Client.Views.Administration.SystemHealth
             if (_isRefreshing)
                 return;
 
-            _isRefreshing = true;
-            RefreshButton.IsEnabled = false;
+            SetBusy(true);
             RefreshStatusTextBlock.Text =
                 "Refreshing system health...";
 
@@ -95,8 +97,7 @@ namespace SmartGridSuite.Client.Views.Administration.SystemHealth
             }
             finally
             {
-                RefreshButton.IsEnabled = true;
-                _isRefreshing = false;
+                SetBusy(false);
             }
         }
 
@@ -412,125 +413,149 @@ namespace SmartGridSuite.Client.Views.Administration.SystemHealth
                 : value.Trim();
         }
 
+        private void SetBusy(bool busy)
+        {
+            _isRefreshing = busy;
+            RefreshButton.IsEnabled = !busy;
+            RestartApiButton.IsEnabled = !busy;
+            TestApiButton.IsEnabled = !busy;
+        }
+
         private async void RestartApiButton_Click(object? sender, RoutedEventArgs e)
         {
-            // Confirm with the user before requesting a restart
-            var confirm = MessageBox.Show(
-                "Restarting the API will briefly interrupt service. Continue?",
-                "Restart API",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (confirm != MessageBoxResult.Yes)
+            if (_isRefreshing)
                 return;
 
+            if (ClientAppSettings.ApiBaseUri.Scheme != Uri.UriSchemeHttps)
+            {
+                MessageBox.Show("Configure the HTTPS API address before requesting a restart.",
+                    "HTTPS Required", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            SetBusy(true);
+            using var operation = new CancellationTokenSource();
+            _maintenanceCts = operation;
+            RestartApiRequest? request = null;
             try
             {
-                // Disable buttons while working
-                RestartApiButton.IsEnabled = false;
-                TestApiButton.IsEnabled = false;
+                var dialog = new RestartApiPasswordWindow { Owner = Window.GetWindow(this) };
+                if (dialog.ShowDialog() != true)
+                    return;
+
+                operation.Token.ThrowIfCancellationRequested();
+                request = new RestartApiRequest { Password = dialog.TakePassword() };
                 RefreshStatusTextBlock.Text = "Requesting API restart...";
-                _isRefreshing = true;
+                RestartApiResponse response;
+                try
+                {
+                    response = await _api.RestartApiAsync(request, operation.Token);
+                }
+                finally
+                {
+                    request.Password = "";
+                }
 
-                // Call the restart endpoint. Adjust path if your server uses a different route.
-                // Using generic PostAsync to avoid guessing typed DTOs.
-                // Option A — make the null explicitly nullable (resolves CS8625)
-                await _api.PostAsync<object, object>("api/admin/restart-api", null!);
+                if (!response.Accepted)
+                    throw new InvalidOperationException(response.Message);
 
+                RefreshStatusTextBlock.Text = "Restart accepted. Waiting for the API to return...";
+                using var polling = CancellationTokenSource.CreateLinkedTokenSource(operation.Token);
+                polling.CancelAfter(TimeSpan.FromSeconds(90));
 
-                RefreshStatusTextBlock.Text = "Restart requested. Waiting briefly before refreshing health...";
+                while (!polling.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(3), polling.Token);
+                        var health = await _api.GetSystemHealthAsync(polling.Token);
+                        if (health != null &&
+                            health.Application.StartedAtUtc > response.PreviousStartedAtUtc)
+                        {
+                            ApplyHealth(health);
+                            RefreshStatusTextBlock.Text =
+                                "API restart confirmed. System health has been refreshed.";
+                            return;
+                        }
+                    }
+                    catch (OperationCanceledException) when (polling.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                    catch (ApiClient.ApiConnectionException)
+                    {
+                        // Expected briefly while the process is restarting.
+                    }
+                    catch (ApiClient.ApiException)
+                    {
+                        // Apache can return 502/503 until the API is listening again.
+                    }
+                }
 
-                // Wait a short time to allow the service to restart, then refresh health
-                await Task.Delay(TimeSpan.FromSeconds(5));
-
-                // Allow RefreshAsync to run (it checks _isRefreshing). Clear the flag first.
-                _isRefreshing = false;
-                await RefreshAsync();
-
-
-                MessageBox.Show(
-                    "Restart request sent. Check system health for current status.",
-                    "Restart Requested",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                if (!operation.IsCancellationRequested)
+                    RefreshStatusTextBlock.Text =
+                        "Restart was accepted, but a new API start time was not confirmed within 90 seconds. " +
+                        "Refresh health or check the VM service.";
             }
-            catch (ApiClient.ApiException ex)
+            catch (OperationCanceledException) when (operation.IsCancellationRequested)
             {
-                RefreshStatusTextBlock.Text = $"Restart failed: {ex.Body ?? ex.Message}";
-                MessageBox.Show(
-                    ex.Body ?? ex.Message,
-                    "Restart Failed",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                // Leaving the pane stops waiting; it does not undo an accepted restart.
             }
             catch (Exception ex)
             {
-                RefreshStatusTextBlock.Text = "Restart failed: " + ex.Message;
-                MessageBox.Show(
-                    ex.Message,
-                    "Restart Failed",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                RefreshStatusTextBlock.Text = "Restart not confirmed: " + ex.Message;
             }
             finally
             {
-                RestartApiButton.IsEnabled = true;
-                TestApiButton.IsEnabled = true;
-                _isRefreshing = false;
+                if (request != null)
+                    request.Password = "";
+                _maintenanceCts = null;
+                SetBusy(false);
             }
         }
 
         private async void TestApiButton_Click(object? sender, RoutedEventArgs e)
         {
+            if (_isRefreshing)
+                return;
+
+            SetBusy(true);
+            using var operation = new CancellationTokenSource();
+            _maintenanceCts = operation;
+            RefreshStatusTextBlock.Text = "Testing a live Parent DB connection...";
             try
             {
-                RestartApiButton.IsEnabled = false;
-                TestApiButton.IsEnabled = false;
-                RefreshStatusTextBlock.Text = "Running API test...";
-                _isRefreshing = true;
+                var result = await _api.TestParentDatabaseAsync(operation.Token)
+                    ?? throw new InvalidOperationException("The API returned no test result.");
 
-                // Call a lightweight test endpoint. Adjust path if your API exposes a different route.
-                await _api.GetAsync<object>("api/admin/system-health");
+                // Apply every card and timestamp on both success and failure.
+                ApplyHealth(result.Health);
+                RefreshStatusTextBlock.Text = result.Message;
 
-                RefreshStatusTextBlock.Text = "API test completed.";
-
-                MessageBox.Show(
-                    "API test completed successfully.",
-                    "API Test",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-
-                // Refresh health to reflect any changes
-                // Clear the flag so RefreshAsync will actually perform the refresh.
-                _isRefreshing = false;
-                await RefreshAsync();
-
+                if (!result.Health.Application.ApplicationDatabaseConnected)
+                    ConnectivityService.ReportDegraded("The SmartGridSuite application database is unavailable.");
+                else if (result.Health.ParentDatabase.IsUsingCache)
+                    ConnectivityService.ReportDegraded("Parent DB is unavailable. Cached fallback data will be used.");
+                else
+                    ConnectivityService.ReportOnline();
             }
-            catch (ApiClient.ApiException ex)
+            catch (OperationCanceledException) when (operation.IsCancellationRequested)
             {
-                RefreshStatusTextBlock.Text = $"API test failed: {ex.Body ?? ex.Message}";
-                MessageBox.Show(
-                    ex.Body ?? ex.Message,
-                    "API Test Failed",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
             }
             catch (Exception ex)
             {
-                RefreshStatusTextBlock.Text = "API test failed: " + ex.Message;
-                MessageBox.Show(
-                    ex.Message,
-                    "API Test Failed",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                // An unreachable API is not evidence that Parent DB itself failed.
+                // Explicitly mark the prior view as stale rather than leave a green result.
+                ApplyStatus(ParentDatabaseStatusBadge, ParentDatabaseStatusTextBlock, "Unknown");
+                ParentDataSourceTextBlock.Text = "Not verified";
+                UpdatedTextBlock.Text = "Test unavailable — other values are from the previous refresh";
+                RefreshStatusTextBlock.Text = "Unable to complete Parent DB test: " + ex.Message;
             }
             finally
             {
-                RestartApiButton.IsEnabled = true;
-                TestApiButton.IsEnabled = true;
-                _isRefreshing = false;
+                _maintenanceCts = null;
+                SetBusy(false);
             }
         }
-
     }
 }
