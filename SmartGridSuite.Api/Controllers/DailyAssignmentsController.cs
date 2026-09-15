@@ -177,11 +177,18 @@ namespace SmartGridSuite.Api.Controllers
                     g => g.Select(x => x.Crew).OrderBy(x => x.Id).First(),
                     StringComparer.OrdinalIgnoreCase);
 
+            // A date-specific override takes precedence over the weekly schedule,
+            // including an explicit working=true override for weekend overtime.
+            var workingOverrides = await _db.TechnicianWorkdayOverrides
+                .AsNoTracking()
+                .Where(x => x.WorkDate == rosterDate)
+                .ToDictionaryAsync(x => x.TechnicianId, x => x.IsWorking, ct);
+
             var techsByTruckId = rosterRows
                 .GroupBy(x => x.TruckId)
                 .ToDictionary(
                     g => g.Key,
-                    g => g.Select(x => MapTechnician(x.Technician, rosterDate, (int?)x.TruckId, null))
+                    g => g.Select(x => MapTechnician(x.Technician, rosterDate, (int?)x.TruckId, null, workingOverrides))
                           .OrderBy(x => x.Name)
                           .ToList());            
 
@@ -315,7 +322,7 @@ namespace SmartGridSuite.Api.Controllers
                         TechnicianTitle = t.Title,
                         Technicians = new List<DailyAssignmentTechnicianDto>
                         {
-                MapTechnician(t, rosterDate, null, truckNumber)
+                MapTechnician(t, rosterDate, null, truckNumber, workingOverrides)
                         },
                         AssignedTickets = technicianAssignmentsByTechId.TryGetValue(t.Id, out var assigned)
                             ? assigned
@@ -2025,7 +2032,7 @@ namespace SmartGridSuite.Api.Controllers
         }
 
         private static DailyAssignmentTechnicianDto MapTechnician(TechnicianEntity tech, DateTime workDate, int? truckId,
-            string? truckNumber)
+            string? truckNumber, IReadOnlyDictionary<uint, bool> workingOverrides)
         {
             return new DailyAssignmentTechnicianDto
             {
@@ -2040,7 +2047,9 @@ namespace SmartGridSuite.Api.Controllers
                 ScheduleText = GetScheduleText(tech),
 
                 IsActive = tech.IsActive,
-                IsOnShift = GetDefaultWorkingStatus(tech, workDate.DayOfWeek),
+                IsOnShift = workingOverrides.TryGetValue(tech.Id, out var isWorking)
+                    ? isWorking
+                    : GetDefaultWorkingStatus(tech, workDate.DayOfWeek),
 
                 TruckId = truckId,
                 TruckNumber = truckNumber

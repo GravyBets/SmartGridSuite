@@ -2668,180 +2668,32 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                    names.Last();
         }
 
-        // Evaluate availability for the provided date. This method is defensive and
-        // checks common DTO shapes that indicate a day off or unavailability.
+        // The API resolves weekly schedules and date-specific overrides.
+        // A crew target carries a lead TechnicianId too, so inspect all members
+        // rather than using TechnicianId to distinguish crews from individuals.
         public void UpdateAvailability(DateTime date)
         {
-            try
+            var technicians = OriginalDto?.Technicians;
+            if (technicians == null || technicians.Count == 0)
             {
-                // Default to available
                 IsAvailable = true;
-                AvailabilityReason = string.Empty;
-
-                var dto = OriginalDto;
-                if (dto != null)
-                {
-                    // If this is an individual technician target, inspect that technician DTO directly.
-                    if (TechnicianId.HasValue)
-                    {
-                        var techDto = dto.Technicians?.FirstOrDefault(t => t.Id == TechnicianId.Value)
-                                      ?? dto.Technicians?.FirstOrDefault();
-
-                        if (techDto != null)
-                        {
-                            // 1) If the DTO exposes IsOnShift (TechniciansPane uses this), treat false as off.
-                            try
-                            {
-                                var onShiftProp = techDto.GetType().GetProperty("IsOnShift");
-                                if (onShiftProp != null)
-                                {
-                                    var val = onShiftProp.GetValue(techDto);
-                                    if (val is bool b && !b)
-                                    {
-                                        IsAvailable = false;
-                                        AvailabilityReason = "Off shift";
-                                        System.Diagnostics.Debug.WriteLine($"[Availability] {PrimaryText} off shift on {date:yyyy-MM-dd}");
-                                        return;
-                                    }
-                                }
-                            }
-                            catch { }
-
-                            // 2) If the DTO exposes ScheduleText (TechniciansPane uses this), look for "off"/"vacation"/"unavailable".
-                            try
-                            {
-                                var scheduleProp = techDto.GetType().GetProperty("ScheduleText");
-                                if (scheduleProp != null)
-                                {
-                                    var scheduleVal = scheduleProp.GetValue(techDto)?.ToString() ?? "";
-                                    if (!string.IsNullOrWhiteSpace(scheduleVal) &&
-                                        (scheduleVal.IndexOf("off", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                         scheduleVal.IndexOf("vacation", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                         scheduleVal.IndexOf("unavailable", StringComparison.OrdinalIgnoreCase) >= 0))
-                                    {
-                                        IsAvailable = false;
-                                        AvailabilityReason = scheduleVal.Trim();
-                                        System.Diagnostics.Debug.WriteLine($"[Availability] {PrimaryText} schedule indicates off on {date:yyyy-MM-dd}: {AvailabilityReason}");
-                                        return;
-                                    }
-                                }
-                            }
-                            catch { }
-
-                            // 3) If the DTO contains OffDates (common), check for the date explicitly.
-                            try
-                            {
-                                var offDatesProp = techDto.GetType().GetProperty("OffDates");
-                                if (offDatesProp != null)
-                                {
-                                    var offDatesVal = offDatesProp.GetValue(techDto) as IEnumerable<object>;
-                                    if (offDatesVal != null)
-                                    {
-                                        if (offDatesVal.Any(od =>
-                                        {
-                                            if (od == null) return false;
-                                            if (od is DateTime d) return d.Date == date.Date;
-                                            if (od is DateTimeOffset dtoff) return dtoff.Date == date.Date;
-                                            if (DateTime.TryParse(od.ToString(), out var parsed)) return parsed.Date == date.Date;
-                                            return false;
-                                        }))
-                                        {
-                                            IsAvailable = false;
-                                            AvailabilityReason = "Scheduled off";
-                                            System.Diagnostics.Debug.WriteLine($"[Availability] {PrimaryText} off on {date:yyyy-MM-dd} (OffDates)");
-                                            return;
-                                        }
-                                    }
-                                }
-                            }
-                            catch { }
-
-                            // If none of the above matched, remain available for this technician.
-                            IsAvailable = true;
-                            AvailabilityReason = string.Empty;
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        // Crew/truck target: inspect crew members and annotate reason if any member is off.
-                        try
-                        {
-                            var techs = dto.Technicians;
-                            if (techs != null && techs.Any())
-                            {
-                                foreach (var t in techs)
-                                {
-                                    try
-                                    {
-                                        // Check IsOnShift
-                                        var onShiftProp = t.GetType().GetProperty("IsOnShift");
-                                        if (onShiftProp != null)
-                                        {
-                                            var val = onShiftProp.GetValue(t);
-                                            if (val is bool b && !b)
-                                            {
-                                                AvailabilityReason = "One or more crew members off";
-                                                System.Diagnostics.Debug.WriteLine($"[Availability] Crew {PrimaryText} member {t} off shift on {date:yyyy-MM-dd}");
-                                                break;
-                                            }
-                                        }
-
-                                        // Check ScheduleText
-                                        var scheduleProp = t.GetType().GetProperty("ScheduleText");
-                                        if (scheduleProp != null)
-                                        {
-                                            var scheduleVal = scheduleProp.GetValue(t)?.ToString() ?? "";
-                                            if (!string.IsNullOrWhiteSpace(scheduleVal) &&
-                                                (scheduleVal.IndexOf("off", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                 scheduleVal.IndexOf("vacation", StringComparison.OrdinalIgnoreCase) >= 0))
-                                            {
-                                                AvailabilityReason = "One or more crew members off";
-                                                System.Diagnostics.Debug.WriteLine($"[Availability] Crew {PrimaryText} member status: {scheduleVal}");
-                                                break;
-                                            }
-                                        }
-
-                                        // Check OffDates
-                                        var offDatesProp = t.GetType().GetProperty("OffDates");
-                                        if (offDatesProp != null)
-                                        {
-                                            var offDatesVal = offDatesProp.GetValue(t) as IEnumerable<object>;
-                                            if (offDatesVal != null && offDatesVal.Any(od =>
-                                            {
-                                                if (od == null) return false;
-                                                if (od is DateTime d) return d.Date == date.Date;
-                                                if (od is DateTimeOffset dtoff) return dtoff.Date == date.Date;
-                                                if (DateTime.TryParse(od.ToString(), out var parsed)) return parsed.Date == date.Date;
-                                                return false;
-                                            }))
-                                            {
-                                                AvailabilityReason = "One or more crew members off";
-                                                System.Diagnostics.Debug.WriteLine($"[Availability] Crew {PrimaryText} has member off on {date:yyyy-MM-dd}");
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    catch { /* per-member swallow */ }
-                                }
-                            }
-                        }
-                        catch { }
-                    }
-                }
-
-                // Fallback: if no DTO info indicated off/unavailable, keep available.
-                IsAvailable = true;
-                if (string.IsNullOrWhiteSpace(AvailabilityReason))
-                    AvailabilityReason = string.Empty;
+                AvailabilityReason = "Availability not supplied by the API.";
+                return;
             }
-            catch (Exception ex)
-            {
-                // On error, assume available to avoid blocking assignments.
-                IsAvailable = true;
-                AvailabilityReason = string.Empty;
-                System.Diagnostics.Debug.WriteLine($"[Availability] evaluation error for {PrimaryText}: {ex.GetType().Name}: {ex.Message}");
-            }
+
+            var unavailable = technicians
+                .Where(t => !t.IsActive || !t.IsOnShift)
+                .ToList();
+
+            IsAvailable = unavailable.Count == 0;
+            AvailabilityReason = IsAvailable
+                ? string.Empty
+                : $"Off / unavailable on {date:M/d/yyyy}: " +
+                  string.Join(", ", unavailable.Select(t =>
+                      string.IsNullOrWhiteSpace(t.Name)
+                          ? $"Technician {t.Id}"
+                          : t.Name)) +
+                  ". Assignment is still allowed.";
         }
 
     }
