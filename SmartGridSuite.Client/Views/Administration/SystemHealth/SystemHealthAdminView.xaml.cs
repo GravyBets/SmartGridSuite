@@ -426,13 +426,6 @@ namespace SmartGridSuite.Client.Views.Administration.SystemHealth
             if (_isRefreshing)
                 return;
 
-            if (ClientAppSettings.ApiBaseUri.Scheme != Uri.UriSchemeHttps)
-            {
-                MessageBox.Show("Configure the HTTPS API address before requesting a restart.",
-                    "HTTPS Required", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
             SetBusy(true);
             using var operation = new CancellationTokenSource();
             _maintenanceCts = operation;

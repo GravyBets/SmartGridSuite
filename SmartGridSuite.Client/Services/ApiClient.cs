@@ -421,11 +421,8 @@ namespace SmartGridSuite.Client.Services
         public async Task<RestartApiResponse> RestartApiAsync(
             RestartApiRequest request, CancellationToken ct = default)
         {
-            if (_http.BaseAddress?.Scheme != Uri.UriSchemeHttps)
-                throw new InvalidOperationException(
-                    "Connect to the HTTPS API address before entering a restart password.");
-
-            // Do not follow redirects carrying a password to another URL or HTTP.
+            // Keep the password on the configured endpoint; never follow redirects.
+            // HTTP transport is explicitly retained for this internal deployment.
             using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
             {
                 BaseAddress = _http.BaseAddress,

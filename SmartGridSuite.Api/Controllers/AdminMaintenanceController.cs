@@ -15,12 +15,6 @@ namespace SmartGridSuite.Api.Controllers
         [RequestSizeLimit(2048)]
         public async Task<ActionResult<RestartApiResponse>> Restart([FromBody] RestartApiRequest request)
         {
-            if (!Request.IsHttps)
-                return StatusCode(400, new RestartApiResponse
-                {
-                    Message = "HTTPS is required for administrator restart requests."
-                });
-
             var result = await _restart.RequestAsync(request.Password);
             request.Password = "";
             return StatusCode(result.Status, result.Response);

@@ -35,7 +35,7 @@ var controller = new AdminMaintenanceController(service)
 };
 controller.Request.Scheme = "http";
 var result = await controller.Restart(new RestartApiRequest { Password = "offline-test-password" });
-Check(result.Result is ObjectResult { StatusCode: 400 }, "HTTP rejected before restart service");
+Check(result.Result is ObjectResult { StatusCode: 503 }, "HTTP reaches restart service but unconfigured restart stays disabled");
 
 if (OperatingSystem.IsLinux())
 {
@@ -46,9 +46,23 @@ if (OperatingSystem.IsLinux())
     }).Build();
     var guarded = new ApiRestartService(enabled,
         new ApplicationRuntimeHealthService(enabled), NullLogger<ApiRestartService>.Instance);
+    var httpController = new AdminMaintenanceController(guarded)
+    {
+        ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+    };
+    httpController.Request.Scheme = "http";
     // Deliberately never supply a correct password to the enabled service.
+    // Empty/wrong passwords must be rejected by the server even over HTTP.
     for (var i = 0; i < 5; i++)
-        Check((await guarded.RequestAsync("incorrect")).Status == 401, "invalid attempt rejected " + (i + 1));
-    Check((await guarded.RequestAsync("incorrect")).Status == 429, "attempt limit enforced");
+    {
+        var rejected = await httpController.Restart(new RestartApiRequest
+        {
+            Password = i == 0 ? "" : "incorrect"
+        });
+        Check(rejected.Result is ObjectResult { StatusCode: 401 },
+            "HTTP missing/invalid password rejected " + (i + 1));
+    }
+    var limited = await httpController.Restart(new RestartApiRequest { Password = "incorrect" });
+    Check(limited.Result is ObjectResult { StatusCode: 429 }, "HTTP attempt limit enforced");
 }
 Console.WriteLine("Offline checks complete. No restart helper was invoked.");

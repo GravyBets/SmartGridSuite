@@ -1,6 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.HttpOverrides;
-using System.Net;
 using SmartGridSuite.Api.Configuration;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Services;
@@ -135,28 +133,12 @@ namespace SmartGridSuite.Api
             builder.Services.AddScoped<DailyAssignmentRolloverEmailService>();
 
             var app = builder.Build();
-            // Only the local Apache proxy may assert that a request used HTTPS.
-            var forwarded = new ForwardedHeadersOptions
-            {
-                ForwardedHeaders = ForwardedHeaders.XForwardedProto,
-                ForwardLimit = 1
-            };
-            forwarded.KnownNetworks.Clear();
-            forwarded.KnownProxies.Clear();
-            forwarded.KnownProxies.Add(IPAddress.Loopback);
-            forwarded.KnownProxies.Add(IPAddress.IPv6Loopback);
-            app.UseForwardedHeaders(forwarded);
             app.UseSerilogRequestLogging();
 
             if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
-            }
-
-            if (app.Environment.IsDevelopment())
-            {
-                app.UseHttpsRedirection();
             }
 
             app.UseAuthorization();
