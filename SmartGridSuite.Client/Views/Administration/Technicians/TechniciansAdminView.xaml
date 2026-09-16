@@ -31,10 +31,12 @@
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
-                    <Button Content="Refresh"
-                            Padding="10,4"
+
+                    <Button Content="Add Tech"
+                            Width="96"
+                            Padding="10,4"                            
                             Margin="0,0,4,0"
-                            Click="Refresh_Click"/>
+                            Click="Add_Click"/>
 
                     <Button x:Name="EditSelectedButton"
                             Content="Edit Selected"
@@ -50,11 +52,11 @@
                             Visibility="Collapsed"
                             Click="DeleteSelected_Click"/>
 
-                    <Button Content="Add Tech"
+                    <Button Content="Refresh"
                             Style="{DynamicResource PrimaryButtonStyle}"
-                            Width="96"
+                            Width="72"
                             Padding="10,4"
-                            Click="Add_Click"/>
+                            Click="Refresh_Click"/>
                 </StackPanel>
             </Grid>
         </Border>

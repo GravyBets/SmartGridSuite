@@ -13,6 +13,7 @@ using System.Windows.Media;
 using SmartGridSuite.Contracts.SiteNotes;
 using SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard;
 using System.Security.Principal;
+using System.Threading.Tasks;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 {
@@ -1888,21 +1889,26 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             UpdateTicketListUiState();
         }
 
-        private void TicketsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        private async void TicketsGrid_MouseDoubleClick(
+            object sender, 
+            MouseButtonEventArgs e)
         {
-            if (IsInsideButton(e.OriginalSource as DependencyObject))
+            if (IsInsideButton(
+                    e.OriginalSource as DependencyObject))
+            {
                 return;
+            }  
 
-            var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+            var row = 
+                FindVisualParent<DataGridRow>(
+                    e.OriginalSource as DependencyObject);
+
             if (row?.Item is not DispatchTicket ticket)
                 return;
 
-            TicketsGrid.SelectedItem = ticket;
-            SelectedTicket = ticket;
+            e.Handled = true;
 
-            _detailsOpen = true;
-            UpdateDetailsVisibility();
-            UpdateTicketListUiState();
+            await OpenTicketEditorAsync(ticket);
         }
 
         private void OpenDetails_Click(object sender, RoutedEventArgs e)

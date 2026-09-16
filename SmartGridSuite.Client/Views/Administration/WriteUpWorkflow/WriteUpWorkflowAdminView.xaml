@@ -7,17 +7,17 @@
                   HorizontalScrollBarVisibility="Disabled">
 
         <!-- Header -->
-        <StackPanel Margin="4">
+        <StackPanel Margin="0,0,4,4">
         <Border Style="{StaticResource Card}"
-                Padding="12"
+                Padding="14"
                 Margin="0,0,0,4">
             <StackPanel Margin="0">
-                <TextBlock Text="Write-Up Workflow"
-                       FontSize="26"
-                       FontWeight="SemiBold"
+                    <TextBlock Text="Administration — Write-Up Workflow"
+                       FontSize="16"
+                       FontWeight="Bold"
                        Foreground="{DynamicResource TextPrimary}"/>
 
-                <TextBlock Margin="0,4,0,4"
+                <TextBlock Margin="0,2,0,0"
                        TextWrapping="Wrap"
                        Foreground="{DynamicResource TextSecondary}"
                        Text="Configure technician flags, Refer To destinations, and the Dispatch closeout checklist."/>

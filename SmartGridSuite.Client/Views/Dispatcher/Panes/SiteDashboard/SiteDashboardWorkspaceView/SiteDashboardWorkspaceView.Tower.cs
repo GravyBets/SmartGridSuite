@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Diagnostics;
+using System.Xml.Serialization;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 {
@@ -747,8 +748,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 return;
             }
 
-            StopTowerSectorPings(
-                sector);
+            /*
+             * Tower View permits manual pings on only one sector at a time. 
+             * Starting this sector automatically stops any other active sector.
+             */
+            StopOtherTowerSectorPings(sector);
+
+            StopTowerSectorPings(sector);
 
             var cts =
                 new CancellationTokenSource();
@@ -1072,8 +1078,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 return;
             }
 
-            StopTowerSectorPings(
-                sector);
+            /*
+             * Tower View permits manual pings on only one sector at a time. 
+             * Starting this sector automatically stops any other active sector.
+             */
+            StopOtherTowerSectorPings(sector);
+
+            StopTowerSectorPings(sector);
 
             var cts =
                 new CancellationTokenSource();
@@ -1159,6 +1170,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     endpoint.SessionState.TestSuccessful =
                         null;
                 }
+            }
+        }
+
+        private void StopOtherTowerSectorPings(TowerSectorPingCard sectorToKeep)
+        {
+            foreach (var otherSector in _towerPingCards)
+            {
+                if (ReferenceEquals(
+                    otherSector, 
+                    sectorToKeep))
+                {
+                    continue;
+                }
+
+                var otherState =
+                    otherSector.SessionState;
+
+                var isRunning =
+                    otherState?.IsRunning == true ||
+                    otherState?.PingCts is not null ||
+                    otherSector.Endpoints.Any(
+                        x => x.SessionState?.IsRunning == true);
+
+                if (isRunning)
+                {
+                    StopTowerSectorPings(otherSector);
+                }                
             }
         }
 

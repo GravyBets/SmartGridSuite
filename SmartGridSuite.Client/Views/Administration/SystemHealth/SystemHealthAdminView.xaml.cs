@@ -419,6 +419,66 @@ namespace SmartGridSuite.Client.Views.Administration.SystemHealth
             RefreshButton.IsEnabled = !busy;
             RestartApiButton.IsEnabled = !busy;
             TestApiButton.IsEnabled = !busy;
+            BackupCacheNowButton.IsEnabled = !busy;
+        }
+
+        private async void BackupCacheNowButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (_isRefreshing)
+                return;
+
+            var confirm =
+                MessageBox.Show(
+                    "Create a fresh Parent DB cache snapshot now?\n\n" +
+                    "The existing snapshot will remain available unless " +
+                    "the entire new snapshot completes successfully.",
+                    "Backup Parent DB Cache",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            SetBusy(true);
+
+            using var operation =
+                new CancellationTokenSource();
+
+            _maintenanceCts = operation;
+
+            RefreshStatusTextBlock.Text =
+                "Creating Parent DB cache snapshot...";
+
+            try
+            {
+                var result =
+                    await _api.RefreshParentCacheAsync(
+                        operation.Token);
+
+                ApplyHealth(result.Health);
+
+                RefreshStatusTextBlock.Text =
+                    result.Message;
+            }
+            catch (OperationCanceledException)
+                when (operation.IsCancellationRequested)
+            {
+                //Switching away from System Health cancels the request.
+            }
+            catch (Exception ex)
+            {
+                RefreshStatusTextBlock.Text =
+                    "Parent DB cache snapshot failed. " +
+                    "The previous snapshot was kept. " +
+                    ex.Message;
+            }
+            finally
+            {
+                _maintenanceCts = null;
+                SetBusy(false);
+            }
         }
 
         private async void RestartApiButton_Click(object? sender, RoutedEventArgs e)

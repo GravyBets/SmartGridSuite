@@ -438,6 +438,71 @@ namespace SmartGridSuite.Client.Services
             return result ?? throw new InvalidOperationException("The API returned no restart result.");
         }
 
+        public async Task<ParentCacheRefreshResponse>RefreshParentCacheAsync(
+            CancellationToken ct = default)
+        {
+            /*
+             * A full Parent DB snapshot can legitimately take much longer
+             * than the normal 15-second client request timeout
+             */
+            using var client = new HttpClient
+            {
+                BaseAddress = _http.BaseAddress,
+                Timeout = TimeSpan.FromMinutes(15)
+            };
+
+            try
+            {
+                using var response = await client.PostAsJsonAsync(
+                    "api/admin/system-health/refresh-parent-cache",
+                    new { },
+                    ct);
+
+                /*
+                 * Any HTTP response proves that the API is reachable.
+                 */
+                ConnectivityService.ReportOnline();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var error = await response.Content.ReadAsStringAsync(ct);
+
+                    throw new ApiException(
+                        (int)response.StatusCode,
+                        string.IsNullOrWhiteSpace(error)
+                            ? "The cache refresh request failt."
+                            : error);
+                }
+
+                return await response.Content.ReadFromJsonAsync<ParentCacheRefreshResponse>(
+                            cancellationToken: ct) ?? throw new InvalidOperationException(
+                                "The API returned no chance refresh result.");
+            }
+            catch (TaskCanceledException ex)
+                when (!ct.IsCancellationRequested)
+            {
+                ConnectivityService.ReportOffline(
+                    "The Parent DB cache refresh did not finish before the request timed out.");
+
+                throw new ApiConnectionException(
+                    "The Parent DB cache refresh time out.",
+                    "api/admin/system-health/refresh-parent-cache",
+                    isTimeout: true,
+                    ex);
+            }
+            catch (HttpRequestException ex)
+            {
+                ConnectivityService.ReportOffline(
+                    "Unable to reach the Smart Grid Suite server.");
+
+                throw new ApiConnectionException(
+                    "Unable to reach the API while refreshing the parent DB cache.",
+                    "api/admin/system-health/refresh-parent-cache",
+                    isTimeout: false,
+                    ex);
+            }
+        }
+
         public Task<ParentDatabaseTestResponse?> TestParentDatabaseAsync(
             CancellationToken ct = default)
             => PostAsync<object, ParentDatabaseTestResponse>(

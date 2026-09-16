@@ -40,8 +40,9 @@
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
                     <Button Content="Refresh"
+                            Style="{DynamicResource PrimaryButtonStyle}"
                             Padding="10,4"
-                            Margin="0,0,8,0"
+                            Width="72"
                             Click="Refresh_Click"/>
 
                 </StackPanel>

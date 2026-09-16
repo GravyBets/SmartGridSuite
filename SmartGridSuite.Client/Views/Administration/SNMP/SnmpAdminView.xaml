@@ -12,7 +12,7 @@
         <!-- Header -->
         <Border Grid.Row="0"
                 Style="{StaticResource Card}"
-                Padding="16">
+                Padding="14">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -20,13 +20,13 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel>
-                    <TextBlock Text="SNMP Configuration"
-                               FontSize="24"
+                    <TextBlock Text="Administration — SNMP Configuration"
+                               FontSize="16"
                                FontWeight="Bold"
                                Foreground="{DynamicResource TextPrimary}"/>
 
                     <TextBlock Text="Manage admin-configurable SNMP profiles and OIDs."
-                               Margin="0,4,0,0"
+                               Margin="0,2,0,0"
                                Foreground="{DynamicResource TextSecondary}"/>
                 </StackPanel>
 
@@ -34,11 +34,10 @@
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
                     <Button x:Name="RefreshProfilesButton"
-                            Style="{StaticResource SecondaryButtonStyle}"
-                            Width="82"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Width="72"
                             Content="Refresh"
-                            Padding="16,6"
-                            Margin="0,0,8,0"/>
+                            Padding="10,4"/>
                 </StackPanel>
             </Grid>
         </Border>

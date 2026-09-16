@@ -100,4 +100,19 @@
 
         public double? UsedPercentage { get; set; }
     }
+
+    public sealed class ParentCacheRefreshResponse
+    {
+        public string Message { get; set; } = "";
+
+        public string SyncRunId { get; set; } = "";
+
+        public int SiteCount { get; set; }
+
+        public int TowerCount { get; set; }
+
+        public int SectorCount { get; set; }
+
+        public SystemHealthDto Health { get; set; } = new();
+    }
 }

@@ -673,7 +673,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     catch (OperationCanceledException)
                         when (pollCts.IsCancellationRequested)
                     {
-                        throw;
+                        session.SnmpOidResults[oid.Id] =
+                            "Not polled.";
+
+                        if (session.SessionKey == _selectedSessionKey)
+                        {
+                            WorkspaceView.SetSnmpOidResult(
+                                oid.Id,
+                                "Not polled.");
+
+                            TopBarView.StatusText =
+                                $"SNMP Poll All stopped for {session.HeaderText}.";
+                        }
                     }
                     catch (Exception ex)
                     {

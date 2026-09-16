@@ -68,7 +68,24 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
             _logger = logger;
         }
 
+        private static readonly SemaphoreSlim RefreshGate =
+            new(1,1);
         public async Task<SiteDashboardCacheRefreshResult> RefreshAsync(
+            CancellationToken cancellationToken = default)
+        {
+            await RefreshGate.WaitAsync(cancellationToken);
+
+            try
+            {
+                return await RefreshCoreAsync(cancellationToken);
+            }
+            finally
+            {
+                RefreshGate.Release();
+            }
+        }
+
+        private async Task<SiteDashboardCacheRefreshResult> RefreshCoreAsync(
             CancellationToken cancellationToken = default)
         {
             var startedAtUtc = DateTime.UtcNow;
