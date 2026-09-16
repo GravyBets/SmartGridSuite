@@ -1,21 +1,34 @@
 ﻿using SmartGridSuite.Client.Services;
 using SmartGridSuite.Client.Views.Dispatcher.Panes;
 using SmartGridSuite.Client.Views.FieldTechnician.Panes;
+using SmartGridSuite.Contracts.FieldTechnician;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Media;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.ComponentModel;
-using SmartGridSuite.Contracts.FieldTechnician;
+using System.Windows.Threading;
 
 namespace SmartGridSuite.Client.Views.FieldTechnician
 {
     public partial class FieldTechnicianShellWindow
     {
         private readonly ApiClient _connectivityApi = ClientAppSettings.CreateApiClient();
+
+        private readonly MediaPlayer _taskNotificationPlayer = new();
+        private readonly DispatcherTimer _taskBadgeTimer;
+        private readonly HashSet<long> _knownTaskIds = new();
+        private readonly CancellationTokenSource _taskBadgeLifetime = new();
+
+        private bool _hasTaskBadgeBaseline;
+        private bool _taskBadgeRefreshInProgress;
+        private bool _taskBadgeRefreshRequested;
+        private bool _isClosed;
 
         private bool _navCollapsed;
         private bool _syncingNav;
@@ -45,8 +58,19 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
             _navCollapsed = true;
             ApplyNavState();
 
+            _taskBadgeTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(60)
+            };
+
+            _taskBadgeTimer.Tick += TaskBadgeTimer_Tick;
+            _taskBadgeTimer.Start();
+
             // Default selection = Site Dashboard
             SelectNavIndex(1);
+
+            // Establish the initial task snapshot silently.
+            _ = UpdateTaskBadgeAsync();
         }
 
         private void SelectNavIndex(int index)
@@ -122,6 +146,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
                          * appear under Other Assigned Tickets.
                          */
                         _ = tasksPane.RefreshAsync();
+                        _ = UpdateTaskBadgeAsync();
 
                         break;
                     }
@@ -199,12 +224,283 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
             Close();
         }
 
+        private void TaskBadgeTimer_Tick(
+            object? sender,
+            EventArgs e)
+        {
+            _ = UpdateTaskBadgeAsync();
+        }
+
+        private void TasksPane_TaskIdsRefreshed(
+            IReadOnlyCollection<long> taskIds)
+        {
+            ApplyTaskSnapshot(taskIds);
+        }
+
+        private async Task UpdateTaskBadgeAsync()
+        {
+            if (_isClosed)
+                return;
+
+            _taskBadgeRefreshRequested = true;
+
+            if (_taskBadgeRefreshInProgress)
+                return;
+
+            _taskBadgeRefreshInProgress = true;
+
+            try
+            {
+                /*
+                 * Coalesce navigation/timer refresh signals so only one task request
+                 * runs at a time. A signal arriving during a request causes one
+                 * follow-up read after the current request completes.
+                 */
+                while (_taskBadgeRefreshRequested &&
+                       !_isClosed)
+                {
+                    _taskBadgeRefreshRequested = false;
+
+                    var technician =
+                        await CurrentUserService
+                            .LoadCurrentTechnicianAsync(
+                                forceRefresh: false);
+
+                    if (technician == null ||
+                        string.IsNullOrWhiteSpace(
+                            technician.EmployeeId))
+                    {
+                        UpdateTaskBadgeVisuals(0);
+                        continue;
+                    }
+
+                    var employeeId =
+                        Uri.EscapeDataString(
+                            technician.EmployeeId);
+
+                    var response =
+                        await _connectivityApi
+                            .GetAsync<FieldTechTasksResponseDto>(
+                                $"api/tickets/field-tech/tasks/{employeeId}",
+                                _taskBadgeLifetime.Token);
+
+                    if (_isClosed ||
+                        response == null)
+                    {
+                        return;
+                    }
+
+                    var taskIds =
+                        response.DailyAssignments
+                            .Concat(
+                                response.OtherAssignedTickets)
+                            .Where(x => x.Id > 0)
+                            .Select(x => x.Id)
+                            .Distinct()
+                            .ToList();
+
+                    var newTasksArrived =
+                        ApplyTaskSnapshot(taskIds);
+
+                    /*
+                     * If Tasks is already visible, put the newly detected assignments
+                     * into the grids immediately instead of waiting for the technician
+                     * to click Refresh. The pane reports the same ID snapshot back to
+                     * us, which cannot cause a second tone because the baseline has
+                     * already been updated above.
+                     */
+                    if (newTasksArrived &&
+                        _tasksPaneView != null &&
+                        ReferenceEquals(
+                            MainPaneHost.Content,
+                            _tasksPaneView))
+                    {
+                        _ = _tasksPaneView.RefreshAsync();
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+                when (_taskBadgeLifetime.IsCancellationRequested)
+            {
+                // Closing the shell cancels any in-flight task check.
+            }
+            catch (Exception ex)
+            {
+                /*
+                 * Weak or missing field connectivity must not erase the last known
+                 * badge/task snapshot. The next timer tick retries automatically.
+                 */
+                System.Diagnostics.Debug.WriteLine(
+                    "[FieldTechTasksBadge] Refresh failed: " +
+                    ex.Message);
+            }
+            finally
+            {
+                _taskBadgeRefreshInProgress = false;
+            }
+        }
+
+        private bool ApplyTaskSnapshot(
+            IReadOnlyCollection<long> taskIds)
+        {
+            var currentIds =
+                taskIds
+                    .Where(x => x > 0)
+                    .ToHashSet();
+
+            var hasNewTasks =
+                _hasTaskBadgeBaseline &&
+                currentIds.Except(_knownTaskIds).Any();
+
+            _knownTaskIds.Clear();
+
+            foreach (var id in currentIds)
+                _knownTaskIds.Add(id);
+
+            UpdateTaskBadgeVisuals(
+                currentIds.Count);
+
+            /*
+             * Opening Field Technician never makes noise for work that was already
+             * assigned. The first successful task snapshot is a silent baseline.
+             */
+            if (!_hasTaskBadgeBaseline)
+            {
+                _hasTaskBadgeBaseline = true;
+                return false;
+            }
+
+            /*
+             * One sound per snapshot/batch, regardless of whether one task or twenty
+             * new task IDs appeared together.
+             */
+            if (hasNewTasks)
+                PlayTaskNotificationSound();
+
+            return hasNewTasks;
+        }
+
+        private void UpdateTaskBadgeVisuals(
+            int count)
+        {
+            var visibility =
+                count > 0
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+
+            var displayText =
+                count > 99
+                    ? "99+"
+                    : count.ToString();
+
+            FieldTechTasksBadgeExpanded.Visibility =
+                visibility;
+
+            FieldTechTasksBadgeCollapsed.Visibility =
+                visibility;
+
+            FieldTechTasksBadgeExpandedText.Text =
+                displayText;
+
+            FieldTechTasksBadgeCollapsedText.Text =
+                displayText;
+        }
+
+        private void PlayTaskNotificationSound()
+        {
+            try
+            {
+                var path =
+                    System.IO.Path.Combine(
+                        AppDomain.CurrentDomain.BaseDirectory,
+                        "Assets",
+                        "Sounds",
+                        "MessageTone.mp3");
+
+                if (System.IO.File.Exists(path))
+                {
+                    _taskNotificationPlayer.Open(
+                        new Uri(
+                            path,
+                            UriKind.Absolute));
+
+                    _taskNotificationPlayer.Volume = 1.0;
+                    _taskNotificationPlayer.Position =
+                        TimeSpan.Zero;
+
+                    _taskNotificationPlayer.Play();
+
+                    _taskNotificationPlayer.MediaEnded -=
+                        TaskNotificationPlayer_MediaEnded;
+
+                    _taskNotificationPlayer.MediaEnded +=
+                        TaskNotificationPlayer_MediaEnded;
+
+                    _taskNotificationPlayer.MediaFailed -=
+                        TaskNotificationPlayer_MediaFailed;
+
+                    _taskNotificationPlayer.MediaFailed +=
+                        TaskNotificationPlayer_MediaFailed;
+
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "[FieldTechTasksBadge] Sound failed: " +
+                    ex.Message);
+            }
+
+            try
+            {
+                SystemSounds.Asterisk.Play();
+            }
+            catch
+            {
+            }
+        }
+
+        private void TaskNotificationPlayer_MediaEnded(
+            object? sender,
+            EventArgs e)
+        {
+            try
+            {
+                _taskNotificationPlayer.Stop();
+                _taskNotificationPlayer.Close();
+            }
+            catch
+            {
+            }
+        }
+
+        private void TaskNotificationPlayer_MediaFailed(
+            object? sender,
+            ExceptionEventArgs e)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                "[FieldTechTasksBadge] Media failed: " +
+                e.ErrorException?.Message);
+
+            try
+            {
+                _taskNotificationPlayer.Close();
+            }
+            catch
+            {
+            }
+        }
+
         private FieldTechTasksPaneView GetOrCreateTasksPane()
         {
             if (_tasksPaneView != null)
                 return _tasksPaneView;
 
             _tasksPaneView = new FieldTechTasksPaneView();
+
+            _tasksPaneView.TaskIdsRefreshed +=
+                TasksPane_TaskIdsRefreshed;
 
             _tasksPaneView.OpenTicketRequested += async ticket =>
             {
@@ -348,11 +644,41 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
             }
         }
 
-        // Removes the shared event subscription when this shell closes.
+        // Removes shared subscriptions and notification resources when this shell closes.
         private void FieldTechnicianShellWindow_Closed(
             object? sender,
             EventArgs e)
         {
+            _isClosed = true;
+
+            _taskBadgeTimer.Stop();
+            _taskBadgeTimer.Tick -=
+                TaskBadgeTimer_Tick;
+
+            _taskBadgeLifetime.Cancel();
+            _taskBadgeLifetime.Dispose();
+
+            if (_tasksPaneView != null)
+            {
+                _tasksPaneView.TaskIdsRefreshed -=
+                    TasksPane_TaskIdsRefreshed;
+            }
+
+            _taskNotificationPlayer.MediaEnded -=
+                TaskNotificationPlayer_MediaEnded;
+
+            _taskNotificationPlayer.MediaFailed -=
+                TaskNotificationPlayer_MediaFailed;
+
+            try
+            {
+                _taskNotificationPlayer.Stop();
+                _taskNotificationPlayer.Close();
+            }
+            catch
+            {
+            }
+
             ConnectivityService.StateChanged -=
                 ConnectivityService_StateChanged;
         }
