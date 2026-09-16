@@ -69,7 +69,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
             // Default selection = Site Dashboard
             SelectNavIndex(1);
 
-            // Establish the initial task snapshot silently.
+            // Establish the initial Daily Assignment snapshot silently.
             _ = UpdateTaskBadgeAsync();
         }
 
@@ -234,7 +234,13 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
         private void TasksPane_TaskIdsRefreshed(
             IReadOnlyCollection<long> taskIds)
         {
-            ApplyTaskSnapshot(taskIds);
+            /*
+             * The Tasks pane reports both Daily Assignments and Other Assigned
+             * Tickets. The nav badge intentionally represents Daily Assignments only,
+             * so use this event merely as a refresh signal and let the shell re-read
+             * the API using the DailyAssignments collection below.
+             */
+            _ = UpdateTaskBadgeAsync();
         }
 
         private async Task UpdateTaskBadgeAsync()
@@ -290,10 +296,13 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
                         return;
                     }
 
+                    /*
+                     * Only dispatcher-published Daily Assignments participate in the
+                     * nav badge and notification sound. Other Assigned Tickets remain
+                     * visible in the Tasks pane but are intentionally ignored here.
+                     */
                     var taskIds =
                         response.DailyAssignments
-                            .Concat(
-                                response.OtherAssignedTickets)
                             .Where(x => x.Id > 0)
                             .Select(x => x.Id)
                             .Distinct()
@@ -303,11 +312,9 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
                         ApplyTaskSnapshot(taskIds);
 
                     /*
-                     * If Tasks is already visible, put the newly detected assignments
-                     * into the grids immediately instead of waiting for the technician
-                     * to click Refresh. The pane reports the same ID snapshot back to
-                     * us, which cannot cause a second tone because the baseline has
-                     * already been updated above.
+                     * If Tasks is already visible, put newly detected Daily
+                     * Assignments into the grids immediately instead of waiting for
+                     * the technician to click Refresh.
                      */
                     if (newTasksArrived &&
                         _tasksPaneView != null &&
@@ -361,8 +368,8 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
                 currentIds.Count);
 
             /*
-             * Opening Field Technician never makes noise for work that was already
-             * assigned. The first successful task snapshot is a silent baseline.
+             * Opening Field Technician never makes noise for Daily Assignments that
+             * were already present. The first successful snapshot is a silent baseline.
              */
             if (!_hasTaskBadgeBaseline)
             {
@@ -371,8 +378,8 @@ namespace SmartGridSuite.Client.Views.FieldTechnician
             }
 
             /*
-             * One sound per snapshot/batch, regardless of whether one task or twenty
-             * new task IDs appeared together.
+             * One sound per snapshot/batch, regardless of whether one Daily
+             * Assignment or twenty new Daily Assignment IDs appeared together.
              */
             if (hasNewTasks)
                 PlayTaskNotificationSound();
