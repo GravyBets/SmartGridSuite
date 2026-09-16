@@ -1,0 +1,38 @@
+name: Apply write-up participant selection
+
+on:
+  push:
+    branches:
+      - fix/dispatch-task-badge
+    paths:
+      - tools/apply-writeup-participant-selection.py
+      - .github/workflows/apply-writeup-participant-selection.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/dispatch-task-badge
+
+      - name: Apply participant-selection changes
+        run: python3 tools/apply-writeup-participant-selection.py
+
+      - name: Remove one-time codemod files
+        run: |
+          rm tools/apply-writeup-participant-selection.py
+          rm .github/workflows/apply-writeup-participant-selection.yml
+
+      - name: Commit applied changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Finish write-up crew participant selection"
+          git push origin HEAD:fix/dispatch-task-badge
