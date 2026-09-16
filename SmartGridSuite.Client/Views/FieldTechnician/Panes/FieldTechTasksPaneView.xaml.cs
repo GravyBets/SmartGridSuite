@@ -21,6 +21,9 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
         public event Action<IReadOnlyList<FieldTechTicketListItemDto>>?
             OpenAllTicketsRequested;
 
+        public event Action<IReadOnlyCollection<long>>?
+            TaskIdsRefreshed;
+
         private readonly ApiClient _api = ClientAppSettings.CreateApiClient();
 
         private readonly bool _isLinemanMode;
@@ -152,6 +155,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
                     string.IsNullOrWhiteSpace(technician.EmployeeId))
                 {
                     ClearTaskCollections();
+                    TaskIdsRefreshed?.Invoke(Array.Empty<long>());
 
                     StatusMessage =
                         "No active technician record was found for the signed-in user.";
@@ -181,6 +185,16 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
                 ReplaceTaskCollections(
                     nextDailyAssignments,
                     nextOtherAssignedTickets);
+
+                var currentTaskIds =
+                    nextDailyAssignments
+                        .Concat(nextOtherAssignedTickets)
+                        .Where(x => x.Id > 0)
+                        .Select(x => x.Id)
+                        .Distinct()
+                        .ToList();
+
+                TaskIdsRefreshed?.Invoke(currentTaskIds);
 
                 var technicianName =
                     !string.IsNullOrWhiteSpace(response?.TechnicianName)
