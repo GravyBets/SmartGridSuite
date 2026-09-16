@@ -266,7 +266,8 @@ namespace SmartGridSuite.Api.Services
                 /*
                  * Published snapshots are what technicians actually
                  * received. Locate the newest prior published state
-                 * for every ticket.
+                 * for every assignment. A ticket can belong to several crews;
+                 * grouping by TicketId would silently drop all but one crew.
                  */
                 var priorPublishedRows =
                     await _db.DailyTicketAssignmentPublished
@@ -287,9 +288,10 @@ namespace SmartGridSuite.Api.Services
                         .ThenByDescending(x => x.Id)
                         .ToListAsync(ct);
 
-                var latestPriorRows = priorPublishedRows
-                    .GroupBy(x => x.TicketId)
-                    .Select(x => x.First())
+                var latestPriorRows = DailyAssignmentRolloverSelection
+                    .LatestPerAssignment(
+                        priorPublishedRows,
+                        x => x.SourceAssignmentId)
                     .Where(IsActionablePublishedRow)
                     .Where(x =>
                         x.Ticket != null &&
@@ -420,9 +422,8 @@ namespace SmartGridSuite.Api.Services
                     .ToList();
 
                 /*
-                 * The database permits only one active Technician assignment
-                 * for the same ticket. Rollover therefore closes yesterday's
-                 * active lifecycle row before creating today's replacement.
+                 * Advance every eligible crew's source lifecycle before creating
+                 * today's replacements. Multiple crews may own the same ticket.
                  *
                  * The immutable published record remains available for audit,
                  * while CarriedFromAssignmentId connects today's row to it.
@@ -496,6 +497,19 @@ namespace SmartGridSuite.Api.Services
                  * and will be rolled back if any later operation fails.
                  */
                 await _db.SaveChangesAsync(ct);
+
+                /*
+                 * Two former routes can resolve to the same lead today. Retire
+                 * BOTH source rows above, but create only one ticket on that
+                 * destination route. Otherwise the unused source can resurface
+                 * on a later day. Input order prefers the newest publication.
+                 */
+                candidates = DailyAssignmentRolloverSelection
+                    .OnePerDestination(
+                        candidates,
+                        x => x.Source.TicketId,
+                        x => x.Target!.Key)
+                    .ToList();
 
                 var nextPublishedVersion =
                     (await _db
