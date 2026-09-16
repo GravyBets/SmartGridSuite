@@ -361,7 +361,8 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
         }
 
         // Debounces search typing, then sends the search expression to the API
-        // so the WPF client does not perform its own History filtering.
+        // so the WPF client does not perform its own History filtering. Search focus
+        // is restored after the refresh so technicians can continue typing naturally.
         private async void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (!_loadedOnce)
@@ -375,10 +376,23 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
 
             try
             {
-                await Task.Delay(350, token);
+                await Task.Delay(650, token);
 
-                if (!token.IsCancellationRequested)
-                    await LoadHistoryAsync();
+                if (token.IsCancellationRequested)
+                    return;
+
+                var restoreSearchFocus =
+                    SearchBox.IsKeyboardFocusWithin;
+
+                await LoadHistoryAsync();
+
+                if (!token.IsCancellationRequested &&
+                    restoreSearchFocus)
+                {
+                    SearchBox.Focus();
+                    SearchBox.CaretIndex = SearchBox.Text.Length;
+                    SearchBox.SelectionLength = 0;
+                }
             }
             catch (TaskCanceledException)
             {
