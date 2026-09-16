@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
@@ -5614,6 +5614,10 @@ namespace SmartGridSuite.Api.Controllers
                     submittedAt.Date,
                     ct);
 
+                submittedWork = ApplyRequestedParticipantSelection(
+                    submittedWork,
+                    req.SelectedTechnicians);
+
                 /*
                  * The API owns the final technician footer. This ensures Ticket Notes,
                  * the structured submission, Site History, Field Tech History, and email
@@ -6342,6 +6346,125 @@ namespace SmartGridSuite.Api.Controllers
                     .OrderByDescending(x => x.IsSubmitter)
                     .ThenBy(x => x.TechnicianName)
                     .ToList()
+            };
+        }
+
+        // Applies the technician choices made in Submit Write-Up Preview to the
+        // API-resolved crew snapshot. The client may only remove resolved crew members;
+        // it cannot inject an unrelated technician. The submitter is always retained.
+        //
+        // An empty list intentionally means "legacy client" and leaves the original
+        // server-side participant resolution unchanged.
+        private static SubmittedWorkInfo ApplyRequestedParticipantSelection(
+            SubmittedWorkInfo submittedWork,
+            IReadOnlyCollection<SubmitTicketWriteUpTechnician>? selectedTechnicians)
+        {
+            var requested =
+                (selectedTechnicians ?? Array.Empty<SubmitTicketWriteUpTechnician>())
+                    .Where(x => x != null)
+                    .ToList();
+
+            if (requested.Count == 0)
+                return submittedWork;
+
+            static bool NamesMatch(string? first, string? second)
+            {
+                return !string.IsNullOrWhiteSpace(first) &&
+                       !string.IsNullOrWhiteSpace(second) &&
+                       string.Equals(
+                           first.Trim(),
+                           second.Trim(),
+                           StringComparison.OrdinalIgnoreCase);
+            }
+
+            bool IsRequested(SubmittedParticipantInfo participant)
+            {
+                if (participant.IsSubmitter)
+                    return true;
+
+                foreach (var selected in requested)
+                {
+                    if (selected.TechnicianId.HasValue &&
+                        participant.TechnicianId.HasValue &&
+                        selected.TechnicianId.Value == participant.TechnicianId.Value)
+                    {
+                        return true;
+                    }
+
+                    if (EmployeeIdsMatch(
+                            selected.EmployeeId,
+                            participant.EmployeeId))
+                    {
+                        return true;
+                    }
+
+                    if (NamesMatch(
+                            selected.TechnicianName,
+                            participant.TechnicianName))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            var filteredParticipants =
+                submittedWork.Participants
+                    .Where(IsRequested)
+                    .OrderByDescending(x => x.IsSubmitter)
+                    .ThenBy(x => x.TechnicianName)
+                    .ToList();
+
+            /*
+             * ResolveSubmittedWorkAsync always supplies a submitter, but keep this
+             * defensive fallback so a malformed client selection can never remove
+             * the person actually submitting the write-up.
+             */
+            if (!filteredParticipants.Any(x => x.IsSubmitter))
+            {
+                var submitter =
+                    submittedWork.Participants
+                        .FirstOrDefault(x => x.IsSubmitter);
+
+                if (submitter != null)
+                {
+                    filteredParticipants.Insert(
+                        0,
+                        submitter);
+                }
+            }
+
+            var secondaryNames =
+                filteredParticipants
+                    .Where(x => !x.IsSubmitter)
+                    .Select(x => x.TechnicianName)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x)
+                    .ToList();
+
+            return new SubmittedWorkInfo
+            {
+                SubmittedByTechnicianId =
+                    submittedWork.SubmittedByTechnicianId,
+
+                SubmittedByEmployeeId =
+                    submittedWork.SubmittedByEmployeeId,
+
+                SubmittedByName =
+                    submittedWork.SubmittedByName,
+
+                PrimaryTech =
+                    submittedWork.PrimaryTech,
+
+                SecondaryTech =
+                    secondaryNames.Count == 0
+                        ? null
+                        : FormatCrewDisplayText(secondaryNames),
+
+                Participants =
+                    filteredParticipants
             };
         }
 

@@ -1,7 +1,8 @@
-﻿#nullable enable
+#nullable enable
 using SmartGridSuite.Client.Services;
 using SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard;
 using SmartGridSuite.Contracts.Crews;
+using SmartGridSuite.Contracts.Tickets;
 using System;
 using System.Linq;
 using System.Security.Principal;
@@ -104,6 +105,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 new List<uint>(
                     e.ReferToOptionIds ??
                     Array.Empty<uint>());
+
+            var selectedTechnicians =
+                new List<SubmitTicketWriteUpTechnician>(
+                    e.SelectedTechnicians ??
+                    Array.Empty<SubmitTicketWriteUpTechnician>());
 
             var equipmentWasSwapped =
                 WorkspaceView
@@ -212,6 +218,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                          new List<uint>(
                              pendingDraft.ReferToOptionIds ??
                              new List<uint>());
+
+                    selectedTechnicians =
+                        new List<SubmitTicketWriteUpTechnician>(
+                            pendingDraft.SelectedTechnicians ??
+                            new List<SubmitTicketWriteUpTechnician>());
 
                     equipmentWasSwapped =
                         pendingDraft.EquipmentWasSwapped;
@@ -463,6 +474,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     submittedBy: employeeId,
                     writeUpFlagIds: writeUpFlagIds,
                     referToOptionIds: referToOptionIds,
+                    selectedTechnicians: selectedTechnicians,
                     equipmentWasSwapped: equipmentWasSwapped,
                     ipAddressWasChanged: ipAddressWasChanged,
                     ct: CancellationToken.None);
@@ -782,6 +794,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     new List<uint>(
                         submission.ReferToOptionIds ??
                         Array.Empty<uint>());
+
+                draft.SelectedTechnicians =
+                    new List<SubmitTicketWriteUpTechnician>(
+                        submission.SelectedTechnicians ??
+                        Array.Empty<SubmitTicketWriteUpTechnician>());
 
                 draft.EquipmentWasSwapped =
                     equipmentWasSwapped;

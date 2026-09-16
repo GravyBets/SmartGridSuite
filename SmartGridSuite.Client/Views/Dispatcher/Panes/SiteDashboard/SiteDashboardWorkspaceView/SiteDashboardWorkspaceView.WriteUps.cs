@@ -1,4 +1,4 @@
-﻿using DocumentFormat.OpenXml.Bibliography;
+using DocumentFormat.OpenXml.Bibliography;
 using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
@@ -28,21 +28,25 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 return;
             }
 
-            var confirmed = ShowWriteUpPreviewWindow(finalWriteUpText);
+            var preview =
+                ShowWriteUpPreviewWindowWithParticipants(
+                    finalWriteUpText,
+                    siteHistoryWriteUpText);
 
-            if (!confirmed)
+            if (preview is null)
                 return;
 
             WriteUpSubmitRequested?.Invoke(
                 this,
                 new WriteUpSubmitRequestedEventArgs(
-                    finalWriteUpText,
-                    siteHistoryWriteUpText,
+                    preview.FinalWriteUpText,
+                    preview.SiteHistoryWriteUpText,
                     true,
                     IncludePingStatsCheckBox.IsChecked == true,
                     IncludeSnmpStatsCheckBox.IsChecked == true,
                     GetSelectedWriteUpFlagIds(),
-                    GetSelectedReferToOptionIds()));
+                    GetSelectedReferToOptionIds(),
+                    preview.SelectedTechnicians));
         }
 
         private bool IsTowerDashboard => string.Equals(EquipmentDashboardKind, SmartGridSuite.Contracts.SiteDashboard.SiteDashboardKinds.Tower,
@@ -779,7 +783,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 bool includePingStats,
                 bool includeSnmpStats,
                 IReadOnlyCollection<uint>? writeUpFlagIds = null,
-                IReadOnlyCollection<uint>? referToOptionIds = null)
+                IReadOnlyCollection<uint>? referToOptionIds = null,
+                IReadOnlyCollection<SmartGridSuite.Contracts.Tickets.SubmitTicketWriteUpTechnician>? selectedTechnicians = null)
             {
                 FinalWriteUpText = finalWriteUpText;
                 SiteHistoryWriteUpText = siteHistoryWriteUpText;
@@ -798,6 +803,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     .Where(x => x > 0)
                     .Distinct()
                     .ToList();
+
+                SelectedTechnicians =
+                    (selectedTechnicians ??
+                     Array.Empty<SmartGridSuite.Contracts.Tickets.SubmitTicketWriteUpTechnician>())
+                    .Where(x => x != null)
+                    .ToList();
             }
 
             public string FinalWriteUpText { get; }
@@ -809,6 +820,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             public IReadOnlyList<uint> WriteUpFlagIds { get; }
             public IReadOnlyList<uint> ReferToOptionIds { get; }
+            public IReadOnlyList<SmartGridSuite.Contracts.Tickets.SubmitTicketWriteUpTechnician> SelectedTechnicians { get; }
         }
 
         private static string BuildSimpleWriteUpSection(string header, string body)

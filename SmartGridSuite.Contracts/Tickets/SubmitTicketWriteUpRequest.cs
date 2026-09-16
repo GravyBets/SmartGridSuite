@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Collections.Generic;
 
@@ -31,10 +31,11 @@ namespace SmartGridSuite.Contracts.Tickets
         public List<uint> ReferToOptionIds { get; set; } = new();
 
         /*
-         * Technicians selected in the Submit Write-Up preview.
+         * Technicians explicitly selected in the Submit Write-Up preview.
          *
-         * All crew technicians will be selected by default. The submitting
-         * technician may remove unavailable technicians before confirming.
+         * New clients include the submitting technician plus every checked crew
+         * member. An empty list preserves the legacy server-side crew resolution
+         * used by older clients.
          */
         public List<SubmitTicketWriteUpTechnician> SelectedTechnicians { get; set; } = new();
 

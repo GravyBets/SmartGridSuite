@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -352,6 +352,7 @@ namespace SmartGridSuite.Client.Services
             string submittedBy = "Unknown",
             IReadOnlyCollection<uint>? writeUpFlagIds = null,
             IReadOnlyCollection<uint>? referToOptionIds = null,
+            IReadOnlyCollection<SubmitTicketWriteUpTechnician>? selectedTechnicians = null,
             bool equipmentWasSwapped = false,
             bool ipAddressWasChanged = false,
             CancellationToken ct = default)
@@ -384,6 +385,11 @@ namespace SmartGridSuite.Client.Services
                             new List<uint>(
                                 referToOptionIds ??
                                 Array.Empty<uint>()),
+
+                        SelectedTechnicians =
+                            new List<SubmitTicketWriteUpTechnician>(
+                                selectedTechnicians ??
+                                Array.Empty<SubmitTicketWriteUpTechnician>()),
 
                         EquipmentWasSwapped = equipmentWasSwapped,
                         IpAddressWasChanged = ipAddressWasChanged

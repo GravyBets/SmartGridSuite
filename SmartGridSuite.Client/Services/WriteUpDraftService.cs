@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.IO;
 using System.Security.Cryptography;
@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
+using SmartGridSuite.Contracts.Tickets;
 
 namespace SmartGridSuite.Client.Services
 {
@@ -391,6 +392,8 @@ namespace SmartGridSuite.Client.Services
         public List<uint> WriteUpFlagIds { get; set; } = new();
 
         public List<uint> ReferToOptionIds { get; set; } = new();
+
+        public List<SubmitTicketWriteUpTechnician> SelectedTechnicians { get; set; } = new();
 
         public bool EquipmentWasSwapped { get; set; }
 
