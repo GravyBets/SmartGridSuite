@@ -8,6 +8,15 @@
                      Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
                      Background="{DynamicResource AppBackground}">
 
+    <Fluent:RibbonWindow.Resources>
+        <SolidColorBrush x:Key="NavBadgeBackgroundBrush"
+                         Color="#D92D20"/>
+        <SolidColorBrush x:Key="NavBadgeForegroundBrush"
+                         Color="White"/>
+        <SolidColorBrush x:Key="NavBadgeBorderBrush"
+                         Color="#FFF8FAFC"/>
+    </Fluent:RibbonWindow.Resources>
+
     <Grid x:Name="ShellRoot"
       Margin="10,0,10,22">
 
@@ -171,14 +180,45 @@
                                           Data="M9 6H20V8H9V6ZM9 11H20V13H9V11ZM9 16H20V18H9V16ZM4.8 8.2L2.8 6.2L4.2 4.8L4.8 5.4L6.8 3.4L8.2 4.8L4.8 8.2ZM4.8 13.2L2.8 11.2L4.2 9.8L4.8 10.4L6.8 8.4L8.2 9.8L4.8 13.2ZM4.8 18.2L2.8 16.2L4.2 14.8L4.8 15.4L6.8 13.4L8.2 14.8L4.8 18.2Z"/>
                                 </Border>
 
-                                <StackPanel Grid.Column="1"
-                                            Margin="10,0,0,0"
-                                            VerticalAlignment="Center">
-                                    <TextBlock Text="Tasks"
-                                               Style="{StaticResource NavRailItemTitleTextStyle}"/>
-                                    <TextBlock Text="Assigned work"
-                                               Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
-                                </StackPanel>
+                                <Grid Grid.Column="1"
+                                      Margin="10,0,0,0"
+                                      VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Tasks"
+                                                   Style="{StaticResource NavRailItemTitleTextStyle}"/>
+                                        <TextBlock Text="Assigned work"
+                                                   Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
+                                    </StackPanel>
+
+                                    <Border x:Name="FieldTechTasksBadgeExpanded"
+                                            Grid.Column="1"
+                                            Background="{DynamicResource NavBadgeBackgroundBrush}"
+                                            BorderBrush="{DynamicResource NavBadgeBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
+                                            MinWidth="18"
+                                            Height="22"
+                                            Margin="8,0,0,0"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Right"
+                                            Visibility="Collapsed">
+                                        <TextBlock x:Name="FieldTechTasksBadgeExpandedText"
+                                                   Text="0"
+                                                   Foreground="{DynamicResource NavBadgeForegroundBrush}"
+                                                   FontSize="11"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   TextAlignment="Center"
+                                                   Padding="6,0,6,1"
+                                                   MinWidth="22"/>
+                                    </Border>
+                                </Grid>
                             </Grid>
                         </ListBoxItem>
 
@@ -222,10 +262,35 @@
                         </ListBoxItem>
 
                         <ListBoxItem Tag="Tasks" ToolTip="Tasks">
-                            <Border Style="{StaticResource NavBadgeStyle}">
-                                <Path Style="{StaticResource NavRailPathIconStyle}"
-                                      Data="M9 6H20V8H9V6ZM9 11H20V13H9V11ZM9 16H20V18H9V16ZM4.8 8.2L2.8 6.2L4.2 4.8L4.8 5.4L6.8 3.4L8.2 4.8L4.8 8.2ZM4.8 13.2L2.8 11.2L4.2 9.8L4.8 10.4L6.8 8.4L8.2 9.8L4.8 13.2ZM4.8 18.2L2.8 16.2L4.2 14.8L4.8 15.4L6.8 13.4L8.2 14.8L4.8 18.2Z"/>
-                            </Border>
+                            <Grid>
+                                <Border Style="{StaticResource NavBadgeStyle}">
+                                    <Path Style="{StaticResource NavRailPathIconStyle}"
+                                          Data="M9 6H20V8H9V6ZM9 11H20V13H9V11ZM9 16H20V18H9V16ZM4.8 8.2L2.8 6.2L4.2 4.8L4.8 5.4L6.8 3.4L8.2 4.8L4.8 8.2ZM4.8 13.2L2.8 11.2L4.2 9.8L4.8 10.4L6.8 8.4L8.2 9.8L4.8 13.2ZM4.8 18.2L2.8 16.2L4.2 14.8L4.8 15.4L6.8 13.4L8.2 14.8L4.8 18.2Z"/>
+                                </Border>
+
+                                <Border x:Name="FieldTechTasksBadgeCollapsed"
+                                        Background="{DynamicResource NavBadgeBackgroundBrush}"
+                                        BorderBrush="{DynamicResource NavBadgeBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="9"
+                                        MinWidth="16"
+                                        Height="20"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        Margin="0,-10,-10,0"
+                                        Visibility="Collapsed">
+                                    <TextBlock x:Name="FieldTechTasksBadgeCollapsedText"
+                                               Text="0"
+                                               Foreground="{DynamicResource NavBadgeForegroundBrush}"
+                                               FontSize="10"
+                                               FontWeight="Bold"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Center"
+                                               Padding="4,0,4,1"
+                                               MinWidth="18"/>
+                                </Border>
+                            </Grid>
                         </ListBoxItem>
 
                         <ListBoxItem Tag="History" ToolTip="History">
@@ -281,8 +346,6 @@
                     </StackPanel>
                 </Grid>
             </Border>
-
-            
 
             <ContentControl x:Name="MainPaneHost"
                             Grid.Column="2"/>
