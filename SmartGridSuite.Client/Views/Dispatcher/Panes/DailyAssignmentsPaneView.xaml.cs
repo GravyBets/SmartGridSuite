@@ -242,9 +242,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             Loaded += async (_, __) =>
             {
-                if (_hasLoaded)
-                    return;
-
+                // The shell caches this pane. Reload on every navigation back,
+                // keeping the chosen work date and existing pool filters.
                 _hasLoaded = true;
                 await LoadBoardAsync();
             };

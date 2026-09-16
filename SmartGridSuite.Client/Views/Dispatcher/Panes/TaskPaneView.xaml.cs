@@ -67,6 +67,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private bool _suppressFilterEvents;
         private bool _filtersInitialized;
         private bool _hasLoadedOnce;
+        private bool _paneRefreshInProgress;
+        private bool _paneRefreshRequested;
 
         // Expose whether the TaskPane has completed its initial load.
         // Shell uses this to decide whether the in-memory task list is authoritative.
@@ -218,34 +220,38 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             RecordTaskActivity();
 
             _idleRefreshTimer.Start();
+            await RefreshPaneAsync();
+        }
 
-            /*
-             * Cached/reloaded Tasks panes should immediately pick up
-             * changes made by another dispatcher.
-             */
-            if (_hasLoadedOnce)
-            {
-                await TrySilentTaskRefreshAsync(
-                    force: true);
-
+        private async Task RefreshPaneAsync()
+        {
+            // Navigation is an explicit refresh, not an idle refresh: an expanded
+            // row or the five-second background throttle must not skip it.
+            // Queue a follow-up if a quick leave/return canceled the current query.
+            _paneRefreshRequested = true;
+            if (_paneRefreshInProgress)
                 return;
-            }
 
-            _hasLoadedOnce = true;
-
+            _paneRefreshInProgress = true;
+            _searchDebounceTimer.Stop();
             ShowBusyOverlay(
                 "Loading dispatch task filters and task list...");
 
             try
             {
-                await LoadFilterOptionsAsync();
-
-                _filtersInitialized = true;
-
-                await LoadTasksAsync();
+                do
+                {
+                    _paneRefreshRequested = false;
+                    await LoadFilterOptionsAsync();
+                    _filtersInitialized = true;
+                    await LoadTasksAsync();
+                    _hasLoadedOnce = true;
+                }
+                while (_paneRefreshRequested && IsLoaded);
             }
             finally
             {
+                _paneRefreshInProgress = false;
                 HideBusyOverlay();
             }
         }
@@ -368,7 +374,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
-        private async void TaskPaneView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        private void TaskPaneView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (!IsVisible)
             {
@@ -388,13 +394,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             _idleRefreshTimer.Start();
 
-            if (_hasLoadedOnce &&
-                _filtersInitialized &&
-                IsLoaded)
-            {
-                await TrySilentTaskRefreshAsync(
-                    force: true);
-            }
+            // Loaded owns navigation refreshes. Do not issue a competing silent
+            // query here; keep visibility handling limited to timer lifecycle.
         }
 
         private void TaskPaneView_Unloaded(object sender, RoutedEventArgs e)
@@ -842,18 +843,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)
         {
-
-            ShowBusyOverlay("Refreshing dispatch tasks...");
-
-            try
-            {
-                await LoadFilterOptionsAsync();
-                await LoadTasksAsync();
-            }
-            finally
-            {
-                HideBusyOverlay();
-            }
+            await RefreshPaneAsync();
         }
 
         private async void ClearTaskFilters_Click(object sender, RoutedEventArgs e)

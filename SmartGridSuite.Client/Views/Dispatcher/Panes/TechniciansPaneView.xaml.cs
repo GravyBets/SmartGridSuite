@@ -131,7 +131,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
             _http = ClientAppSettings.CreateHttpClient();
 
-            Loaded += async (_, __) => await InitializeAndLoadAsync();
+            Loaded += async (_, __) => await RefreshBoardWithConfirmationAsync();
         }
 
         private void SetStatus(string msg)
@@ -139,28 +139,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             // Status is intentionally hidden from the UI.
             // Keep this method so the existing load/save code does not need to change.
             System.Diagnostics.Debug.WriteLine($"Truck Board: {msg}");
-        }
-
-        private async Task InitializeAndLoadAsync()
-        {
-            if (_busyLoading)
-                return;
-
-            try
-            {
-                _busyLoading = true;
-                SetStatus("Loading board...");
-
-                await LoadBoardAsync();
-            }
-            catch (Exception ex)
-            {
-                SetStatus("Error: " + ex.Message);
-            }
-            finally
-            {
-                _busyLoading = false;
-            }
         }
 
         private async Task LoadBoardAsync(string busyMessage = "Loading truck board...")
@@ -238,6 +216,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         }
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)
+        {
+            await RefreshBoardWithConfirmationAsync();
+        }
+
+        // Navigation reloads use the same unsaved-change protection as Refresh.
+        private async Task RefreshBoardWithConfirmationAsync()
         {
             if (IsCommitting)
                 return;

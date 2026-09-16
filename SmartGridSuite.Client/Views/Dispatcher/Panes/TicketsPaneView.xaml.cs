@@ -647,7 +647,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void TicketsPaneView_Loaded(object sender, RoutedEventArgs e)
         {
-            if (_hasLoadedOnce || _isInitialLoadRunning)
+            await RefreshPaneAsync();
+        }
+
+        private async Task RefreshPaneAsync()
+        {
+            if (_isInitialLoadRunning)
                 return;
 
             _isInitialLoadRunning = true;
@@ -659,11 +664,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 RebuildTechFilterFromKnownTechs();
 
                 await LoadStatusOptionsFromApiAsync(
-                    preserveSelections: false);
+                    preserveSelections: _hasLoadedOnce);
 
                 _filtersInitialized = true;
 
-                await LoadTicketsFromApiAsync();
+                await LoadTicketsFromApiAsync(resetPage: true);
 
                 _hasLoadedOnce = true;
             }
@@ -1487,20 +1492,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)
         {
-            ShowBusyOverlay("Refreshing tickets, filters, and summary...");
-
-            try
-            {
-                await LoadStatusOptionsFromApiAsync(
-                    preserveSelections: true);
-
-                await LoadTicketsFromApiAsync(
-                    resetPage: true);
-            }
-            finally
-            {
-                HideBusyOverlay();
-            }
+            await RefreshPaneAsync();
         }
 
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
