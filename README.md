@@ -1,5 +1,12 @@
 # SmartGridSuite
 
+## VM restart password setup
+
+Follow the [step-by-step VM password setup guide](deploy/maintenance/README.md#step-by-step-set-the-restart-password-on-the-vm) when you are back at work.
+It covers pulling the testing branch, uploading the helper, setting/changing the shared password, and verifying setup without restarting the API.
+The app remains on HTTP; use a unique restart-only password because it is sent unencrypted.
+
+
 To-Do List
 
 Administration
