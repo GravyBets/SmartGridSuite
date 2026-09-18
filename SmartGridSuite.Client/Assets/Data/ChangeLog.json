@@ -1,5 +1,31 @@
 [
   {
+    "version": "3.4.0.1",
+    "date": "September 18, 2026",
+    "title": "Reliability, Notifications \u0026 Workflow Improvements",
+    "changes": [
+      "Added automatic Parent DB health monitoring every 5 mins, clear SQL connection polls on failure and retries.",
+      "Added Parent DB connection testing to Admin-\u003e System Health for manually verifying live Parent DB connectivity.",
+      "Added Backup Now to the Parent DB Cache snapshot card so admins can create a fresh cache snapshot on demand.",
+      "Added an API Restart control so System Health, including password-protected server-side restart support for admins",
+      "Improved Parent DB outage handling so cached site data remains available when live Parent DB access is unavailable.",
+      "Added Field Tech task notifications with a navigation badge and sounds when tasks are recieved.",
+      "Field Tech task notifications are Daily Assignments only (Does not include the Lineman Role).",
+      "Improved Field Tech History search by extending search bar debounce and auto focus of the caret after search results refresh.",
+      "Improved Submit Write-Up crew participation. All crew members are checked by default with the option to remove a tech from write-up, tech history and site history.",
+      "Improved Dispatch pane refreshing so Tickets, Tasks, Daily Assignments, and Technicians refresh automatically when opened.",
+      "Fixed Daily Assignment carry-over behavior including multi-crew assignment scenarios.",
+      "Improved technician availability display so off-duty techs are shown appropriately on Daily Assignments Pane.",
+      "Updated Dispatch Tickets double-click to Edit Ticket instead of the Details Pane. Details pane is still accessible by clicking the \"Open Details\" button.",
+      "Limited Tower View pings so only one tower sector can run manual pings at a time. Starting pings on another sector automatically stops the currently active sector pings.",
+      "Improved Dispatch task notifications and sounds.",
+      "Added write-up textblock spell-check.",
+      "Improved several Admin and System Health workflows and navigation layouts.",
+      "UI polish on several of the Admin panes."
+    ]
+  },
+
+  {
     "version": "3.3.0.2",
     "date": "September 8, 2026",
     "title": "Cache Backup Reliability / Tower View Updates",
@@ -42,9 +68,9 @@
     "date": "August 28, 2026",
     "title": "Summary Cards, Dispatch Tasks Capital Requests",
     "changes": [
-      "Added Maintenance/Capital request details to Dispatch Ã¢â€ â€™ Tasks.",
+      "Added Maintenance/Capital request details to Dispatch ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Tasks.",
       "Requested Work now shows technician name and request reason.",
-      "Made Dispatch Ã¢â€ â€™ Tickets summary cards clickable to filter by status.",
+      "Made Dispatch ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Tickets summary cards clickable to filter by status.",
       "Added selected-state border to the active summary card.",
       "Clear Filters now clears the summary card selection."
     ]
@@ -77,7 +103,7 @@
     "changes": [
       "Added support for editing legacy/imported Site History entries while preserving the original imported source data.",
       "Fixed Ticket Status renames so existing tickets automatically update to the new status name.",
-      "Fixed the Dispatch Tickets ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“All / Include ClosedÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â status filter so it truly includes tickets with any status, including legacy or inactive statuses.",
+      "Fixed the Dispatch Tickets ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œAll / Include ClosedÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â status filter so it truly includes tickets with any status, including legacy or inactive statuses.",
       "Added a copy-to-clipboard button beside Site numbers in Field Technician History, with the same temporary checkmark feedback used for Notifications and Work Orders."
     ]
   },
