@@ -90,6 +90,9 @@ namespace SmartGridSuite.Api
 
             builder.Services.AddScoped<ParentSyncService>();
 
+            builder.Services.AddHostedService<
+                ParentDatabaseHeartbeatHostedService>();
+
             builder.Services.AddSingleton<ApplicationRuntimeHealthService>();
 
             builder.Services.AddSingleton<ServerHealthProbeService>();
