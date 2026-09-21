@@ -1,12 +1,13 @@
 ﻿using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
+using SmartGridSuite.Api.Services.SystemHealth;
 
 namespace SmartGridSuite.Api.Services.ParentSync
 {
     /// <summary>
     /// Periodically verifies that the API can still open a live Parent DB
-    /// connection. A failed probe uses the existing ParentDatabaseHealthService
-    /// recovery path, which clears SqlClient connection pools, then retries once.
+    /// connection. A failed probe clears SqlClient pools and retries once.
+    /// Repeated failures can escalate to one guarded API restart.
     /// </summary>
     public sealed class ParentDatabaseHeartbeatHostedService : BackgroundService
     {
@@ -16,20 +17,29 @@ namespace SmartGridSuite.Api.Services.ParentSync
         private static readonly TimeSpan ProbeTimeout =
             TimeSpan.FromSeconds(5);
 
+        private const int AutomaticRestartFailureThreshold = 3;
+
         private const string HeartbeatOperation =
             "Automatic Parent DB heartbeat";
 
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ParentDatabaseHealthService _parentDatabaseHealth;
+        private readonly ApiRestartService _apiRestartService;
         private readonly ILogger<ParentDatabaseHeartbeatHostedService> _logger;
+
+        private int _consecutiveFailedCycles;
+        private bool _hasObservedHealthyParentDatabase;
+        private bool _automaticRestartQueued;
 
         public ParentDatabaseHeartbeatHostedService(
             IServiceScopeFactory scopeFactory,
             ParentDatabaseHealthService parentDatabaseHealth,
+            ApiRestartService apiRestartService,
             ILogger<ParentDatabaseHeartbeatHostedService> logger)
         {
             _scopeFactory = scopeFactory;
             _parentDatabaseHealth = parentDatabaseHealth;
+            _apiRestartService = apiRestartService;
             _logger = logger;
         }
 
@@ -52,7 +62,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
             catch (OperationCanceledException)
                 when (stoppingToken.IsCancellationRequested)
             {
-                // Normal API shutdown.
+                // Normal API shutdown/restart.
             }
         }
 
@@ -64,16 +74,16 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
             if (firstFailure is null)
             {
-                _parentDatabaseHealth.RecordSuccess(
+                RecordSuccessfulHeartbeat(
                     HeartbeatOperation);
 
                 return;
             }
 
             /*
-             * RecordFailure clears every SqlClient connection pool. This is the
-             * lightweight equivalent of the useful part of an API restart for
-             * stale/broken pooled Parent DB connections.
+             * RecordFailure already clears every SqlClient connection pool.
+             * That gives a broken/stale pooled connection one chance to recover
+             * without interrupting the API for the entire shop.
              */
             _parentDatabaseHealth.RecordFailure(
                 firstFailure,
@@ -91,7 +101,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
             if (retryFailure is null)
             {
-                _parentDatabaseHealth.RecordSuccess(
+                RecordSuccessfulHeartbeat(
                     HeartbeatOperation + " recovery retry");
 
                 return;
@@ -101,11 +111,65 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 retryFailure,
                 HeartbeatOperation + " recovery retry");
 
+            _consecutiveFailedCycles++;
+
             _logger.LogWarning(
                 retryFailure,
                 "Parent DB heartbeat recovery retry failed. " +
-                "Cached Parent DB data will remain in use until a later " +
-                "heartbeat or live lookup succeeds.");
+                "Consecutive failed heartbeat cycles: {FailureCount}/{Threshold}. " +
+                "Cached Parent DB data will remain in use.",
+                _consecutiveFailedCycles,
+                AutomaticRestartFailureThreshold);
+
+            /*
+             * Restart only when this API process previously demonstrated that
+             * Parent DB was healthy. A process that STARTS while SQL/networking is
+             * genuinely unavailable is therefore never allowed to restart-loop.
+             *
+             * Each failed cycle contains two failed probes (before and after pool
+             * clearing), and cycles are five minutes apart.
+             */
+            if (!_hasObservedHealthyParentDatabase ||
+                _automaticRestartQueued ||
+                _consecutiveFailedCycles <
+                    AutomaticRestartFailureThreshold)
+            {
+                return;
+            }
+
+            var queued =
+                await _apiRestartService
+                    .TryQueueAutomaticRestartAsync(
+                        "Parent DB remained unavailable after " +
+                        $"{_consecutiveFailedCycles} consecutive heartbeat " +
+                        "cycles, including SQL pool-clear recovery retries.",
+                        stoppingToken);
+
+            if (!queued)
+            {
+                _logger.LogError(
+                    "Parent DB automatic recovery reached the restart threshold, " +
+                    "but the API restart could not be queued. The heartbeat will " +
+                    "try recovery again on the next cycle.");
+
+                return;
+            }
+
+            /*
+             * Do not request another restart from this process while the detached
+             * helper is waiting to restart the SysV service.
+             */
+            _automaticRestartQueued = true;
+        }
+
+        private void RecordSuccessfulHeartbeat(
+            string operation)
+        {
+            _parentDatabaseHealth.RecordSuccess(
+                operation);
+
+            _hasObservedHealthyParentDatabase = true;
+            _consecutiveFailedCycles = 0;
         }
 
         private async Task<Exception?> ProbeOnceAsync(
