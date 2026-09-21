@@ -923,6 +923,12 @@ namespace SmartGridSuite.Api.Controllers
                         .Distinct()
                         .ToList();
 
+                var allSubmissionIds =
+                    submissionCandidates
+                        .Select(x => x.Id)
+                        .Distinct()
+                        .ToList();
+
                 if (latestSubmissionIds.Count > 0)
                 {
                     /*
@@ -963,8 +969,15 @@ namespace SmartGridSuite.Api.Controllers
                         await _db
                             .TicketWriteUpSubmissionCloseoutItems
                             .AsNoTracking()
+                            /*
+                             * Load checklist rows for every active write-up on the
+                             * ticket. Dispatch still reviews the latest write-up's
+                             * flags/refer-to metadata, but an unfinished REQUIRED
+                             * item from an older write-up must remain visible because
+                             * the close endpoint correctly enforces it.
+                             */
                             .Where(x =>
-                                latestSubmissionIds.Contains(
+                                allSubmissionIds.Contains(
                                     x.SubmissionId))
                             .OrderBy(x => x.SortOrderSnapshot)
                             .ThenBy(x => x.DisplayNameSnapshot)
@@ -1097,13 +1110,79 @@ namespace SmartGridSuite.Api.Controllers
                                 ? referToOptions
                                 : new List<string>();
 
-                        var closeoutItems =
+                        var latestCloseoutItems =
                             closeoutItemsBySubmission.TryGetValue(
                                 latestSubmission.Id,
                                 out var submissionCloseoutItems)
                                 ? submissionCloseoutItems
                                 : new List<
                                     DispatchCloseoutChecklistItemDto>();
+
+                        /*
+                         * Older completed/optional checklist rows stay historical and
+                         * do not clutter the current task. The only older rows surfaced
+                         * here are unfinished REQUIRED items, because those are exactly
+                         * the rows that can still block ticket closure.
+                         */
+                        var priorOutstandingCloseoutItems =
+                            submissionCandidates
+                                .Where(x =>
+                                    x.TicketId == item.TicketId &&
+                                    x.Id != latestSubmission.Id)
+                                .OrderBy(x => x.SubmittedAt)
+                                .ThenBy(x => x.Id)
+                                .SelectMany(
+                                    priorSubmission =>
+                                    {
+                                        if (!closeoutItemsBySubmission.TryGetValue(
+                                                priorSubmission.Id,
+                                                out var priorItems))
+                                        {
+                                            return Enumerable.Empty<
+                                                DispatchCloseoutChecklistItemDto>();
+                                        }
+
+                                        var priorSubmittedBy =
+                                            string.IsNullOrWhiteSpace(
+                                                priorSubmission.SubmittedByName)
+                                                ? "Unknown technician"
+                                                : priorSubmission
+                                                    .SubmittedByName
+                                                    .Trim();
+
+                                        return priorItems
+                                            .Where(x =>
+                                                x.IsRequired &&
+                                                !x.IsCompleted)
+                                            .Select(x =>
+                                                new DispatchCloseoutChecklistItemDto
+                                                {
+                                                    Id = x.Id,
+                                                    SubmissionId = x.SubmissionId,
+                                                    DefinitionId = x.DefinitionId,
+
+                                                    DisplayName =
+                                                        $"{x.DisplayName} — Prior write-up: " +
+                                                        $"{priorSubmittedBy}, " +
+                                                        $"{priorSubmission.SubmittedAt:MM/dd/yyyy HH:mm}",
+
+                                                    SortOrder = x.SortOrder,
+                                                    IsRequired = x.IsRequired,
+                                                    ConditionType = x.ConditionType,
+                                                    WriteUpFlagId = x.WriteUpFlagId,
+                                                    ReferToOptionId = x.ReferToOptionId,
+                                                    IsCompleted = x.IsCompleted,
+                                                    CompletedBy = x.CompletedBy,
+                                                    CompletedAt = x.CompletedAt
+                                                });
+                                    })
+                                .ToList();
+
+                        var closeoutItems =
+                            latestCloseoutItems
+                                .Concat(
+                                    priorOutstandingCloseoutItems)
+                                .ToList();
 
                         item.CloseoutChecklistItems =
                             closeoutItems;
