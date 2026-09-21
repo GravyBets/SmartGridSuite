@@ -10,6 +10,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             HistoryDataGrid.ItemsSource = rows?.ToList() ?? new List<SiteDashboardHistoryRowViewModel>();
             HistoryDataGrid.SelectedItem = null;
             NarrativeTextBlock.Text = string.Empty;
+            NarrativeReadOnlyTextBlock.Text = string.Empty;
 
             if (HistoryEditedTextBlock != null)
                 HistoryEditedTextBlock.Text = string.Empty;
@@ -19,7 +20,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         {
             if (HistoryDataGrid.SelectedItem is SiteDashboardHistoryRowViewModel row)
             {
-                NarrativeTextBlock.Text = CleanNarrativeText(row.NarrativeText);
+                var narrative =
+                    CleanNarrativeText(row.NarrativeText);
+
+                NarrativeTextBlock.Text = narrative;
+                NarrativeReadOnlyTextBlock.Text = narrative;
 
                 if (HistoryEditedTextBlock != null)
                     HistoryEditedTextBlock.Text = row.EditedText;
@@ -27,6 +32,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             else
             {
                 NarrativeTextBlock.Text = string.Empty;
+                NarrativeReadOnlyTextBlock.Text = string.Empty;
 
                 if (HistoryEditedTextBlock != null)
                     HistoryEditedTextBlock.Text = string.Empty;
