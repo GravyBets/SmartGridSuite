@@ -70,20 +70,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     : new GridLength(4);
 
             /*
-             * The shared dashboard is used by both the Field Tech and Lineman
-             * modules. The Site History narrative is selectable only in the
-             * Lineman module.
+             * The shared dashboard is used by Dispatcher, Field Tech, and
+             * Lineman. Only Lineman may select/copy Site History narrative
+             * text. Everyone else gets a non-selectable TextBlock inside a
+             * ScrollViewer so long history entries remain fully readable.
              */
-            WorkspaceView.NarrativeTextBlock.IsHitTestVisible =
-                isLineman;
-
-            WorkspaceView.NarrativeTextBlock.Focusable =
-                isLineman;
-
-            WorkspaceView.NarrativeTextBlock.Cursor =
+            WorkspaceView.NarrativeTextBlock.Visibility =
                 isLineman
-                    ? System.Windows.Input.Cursors.IBeam
-                    : System.Windows.Input.Cursors.Arrow;
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+
+            WorkspaceView.NarrativeReadOnlyScrollViewer.Visibility =
+                isLineman
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
         }
 
         private readonly List<SiteDashboardTabSession> _sessions = new();
