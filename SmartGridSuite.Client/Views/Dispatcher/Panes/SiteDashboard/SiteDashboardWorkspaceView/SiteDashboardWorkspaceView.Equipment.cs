@@ -570,7 +570,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             fieldsGrid.ColumnDefinitions.Add(
                 new ColumnDefinition
                 {
-                    Width = new GridLength(8)
+                    Width = new GridLength(4)
                 });
 
             fieldsGrid.ColumnDefinitions.Add(
@@ -584,7 +584,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             fieldsGrid.ColumnDefinitions.Add(
                 new ColumnDefinition
                 {
-                    Width = new GridLength(8)
+                    Width = new GridLength(4)
                 });
 
             fieldsGrid.ColumnDefinitions.Add(
@@ -611,20 +611,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             Grid.SetColumn(firstField, 0);
 
             var oldSerialField = CreateReplacementField(
-                "Found SN or Leave Blank if installing new Device.",
+                "Found Serial Number - *Leave blank if applicable*",
                 cleanOldSerial,
                 isReadOnly: false,
                 fieldKey: "ReplacementOldSerial",
-                watermark: "Found SN");
+                watermark: "Found Serial #");
 
             Grid.SetColumn(oldSerialField, 2);
 
             var newSerialField = CreateReplacementField(
-                "Left SN or Leave Blank if just removing.",
+                "Left Serial Number - *Leave blank if applicable*",
                 string.Empty,
                 isReadOnly: false,
                 fieldKey: "ReplacementNewSerial",
-                watermark: "Left SN");
+                watermark: "Left Serial #");
 
             Grid.SetColumn(newSerialField, 4);
 
