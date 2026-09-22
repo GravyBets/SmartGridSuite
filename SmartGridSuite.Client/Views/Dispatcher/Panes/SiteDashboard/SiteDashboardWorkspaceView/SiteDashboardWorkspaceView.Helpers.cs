@@ -14,7 +14,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private static string GetTaggedTextBoxValue(DependencyObject root, string tag)
         {
             return FindVisualChildren<TextBox>(root)
-                .FirstOrDefault(x => string.Equals(x.Tag?.ToString(), tag, StringComparison.OrdinalIgnoreCase))
+                .FirstOrDefault(x => string.Equals(x.Uid, tag, StringComparison.OrdinalIgnoreCase))
                 ?.Text
                 ?.Trim()
                 ?? string.Empty;
@@ -23,7 +23,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private static string GetTaggedComboBoxValue(DependencyObject root, string tag)
         {
             var comboBox = FindVisualChildren<ComboBox>(root)
-                .FirstOrDefault(x => string.Equals(x.Tag?.ToString(), tag, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(x => string.Equals(x.Uid, tag, StringComparison.OrdinalIgnoreCase));
 
             if (comboBox?.SelectedItem is null)
                 return string.Empty;
