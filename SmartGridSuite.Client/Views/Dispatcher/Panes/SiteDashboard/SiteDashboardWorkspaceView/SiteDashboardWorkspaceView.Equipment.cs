@@ -1042,7 +1042,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 if (rowTag.UsesCommunicationDeviceTypePicker)
                 {
                     var comboBox =
-                        FindVisualChildByTag<ComboBox>(
+                        FindVisualChildByFieldKey<ComboBox>(
                             rowBorder,
                             "ReplacementDeviceType");
 
@@ -1080,7 +1080,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                  * Old Serial and New Serial remain optional.
                  */
                 var itemTextBox =
-                    FindVisualChildByTag<TextBox>(
+                    FindVisualChildByFieldKey<TextBox>(
                         rowBorder,
                         "ReplacementItem");
 
@@ -1130,7 +1130,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             control.ClearValue(Control.BorderThicknessProperty);
         }
 
-        private static T? FindVisualChildByTag<T>(DependencyObject root, object tag)
+        private static T? FindVisualChildByFieldKey<T>(
+            DependencyObject root,
+            string fieldKey)
             where T : FrameworkElement
         {
             var childCount = VisualTreeHelper.GetChildrenCount(root);
@@ -1142,13 +1144,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 if (child is T typedChild &&
                     string.Equals(
                         typedChild.Uid,
-                        tag?.ToString(),
+                        fieldKey,
                         StringComparison.OrdinalIgnoreCase))
                 {
                     return typedChild;
                 }
 
-                var nested = FindVisualChildByTag<T>(child, tag);
+                var nested =
+                    FindVisualChildByFieldKey<T>(
+                        child,
+                        fieldKey);
 
                 if (nested is not null)
                     return nested;
