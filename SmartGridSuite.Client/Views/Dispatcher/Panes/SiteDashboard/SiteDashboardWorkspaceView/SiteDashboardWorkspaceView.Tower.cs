@@ -2,6 +2,7 @@
 using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Diagnostics;
 using System.Xml.Serialization;
@@ -188,6 +189,36 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 Tag = "Ping Count",
                 Text = string.Empty
             };
+
+            pingCountBox.KeyDown +=
+                async (_, e) =>
+                {
+                    if (e.Key != Key.Enter)
+                        return;
+
+                    e.Handled = true;
+
+                    var sectorState =
+                        card.SessionState;
+
+                    /*
+                     * Enter starts this sector using the same path as
+                     * Ping Sector. If this sector is already running,
+                     * leave the active ping alone instead of stopping it.
+                     */
+                    if (sectorState?.IsRunning == true ||
+                        sectorState?.PingCts is not null ||
+                        card.Endpoints.Any(
+                            x =>
+                                x.SessionState?.IsRunning ==
+                                true))
+                    {
+                        return;
+                    }
+
+                    await RunTowerSectorPingAsync(
+                        card);
+                };
 
             card.PingCountTextBox = pingCountBox;
 
