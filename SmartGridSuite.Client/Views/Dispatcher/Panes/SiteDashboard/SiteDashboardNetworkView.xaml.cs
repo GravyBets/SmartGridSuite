@@ -43,6 +43,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 PingCountTextBox,
                 PingCountTextBox_Pasting);
 
+            PingCountTextBox.KeyDown +=
+                PingCountTextBox_KeyDown;
+
             Reset();
         }
 
@@ -1080,6 +1083,28 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         }
 
         //Ping Helpers
+        private void PingCountTextBox_KeyDown(
+            object sender,
+            KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter)
+                return;
+
+            e.Handled = true;
+
+            /*
+             * Enter starts the same operation as Ping All.
+             * If a ping session is already active, leave it running rather
+             * than treating Enter as the Ping All button's Stop action.
+             */
+            if (IsAnyPingRunning(_pingState))
+                return;
+
+            PingAllButton_Click(
+                PingAllButton,
+                new RoutedEventArgs());
+        }
+
         private void PingCountTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             if (sender is not TextBox textBox)
