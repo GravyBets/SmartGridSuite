@@ -605,7 +605,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     "Equipment Type",
                     cleanLabel,
                     isReadOnly: !allowCustomLabel,
-                    fieldKey: "ReplacementItem");
+                    fieldKey: "ReplacementItem",
+                    watermark: "Equipment Type");
 
             Grid.SetColumn(firstField, 0);
 
@@ -613,7 +614,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 "Found SN or Leave Blank if installing new Device.",
                 cleanOldSerial,
                 isReadOnly: false,
-                fieldKey: "ReplacementOldSerial");
+                fieldKey: "ReplacementOldSerial",
+                watermark: "Found SN");
 
             Grid.SetColumn(oldSerialField, 2);
 
@@ -621,7 +623,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 "Left SN or Leave Blank if just removing.",
                 string.Empty,
                 isReadOnly: false,
-                fieldKey: "ReplacementNewSerial");
+                fieldKey: "ReplacementNewSerial",
+                watermark: "Left SN");
 
             Grid.SetColumn(newSerialField, 4);
 
@@ -640,7 +643,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             string label,
             string value,
             bool isReadOnly,
-            string? fieldKey = null)
+            string? fieldKey = null,
+            string? watermark = null)
         {
             var stack = new StackPanel
             {
@@ -663,7 +667,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             var textBox = new TextBox
             {
                 Text = value,
-                Tag = fieldKey,
+
+                /*
+                 * ModernWatermarkTextBox uses Tag for the text shown inside an
+                 * empty box. Uid carries the stable internal field key so changing
+                 * user-facing wording cannot break write-up extraction/persistence.
+                 */
+                Tag = string.IsNullOrWhiteSpace(watermark)
+                    ? label
+                    : watermark,
+
+                Uid = fieldKey ?? string.Empty,
                 IsReadOnly = isReadOnly,
                 Style = (Style)FindResource("ModernWatermarkTextBox"),
                 Height = 30,
@@ -726,7 +740,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     VerticalAlignment.Center,
 
                 IsEditable = false,
-                Tag = "ReplacementDeviceType",
+
+                // Tag is user-facing; Uid is the stable internal lookup key.
+                Tag = "Equipment Type",
+                Uid = "ReplacementDeviceType",
 
                 ToolTip =
                     "Select a device type before submitting this replacement."
@@ -765,12 +782,39 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             // Required selection remains blank until the user chooses.
             comboBox.SelectedIndex = -1;
 
+            /*
+             * The shared ComboBox template does not have a watermark layer,
+             * so add a lightweight non-interactive placeholder over this one
+             * picker to match the replacement TextBoxes.
+             */
+            var pickerGrid = new Grid();
+
+            var watermarkText = new TextBlock
+            {
+                Text = "Equipment Type",
+                Foreground =
+                    TryFindResource("WatermarkText") as Brush,
+                Margin = new Thickness(12, 0, 44, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                IsHitTestVisible = false,
+                Visibility = Visibility.Visible
+            };
+
             comboBox.SelectionChanged += (_, _) =>
             {
                 ClearRequiredFieldWarning(comboBox);
+
+                watermarkText.Visibility =
+                    comboBox.SelectedItem is null
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
             };
 
-            stack.Children.Add(comboBox);
+            pickerGrid.Children.Add(comboBox);
+            pickerGrid.Children.Add(watermarkText);
+
+            stack.Children.Add(pickerGrid);
 
             return stack;
         }
@@ -1038,7 +1082,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 var itemTextBox =
                     FindVisualChildByTag<TextBox>(
                         rowBorder,
-                        "Equipment Name");
+                        "ReplacementItem");
 
                 if (itemTextBox is null)
                     continue;
@@ -1096,7 +1140,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 var child = VisualTreeHelper.GetChild(root, i);
 
                 if (child is T typedChild &&
-                    Equals(typedChild.Tag, tag))
+                    string.Equals(
+                        typedChild.Uid,
+                        tag?.ToString(),
+                        StringComparison.OrdinalIgnoreCase))
                 {
                     return typedChild;
                 }
