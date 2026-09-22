@@ -2210,6 +2210,7 @@
                             <TextBox x:Name="SnmpDecoderValuesTextBox"
                                      Grid.Row="2"
                                      Style="{StaticResource WorkspaceReadOnlyBoxStyle}"
+                                     Foreground="{DynamicResource TextSecondary}"
                                      MinHeight="56"
                                      MinWidth="220"
                                      Padding="10,7"

@@ -597,23 +597,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             var firstField = usesCommunicationDeviceTypePicker
                 ? CreateCommunicationDeviceTypePicker("Device Type")
-                : CreateReplacementField("Item", cleanLabel, isReadOnly: !allowCustomLabel, fieldKey: "ReplacementItem");
+                : CreateReplacementField("Item", cleanLabel, isReadOnly: !allowCustomLabel, fieldKey: "Equipment Type");
 
             Grid.SetColumn(firstField, 0);
 
             var oldSerialField = CreateReplacementField(
-                "Old Serial",
+                "Found Serial",
                 cleanOldSerial,
                 isReadOnly: false,
-                fieldKey: "ReplacementOldSerial");
+                fieldKey: "Found SN or Leave Blank if installing new Device.");
 
             Grid.SetColumn(oldSerialField, 2);
 
             var newSerialField = CreateReplacementField(
-                "New Serial",
+                "Left Serial",
                 string.Empty,
                 isReadOnly: false,
-                fieldKey: "ReplacementNewSerial");
+                fieldKey: "Left SN or Leave Blank if just removing.");
 
             Grid.SetColumn(newSerialField, 4);
 
@@ -1029,7 +1029,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 var itemTextBox =
                     FindVisualChildByTag<TextBox>(
                         rowBorder,
-                        "ReplacementItem");
+                        "Equipment Name");
 
                 if (itemTextBox is null)
                     continue;

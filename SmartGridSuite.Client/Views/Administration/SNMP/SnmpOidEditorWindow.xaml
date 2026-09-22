@@ -173,11 +173,13 @@
                         <CheckBox x:Name="WritableCheckBox"
                                   Grid.Column="8"
                                   Content="Writable"
+                                  Foreground="{DynamicResource TextSecondary}"
                                   VerticalAlignment="Center"/>
 
                         <CheckBox x:Name="ShowInWorkspaceCheckBox"
                                   Grid.Column="10"
                                   Content="Show in Workspace"
+                                  Foreground="{DynamicResource TextSecondary}"
                                   VerticalAlignment="Center"/>
                     </Grid>
                 </Grid>
@@ -225,6 +227,7 @@
                         <CheckBox x:Name="ShowRawAlongsideDecodedCheckBox"
                                   Grid.Column="4"
                                   Content="Show raw value alongside decoded"
+                                  Foreground="{DynamicResource TextSecondary}"
                                   VerticalAlignment="Center"/>
                     </Grid>
                 </Grid>

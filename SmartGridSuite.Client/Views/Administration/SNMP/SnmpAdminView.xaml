@@ -214,6 +214,7 @@
                             <CheckBox x:Name="ProfileIsActiveCheckBox"
                                       Grid.Column="8"
                                       Content="Active"
+                                      Foreground="{DynamicResource TextSecondary}"
                                       VerticalAlignment="Center"/>
 
                             <TextBlock Grid.Column="10"
@@ -225,7 +226,7 @@
                                        Grid.Column="12"
                                        VerticalAlignment="Center"
                                        FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextPrimary}"
+                                       Foreground="{DynamicResource TextSecondary}"
                                        Text="(new)"/>
                         </Grid>
                     </Grid>
