@@ -595,25 +595,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                         GridUnitType.Star)
                 });
 
+            /*
+             * Keep user-facing wording separate from the stable internal field
+             * keys used by write-up generation and tab/session persistence.
+             */
             var firstField = usesCommunicationDeviceTypePicker
-                ? CreateCommunicationDeviceTypePicker("Device Type")
-                : CreateReplacementField("Item", cleanLabel, isReadOnly: !allowCustomLabel, fieldKey: "Equipment Type");
+                ? CreateCommunicationDeviceTypePicker("Equipment Type")
+                : CreateReplacementField(
+                    "Equipment Type",
+                    cleanLabel,
+                    isReadOnly: !allowCustomLabel,
+                    fieldKey: "ReplacementItem");
 
             Grid.SetColumn(firstField, 0);
 
             var oldSerialField = CreateReplacementField(
-                "Found Serial",
+                "Found SN or Leave Blank if installing new Device.",
                 cleanOldSerial,
                 isReadOnly: false,
-                fieldKey: "Found SN or Leave Blank if installing new Device.");
+                fieldKey: "ReplacementOldSerial");
 
             Grid.SetColumn(oldSerialField, 2);
 
             var newSerialField = CreateReplacementField(
-                "Left Serial",
+                "Left SN or Leave Blank if just removing.",
                 string.Empty,
                 isReadOnly: false,
-                fieldKey: "Left SN or Leave Blank if just removing.");
+                fieldKey: "ReplacementNewSerial");
 
             Grid.SetColumn(newSerialField, 4);
 
@@ -648,6 +656,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     FontWeight = FontWeights.SemiBold,
                     Foreground =
                         TryFindResource("TextSecondary") as Brush,
+                    TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(0, 0, 0, 4)
                 });
 
