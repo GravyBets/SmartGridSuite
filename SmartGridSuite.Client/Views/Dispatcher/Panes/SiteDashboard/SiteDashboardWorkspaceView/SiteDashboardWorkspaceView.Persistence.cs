@@ -103,7 +103,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private static void SetTaggedTextBoxValue(DependencyObject root, string tag, string? value)
         {
             var textBox = FindVisualChildren<TextBox>(root)
-                .FirstOrDefault(x => string.Equals(x.Tag?.ToString(), tag, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(x => string.Equals(x.Uid, tag, StringComparison.OrdinalIgnoreCase));
 
             if (textBox is not null)
                 textBox.Text = value ?? string.Empty;
@@ -112,7 +112,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private static void SetTaggedComboBoxValue(DependencyObject root, string tag, string? value)
         {
             var comboBox = FindVisualChildren<ComboBox>(root)
-                .FirstOrDefault(x => string.Equals(x.Tag?.ToString(), tag, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(x => string.Equals(x.Uid, tag, StringComparison.OrdinalIgnoreCase));
 
             if (comboBox is null)
                 return;
