@@ -2026,11 +2026,15 @@ namespace SmartGridSuite.Api.Controllers
 
             /*
              * A submission belongs in this technician's History when the technician
-             * was snapshotted as a participant in the assigned work. The technician who
-             * pressed Submit is not the sole owner of the completed-work record.
+             * was included at submission time OR Dispatch explicitly added that person
+             * to the already-closed ticket afterward for time-entry purposes.
+             *
+             * The technician who pressed Submit is not the sole owner of the completed
+             * work record. A later Dispatch addition does not rewrite the saved write-up
+             * narrative or technician footer; it only adds History visibility.
              *
              * Current ticket assignment and closure status are intentionally ignored
-             * because those values may change after the field work was completed.
+             * by the History query because those values may change after completion.
              */
             var query =
                 from submission in _db.TicketWriteUpSubmissions.AsNoTracking()
@@ -3255,6 +3259,7 @@ namespace SmartGridSuite.Api.Controllers
 
             var originalWorkOrder = entity.CurrentWorkOrder;
             var originalWorkOrderClass = entity.WorkOrderClass;
+            var originalAssignedTech = entity.AssignedTech;
 
             var updateValidationError = ValidateUpdateTicketRequest(req);
 
@@ -3351,6 +3356,25 @@ namespace SmartGridSuite.Api.Controllers
                     NormalizeWorkOrderType(originalWorkOrderClass),
                     NormalizeWorkOrderType(entity.WorkOrderClass),
                     StringComparison.OrdinalIgnoreCase);
+
+            /*
+             * Dispatch may add a technician or Lineman after a ticket has already
+             * been closed so the completed work appears in that person's History
+             * for time entry.
+             *
+             * This deliberately does NOT rewrite the saved write-up narrative or
+             * its technician footer. The original Submit Write-Up selections remain
+             * exactly as submitted; this only grants History visibility to newly
+             * assigned people on a closed ticket.
+             */
+            if (statusEntity.IsClosed)
+            {
+                await AddClosedTicketHistoryForNewAssignmentsAsync(
+                    entity.Id,
+                    originalAssignedTech,
+                    assignedTech,
+                    ct);
+            }
 
             try
             {
@@ -6662,6 +6686,148 @@ namespace SmartGridSuite.Api.Controllers
                     EmailAddress = cleanEmailAddress,
                     IsSubmitter = isSubmitter
                 };
+        }
+
+        /*
+         * Grants History visibility when Dispatch explicitly adds technicians to a
+         * CLOSED ticket after field completion.
+         *
+         * The existing ticket_writeup_submission_technicians table is used because
+         * Field Tech History is keyed to a completed submission. Adding a non-submitter
+         * row here does not alter SubmittedNarrative, Site History, PrimaryTech, or
+         * SecondaryTech, so the original write-up remains unchanged.
+         */
+        private async Task AddClosedTicketHistoryForNewAssignmentsAsync(
+            long ticketId,
+            string? originalAssignedTech,
+            string? updatedAssignedTech,
+            CancellationToken ct)
+        {
+            var originalNames =
+                ParseAssignedTechnicianDisplayNames(
+                    originalAssignedTech);
+
+            var updatedNames =
+                ParseAssignedTechnicianDisplayNames(
+                    updatedAssignedTech);
+
+            var addedNames =
+                updatedNames
+                    .Where(x =>
+                        !originalNames.Contains(x))
+                    .ToHashSet(
+                        StringComparer.OrdinalIgnoreCase);
+
+            if (addedNames.Count == 0)
+                return;
+
+            /*
+             * Completion date in Field Tech History comes from SubmittedAt.
+             * The latest active write-up therefore represents the ticket's most
+             * recent field completion event.
+             */
+            var latestSubmissionId =
+                await _db.TicketWriteUpSubmissions
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.TicketId == ticketId &&
+                        !x.IsDeleted)
+                    .OrderByDescending(x => x.SubmittedAt)
+                    .ThenByDescending(x => x.Id)
+                    .Select(x => (long?)x.Id)
+                    .FirstOrDefaultAsync(ct);
+
+            if (!latestSubmissionId.HasValue)
+                return;
+
+            var activeTechnicians =
+                await ActiveFieldTechniciansQuery()
+                    .ToListAsync(ct);
+
+            var addedTechnicians =
+                activeTechnicians
+                    .Where(technician =>
+                    {
+                        var employeeId =
+                            (technician.EmployeeId ?? string.Empty)
+                                .Trim();
+
+                        var displayName =
+                            FormatTechnicianName(
+                                technician.FirstName,
+                                technician.LastName,
+                                technician.EmployeeId);
+
+                        return
+                            addedNames.Contains(displayName) ||
+                            (!string.IsNullOrWhiteSpace(employeeId) &&
+                             addedNames.Contains(employeeId));
+                    })
+                    .ToList();
+
+            if (addedTechnicians.Count == 0)
+                return;
+
+            var existingParticipants =
+                await _db.TicketWriteUpSubmissionTechnicians
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.SubmissionId ==
+                        latestSubmissionId.Value)
+                    .Select(x => new
+                    {
+                        x.TechnicianId,
+                        x.EmployeeId
+                    })
+                    .ToListAsync(ct);
+
+            foreach (var technician in addedTechnicians)
+            {
+                var employeeId =
+                    (technician.EmployeeId ?? string.Empty)
+                        .Trim();
+
+                var alreadyVisible =
+                    existingParticipants.Any(x =>
+                        x.TechnicianId == technician.Id ||
+                        (
+                            !string.IsNullOrWhiteSpace(employeeId) &&
+                            string.Equals(
+                                x.EmployeeId,
+                                employeeId,
+                                StringComparison.OrdinalIgnoreCase)
+                        ));
+
+                if (alreadyVisible)
+                    continue;
+
+                _db.TicketWriteUpSubmissionTechnicians.Add(
+                    new TicketWriteUpSubmissionTechnicianEntity
+                    {
+                        SubmissionId =
+                            latestSubmissionId.Value,
+
+                        TechnicianId =
+                            technician.Id,
+
+                        EmployeeId =
+                            string.IsNullOrWhiteSpace(employeeId)
+                                ? $"TECH-{technician.Id}"
+                                : employeeId,
+
+                        TechnicianName =
+                            FormatTechnicianName(
+                                technician.FirstName,
+                                technician.LastName,
+                                technician.EmployeeId),
+
+                        IsSubmitter =
+                            false,
+
+                        CreatedAt =
+                            DateTime.Now
+                    });
+            }
         }
 
         // Splits the AssignedTech display value used for direct or older assignments.
