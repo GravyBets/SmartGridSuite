@@ -637,10 +637,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             Grid.SetRow(fieldsGrid, 2);
             root.Children.Add(fieldsGrid);
 
+            // Swap cards retain their replacement key when restored from a tab.
+            // Do not infer this from allowCustomLabel alone: restoration allows editing.
+            var canMarkBadFromStock = allowCustomLabel &&
+                !usesCommunicationDeviceTypePicker && string.IsNullOrWhiteSpace(replacementKey);
             var badFromStockCheckBox = new CheckBox
             {
                 Content = "Bad From Stock",
-                IsChecked = badFromStock,
+                IsChecked = canMarkBadFromStock && badFromStock,
+                Visibility = canMarkBadFromStock ? Visibility.Visible : Visibility.Collapsed,
                 Margin = new Thickness(0, 10, 0, 0),
                 Foreground = TryFindResource("TextPrimary") as Brush,
                 ToolTip = "Record a defective stock unit using the serial number shown on this card."
@@ -649,7 +654,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             var normalLeftWidth = fieldsGrid.ColumnDefinitions[4].Width;
             void ApplyBadFromStockState()
             {
-                var isBad = badFromStockCheckBox.IsChecked == true;
+                var isBad = canMarkBadFromStock && badFromStockCheckBox.IsChecked == true;
                 ((ReplacementEntryRowTag)outerBorder.Tag).BadFromStock = isBad;
                 newSerialField.Visibility = isBad ? Visibility.Collapsed : Visibility.Visible;
                 fieldsGrid.ColumnDefinitions[3].Width = isBad ? new GridLength(0) : normalGapWidth;
