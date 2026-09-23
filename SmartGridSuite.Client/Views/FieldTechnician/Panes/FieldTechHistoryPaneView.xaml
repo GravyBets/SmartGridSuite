@@ -489,7 +489,8 @@
                           RowDetailsTemplate="{StaticResource HistoryRowDetailsTemplate}"
                           LoadingRow="HistoryGrid_LoadingRow"
                           HorizontalScrollBarVisibility="Disabled"
-                          SelectionChanged="HistoryGrid_SelectionChanged">
+                          SelectionChanged="HistoryGrid_SelectionChanged"
+                          MouseDoubleClick="HistoryGrid_MouseDoubleClick">
 
                     <DataGrid.Columns>
 

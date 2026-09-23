@@ -440,19 +440,55 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
             UpdateHistorySelectionActions();
         }
 
-        // Selects or clears every currently displayed API-returned History row.
-        private void HistoryHeaderSelectAllCheckBox_Click(object sender, RoutedEventArgs e)
+        private void HistoryGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (sender is not CheckBox checkBox)
+            if (e.OriginalSource is not DependencyObject source)
                 return;
 
-            if (checkBox.IsChecked == true)
-                HistoryGrid.SelectAll();
-            else
-                HistoryGrid.UnselectAll();
+            /*
+             * Don't turn a double-click on one of the row's actual controls
+             * into a second expand/collapse action.
+             */
+            if (FindVisualParent<Button>(source) != null ||
+                FindVisualParent<CheckBox>(source) != null)
+            {
+                return;
+            }
 
-            UpdateHistorySelectionActions();
+            var row =
+                FindVisualParent<DataGridRow>(source);
+
+            if (row?.Item is not FieldTechHistoryItemDto historyItem)
+                return;
+
+            if (row.DetailsVisibility == Visibility.Visible)
+            {
+                row.DetailsVisibility = Visibility.Collapsed;
+
+                _expandedHistorySubmissionIds.Remove(historyItem.SubmissionId);
+            }
+            else
+            {
+                row.DetailsVisibility = Visibility.Visible;
+                _expandedHistorySubmissionIds.Add(historyItem.SubmissionId);
+            }
+
+            e.Handled = true;
         }
+
+                // Selects or clears every currently displayed API-returned History row.
+                private void HistoryHeaderSelectAllCheckBox_Click(object sender, RoutedEventArgs e)
+                {
+                    if (sender is not CheckBox checkBox)
+                        return;
+
+                    if (checkBox.IsChecked == true)
+                        HistoryGrid.SelectAll();
+                    else
+                        HistoryGrid.UnselectAll();
+
+                    UpdateHistorySelectionActions();
+                }
 
         // Allows each checkbox to toggle its full DataGrid row while preserving
         // multi-selection for the Copy Selected Orders workflow.

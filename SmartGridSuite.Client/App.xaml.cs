@@ -1,5 +1,4 @@
 ﻿using SmartGridSuite.Client.Services;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 
@@ -7,18 +6,7 @@ namespace SmartGridSuite.Client
 {
     public partial class App : Application
     {
-        /*
-         * Stable Windows taskbar identity.
-         *
-         * ClickOnce installs each application revision into a versioned
-         * cache path. Without an explicit AppUserModelID, Windows can treat
-         * the pinned SmartGridSuite launcher and the running client as
-         * different applications.
-         *
-         * Do not change this value between releases.
-         */
-        private const string AppUserModelId =
-            "SmartGridSuite.Desktop.Client";
+        
 
         private const string SingleInstanceMutexName =
             @"Local\SmartGridSuite.Client.SingleInstance";
@@ -26,25 +14,9 @@ namespace SmartGridSuite.Client
         private Mutex? _singleInstanceMutex;
         private bool _ownsSingleInstanceMutex;
 
-        [DllImport(
-            "shell32.dll",
-            CharSet = CharSet.Unicode,
-            SetLastError = false)]
-        private static extern int
-            SetCurrentProcessExplicitAppUserModelID(
-                string appID);
-
         protected override void OnStartup(StartupEventArgs e)
         {
-            /*
-             * Set the taskbar identity before any WPF windows are created.
-             * All Launcher / Dispatcher / Field Technician /
-             * Administration windows will inherit this identity.
-             */
-            _ =
-                SetCurrentProcessExplicitAppUserModelID(
-                    AppUserModelId);
-
+            
             _singleInstanceMutex = new Mutex(
                 initiallyOwned: true,
                 name: SingleInstanceMutexName,
