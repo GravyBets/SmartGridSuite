@@ -23,6 +23,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 var entry = GetEquipmentReplacementEntry(rowBorder, rowTag);
 
                 var isBlank =
+                    !entry.BadFromStock &&
                     string.IsNullOrWhiteSpace(entry.Item) &&
                     string.IsNullOrWhiteSpace(entry.OldSerial) &&
                     string.IsNullOrWhiteSpace(entry.NewSerial);
@@ -32,6 +33,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
                 entries.Add(new EquipmentReplacementSessionEntry
                 {
+                    BadFromStock = entry.BadFromStock,
                     SlotLabel = rowTag.Label,
                     UsesCommunicationDeviceTypePicker = rowTag.UsesCommunicationDeviceTypePicker,
                     ReplacementKey = rowTag.ReplacementKey ?? string.Empty,
@@ -53,7 +55,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             foreach (var entry in entries)
             {
-                if (string.IsNullOrWhiteSpace(entry.Item) &&
+                if (!entry.BadFromStock && string.IsNullOrWhiteSpace(entry.Item) &&
                     string.IsNullOrWhiteSpace(entry.OldSerial) &&
                     string.IsNullOrWhiteSpace(entry.NewSerial))
                 {
@@ -80,7 +82,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     oldSerial: entry.OldSerial,
                     allowCustomLabel: true,
                     usesCommunicationDeviceTypePicker: entry.UsesCommunicationDeviceTypePicker,
-                    replacementKey: string.IsNullOrWhiteSpace(replacementKey) ? null : replacementKey);
+                    replacementKey: string.IsNullOrWhiteSpace(replacementKey) ? null : replacementKey,
+                    badFromStock: entry.BadFromStock);
 
                 if (ReplacementEntriesPanel.Children.Count == 0)
                     continue;

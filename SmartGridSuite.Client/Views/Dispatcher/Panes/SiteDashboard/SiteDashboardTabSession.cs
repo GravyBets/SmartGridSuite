@@ -113,6 +113,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
     }
     public sealed class EquipmentReplacementSessionEntry
     {
+        public bool BadFromStock { get; set; }
         public string SlotLabel { get; set; } = "";
         public bool UsesCommunicationDeviceTypePicker { get; set; }
         public string Item { get; set; } = "";

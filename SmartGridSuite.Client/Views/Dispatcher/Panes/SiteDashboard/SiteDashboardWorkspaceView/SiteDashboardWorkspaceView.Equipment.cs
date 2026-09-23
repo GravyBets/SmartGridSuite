@@ -38,6 +38,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private sealed class ReplacementEntryRowTag
         {
+            public bool BadFromStock { get; set; }
             public string Label { get; set; } = string.Empty;
             public bool UsesCommunicationDeviceTypePicker { get; set; }
             public string? ReplacementKey { get; set; }
@@ -45,6 +46,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         private sealed class EquipmentReplacementWriteUpEntry
         {
+            public bool BadFromStock { get; set; }
             public string SlotLabel { get; set; } = string.Empty;
             public string Item { get; set; } = string.Empty;
             public string OldSerial { get; set; } = string.Empty;
@@ -411,7 +413,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         }
 
         private void AddReplacementEntryRow(string? label = null, string? oldSerial = null, bool allowCustomLabel = true, bool usesCommunicationDeviceTypePicker = false,
-            string? replacementKey = null)
+            string? replacementKey = null, bool badFromStock = false)
         {
             if (ReplacementEntriesPanel is null)
                 return;
@@ -634,6 +636,35 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             Grid.SetRow(fieldsGrid, 2);
             root.Children.Add(fieldsGrid);
+
+            var badFromStockCheckBox = new CheckBox
+            {
+                Content = "Bad From Stock",
+                IsChecked = badFromStock,
+                Margin = new Thickness(0, 10, 0, 0),
+                Foreground = TryFindResource("TextPrimary") as Brush,
+                ToolTip = "Record a defective stock unit using the serial number shown on this card."
+            };
+            var normalGapWidth = fieldsGrid.ColumnDefinitions[3].Width;
+            var normalLeftWidth = fieldsGrid.ColumnDefinitions[4].Width;
+            void ApplyBadFromStockState()
+            {
+                var isBad = badFromStockCheckBox.IsChecked == true;
+                ((ReplacementEntryRowTag)outerBorder.Tag).BadFromStock = isBad;
+                newSerialField.Visibility = isBad ? Visibility.Collapsed : Visibility.Visible;
+                fieldsGrid.ColumnDefinitions[3].Width = isBad ? new GridLength(0) : normalGapWidth;
+                fieldsGrid.ColumnDefinitions[4].Width = isBad ? new GridLength(0) : normalLeftWidth;
+                if (oldSerialField is StackPanel serialPanel && serialPanel.Children[0] is TextBlock serialLabel)
+                    serialLabel.Text = isBad
+                        ? "Bad From Stock Serial Number"
+                        : "Found Serial Number - *Leave blank if applicable*";
+            }
+            badFromStockCheckBox.Checked += (_, _) => ApplyBadFromStockState();
+            badFromStockCheckBox.Unchecked += (_, _) => ApplyBadFromStockState();
+            ApplyBadFromStockState();
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetRow(badFromStockCheckBox, 3);
+            root.Children.Add(badFromStockCheckBox);
 
             outerBorder.Child = root;
             ReplacementEntriesPanel.Children.Add(outerBorder);

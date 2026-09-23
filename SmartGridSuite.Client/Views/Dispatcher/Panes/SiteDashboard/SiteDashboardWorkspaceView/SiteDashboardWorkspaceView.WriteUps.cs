@@ -374,6 +374,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 var entry = GetEquipmentReplacementEntry(rowBorder, rowTag);
 
                 var isCompletelyBlank =
+                    !entry.BadFromStock &&
                     string.IsNullOrWhiteSpace(entry.Item) &&
                     string.IsNullOrWhiteSpace(entry.OldSerial) &&
                     string.IsNullOrWhiteSpace(entry.NewSerial);
@@ -405,6 +406,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             var oldSerial =
                 entry.OldSerial.Trim();
+
+            if (entry.BadFromStock)
+                return $"Bad From Stock {item} SN: {(string.IsNullOrWhiteSpace(oldSerial) ? "(not recorded)" : oldSerial)}";
 
             var newSerial =
                 entry.NewSerial.Trim();
@@ -446,6 +450,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             return new EquipmentReplacementWriteUpEntry
             {
+                BadFromStock = rowTag.BadFromStock,
                 SlotLabel = rowTag.Label,
                 UsesCommunicationDeviceTypePicker = rowTag.UsesCommunicationDeviceTypePicker,
                 Item = FriendlyReplacementItemLabel(item),
