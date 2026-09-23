@@ -1259,17 +1259,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private const int QuickTestWarmupCount = 1;
         private const int QuickTestMeasuredCount = 4;
 
-        private async Task RunQuickReachabilityTestAsync(TextBox ipTextBox, TextBlock summaryTextBlock)
+        private async Task RunQuickReachabilityTestAsync(TextBox ipTextBox)
         {
             var ip = ipTextBox.Text?.Trim();
 
             ClearIpTestState(ipTextBox);
             RememberIpTestState(ipTextBox, null);
-            summaryTextBlock.Text = "Testing...";
 
             if (string.IsNullOrWhiteSpace(ip))
             {
-                summaryTextBlock.Text = "Test Failed";
                 return;
             }
 
@@ -1303,7 +1301,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             SetIpTestState(ipTextBox, isSuccessful);
             RememberIpTestState(ipTextBox, isSuccessful);
-            summaryTextBlock.Text = isSuccessful ? "Test Successful" : "Test Failed";
+            // Quick Test changes only IP colors. Ping summaries belong to the
+            // running ping session and are also used in submitted write-ups.
         }
 
         private static void SetIpTestState(TextBox ipTextBox, bool? isSuccessful)
@@ -1475,38 +1474,31 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             {
                 return Task.WhenAll(
                     RunQuickReachabilityTestAsync(
-                        PrimaryIpTextBox,
-                        PrimarySummaryTextBlock),
+                        PrimaryIpTextBox),
 
                     RunQuickReachabilityTestAsync(
-                        LanIpTextBox,
-                        LanSummaryTextBlock));
+                        LanIpTextBox));
             }
 
             if (IsIgsdMode)
             {
                 return Task.WhenAll(
                     RunQuickReachabilityTestAsync(
-                        PrimaryIpTextBox,
-                        PrimarySummaryTextBlock),
+                        PrimaryIpTextBox),
 
                     RunQuickReachabilityTestAsync(
-                        SecondaryIpTextBox,
-                        SecondarySummaryTextBlock));
+                        SecondaryIpTextBox));
             }
 
             return Task.WhenAll(
                 RunQuickReachabilityTestAsync(
-                    PrimaryIpTextBox,
-                    PrimarySummaryTextBlock),
+                    PrimaryIpTextBox),
 
                 RunQuickReachabilityTestAsync(
-                    LanIpTextBox,
-                    LanSummaryTextBlock),
+                    LanIpTextBox),
 
                 RunQuickReachabilityTestAsync(
-                    SecondaryIpTextBox,
-                    SecondarySummaryTextBlock));
+                    SecondaryIpTextBox));
         }
 
         private async void TestAllButton_Click(object sender, RoutedEventArgs e)
