@@ -43,6 +43,7 @@ public class TopChangeDto
     public DateTime RequestedAt { get; set; }
     public DateTime? IpAssignedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
+    // Retained for the existing table; TOP changes no longer send email.
     public string EmailStatus { get; set; } = "";
 }
 
@@ -64,8 +65,3 @@ public sealed class AssignTopChangeIpRequest
     public string AssignedBy { get; set; } = "";
 }
 
-public sealed class TopChangeEmailResult
-{
-    public string Status { get; set; } = "";
-    public string Message { get; set; } = "";
-}

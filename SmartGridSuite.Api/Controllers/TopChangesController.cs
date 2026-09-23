@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
-using SmartGridSuite.Api.Services;
 using SmartGridSuite.Api.Services.SiteDashboard;
 using SmartGridSuite.Contracts.Tickets;
 using System.Net;
@@ -17,11 +16,8 @@ public sealed class TopChangesController : ControllerBase
 {
     private readonly SmartGridDbContext _db;
     private readonly SiteDashboardLookupService _lookup;
-    private readonly EmailService _email;
-    private readonly IConfiguration _configuration;
-    public TopChangesController(SmartGridDbContext db, SiteDashboardLookupService lookup,
-        EmailService email, IConfiguration configuration)
-        => (_db, _lookup, _email, _configuration) = (db, lookup, email, configuration);
+    public TopChangesController(SmartGridDbContext db, SiteDashboardLookupService lookup)
+        => (_db, _lookup) = (db, lookup);
 
     [HttpGet]
     public async Task<ActionResult<TopChangeContextDto>> Get(long ticketId, CancellationToken ct)
@@ -119,54 +115,8 @@ public sealed class TopChangesController : ControllerBase
         ticket.LastActivityAt = DateTime.Now;
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        row.EmailStatus = await NotifyRequesterAsync(row, ct);
-        await _db.SaveChangesAsync(ct);
         return Ok(row);
     }
-
-    [HttpPost("{id:long}/email-request")]
-    public async Task<ActionResult<TopChangeEmailResult>> EmailRequest(long ticketId, long id, CancellationToken ct)
-    {
-        var row = await _db.TopChanges.SingleOrDefaultAsync(x => x.Id == id && x.TicketId == ticketId, ct);
-        if (row == null) return NotFound();
-        if (row.State != "PendingIp") return Conflict("This request is no longer awaiting an IP.");
-        if (row.SiteKind == "AMS") return BadRequest("Dispatch assigns MR IPs directly.");
-        var recipients = (_configuration["TopChange:IpRequestRecipients"] ?? "")
-            .Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (recipients.Length == 0) return BadRequest("Configure TopChange:IpRequestRecipients on the API first.");
-        var result = await _email.SendAsync(new EmailSendRequest
-        {
-            EmailType = "TopChange", ToAddresses = recipients,
-            Subject = $"IP requested: TOP change for {row.Site} (ticket {ticketId})",
-            Body = Describe(row) + "\nPlease return the new IP to Dispatch.",
-            RelatedTicketId = ticketId, RelatedSite = row.Site, CreatedBy = "Dispatch TOP Change"
-        }, ct);
-        row.EmailStatus = $"IP request: {result.Status}";
-        await _db.SaveChangesAsync(ct);
-        return Ok(new TopChangeEmailResult { Status = result.Status, Message = result.Message });
-    }
-
-    private async Task<string> NotifyRequesterAsync(TopChangeEntity row, CancellationToken ct)
-    {
-        var address = await _db.Technicians.AsNoTracking().Where(x => x.EmployeeId == row.RequestedBy)
-            .Select(x => x.EmailAddress).FirstOrDefaultAsync(ct);
-        if (string.IsNullOrWhiteSpace(address)) return "IP saved; technician has no email address. View IP in Site Dashboard.";
-        try
-        {
-            var result = await _email.SendAsync(new EmailSendRequest
-            {
-                EmailType = "TopChange", ToAddresses = new[] { address },
-                Subject = $"New IP ready: {row.Site}", Body = Describe(row) + $"\nNew IP: {row.NewIp}\nSubmit your normal write-up when your site work is finished.",
-                RelatedTicketId = row.TicketId, RelatedSite = row.Site, CreatedBy = row.IpAssignedBy
-            }, ct);
-            return $"Technician notification: {result.Status}";
-        }
-        catch (Exception) when (!ct.IsCancellationRequested)
-        { return "IP saved; email failed. Re-save the same IP to retry notification."; }
-    }
-
-    private static string Describe(TopChangeDto row) =>
-        $"Site: {row.Site}\nTicket: {row.TicketId}\nCurrent TOP/sector: {row.OldTop} / {row.OldSector}\nCurrent IP: {row.OldIp}\nRequested TOP/sector: {row.NewTop} / {row.NewSector}\nTOP/sector already changed: {row.AlreadyChanged}\nRequested by: {row.RequestedBy}";
 
     private async Task<TopChangeContextDto?> LoadContextAsync(TicketEntity ticket, CancellationToken ct)
     {
