@@ -2,7 +2,10 @@
 
 Client-only change. No API deployment or database migration required.
 
-- Add a manual equipment card and a Swap card. Bad From Stock starts unchecked.
+- Add a blank/manual equipment card: Bad From Stock is visible and unchecked.
+- Create a card through Swap: the checkbox must be hidden and both serial fields visible.
+  Switch tabs and return: it must remain hidden. Previously checked Swap cards must
+  restore as normal replacements, with both serial fields visible.
 - Check it: Left Serial Number and its space disappear; the remaining serial
   field is labeled Bad From Stock Serial Number. Enter the defective unit's serial.
 - Preview: expect `Bad From Stock Radio SN: ABC123` for Radio / ABC123,
