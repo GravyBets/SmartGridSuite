@@ -215,15 +215,11 @@ public partial class NewTicketWindow : Window
         /*
          * This mirrors Create_Click.
          *
-         * Work Order Type and Code are not actually persisted
-         * when there is no Work Order, so changing those alone
-         * should not make Save appear enabled.
+         * Work Order Type can be chosen before the number is available.
+         * The existing Work Order Code rule still depends on the number.
          */
         var workOrderType =
-            string.IsNullOrWhiteSpace(workOrder)
-                ? ""
-                : NormalizeDraftText(
-                    Draft.WorkOrderType);
+            NormalizeDraftText(Draft.WorkOrderType);
 
         var workOrderCode =
             string.IsNullOrWhiteSpace(workOrder)
@@ -998,7 +994,6 @@ public partial class NewTicketWindow : Window
 
         if (workOrder == null)
         {
-            workOrderType = "";
             workOrderCode = "";
         }
 

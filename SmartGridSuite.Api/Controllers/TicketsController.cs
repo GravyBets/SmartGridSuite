@@ -3206,9 +3206,7 @@ namespace SmartGridSuite.Api.Controllers
                 LastActivityAt = now,
 
                 CurrentWorkOrder = string.IsNullOrWhiteSpace(wo) ? null : wo,
-                WorkOrderClass = string.IsNullOrWhiteSpace(wo)
-                    ? null
-                    : NormalizeWorkOrderClassForStorage(req.WorkOrderClass),
+                WorkOrderClass = NormalizeWorkOrderClassForStorage(req.WorkOrderClass),
                 GroupCode = (req.GroupCode ?? "").Trim(),
                 PriorityDays = (byte)Math.Clamp(req.PriorityDays, 0, 255),
 
@@ -3319,9 +3317,7 @@ namespace SmartGridSuite.Api.Controllers
             entity.AssignedTech = assignedTech;
 
             entity.CurrentWorkOrder = string.IsNullOrWhiteSpace(wo) ? null : wo;
-            entity.WorkOrderClass = string.IsNullOrWhiteSpace(wo)
-                ? null
-                : NormalizeWorkOrderClassForStorage(req.WorkOrderClass);
+            entity.WorkOrderClass = NormalizeWorkOrderClassForStorage(req.WorkOrderClass);
             entity.GroupCode = string.IsNullOrWhiteSpace(wo)
                 ? ""
                 : (req.GroupCode ?? "").Trim();
@@ -3729,16 +3725,6 @@ namespace SmartGridSuite.Api.Controllers
 
             foreach (var ticket in tickets)
             {
-                /*
-                 * Keep the existing data rule: WO Type only matters when a Work Order
-                 * exists. Tickets without a WO are skipped instead of creating dirty data.
-                 */
-                if (string.IsNullOrWhiteSpace(ticket.CurrentWorkOrder))
-                {
-                    skipped++;
-                    continue;
-                }
-
                 ticket.WorkOrderClass = storedType;
                 ticket.LastActivityAt = now;
                 updated++;

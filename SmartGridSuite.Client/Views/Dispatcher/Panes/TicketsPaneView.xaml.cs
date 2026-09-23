@@ -2592,7 +2592,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 {
                     message +=
                         $"{Environment.NewLine}{Environment.NewLine}" +
-                        $"{skippedCount} ticket(s) were skipped because they do not have a Work Order.";
+                        $"{skippedCount} ticket(s) were not updated by the server.";
                 }
 
                 if (notFoundCount > 0)
