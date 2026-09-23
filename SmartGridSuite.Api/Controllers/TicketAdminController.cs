@@ -22,6 +22,7 @@ namespace SmartGridSuite.Api.Controllers
         {
             "Open",
             "Needs Review",
+            "TOP Change",
             "Closed"
         };
 
@@ -168,6 +169,10 @@ namespace SmartGridSuite.Api.Controllers
                 return NotFound();
 
             var existingName = (entity.Name ?? string.Empty).Trim();
+
+            if (existingName.Equals("TOP Change", StringComparison.OrdinalIgnoreCase) &&
+                (!request.SendToDispatchTasks || request.IsFieldComplete || request.IsWriteUpSubmitTarget))
+                return BadRequest("TOP Change must remain a Dispatch task and cannot be a completion or write-up target status.");
 
             if (IsRequiredTicketStatus(existingName))
             {

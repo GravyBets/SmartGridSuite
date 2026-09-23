@@ -10,6 +10,44 @@ namespace SmartGridSuite.Api.Data
         public SmartGridDbContext(DbContextOptions<SmartGridDbContext> options) : base(options) { }
 
         public DbSet<TicketEntity> Tickets => Set<TicketEntity>();
+        public DbSet<TopChangeEntity> TopChanges => Set<TopChangeEntity>();
+
+        public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        {
+            ChangeTracker.DetectChanges();
+            var tickets = ChangeTracker.Entries<TicketEntity>()
+                .Where(x => x.State == EntityState.Modified).Select(x => x.Entity).ToList();
+            await using var ownTransaction = tickets.Count > 0 && Database.CurrentTransaction == null
+                ? await Database.BeginTransactionAsync(cancellationToken) : null;
+            if (tickets.Count > 0)
+            {
+                foreach (var ticket in tickets.OrderBy(x => x.Id))
+                {
+                    await LockTicketAsync(ticket.Id, cancellationToken);
+                    // Locking reads see the latest committed state even under repeatable-read isolation.
+                    var rows = await TopChanges.FromSqlInterpolated(
+                        $"SELECT * FROM ticket_top_changes WHERE ActiveTicketId = {ticket.Id} FOR UPDATE")
+                        .AsNoTracking().ToListAsync(cancellationToken);
+                    var local = ChangeTracker.Entries<TopChangeEntity>()
+                        .FirstOrDefault(x => x.Entity.TicketId == ticket.Id &&
+                            (x.State == EntityState.Added || x.State == EntityState.Modified));
+                    var request = local != null ? local.Entity : rows.SingleOrDefault();
+                    if (request?.ActiveTicketId == null) continue;
+                    ticket.Status = "TOP Change";
+                    ticket.ActionRequiredOverride = TopChangeWorkflow.ActionRequired(request);
+                }
+            }
+            var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+            if (ownTransaction != null) await ownTransaction.CommitAsync(cancellationToken);
+            return result;
+        }
+
+        public async Task LockTicketAsync(long ticketId, CancellationToken ct)
+        {
+            // Always lock ticket before request to give write-ups/IP assignment a consistent lock order.
+            await Tickets.FromSqlInterpolated($"SELECT * FROM tickets WHERE id = {ticketId} FOR UPDATE")
+                .AsNoTracking().ToListAsync(ct);
+        }
         public virtual DbSet<CrewEntity> Crews { get; set; }
         public virtual DbSet<TechnicianRosterEntity> TechnicianRosters { get; set; }
         public virtual DbSet<TechnicianEntity> Technicians { get; set; }
@@ -95,6 +133,17 @@ namespace SmartGridSuite.Api.Data
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<TopChangeEntity>(e =>
+            {
+                e.ToTable("ticket_top_changes");
+                e.HasKey(x => x.Id);
+                e.HasIndex(x => x.ActiveTicketId).IsUnique();
+                e.HasIndex(x => x.ClientRequestId).IsUnique();
+                e.HasIndex(x => x.TicketId);
+                e.HasOne<TicketEntity>().WithMany().HasForeignKey(x => x.TicketId).OnDelete(DeleteBehavior.Cascade);
+                foreach (var property in e.Metadata.GetProperties().Where(x => x.ClrType == typeof(string)))
+                    property.SetMaxLength(255);
+            });
             modelBuilder.Entity<TicketEntity>(e =>
             {
                 e.ToTable("tickets");

@@ -866,6 +866,11 @@
                         Height="32"
                         Width="96"
                         Click="Refresh_Click"/>
+                <Button Content="TOP Change"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Margin="8,0,0,0" Height="32" Padding="12,0"
+                        IsEnabled="{Binding HasSelectedTopChange}"
+                        Click="TopChangeTask_Click"/>
             </StackPanel>
         </Grid>
 

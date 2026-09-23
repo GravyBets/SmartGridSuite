@@ -1200,7 +1200,11 @@ namespace SmartGridSuite.Api.Controllers
 
             return Ok(new DispatchTaskQueryResponse
             {
-                Items = items,
+                Items = items.Select(item =>
+                {
+                    if (item.Status == "TOP Change") item.CanMarkClosed = false;
+                    return item;
+                }).ToList(),
                 TotalCount = totalCount
             });
         }
@@ -2624,6 +2628,8 @@ namespace SmartGridSuite.Api.Controllers
         [HttpPost("{id:long}/close-dispatch-task")]
         public async Task<ActionResult<UpdateTicketResponse>> CloseDispatchTask(long id, CancellationToken ct)
         {
+            if (await _db.TopChanges.AnyAsync(x => x.ActiveTicketId == id, ct))
+                return Conflict("This ticket has an active TOP change. Assign its IP and submit the normal site write-up before closing it.");
             var entity = await _db.Tickets
                 .FirstOrDefaultAsync(t => t.Id == id, ct);
 
@@ -3313,6 +3319,10 @@ namespace SmartGridSuite.Api.Controllers
                 return BadRequest("Selected status is invalid or inactive.");
 
             var status = statusEntity.Name;
+
+            if (await _db.TopChanges.AnyAsync(x => x.ActiveTicketId == entity.Id, ct) &&
+                (status != "TOP Change" || !string.Equals(entity.Site, req.Site.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return Conflict("An active TOP change protects this ticket's site and status until an IP is assigned and a normal write-up is submitted.");
 
             entity.Site = req.Site.Trim();
             entity.NotificationName = (req.NotificationName ?? "").Trim();
@@ -5697,6 +5707,7 @@ namespace SmartGridSuite.Api.Controllers
 
             try
             {
+                await _db.LockTicketAsync(entity.Id, ct);
                 var submittedWork = await ResolveSubmittedWorkAsync(
                     entity,
                     req.SubmittedBy,
@@ -5732,6 +5743,21 @@ namespace SmartGridSuite.Api.Controllers
                 entity.LastActivityAt = submittedAt;
                 entity.Status = writeUpSubmitStatus.Name;
 
+                // A regular write-up completes the TOP change only after Dispatch
+                // assigned an IP. Earlier write-ups remain saved without closing the request.
+                var topChanges = await _db.TopChanges.FromSqlInterpolated(
+                    $"SELECT * FROM ticket_top_changes WHERE ActiveTicketId = {entity.Id} FOR UPDATE")
+                    .ToListAsync(ct);
+                var topChange = topChanges.SingleOrDefault();
+                var topChangeStillPending = topChange != null;
+                if (topChange != null && TopChangeWorkflow.CanCompleteWithWriteUp(topChange, submittedAt))
+                {
+                    topChange.State = "Completed";
+                    topChange.CompletedAt = submittedAt;
+                    topChange.ActiveTicketId = null;
+                    topChangeStillPending = false;
+                }
+
                 var writeUpSubmissionId =
                     await CreateSubmittedWriteUpRecordsAsync(
                         entity,
@@ -5744,7 +5770,8 @@ namespace SmartGridSuite.Api.Controllers
                         automaticDbCorrectionReason,
                         ct);
 
-                await CompleteActiveDailyAssignmentForWriteUpAsync(
+                if (!topChangeStillPending)
+                    await CompleteActiveDailyAssignmentForWriteUpAsync(
                     entity.Id,
                     writeUpSubmissionId,
                     submittedWork,

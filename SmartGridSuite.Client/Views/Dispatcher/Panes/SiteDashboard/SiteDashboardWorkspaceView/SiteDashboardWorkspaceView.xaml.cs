@@ -38,6 +38,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public SiteDashboardWorkspaceView()
         {
             InitializeComponent();
+            InitializeTopChangeRefresh();
 
             Loaded += SiteDashboardWorkspaceView_Loaded;
 
@@ -152,7 +153,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         public Func<IReadOnlyList<string>>? IpChangeWriteUpLinesProvider { get; set; }
 
-        public long CurrentTicketId { get; set; }
+        private long _topChangeTicketId;
+        public long CurrentTicketId
+        {
+            get => _topChangeTicketId;
+            set
+            {
+                if (_topChangeTicketId == value) return;
+                _topChangeTicketId = value;
+                _ = RefreshTopChangeNoticeAsync();
+            }
+        }
 
         public string TowerSummaryText
         {
@@ -212,6 +223,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 _equipmentDashboardKind = value ?? string.Empty;
                 ApplyDashboardFeatureVisibility();
                 RefreshEquipmentCards();
+                _ = RefreshTopChangeNoticeAsync();
             }
         }
         private string _equipmentDashboardKind = string.Empty;

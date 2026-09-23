@@ -611,7 +611,7 @@
 
                         <DataGridTextColumn Header="Status"
                                             Width="3*"
-                                            Binding="{Binding Status}"
+                                            Binding="{Binding StatusDisplay}"
                                             ElementStyle="{StaticResource FieldTechTrimCellText}"/>
 
                     </DataGrid.Columns>
@@ -719,7 +719,7 @@
 
                         <DataGridTextColumn Header="Status"
                                             Width="150"
-                                            Binding="{Binding Status}"
+                                            Binding="{Binding StatusDisplay}"
                                             ElementStyle="{StaticResource FieldTechTrimCellText}"/>
 
                     </DataGrid.Columns>

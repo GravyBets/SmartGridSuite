@@ -1,5 +1,11 @@
 # SmartGridSuite
 
+## TOP Change workflow
+
+On branch `feature/dispatch-top-change-workflow`, **Request TOP Change** is in the
+Site Dashboard's **TOP Access** card. Dispatch manages requests from **Tasks → TOP Change**.
+Run the [database setup and test checklist](docs/top-change-workflow.md) before deploying this version.
+
 ## VM restart password setup
 
 Follow the [step-by-step VM password setup guide](deploy/maintenance/README.md#step-by-step-set-the-restart-password-on-the-vm) when you are back at work.

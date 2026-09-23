@@ -10,6 +10,8 @@ public sealed class FieldTechTicketListItemDto
     public string Notification { get; set; } = "";
 
     public string Status { get; set; } = "";
+    public string StatusDisplay => Status == "TOP Change" && !string.IsNullOrWhiteSpace(ActionRequired)
+        ? ActionRequired : Status;
     public string AssignedTech { get; set; } = "";
 
     public DateTime CreatedAt { get; set; }
