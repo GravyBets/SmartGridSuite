@@ -40,7 +40,7 @@ public sealed class TopChangeWindow : Window
         Title = $"TOP Change — {context.Site}";
         Width = 620; Height = 620; MinWidth = 500; MinHeight = 450;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        SetResourceReference(BackgroundProperty, "PrimaryBg");
+        SetResourceReference(BackgroundProperty, "AppBackground");
         SetResourceReference(ForegroundProperty, "TextPrimary");
         _body.Margin = new Thickness(20);
         Content = new ScrollViewer { Content = _body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };

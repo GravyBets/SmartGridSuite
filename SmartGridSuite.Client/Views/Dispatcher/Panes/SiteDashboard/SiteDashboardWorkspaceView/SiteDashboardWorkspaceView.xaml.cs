@@ -573,7 +573,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     MessageBoxImage.Error);
             }
         }
-
+        
         private async void DeleteSiteNoteButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Button button || button.Tag is not SiteNoteDto note)
