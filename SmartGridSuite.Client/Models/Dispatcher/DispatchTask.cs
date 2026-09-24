@@ -382,11 +382,16 @@ namespace SmartGridSuite.Client.Models.Dispatcher
                     .Select(x => x.Trim())
                     .Where(x =>
                         x.StartsWith(
-                            "New ",
-                            StringComparison.OrdinalIgnoreCase) &&
-                        x.Contains(
-                            " IP:",
-                            StringComparison.OrdinalIgnoreCase))
+                            "New TOP:",
+                            StringComparison.OrdinalIgnoreCase) ||
+                        (
+                            x.StartsWith(
+                                "New ",
+                                StringComparison.OrdinalIgnoreCase) &&
+                            x.Contains(
+                                " IP:",
+                                StringComparison.OrdinalIgnoreCase)
+                        ))
                     .Distinct(
                         StringComparer.OrdinalIgnoreCase)
                     .ToList();
