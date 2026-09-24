@@ -5766,6 +5766,57 @@ namespace SmartGridSuite.Api.Controllers
 
                 if (topChangeCompletesWithThisWriteUp)
                 {
+                    /*
+                     * A completed TOP change always requires the parent/current-site
+                     * database to be reviewed, even if the technician forgot to edit
+                     * the Primary IP field and therefore did not set
+                     * IpAddressWasChanged on the submission.
+                     *
+                     * Reuse the existing DB_CORRECTION_NEEDED system flag so Dispatch
+                     * receives the normal Update DB closeout checklist item.
+                     */
+                    if (!automaticDbCorrectionReasons.Contains(
+                            "TOP Change",
+                            StringComparer.OrdinalIgnoreCase))
+                    {
+                        automaticDbCorrectionReasons.Add("TOP Change");
+                    }
+
+                    automaticDbCorrectionReason =
+                        string.Join(
+                            "; ",
+                            automaticDbCorrectionReasons);
+
+                    if (selectedWriteUpFlags.All(x =>
+                            !string.Equals(
+                                x.SystemKey,
+                                "DB_CORRECTION_NEEDED",
+                                StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var automaticDbCorrectionFlag =
+                            await _db.WriteUpFlags
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(
+                                    x =>
+                                        x.IsActive &&
+                                        x.IsSystem &&
+                                        x.SystemKey ==
+                                            "DB_CORRECTION_NEEDED",
+                                    ct);
+
+                        if (automaticDbCorrectionFlag is not null)
+                        {
+                            selectedWriteUpFlags.Add(
+                                automaticDbCorrectionFlag);
+
+                            selectedWriteUpFlags =
+                                selectedWriteUpFlags
+                                    .OrderBy(x => x.SortOrder)
+                                    .ThenBy(x => x.DisplayName)
+                                    .ToList();
+                        }
+                    }
+
                     var topChangeLine =
                         TopChangeWorkflow.WriteUpLine(topChange!);
 
