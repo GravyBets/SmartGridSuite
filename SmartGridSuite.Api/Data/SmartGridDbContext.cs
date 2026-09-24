@@ -32,9 +32,28 @@ namespace SmartGridSuite.Api.Data
                         .FirstOrDefault(x => x.Entity.TicketId == ticket.Id &&
                             (x.State == EntityState.Added || x.State == EntityState.Modified));
                     var request = local != null ? local.Entity : rows.SingleOrDefault();
-                    if (request?.ActiveTicketId == null) continue;
-                    ticket.Status = "TOP Change";
-                    ticket.ActionRequiredOverride = TopChangeWorkflow.ActionRequired(request);
+                    if (request?.ActiveTicketId == null)
+                        continue;
+
+                    /*
+                     * TOP Change is a protected Dispatch status only while the
+                     * request is waiting for an IP.
+                     *
+                     * Once Dispatch assigns the IP, the request remains active
+                     * in IpReady state so the field client can keep polling it,
+                     * but the ticket itself must return to the normal workflow
+                     * (Open until the technician submits the write-up).
+                     *
+                     * Do not force IpReady tickets back to TOP Change here.
+                     */
+                    if (request.State.Equals(
+                            "PendingIp",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        ticket.Status = "TOP Change";
+                        ticket.ActionRequiredOverride =
+                            TopChangeWorkflow.ActionRequired(request);
+                    }
                 }
             }
             var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
