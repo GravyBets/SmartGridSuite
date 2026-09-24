@@ -189,6 +189,4 @@ public partial class TopChangeWindow : Window
         ex is ApiClient.ApiException api ? api.Body ?? api.Message : ex.Message,
         "TOP Change", MessageBoxButton.OK, MessageBoxImage.Warning);
 
-    // Add this field to the TopChangeWindow class to fix CS0103
-    private TextBlock RequestedBaseIpSourceText => (TextBlock)FindName("RequestedBaseIpSourceText");
 }
