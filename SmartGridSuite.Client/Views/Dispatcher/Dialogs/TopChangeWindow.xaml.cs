@@ -3,6 +3,7 @@ using SmartGridSuite.Contracts.Tickets;
 using System.Security.Principal;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs;
 
@@ -13,6 +14,8 @@ public partial class TopChangeWindow : Window
     private readonly Guid _requestId = Guid.NewGuid();
     private bool _saving;
     private int _copyFeedbackVersion;
+    private ICollectionView? _topOptionsView;
+    private string? _selectedTopDisplay;
     private static string Actor => (WindowsIdentity.GetCurrent()?.Name ?? "").Split('\\').Last().Split('@').First().Trim();
 
     public static async Task OpenAsync(Window? owner, long ticketId, bool dispatch)
@@ -72,6 +75,10 @@ public partial class TopChangeWindow : Window
                 .Select(x => x.First().TopDisplay)
                 .OrderBy(x => x)
                 .ToList();
+
+            _topOptionsView =
+                CollectionViewSource.GetDefaultView(TopCombo.ItemsSource);
+
             if (context.Sectors.Count == 0)
                 MessageText.Text = "No TOP sectors are available. Refresh the server's tower cache before requesting a change.";
         }
@@ -94,14 +101,17 @@ public partial class TopChangeWindow : Window
 
     private void TopCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (SectorCombo == null) return;
+        if (SectorCombo == null || TopCombo.SelectedItem is not string selectedDisplay)
+            return;
+
+        _selectedTopDisplay = selectedDisplay;
 
         var selectedTop = GetSelectedRequestedTop();
 
         SectorCombo.ItemsSource = _context.Sectors
-            .Where(x => 
+            .Where(x =>
                 x.Top.Equals(
-                    selectedTop, 
+                    selectedTop,
                     StringComparison.OrdinalIgnoreCase))
             .Select(x => x.Sector)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -109,6 +119,67 @@ public partial class TopChangeWindow : Window
             .ToList();
 
         SectorCombo.SelectedIndex = -1;
+    }
+
+    private void TopCombo_DropDownOpened(object sender, EventArgs e)
+    {
+        _topOptionsView ??=
+            CollectionViewSource.GetDefaultView(TopCombo.ItemsSource);
+
+        ClearTopSearchFilter();
+
+        Dispatcher.BeginInvoke(
+            new Action(() =>
+            {
+                if (TopCombo.Template.FindName("TopSearchBox", TopCombo) is not TextBox searchBox)
+                    return;
+
+                searchBox.Text = string.Empty;
+                searchBox.Focus();
+                searchBox.SelectAll();
+            }));
+    }
+
+    private void TopCombo_DropDownClosed(object sender, EventArgs e)
+    {
+        ClearTopSearchFilter();
+
+        if (TopCombo.SelectedItem == null &&
+            !string.IsNullOrWhiteSpace(_selectedTopDisplay))
+        {
+            TopCombo.SelectedItem = _selectedTopDisplay;
+        }
+    }
+
+    private void TopSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_topOptionsView == null || sender is not TextBox searchBox)
+            return;
+
+        var searchText =
+            (searchBox.Text ?? string.Empty).Trim();
+
+        _topOptionsView.Filter = item =>
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+                return true;
+
+            return item is string display &&
+                   display.Contains(
+                       searchText,
+                       StringComparison.OrdinalIgnoreCase);
+        };
+
+        _topOptionsView.Refresh();
+    }
+
+    private void ClearTopSearchFilter()
+    {
+        if (_topOptionsView == null)
+            return;
+
+        _topOptionsView.Filter = null;
+        _topOptionsView.Refresh();
     }
 
     private string GetSelectedRequestedTop()
