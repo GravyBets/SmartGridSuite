@@ -73,6 +73,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (session is null)
                 return;
 
+            /*
+             * The technician has confirmed Submit in the preview window.
+             * Stop every active ping session immediately so diagnostics do not
+             * continue running behind a submitted/completed site workflow.
+             */
+            NetworkView.StopPingSession(
+                NetworkView.GetPingSessionState());
+
+            WorkspaceView.StopTowerPings();
+
+            session.NetworkPingState =
+                NetworkView.GetPingSessionState();
+
+            session.TowerPingState =
+                WorkspaceView.GetTowerPingSessionState();
+
             var employeeId =
                 GetWindowsEmployeeId();
 
