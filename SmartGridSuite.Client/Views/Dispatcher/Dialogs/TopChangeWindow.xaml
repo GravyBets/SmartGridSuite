@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="TOP Change" 
         Width="400" 
-        Height="Auto"
+        Height="700" MinHeight="480" MinWidth="400"
         Icon="/Assets/Branding/SmartGridSuite_Icon.ico"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource AppBackground}" 
@@ -55,51 +55,26 @@
                     <StackPanel>
                         <TextBlock Text="Current site information" 
                                    Style="{StaticResource SectionHeading}"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition/>
-                                <ColumnDefinition/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <StackPanel Margin="0,0,0,0">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="1"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <TextBlock Text="TOP" 
-                                               Grid.Column="0"
-                                               Grid.Row="0"
-                                               Style="{StaticResource FieldLabel}"/>
-
-                                    <TextBox Text="{Binding CurrentTop, Mode=OneWay}" 
-                                             Grid.Row="2"
-                                             Style="{StaticResource CopyableValue}"/>
-
-                                    <TextBlock Text="Sector" 
-                                               Grid.Column="1"
-                                               Grid.Row="0"
-                                               Style="{StaticResource FieldLabel}"/>
-
-                                    <TextBox Text="{Binding CurrentSector, Mode=OneWay}" 
-                                             Grid.Column="1"
-                                             Grid.Row="2"
-                                             Margin="0,0,0,4"
-                                             Style="{StaticResource CopyableValue}"/>
-                                </Grid>
-
-                                <TextBlock Text="Current IP" 
-                                           Style="{StaticResource FieldLabel}"/>
-                                
-                                <TextBox Text="{Binding CurrentIp, Mode=OneWay}" 
-                                          Style="{StaticResource CopyableValue}"/>
-                            </StackPanel>
-                        </Grid>
+                        <StackPanel x:Name="CurrentSitePanel">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="TOP" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="CurrentTopCombo" MinHeight="32"
+                                              SelectionChanged="CurrentTopCombo_SelectionChanged"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Sector" Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="CurrentSectorCombo" MinHeight="32"/>
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Text="Current IP" Style="{StaticResource FieldLabel}" Margin="0,8,0,0"/>
+                            <TextBox x:Name="CurrentIpTextBox" Style="{StaticResource ModernTextBox}" MaxLength="255"/>
+                        </StackPanel>
                         <TextBlock Text="{Binding DataWarning}" 
                                    TextWrapping="Wrap" Margin="0,12,0,0"/>
                     </StackPanel>
@@ -125,7 +100,7 @@
                     <ComboBox x:Name="SectorCombo" 
                               MinHeight="34" 
                               HorizontalAlignment="Left"
-                              DisplayMemberPath="Sector"/>
+                              IsTextSearchEnabled="True"/>
                     
                     <TextBlock Text="Field work status" 
                                Style="{StaticResource FieldLabel}"/>
@@ -137,11 +112,7 @@
                         <ComboBoxItem Content="TOP/sector already changed — waiting for IP"/>
                     </ComboBox>
                     
-                    <Button Content="Submit TOP Change" 
-                            Click="Submit_Click"
-                            Style="{DynamicResource PrimaryButtonStyle}" 
-                            MinHeight="36" 
-                            Margin="0,18,0,0"/>
+
                 </StackPanel>
                 
                 <!-- Shared saved request; Dispatch-only controls are in DispatchPanel. -->
@@ -218,23 +189,28 @@
         
         <Grid Grid.Row="2" 
               Margin="0,16,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             
             <TextBlock x:Name="MessageText" 
+                       Grid.ColumnSpan="2"
                        TextWrapping="Wrap" 
                        VerticalAlignment="Center" 
                        Margin="0,0,12,0"/>
             
-            <Button Grid.Column="1" 
-                    Content="Close" 
-                    Click="Close_Click" 
-                    IsCancel="True"
-                    Style="{DynamicResource SecondaryButtonStyle}" 
-                    MinWidth="90" 
-                    MinHeight="34"/>
+            <StackPanel Grid.Row="1" Grid.ColumnSpan="2" HorizontalAlignment="Right" Orientation="Horizontal" Margin="0,8,0,0">
+                <Button x:Name="SubmitButton" Content="Submit" Click="Submit_Click"
+                        Visibility="Collapsed" Style="{DynamicResource PrimaryButtonStyle}"
+                        MinWidth="90" MinHeight="34" Margin="0,0,8,0"/>
+                <Button x:Name="CancelButton" Content="Cancel" Click="Close_Click" IsCancel="True"
+                        Style="{DynamicResource SecondaryButtonStyle}" MinWidth="90" MinHeight="34"/>
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>

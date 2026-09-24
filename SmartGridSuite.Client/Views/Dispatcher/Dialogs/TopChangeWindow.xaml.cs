@@ -40,9 +40,18 @@ public partial class TopChangeWindow : Window
         DataContext = context;
         Title = $"TOP Change — {context.Site}";
         SiteHeading.Text = $"Site: {context.Site}   •   Ticket: {context.TicketId}";
+        CurrentTopCombo.ItemsSource = context.Sectors.Select(x => x.Top).Append(context.CurrentTop)
+            .Distinct().OrderBy(x => x).ToList();
+        CurrentTopCombo.SelectedItem = context.CurrentTop;
+        CurrentSectorCombo.ItemsSource = context.Sectors.Where(x => x.Top == context.CurrentTop)
+            .Select(x => x.Sector).Append(context.CurrentSector).Distinct().OrderBy(x => x).ToList();
+        CurrentSectorCombo.SelectedItem = context.CurrentSector;
+        CurrentIpTextBox.Text = context.CurrentIp;
+        CurrentSitePanel.IsEnabled = !dispatch && (context.Request == null || context.Request.State == "Completed");
         if (context.Request is { State: not "Completed" } row)
         {
             ExistingRequestPanel.Visibility = Visibility.Visible;
+            CancelButton.Content = "Close";
             ShowRequest(row);
             DispatchPanel.Visibility = dispatch ? Visibility.Visible : Visibility.Collapsed;
             AssignedIpTextBox.IsReadOnly = !dispatch || row.State == "IpReady";
@@ -52,6 +61,7 @@ public partial class TopChangeWindow : Window
         else
         {
             NewRequestPanel.Visibility = Visibility.Visible;
+            SubmitButton.Visibility = Visibility.Visible;
             TopCombo.ItemsSource = context.Sectors.Select(x => x.Top).Distinct().OrderBy(x => x).ToList();
             if (context.Sectors.Count == 0)
                 MessageText.Text = "No TOP sectors are available. Refresh the server's tower cache before requesting a change.";
@@ -77,16 +87,36 @@ public partial class TopChangeWindow : Window
     private void TopCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (SectorCombo == null) return;
-        SectorCombo.ItemsSource = _context.Sectors.Where(x => x.Top == (TopCombo.SelectedItem as string)).ToList();
+        SectorCombo.ItemsSource = _context.Sectors.Where(x => x.Top == (TopCombo.SelectedItem as string))
+            .Select(x => x.Sector).Distinct().OrderBy(x => x).ToList();
         SectorCombo.SelectedIndex = -1;
+    }
+
+    private void CurrentTopCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (CurrentSectorCombo == null) return;
+        CurrentSectorCombo.ItemsSource = _context.Sectors
+            .Where(x => x.Top == (CurrentTopCombo.SelectedItem as string))
+            .Select(x => x.Sector)
+            .Concat((CurrentTopCombo.SelectedItem as string) == _context.CurrentTop
+                ? new[] { _context.CurrentSector } : Array.Empty<string>())
+            .Distinct().OrderBy(x => x).ToList();
+        CurrentSectorCombo.SelectedIndex = -1;
     }
 
     private async void Submit_Click(object sender, RoutedEventArgs e)
     {
-        if (SectorCombo.SelectedItem is not TopChangeSectorOption selected || TimingCombo.SelectedIndex < 0)
+        var selected = _context.Sectors.FirstOrDefault(x => x.Top == (TopCombo.SelectedItem as string)
+            && x.Sector == (SectorCombo.SelectedItem as string));
+        var currentTop = (CurrentTopCombo.SelectedItem as string ?? "").Trim();
+        var currentSector = (CurrentSectorCombo.SelectedItem as string ?? "").Trim();
+        var currentIp = CurrentIpTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(currentTop) || string.IsNullOrWhiteSpace(currentSector))
+        { MessageText.Text = "Select the current TOP and sector."; return; }
+        if (selected == null || TimingCombo.SelectedIndex < 0)
         { MessageText.Text = "Select a TOP, sector, and field work status."; return; }
         if (MessageBox.Show(this,
-            $"Request {_context.CurrentTop} / {_context.CurrentSector} → {selected.Top} / {selected.Sector}?\n\nDispatch will receive this ticket in TOP Change status.",
+            $"Request {currentTop} / {currentSector} → {selected.Top} / {selected.Sector}?\n\nCurrent IP: {currentIp}\n\nDispatch will receive this ticket in TOP Change status.",
             "Confirm TOP Change", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         await RunAsync(async () =>
         {
@@ -95,6 +125,7 @@ public partial class TopChangeWindow : Window
                 {
                     ClientRequestId = _requestId, NewSectorId = selected.SectorId,
                     AlreadyChanged = TimingCombo.SelectedIndex == 1, RequestedBy = Actor,
+                    CurrentTop = currentTop, CurrentSector = currentSector, CurrentIp = currentIp,
                     ExpectedTop = _context.CurrentTop, ExpectedSector = _context.CurrentSector, ExpectedIp = _context.CurrentIp
                 });
             if (saved == null) throw new InvalidOperationException("No response received. Reopen the request to check whether it was saved.");
@@ -141,4 +172,3 @@ public partial class TopChangeWindow : Window
         ex is ApiClient.ApiException api ? api.Body ?? api.Message : ex.Message,
         "TOP Change", MessageBoxButton.OK, MessageBoxImage.Warning);
 }
-

@@ -28,6 +28,27 @@ configure radio equipment. TOP/sector choices come from the tower cache; cached 
 site values are labelled in the dialog. Verify IP allocation using your existing process;
 the app checks IPv4 format, not availability, subnet membership or duplicate allocation.
 
+## Reviewing current site values
+
+For a new request, the current TOP and sector are dropdowns, preselected to the site
+lookup values. Current IP is editable using the ModernTextBox control style. Confirm
+or correct these before submitting. Corrections are saved as the request's old/current
+values and appear in Dispatch's copyable summary; Parent DB and cache are not updated.
+Existing submitted requests show their saved values read-only.
+
+The current site lookup tries Parent DB first, with an eight-second timeout. SQL errors
+or timeout cause cache fallback. The source message distinguishes live current values
+from cached current values. Dropdown options come from the tower cache in either case.
+A warning about dropdown options alone does not mean the live site lookup failed.
+The original lookup snapshot is still checked at submission to detect concurrent
+changes; technician corrections are sent separately from that snapshot.
+
+No new database script is required. Deploy both API and client for editable current
+values. Check a deliberately incorrect current TOP/sector/IP, submit corrections,
+and confirm Dispatch's copied details match. Also check that changing the new TOP
+filters its sectors and the selected sector displays its name, not a contract type.
+Check Submit/Cancel placement on a small display.
+
 ## Editing the window
 
 Edit `SmartGridSuite.Client/Views/Dispatcher/Dialogs/TopChangeWindow.xaml` for all
@@ -115,3 +136,4 @@ Keep the additive table for request history. Older APIs do not enforce TOP Chang
 do not switch them in while requests are active. Do not drop the table while this API is running.
 There is no cancellation/reassignment screen in this first version; if a request is wrong,
 stop and resolve it before recording an IP or completing its write-up.
+

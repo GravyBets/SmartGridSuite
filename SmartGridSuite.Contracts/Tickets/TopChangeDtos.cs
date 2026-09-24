@@ -53,6 +53,10 @@ public sealed class CreateTopChangeRequest
     public int NewSectorId { get; set; }
     public bool AlreadyChanged { get; set; }
     public string RequestedBy { get; set; } = "";
+    // Technician-reviewed current values. Null preserves compatibility with older clients.
+    public string? CurrentTop { get; set; }
+    public string? CurrentSector { get; set; }
+    public string? CurrentIp { get; set; }
     // Compare the snapshot the technician reviewed to current server data.
     public string ExpectedTop { get; set; } = "";
     public string ExpectedSector { get; set; } = "";
