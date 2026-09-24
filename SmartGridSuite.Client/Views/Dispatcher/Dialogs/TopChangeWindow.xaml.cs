@@ -15,6 +15,7 @@ public partial class TopChangeWindow : Window
     private readonly Guid _requestId = Guid.NewGuid();
     private bool _saving;
     private int _copyFeedbackVersion;
+    private int _ipCopyFeedbackVersion;
     private ICollectionView? _topOptionsView;
     private string? _selectedTopDisplay;
     private static string Actor => (WindowsIdentity.GetCurrent()?.Name ?? "").Split('\\').Last().Split('@').First().Trim();
@@ -84,7 +85,11 @@ public partial class TopChangeWindow : Window
                 MessageText.Text = "No TOP sectors are available. Refresh the server's tower cache before requesting a change.";
         }
         Closing += (_, e) => { if (_saving) e.Cancel = true; };
-        Closed += (_, _) => _copyFeedbackVersion++;
+        Closed += (_, _) =>
+        {
+            _copyFeedbackVersion++;
+            _ipCopyFeedbackVersion++;
+        };
     }
 
     private void ShowRequest(TopChangeDto row)
@@ -270,7 +275,37 @@ public partial class TopChangeWindow : Window
         RequestCopyGlyph.ClearValue(TextBlock.TextProperty);
         CopyRequestButton.ToolTip = "Copy IP request text";
     }
-    private void CopyIp_Click(object sender, RoutedEventArgs e) => CopyText(_context.Request?.NewIp ?? "");
+    private async void CopyIp_Click(object sender, RoutedEventArgs e)
+    {
+        var ip =
+            (_context.Request?.NewIp ?? AssignedIpTextBox.Text ?? string.Empty).Trim();
+
+        if (string.IsNullOrWhiteSpace(ip))
+            return;
+
+        try
+        {
+            Clipboard.SetText(ip);
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex);
+            return;
+        }
+
+        var version = ++_ipCopyFeedbackVersion;
+        IpCopyGlyph.Text = "\uE73E";
+        CopyIpButton.ToolTip = "Copied!";
+
+        await Task.Delay(TimeSpan.FromSeconds(3));
+
+        if (version != _ipCopyFeedbackVersion)
+            return;
+
+        IpCopyGlyph.ClearValue(TextBlock.TextProperty);
+        CopyIpButton.ToolTip = "Copy assigned IP";
+    }
+
     private void CopyText(string text)
     {
         try { Clipboard.SetText(text); MessageText.Text = "Copied."; }
