@@ -5718,6 +5718,29 @@ namespace SmartGridSuite.Api.Controllers
                     submittedWork,
                     req.SelectedTechnicians);
 
+                // Lock the active TOP change before building the canonical write-up so an
+                // IP assignment cannot race this submission. Once Dispatch has assigned
+                // the IP, the new TOP/IP are promoted to the top of the technician write-up.
+                var topChanges = await _db.TopChanges.FromSqlInterpolated(
+                    $"SELECT * FROM ticket_top_changes WHERE ActiveTicketId = {entity.Id} FOR UPDATE")
+                    .ToListAsync(ct);
+                var topChange = topChanges.SingleOrDefault();
+                var topChangeCompletesWithThisWriteUp =
+                    topChange != null &&
+                    TopChangeWorkflow.CanCompleteWithWriteUp(topChange, submittedAt);
+
+                if (topChangeCompletesWithThisWriteUp)
+                {
+                    var topChangeHeader =
+                        TopChangeWorkflow.WriteUpHeader(topChange!);
+
+                    finalWriteUp =
+                        topChangeHeader + Environment.NewLine + Environment.NewLine + finalWriteUp;
+
+                    siteHistoryWriteUp =
+                        topChangeHeader + Environment.NewLine + Environment.NewLine + siteHistoryWriteUp;
+                }
+
                 /*
                  * The API owns the final technician footer. This ensures Ticket Notes,
                  * the structured submission, Site History, Field Tech History, and email
@@ -5745,14 +5768,10 @@ namespace SmartGridSuite.Api.Controllers
 
                 // A regular write-up completes the TOP change only after Dispatch
                 // assigned an IP. Earlier write-ups remain saved without closing the request.
-                var topChanges = await _db.TopChanges.FromSqlInterpolated(
-                    $"SELECT * FROM ticket_top_changes WHERE ActiveTicketId = {entity.Id} FOR UPDATE")
-                    .ToListAsync(ct);
-                var topChange = topChanges.SingleOrDefault();
                 var topChangeStillPending = topChange != null;
-                if (topChange != null && TopChangeWorkflow.CanCompleteWithWriteUp(topChange, submittedAt))
+                if (topChangeCompletesWithThisWriteUp)
                 {
-                    topChange.State = "Completed";
+                    topChange!.State = "Completed";
                     topChange.CompletedAt = submittedAt;
                     topChange.ActiveTicketId = null;
                     topChangeStillPending = false;
