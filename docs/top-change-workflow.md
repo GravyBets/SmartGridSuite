@@ -2,13 +2,17 @@
 
 ## Where to find it
 
-Open an existing ticket's Site Dashboard. **Request TOP Change** appears below the
-**TOP Access** heading for MR (AMS), DAC and IG sites. Select the new TOP, its sector,
+Open an existing ticket's Site Dashboard. **Request TOP Change** spans the TOP Access card below the
+TOP IPs (with Active Test beside the title) for MR (AMS), DAC and IG sites. Select the new TOP, its sector,
 and whether the radio change is planned or already done. Current TOP, sector and IP
 remain visible separately. The request sets the ticket to protected **TOP Change** status.
 This version requires a ticket; opening a site without one prompts you to open a ticket first.
 
-In **Dispatch → Tasks**, select that ticket and click **TOP Change**:
+In **Dispatch → Tasks**, expand that ticket and use **View Request / Assign IP** in its
+**TOP Change** section. The action uses the expanded ticket, independently of which row
+is selected. The Dispatch window opens at 960 × 850 (limited by available screen space)
+and can be resized; its sizing is defined in `TopChangeWindow.xaml`.
+
 
 - MR, DAC and IG: use **Copy Request Details** to copy the site, ticket, old/new TOP
   and sector, current IP, requester and field-work status. Dispatch can paste this into

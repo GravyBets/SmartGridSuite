@@ -37,6 +37,7 @@ public partial class TopChangeWindow : Window
     {
         _context = context;
         InitializeComponent();
+        Tag = dispatch ? "Dispatch" : "Technician";
         DataContext = context;
         Title = $"TOP Change — {context.Site}";
         SiteHeading.Text = $"Site: {context.Site}   •   Ticket: {context.TicketId}";

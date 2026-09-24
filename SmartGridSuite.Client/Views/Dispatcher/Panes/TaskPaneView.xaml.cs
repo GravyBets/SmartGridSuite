@@ -95,7 +95,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private int _busyOverlayDepth;
         public bool HasSelectedTask => SelectedTask != null;
-        public bool HasSelectedTopChange => SelectedTask?.Status == "TOP Change";
 
         private readonly HashSet<long> _expandedTaskTicketIds = new();
 
@@ -116,7 +115,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 OnPropertyChanged(nameof(SelectedTask));
                 OnPropertyChanged(nameof(HasSelectedTask));
-                OnPropertyChanged(nameof(HasSelectedTopChange));
             }
         }
 
@@ -850,8 +848,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async void TopChangeTask_Click(object sender, RoutedEventArgs e)
         {
-            if (SelectedTask == null) return;
-            await TopChangeWindow.OpenAsync(Window.GetWindow(this), SelectedTask.TicketId, dispatch: true);
+            if (sender is not FrameworkElement element || element.DataContext is not DispatchTask task ||
+                task.TicketId <= 0 || task.Status != "TOP Change") return;
+            await TopChangeWindow.OpenAsync(Window.GetWindow(this), task.TicketId, dispatch: true);
             await RefreshPaneAsync();
         }
 

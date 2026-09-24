@@ -352,19 +352,19 @@
 
                             <!-- Header row -->
                             <Grid Grid.Row="0">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-
                                 <TextBlock x:Name="TopAccessTitleTextBlock"
-                                            Grid.Column="0"
-                                            Text="TOP Access"
-                                            Style="{StaticResource WorkspaceSectionHeaderStyle}"
-                                            TextTrimming="CharacterEllipsis"
-                                            VerticalAlignment="Center" />
+                                           Text="TOP Access"
+                                           Style="{StaticResource WorkspaceSectionHeaderStyle}"
+                                           TextTrimming="CharacterEllipsis" Margin="0,0,8,0"
+                                           VerticalAlignment="Center"/>
+                                <Button x:Name="TestTopPairButton" Grid.Column="1"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        HorizontalAlignment="Right" Content="Active Test"
+                                        Height="30" Width="88" Click="TestTopPairButton_Click"/>
                             </Grid>
 
                             <!-- IP A -->
@@ -485,34 +485,12 @@
                             </Grid>
 
 
-                            <Grid Grid.Row="8">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="4"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                
-                                <Button x:Name="TopChangeButton"
-                                        Grid.Column="2"
-                                        Height="30"
-                                        Content="Request TOP Change"
-                                        Style="{StaticResource SecondaryButtonStyle}"
-                                        Margin="0,2,0,0"
-                                        Click="TopChangeButton_Click" />
-                                
-                                <Button x:Name="TestTopPairButton"
-                                        Grid.Column="0"
-                                        Style="{StaticResource PrimaryButtonStyle}"
-                                        HorizontalAlignment="Right"
-                                        Content="Active Test"
-                                        Margin="0,0,0,0"
-                                        Height="30"
-                                        Width="88"
-                                        Click="TestTopPairButton_Click" />
-                            </Grid>
+                            <!-- Full-width request action below IP A, IP B and the optional tunnel. -->
+                            <Button x:Name="TopChangeButton" Grid.Row="8"
+                                    Height="30" Content="Request TOP Change"
+                                    HorizontalAlignment="Stretch"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Margin="0,2,0,0" Click="TopChangeButton_Click"/>
 
                             <Border Grid.Row="10"
                                     Background="{DynamicResource SurfaceBorder}" />

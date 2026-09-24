@@ -194,6 +194,35 @@
                               HorizontalScrollBarVisibility="Disabled"
                               CanContentScroll="False">
 
+                    <StackPanel>
+                        <!-- Keep this action with the ticket that owns the request. -->
+                        <Border Margin="0,0,6,10">
+                            <Border.Style>
+                                <Style TargetType="Border" BasedOn="{StaticResource TaskExpandedSectionCard}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Status}" Value="TOP Change">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Text="TOP Change" Style="{StaticResource TaskExpandedLabelText}"/>
+                                    <TextBlock Text="{Binding ActionRequired}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Review the submitted TOP / sector details, copy the request, or record the assigned IP."
+                                               TextWrapping="Wrap" Foreground="{DynamicResource TextSecondary}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="View Request / Assign IP"
+                                        Style="{StaticResource PrimaryButtonStyle}" Height="34" Padding="14,0"
+                                        VerticalAlignment="Center" Click="TopChangeTask_Click"/>
+                            </Grid>
+                        </Border>
                     <Grid Margin="0,0,6,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -799,6 +828,7 @@
                             </StackPanel>
                         </Border>
                     </Grid>
+                </StackPanel>
                 </ScrollViewer>
             </Grid>
         </DataTemplate>
@@ -866,11 +896,6 @@
                         Height="32"
                         Width="96"
                         Click="Refresh_Click"/>
-                <Button Content="TOP Change"
-                        Style="{StaticResource SecondaryButtonStyle}"
-                        Margin="8,0,0,0" Height="32" Padding="12,0"
-                        IsEnabled="{Binding HasSelectedTopChange}"
-                        Click="TopChangeTask_Click"/>
             </StackPanel>
         </Grid>
 
