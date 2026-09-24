@@ -12,6 +12,7 @@ public partial class TopChangeWindow : Window
     private readonly TopChangeContextDto _context;
     private readonly Guid _requestId = Guid.NewGuid();
     private bool _saving;
+    private int _copyFeedbackVersion;
     private static string Actor => (WindowsIdentity.GetCurrent()?.Name ?? "").Split('\\').Last().Split('@').First().Trim();
 
     public static async Task OpenAsync(Window? owner, long ticketId, bool dispatch)
@@ -40,7 +41,7 @@ public partial class TopChangeWindow : Window
         Tag = dispatch ? "Dispatch" : "Technician";
         DataContext = context;
         Title = $"TOP Change — {context.Site}";
-        SiteHeading.Text = $"Site: {context.Site}   •   Ticket: {context.TicketId}";
+        SiteHeading.Text = $"Site: {context.Site}";
         CurrentTopCombo.ItemsSource = context.Sectors.Select(x => x.Top).Append(context.CurrentTop)
             .Distinct().OrderBy(x => x).ToList();
         CurrentTopCombo.SelectedItem = context.CurrentTop;
@@ -49,7 +50,7 @@ public partial class TopChangeWindow : Window
         CurrentSectorCombo.SelectedItem = context.CurrentSector;
         CurrentIpTextBox.Text = context.CurrentIp;
         CurrentSiteCard.Visibility = dispatch ? Visibility.Collapsed : Visibility.Visible;
-        CurrentReferenceExpander.Visibility = dispatch ? Visibility.Visible : Visibility.Collapsed;
+        ExistingTopPanel.Visibility = dispatch ? Visibility.Visible : Visibility.Collapsed;
         CurrentSitePanel.IsEnabled = !dispatch && (context.Request == null || context.Request.State == "Completed");
         if (context.Request is { State: not "Completed" } row)
         {
@@ -57,6 +58,7 @@ public partial class TopChangeWindow : Window
             CancelButton.Content = "Close";
             ShowRequest(row);
             DispatchPanel.Visibility = dispatch ? Visibility.Visible : Visibility.Collapsed;
+            SaveAssignedIpButton.Visibility = dispatch ? Visibility.Visible : Visibility.Collapsed;
             AssignedIpTextBox.IsReadOnly = !dispatch || row.State == "IpReady";
         }
         else if (dispatch)
@@ -70,6 +72,7 @@ public partial class TopChangeWindow : Window
                 MessageText.Text = "No TOP sectors are available. Refresh the server's tower cache before requesting a change.";
         }
         Closing += (_, e) => { if (_saving) e.Cancel = true; };
+        Closed += (_, _) => _copyFeedbackVersion++;
     }
 
     private void ShowRequest(TopChangeDto row)
@@ -78,7 +81,7 @@ public partial class TopChangeWindow : Window
         RequestedTopText.Text = TopChangeRequestText.TopSector(row.NewTop, row.NewSector);
         RequestedBaseIpText.Text = $"Base IP: {(string.IsNullOrWhiteSpace(_context.RequestedBaseIp) ? "unavailable" : _context.RequestedBaseIp)}";
         RequestedBaseIpSourceText.Text = _context.RequestedBaseIpSource;
-        CurrentReferenceText.Text = $"Current TOP: {TopChangeRequestText.TopSector(row.OldTop, row.OldSector)}\nCurrent IP: {row.OldIp}";
+        CurrentReferenceText.Text = $"{TopChangeRequestText.TopSector(row.OldTop, row.OldSector)}\nCurrent IP: {row.OldIp}";
         RequestDetailsText.Text = $"Requested: {row.RequestedAt:g}\n" +
             (row.AlreadyChanged ? "TOP/sector was already changed when requested." : "TOP/sector change was planned when requested.");
         AssignedIpTextBox.Text = row.NewIp;
@@ -150,7 +153,19 @@ public partial class TopChangeWindow : Window
         });
     }
 
-    private void CopyRequest_Click(object sender, RoutedEventArgs e) => CopyText(RequestSummaryTextBox.Text);
+    private async void CopyRequest_Click(object sender, RoutedEventArgs e)
+    {
+        try { Clipboard.SetText(RequestSummaryTextBox.Text); }
+        catch (Exception ex) { ShowError(ex); return; }
+
+        var version = ++_copyFeedbackVersion;
+        RequestCopyGlyph.Text = "\uE73E";
+        CopyRequestButton.ToolTip = "Copied!";
+        await Task.Delay(TimeSpan.FromSeconds(3));
+        if (version != _copyFeedbackVersion) return;
+        RequestCopyGlyph.ClearValue(TextBlock.TextProperty);
+        CopyRequestButton.ToolTip = "Copy IP request text";
+    }
     private void CopyIp_Click(object sender, RoutedEventArgs e) => CopyText(_context.Request?.NewIp ?? "");
     private void CopyText(string text)
     {

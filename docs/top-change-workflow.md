@@ -14,10 +14,12 @@ is selected. The Dispatch window opens at 960 × 850 (limited by available scree
 and can be resized; its sizing is defined in `TopChangeWindow.xaml`.
 
 
-- Dispatch sees the requested TOP-sector (for example ACKMWB-AP1) and base IP first.
-  Existing TOP/IP details are in a collapsed reference section.
-- **Copy IP Request Text** copies the requested email wording: site, current TOP/IP,
+- Dispatch sees existing TOP/IP on the left and requested TOP-sector/base IP on the right
+  in the same card. The request message is below it, followed by the assigned IP field.
+  Save Assigned IP sits immediately left of Close in the footer. Both window headers show only the site.
+- The mini copy icon at the top-right of the message box copies the requested email wording: site, current TOP/IP,
   requested TOP-sector with base IP, and the request to provide IP/update tunnels.
+  The icon becomes a checkmark for three seconds after a successful copy.
   The app does not create or send emails.
 - Base IP is resolved from the requested sector's live tower data with the existing
   eight-second cache fallback. It uses VIP, then IP A, then IP B, keeping the first

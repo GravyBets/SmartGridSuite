@@ -1,4 +1,4 @@
-<Window x:Class="SmartGridSuite.Client.Views.Dispatcher.Dialogs.TopChangeWindow"
+<Window x:Name="TopChangeDialog" x:Class="SmartGridSuite.Client.Views.Dispatcher.Dialogs.TopChangeWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="TOP Change" 
@@ -169,80 +169,64 @@
                 <StackPanel x:Name="ExistingRequestPanel" 
                             Visibility="Collapsed">
                     
+                    <!-- Dispatch comparison: existing on the left, requested on the right. -->
                     <Border Background="{DynamicResource CardBackground}" CornerRadius="8" Padding="16" Margin="0,0,0,12">
-                        <StackPanel>
-                            <TextBlock Text="Requested TOP / sector" Style="{StaticResource SectionHeading}"/>
-                            <TextBox x:Name="RequestedTopText" Style="{StaticResource CopyableValue}" FontSize="26" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="RequestedBaseIpText" FontSize="18" Margin="0,8,0,0"/>
-                            <TextBlock x:Name="RequestedBaseIpSourceText" TextWrapping="Wrap"
-                                       Foreground="{DynamicResource TextSecondary}" Margin="0,4,0,0"/>
-                        </StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition>
+                                    <ColumnDefinition.Style>
+                                        <Style TargetType="ColumnDefinition">
+                                            <Setter Property="Width" Value="0"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Tag, ElementName=TopChangeDialog}" Value="Dispatch">
+                                                    <Setter Property="Width" Value="*"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ColumnDefinition.Style>
+                                </ColumnDefinition>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel x:Name="ExistingTopPanel" Visibility="Collapsed" Margin="0,0,20,0">
+                                <TextBlock Text="Existing TOP" Style="{StaticResource SectionHeading}"/>
+                                <TextBox x:Name="CurrentReferenceText" Style="{StaticResource CopyableValue}" FontSize="18"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Requested TOP" Style="{StaticResource SectionHeading}"/>
+                                <TextBox x:Name="RequestedTopText" Style="{StaticResource CopyableValue}" FontSize="26" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="RequestedBaseIpText" FontSize="18" Margin="0,8,0,0"/>
+                                <TextBlock x:Name="RequestedBaseIpSourceText" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextSecondary}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Grid>
                     </Border>
-                    <TextBlock x:Name="RequestStateText" 
-                               Style="{StaticResource SectionHeading}"/>
-                    
-                    <TextBox x:Name="RequestDetailsText" 
-                             Style="{StaticResource CopyableValue}"/>
-                    
-                    <TextBlock Text="Assigned IP" 
-                               Style="{StaticResource FieldLabel}"/>
-                    
-                    <TextBox x:Name="AssignedIpTextBox" MinHeight="34" Padding="8" IsReadOnly="True"/>
-                    
-                    <Button x:Name="CopyIpButton" 
-                            Content="Copy IP" 
-                            Click="CopyIp_Click"
-                            Style="{DynamicResource SecondaryButtonStyle}" 
-                            HorizontalAlignment="Left"
-                            MinHeight="32" 
-                            Margin="0,8,0,0" 
-                            Visibility="Collapsed"/>
-                    
-                    <TextBlock Text="Submit your normal site write-up when the work is finished."
-                               TextWrapping="Wrap" 
-                               Margin="0,12,0,0"/>
-                    
-                    <!-- Dispatch: copy information into your existing email process, then record the IP. -->
-                    <StackPanel x:Name="DispatchPanel" 
-                                Visibility="Collapsed" 
-                                Margin="0,18,0,0">
-                        
-                        <TextBlock Text="Dispatch" 
-                                   Style="{StaticResource SectionHeading}"/>
-                        
-                        <TextBlock Text="Copy the request details for your usual IP-assignment email. When an IP is assigned, enter it above and save it for the technician."
-                                   TextWrapping="Wrap" 
-                                   Margin="0,0,0,12"/>
-                        <TextBox x:Name="RequestSummaryTextBox" 
-                                 IsReadOnly="True" 
-                                 TextWrapping="Wrap"
-                                 AcceptsReturn="True" 
-                                 VerticalScrollBarVisibility="Auto"
-                                 MinHeight="230" 
-                                 MaxHeight="320" 
-                                 Padding="10"/>
-                        
-                        <WrapPanel Margin="0,12,0,0">
-                            <Button Content="Copy IP Request Text" Click="CopyRequest_Click"
-                                    Style="{DynamicResource SecondaryButtonStyle}" 
-                                    MinHeight="36" 
-                                    Margin="0,0,12,8"/>
-                            <Button Content="Save Assigned IP" 
-                                    Click="SaveIp_Click"
-                                    Style="{DynamicResource PrimaryButtonStyle}" 
-                                    MinHeight="36" 
-                                    Margin="0,0,0,8"/>
-                        </WrapPanel>
-                        
-                        <TextBlock Text="Saving makes the IP available in the app. No email is sent."
-                                   TextWrapping="Wrap"/>                        
+
+                    <!-- Copyable email text sits directly below the comparison card. -->
+                    <StackPanel x:Name="DispatchPanel" Visibility="Collapsed" Margin="0,0,0,16">
+                        <TextBlock Text="IP request message" Style="{StaticResource SectionHeading}"/>
+                        <Grid>
+                            <TextBox x:Name="RequestSummaryTextBox" IsReadOnly="True" TextWrapping="Wrap"
+                                     AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                                     MinHeight="230" MaxHeight="320" Padding="10,10,48,10"/>
+                            <Button x:Name="CopyRequestButton" Style="{StaticResource MiniIconButton}"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,18,0"
+                                    ToolTip="Copy IP request text" AutomationProperties.Name="Copy IP request text"
+                                    Click="CopyRequest_Click">
+                                <TextBlock x:Name="RequestCopyGlyph" Style="{StaticResource CopyGlyph}"/>
+                            </Button>
+                        </Grid>
                     </StackPanel>
+
+                    <TextBlock Text="Assigned IP" Style="{StaticResource FieldLabel}" Margin="0,0,0,4"/>
+                    <TextBox x:Name="AssignedIpTextBox" Style="{StaticResource ModernTextBox}" IsReadOnly="True"/>
+                    <Button x:Name="CopyIpButton" Content="Copy IP" Click="CopyIp_Click"
+                            Style="{DynamicResource SecondaryButtonStyle}" HorizontalAlignment="Left"
+                            MinHeight="32" Margin="0,8,0,0" Visibility="Collapsed"/>
+                    <TextBlock x:Name="RequestStateText" Style="{StaticResource SectionHeading}" Margin="0,16,0,6"/>
+                    <TextBox x:Name="RequestDetailsText" Style="{StaticResource CopyableValue}"/>
+                    <TextBlock Text="Submit your normal site write-up when the work is finished."
+                               TextWrapping="Wrap" Margin="0,12,0,0"/>
                 </StackPanel>
-                
-                <Expander x:Name="CurrentReferenceExpander" Header="Existing TOP / IP (reference)"
-                          IsExpanded="False" Visibility="Collapsed" Margin="0,16,0,0">
-                    <TextBox x:Name="CurrentReferenceText" Style="{StaticResource CopyableValue}" Margin="8"/>
-                </Expander>
 
                 <TextBlock x:Name="NoRequestText" 
                            Text="There is no active TOP-change request on this ticket."
@@ -274,6 +258,9 @@
                         Orientation="Horizontal" 
                         Margin="0,8,0,0">
                 
+                <Button x:Name="SaveAssignedIpButton" Content="Save Assigned IP" Click="SaveIp_Click"
+                        Visibility="Collapsed" Style="{DynamicResource PrimaryButtonStyle}"
+                        MinWidth="150" MinHeight="34" Margin="0,0,8,0"/>
                 <Button x:Name="CancelButton" 
                         Content="Cancel" 
                         Click="Close_Click" 
