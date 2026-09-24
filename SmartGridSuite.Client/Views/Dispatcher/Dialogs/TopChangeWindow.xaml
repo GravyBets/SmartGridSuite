@@ -30,7 +30,7 @@
         <Style x:Key="SectionHeading" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
         </Style>
         <Style x:Key="FieldLabel" TargetType="TextBlock">
             <Setter Property="Margin" Value="0,0,0,0"/>
@@ -47,7 +47,7 @@
     </Window.Resources>
     
     <Grid x:Name="Body" 
-          Margin="14">
+          Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -67,7 +67,7 @@
             <StackPanel>
                 <Border x:Name="CurrentSiteCard" Background="{DynamicResource CardBackground}" 
                         CornerRadius="8" 
-                        Padding="10" 
+                        Padding="12" 
                         Margin="0,0,0,4">
                     <StackPanel>
                         <TextBlock Text="Current site information" 
@@ -76,20 +76,33 @@
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="6"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="TOP" Style="{StaticResource FieldLabel}"/>
-                                    <ComboBox x:Name="CurrentTopCombo" MinHeight="32"
+                                    <TextBlock Text="TOP" 
+                                               Margin="2,0,0,4"
+                                               Style="{StaticResource FieldLabel}"/>
+                                    
+                                    <ComboBox x:Name="CurrentTopCombo" 
+                                              MinHeight="32"
+                                              HorizontalAlignment="Stretch"
+                                              Width="Auto"
                                               SelectionChanged="CurrentTopCombo_SelectionChanged"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="Sector" Style="{StaticResource FieldLabel}"/>
-                                    <ComboBox x:Name="CurrentSectorCombo" MinHeight="32"/>
+                                    <TextBlock Text="Sector" 
+                                               Margin="2,0,0,4"
+                                               Style="{StaticResource FieldLabel}"/>
+                                    <ComboBox x:Name="CurrentSectorCombo" 
+                                              MinHeight="32"
+                                              HorizontalAlignment="Stretch"
+                                              Width="Auto"/>
                                 </StackPanel>
                             </Grid>
-                            <TextBlock Text="Current IP" Style="{StaticResource FieldLabel}" Margin="0,8,0,0"/>
+                            <TextBlock Text="Current IP" 
+                                       Style="{StaticResource FieldLabel}" 
+                                       Margin="2,6,0,4"/>
                             <TextBox x:Name="CurrentIpTextBox" Style="{StaticResource ModernTextBox}" MaxLength="255"/>
                         </StackPanel>
                         <TextBlock Text="{Binding DataWarning}" 
@@ -98,32 +111,52 @@
                 </Border>
                 
                 <!-- Technician: create a request. -->
-                <StackPanel x:Name="NewRequestPanel" 
+                <StackPanel x:Name="NewRequestPanel"
+                            Margin="0,8,0,0"
                             Visibility="Collapsed">                    
                     
                     <TextBlock Text="Request a new TOP / sector"
                                Style="{StaticResource SectionHeading}"/>
-                    
-                    <TextBlock Text="New TOP"                               
-                               Style="{StaticResource FieldLabel}"/>
 
-                    <ComboBox x:Name="TopCombo" 
-                              MinHeight="34" 
-                              HorizontalAlignment="Left"
-                              SelectionChanged="TopCombo_SelectionChanged"/>
-                    
-                    <TextBlock Text="New sector" 
-                               Style="{StaticResource FieldLabel}"/>
-                    <ComboBox x:Name="SectorCombo" 
-                              MinHeight="34" 
-                              HorizontalAlignment="Left"
-                              IsTextSearchEnabled="True"/>
-                    
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="6"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock Text="New TOP"
+                                       Margin="2,0,0,4"
+                                       Style="{StaticResource FieldLabel}"/>
+
+                            <ComboBox x:Name="TopCombo" 
+                                      MinHeight="34" 
+                                      HorizontalAlignment="Stretch"
+                                      Width="Auto"
+                                    SelectionChanged="TopCombo_SelectionChanged"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="New sector" 
+                                       Margin="2,0,0,4"
+                                       Style="{StaticResource FieldLabel}"/>
+                            
+                            <ComboBox x:Name="SectorCombo" 
+                                      MinHeight="34" 
+                                      HorizontalAlignment="Stretch"
+                                      Width="Auto"
+                                      IsTextSearchEnabled="True"/>
+                        </StackPanel>
+                    </Grid>
+
                     <TextBlock Text="Field work status" 
+                               Margin="2,6,0,4"
                                Style="{StaticResource FieldLabel}"/>
                     
                     <ComboBox x:Name="TimingCombo" 
-                              HorizontalAlignment="Left"
+                              HorizontalAlignment="Stretch"
+                              Width="Auto"
                               MinHeight="34">
                         <ComboBoxItem Content="Change planned — waiting for IP"/>
                         <ComboBoxItem Content="TOP/sector already changed — waiting for IP"/>
@@ -219,7 +252,7 @@
         </ScrollViewer>
         
         <Grid Grid.Row="2" 
-              Margin="0,16,0,0">
+              Margin="0,0,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -235,12 +268,28 @@
                        VerticalAlignment="Center" 
                        Margin="0,0,12,0"/>
             
-            <StackPanel Grid.Row="1" Grid.ColumnSpan="2" HorizontalAlignment="Right" Orientation="Horizontal" Margin="0,8,0,0">
-                <Button x:Name="SubmitButton" Content="Submit" Click="Submit_Click"
-                        Visibility="Collapsed" Style="{DynamicResource PrimaryButtonStyle}"
-                        MinWidth="90" MinHeight="34" Margin="0,0,8,0"/>
-                <Button x:Name="CancelButton" Content="Cancel" Click="Close_Click" IsCancel="True"
-                        Style="{DynamicResource SecondaryButtonStyle}" MinWidth="90" MinHeight="34"/>
+            <StackPanel Grid.Row="1" 
+                        Grid.ColumnSpan="2" 
+                        HorizontalAlignment="Right" 
+                        Orientation="Horizontal" 
+                        Margin="0,8,0,0">
+                
+                <Button x:Name="CancelButton" 
+                        Content="Cancel" 
+                        Click="Close_Click" 
+                        IsCancel="True"
+                        Style="{DynamicResource SecondaryButtonStyle}" 
+                        MinWidth="90" 
+                        MinHeight="34"                         
+                        Margin="0,0,4,0"/>
+
+                <Button x:Name="SubmitButton" 
+                        Content="Submit" 
+                        Click="Submit_Click"
+                        Visibility="Collapsed" 
+                        Style="{DynamicResource PrimaryButtonStyle}"
+                        MinWidth="90" 
+                        MinHeight="34"/>
             </StackPanel>
         </Grid>
     </Grid>
