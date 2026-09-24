@@ -1,5 +1,6 @@
 using SmartGridSuite.Client.Services;
 using SmartGridSuite.Contracts.Tickets;
+using System.ComponentModel;
 using System.Security.Principal;
 using System.Windows;
 using System.Windows.Controls;
