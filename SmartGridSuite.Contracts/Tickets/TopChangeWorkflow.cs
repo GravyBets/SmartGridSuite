@@ -8,4 +8,13 @@ public static class TopChangeWorkflow
 
     public static string ActionRequired(TopChangeDto request) => request.State == "IpReady"
         ? $"TOP Change — IP ready: {request.NewIp}" : "TOP Change — awaiting IP";
+
+    public static string Destination(TopChangeDto request) =>
+        TopChangeRequestText.TopSector(request.NewTop, request.NewSector);
+
+    public static string WriteUpLine(TopChangeDto request) =>
+        $"New TOP: {Destination(request)}";
+
+    public static string DispatchNote(TopChangeDto request) =>
+        $"TOP Change — New TOP: {Destination(request)} | New IP: {request.NewIp}";
 }
