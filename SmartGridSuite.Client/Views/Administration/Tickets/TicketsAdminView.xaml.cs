@@ -292,6 +292,7 @@ namespace SmartGridSuite.Client.Views.Administration.Tickets
 
             return clean.Equals("Open", StringComparison.OrdinalIgnoreCase)
                 || clean.Equals("Needs Review", StringComparison.OrdinalIgnoreCase)
+                || clean.Equals("TOP Change", StringComparison.OrdinalIgnoreCase)
                 || clean.Equals("Closed", StringComparison.OrdinalIgnoreCase);
         }
 
