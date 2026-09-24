@@ -5368,6 +5368,41 @@ namespace SmartGridSuite.Api.Controllers
             }
         }
 
+        private static string InsertTopChangeIntoWriteUp(
+            string? writeUpText,
+            string? topChangeLine)
+        {
+            var text = (writeUpText ?? string.Empty).Trim();
+            var line = (topChangeLine ?? string.Empty).Trim();
+
+            if (line.Length == 0)
+                return text;
+
+            var lines = text
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+                .ToList();
+
+            if (lines.Any(x =>
+                x.Trim().StartsWith(
+                    "New TOP:",
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                return text;
+            }
+
+            var reasonIndex = lines.FindIndex(x =>
+                x.Trim().StartsWith(
+                    "Reason:",
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (reasonIndex >= 0)
+                lines.Insert(reasonIndex + 1, line);
+            else
+                lines.Insert(0, line);
+
+            return string.Join(Environment.NewLine, lines).Trim();
+        }
+
         private static string InsertReferToIntoWriteUp(
             string? writeUpText,
             IReadOnlyCollection<ReferToOptionEntity> referToOptions)
@@ -5731,14 +5766,14 @@ namespace SmartGridSuite.Api.Controllers
 
                 if (topChangeCompletesWithThisWriteUp)
                 {
-                    var topChangeHeader =
-                        TopChangeWorkflow.WriteUpHeader(topChange!);
+                    var topChangeLine =
+                        TopChangeWorkflow.WriteUpLine(topChange!);
 
                     finalWriteUp =
-                        topChangeHeader + Environment.NewLine + Environment.NewLine + finalWriteUp;
+                        InsertTopChangeIntoWriteUp(finalWriteUp, topChangeLine);
 
                     siteHistoryWriteUp =
-                        topChangeHeader + Environment.NewLine + Environment.NewLine + siteHistoryWriteUp;
+                        InsertTopChangeIntoWriteUp(siteHistoryWriteUp, topChangeLine);
                 }
 
                 /*
