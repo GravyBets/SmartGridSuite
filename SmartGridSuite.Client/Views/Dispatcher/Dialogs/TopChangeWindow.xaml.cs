@@ -99,7 +99,10 @@ public partial class TopChangeWindow : Window
         var selectedTop = GetSelectedRequestedTop();
 
         SectorCombo.ItemsSource = _context.Sectors
-            .Where(x => x.Top.Equals(selectedTop, StringComparison.OrdinalIgnoreCase))
+            .Where(x => 
+                x.Top.Equals(
+                    selectedTop, 
+                    StringComparison.OrdinalIgnoreCase))
             .Select(x => x.Sector)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(x => x)
@@ -115,8 +118,12 @@ public partial class TopChangeWindow : Window
 
         return _context.Sectors
             .FirstOrDefault(x =>
-                x.Top.Equals(selectedText, StringComparison.OrdinalIgnoreCase) ||
-                x.TopDisplay.Equals(selectedText, StringComparison.OrdinalIgnoreCase))
+                x.Top.Equals(
+                    selectedText, 
+                    StringComparison.OrdinalIgnoreCase) ||
+                x.TopDisplay.Equals(
+                    selectedText, 
+                    StringComparison.OrdinalIgnoreCase))
             ?.Top ?? string.Empty;
     }
 
