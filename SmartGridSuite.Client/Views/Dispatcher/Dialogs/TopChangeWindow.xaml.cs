@@ -67,7 +67,11 @@ public partial class TopChangeWindow : Window
         {
             NewRequestPanel.Visibility = Visibility.Visible;
             SubmitButton.Visibility = Visibility.Visible;
-            TopCombo.ItemsSource = context.Sectors.Select(x => x.Top).Distinct().OrderBy(x => x).ToList();
+            TopCombo.ItemsSource = context.Sectors
+                .GroupBy(x => x.Top, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.First())
+                .OrderBy(x => x.TopDisplay)
+                .ToList();
             if (context.Sectors.Count == 0)
                 MessageText.Text = "No TOP sectors are available. Refresh the server's tower cache before requesting a change.";
         }
@@ -92,9 +96,31 @@ public partial class TopChangeWindow : Window
     private void TopCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (SectorCombo == null) return;
-        SectorCombo.ItemsSource = _context.Sectors.Where(x => x.Top == (TopCombo.SelectedItem as string))
-            .Select(x => x.Sector).Distinct().OrderBy(x => x).ToList();
+
+        var selectedTop = GetSelectedRequestedTop();
+
+        SectorCombo.ItemsSource = _context.Sectors
+            .Where(x => x.Top.Equals(selectedTop, StringComparison.OrdinalIgnoreCase))
+            .Select(x => x.Sector)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToList();
+
         SectorCombo.SelectedIndex = -1;
+    }
+
+    private string GetSelectedRequestedTop()
+    {
+        if (TopCombo.SelectedItem is TopChangeSectorOption selected)
+            return selected.Top;
+
+        var typed = (TopCombo.Text ?? string.Empty).Trim();
+
+        return _context.Sectors
+            .FirstOrDefault(x =>
+                x.Top.Equals(typed, StringComparison.OrdinalIgnoreCase) ||
+                x.TopDisplay.Equals(typed, StringComparison.OrdinalIgnoreCase))
+            ?.Top ?? string.Empty;
     }
 
     private void CurrentTopCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -111,8 +137,10 @@ public partial class TopChangeWindow : Window
 
     private async void Submit_Click(object sender, RoutedEventArgs e)
     {
-        var selected = _context.Sectors.FirstOrDefault(x => x.Top == (TopCombo.SelectedItem as string)
-            && x.Sector == (SectorCombo.SelectedItem as string));
+        var requestedTop = GetSelectedRequestedTop();
+        var selected = _context.Sectors.FirstOrDefault(x =>
+            x.Top.Equals(requestedTop, StringComparison.OrdinalIgnoreCase) &&
+            x.Sector == (SectorCombo.SelectedItem as string));
         var currentTop = (CurrentTopCombo.SelectedItem as string ?? "").Trim();
         var currentSector = (CurrentSectorCombo.SelectedItem as string ?? "").Trim();
         var currentIp = CurrentIpTextBox.Text.Trim();
