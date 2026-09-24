@@ -730,20 +730,25 @@ namespace SmartGridSuite.Api.Services.ParentSync
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-            var lteBySite =
+            var matchingLteRows =
                 await _appDb.CacheSiteLte
                     .AsNoTracking()
                     .Where(x =>
                         x.IsActive &&
                         pmrSiteIds.Contains(x.SiteId))
-                    .GroupBy(x => x.SiteId)
-                    .Select(group => group
-                        .OrderByDescending(x => x.UpdatedAt)
-                        .First())
-                    .ToDictionaryAsync(
+                    .ToListAsync(cancellationToken);
+
+            var lteBySite =
+                matchingLteRows
+                    .GroupBy(
                         x => x.SiteId,
-                        StringComparer.OrdinalIgnoreCase,
-                        cancellationToken);
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group
+                            .OrderByDescending(x => x.UpdatedAt)
+                            .First(),
+                        StringComparer.OrdinalIgnoreCase);
 
             foreach (var row in pmrRows)
             {
