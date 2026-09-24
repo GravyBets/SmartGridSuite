@@ -44,6 +44,153 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="0"/>
         </Style>
+
+        <!--
+            TOP picker only.
+            Keep the selected value non-editable so it always renders correctly,
+            but put a real search box inside the dropdown to filter TOPs live.
+        -->
+        <Style x:Key="TopSearchComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource ControlInputText}"/>
+            <Setter Property="Background" Value="{DynamicResource ControlInputBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource ControlInputBorder}"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Padding" Value="12,0,44,0"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource ModernComboBoxItem}"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid SnapsToDevicePixels="True"
+                              TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}">
+
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="10"/>
+
+                            <ToggleButton x:Name="PART_DropDownToggle"
+                                          Focusable="False"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          Cursor="Hand">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <ContentPresenter/>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="44"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0"
+                                            Background="Transparent"
+                                            Padding="12,0,8,0">
+                                        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
+                                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                          VerticalAlignment="Center"
+                                                          HorizontalAlignment="Left"
+                                                          RecognizesAccessKey="True"
+                                                          TextElement.Foreground="{TemplateBinding Foreground}"/>
+                                    </Border>
+
+                                    <Border x:Name="ArrowBd"
+                                            Grid.Column="1"
+                                            Margin="6"
+                                            Background="{DynamicResource TileFill}"
+                                            BorderBrush="{DynamicResource SurfaceBorder}"
+                                            BorderThickness="1"
+                                            CornerRadius="8">
+                                        <Path x:Name="Arrow"
+                                              Data="M 0 0 L 6 6 L 12 0 Z"
+                                              Fill="{DynamicResource TextSecondary}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                                    </Border>
+                                </Grid>
+                            </ToggleButton>
+
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Bottom"
+                                   PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                   HorizontalOffset="0"
+                                   VerticalOffset="6"
+                                   AllowsTransparency="True"
+                                   Focusable="True"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   PopupAnimation="Fade">
+                                <Border Background="{DynamicResource CardBackground}"
+                                        BorderBrush="{DynamicResource CardBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="12"
+                                        Padding="6"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        TextElement.Foreground="{DynamicResource TextPrimary}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="6"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBox x:Name="TopSearchBox"
+                                                 Grid.Row="0"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 Height="34"
+                                                 MinWidth="220"
+                                                 Tag="Search TOP..."
+                                                 TextChanged="TopSearchBox_TextChanged"/>
+
+                                        <ScrollViewer Grid.Row="2"
+                                                      MaxHeight="320"
+                                                      VerticalScrollBarVisibility="Auto">
+                                            <ItemsPresenter/>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlInputHoverBorder}"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                                <Setter TargetName="ArrowBd" Property="Background" Value="{DynamicResource TileFillHover}"/>
+                                <Setter TargetName="ArrowBd" Property="BorderBrush" Value="{DynamicResource ControlInputHoverBorder}"/>
+                                <Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource TextPrimary}"/>
+                            </Trigger>
+
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlInputFocusBorder}"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+
+                            <Trigger Property="IsDropDownOpen" Value="True">
+                                <Setter TargetName="Arrow" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <RotateTransform Angle="180" CenterX="6" CenterY="3"/>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="ArrowBd" Property="Background" Value="{DynamicResource TileFillHover}"/>
+                                <Setter TargetName="ArrowBd" Property="BorderBrush" Value="#6B7280"/>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.60"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     
     <Grid x:Name="Body" 
@@ -136,10 +283,12 @@
                                       MinHeight="34"
                                       HorizontalAlignment="Stretch"
                                       Width="Auto"
+                                      Style="{StaticResource TopSearchComboBoxStyle}"
                                       IsEditable="False"
-                                      IsTextSearchEnabled="True"
-                                      IsTextSearchCaseSensitive="False"
-                                      SelectionChanged="TopCombo_SelectionChanged"/>
+                                      IsTextSearchEnabled="False"
+                                      SelectionChanged="TopCombo_SelectionChanged"
+                                      DropDownOpened="TopCombo_DropDownOpened"
+                                      DropDownClosed="TopCombo_DropDownClosed"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="2">
