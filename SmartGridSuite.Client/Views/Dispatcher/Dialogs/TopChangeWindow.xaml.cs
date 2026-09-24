@@ -69,8 +69,8 @@ public partial class TopChangeWindow : Window
             SubmitButton.Visibility = Visibility.Visible;
             TopCombo.ItemsSource = context.Sectors
                 .GroupBy(x => x.Top, StringComparer.OrdinalIgnoreCase)
-                .Select(x => x.First())
-                .OrderBy(x => x.TopDisplay)
+                .Select(x => x.First().TopDisplay)
+                .OrderBy(x => x)
                 .ToList();
             if (context.Sectors.Count == 0)
                 MessageText.Text = "No TOP sectors are available. Refresh the server's tower cache before requesting a change.";
@@ -86,8 +86,7 @@ public partial class TopChangeWindow : Window
         RequestedBaseIpText.Text = $"Base IP: {(string.IsNullOrWhiteSpace(_context.RequestedBaseIp) ? "unavailable" : _context.RequestedBaseIp)}";
         RequestedBaseIpSourceText.Text = _context.RequestedBaseIpSource;
         CurrentReferenceText.Text = $"{TopChangeRequestText.TopSector(row.OldTop, row.OldSector)}\nCurrent IP: {row.OldIp}";
-        RequestDetailsText.Text = $"Requested: {row.RequestedAt:g}\n" +
-            (row.AlreadyChanged ? "TOP/sector was already changed when requested." : "TOP/sector change was planned when requested.");
+        RequestDetailsText.Text = $"Requested: {row.RequestedAt:g}";
         AssignedIpTextBox.Text = row.NewIp;
         CopyIpButton.Visibility = row.State == "IpReady" ? Visibility.Visible : Visibility.Collapsed;
         RequestSummaryTextBox.Text = TopChangeRequestText.Format(row, _context.RequestedBaseIp);
@@ -111,15 +110,13 @@ public partial class TopChangeWindow : Window
 
     private string GetSelectedRequestedTop()
     {
-        if (TopCombo.SelectedItem is TopChangeSectorOption selected)
-            return selected.Top;
-
-        var typed = (TopCombo.Text ?? string.Empty).Trim();
+        var selectedText =
+            (TopCombo.SelectedItem as string ?? TopCombo.Text ?? string.Empty).Trim();
 
         return _context.Sectors
             .FirstOrDefault(x =>
-                x.Top.Equals(typed, StringComparison.OrdinalIgnoreCase) ||
-                x.TopDisplay.Equals(typed, StringComparison.OrdinalIgnoreCase))
+                x.Top.Equals(selectedText, StringComparison.OrdinalIgnoreCase) ||
+                x.TopDisplay.Equals(selectedText, StringComparison.OrdinalIgnoreCase))
             ?.Top ?? string.Empty;
     }
 
@@ -146,8 +143,8 @@ public partial class TopChangeWindow : Window
         var currentIp = CurrentIpTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(currentTop) || string.IsNullOrWhiteSpace(currentSector))
         { MessageText.Text = "Select the current TOP and sector."; return; }
-        if (selected == null || TimingCombo.SelectedIndex < 0)
-        { MessageText.Text = "Select a TOP, sector, and field work status."; return; }
+        if (selected == null)
+        { MessageText.Text = "Select a TOP and sector."; return; }
         if (MessageBox.Show(this,
             $"Request {currentTop} / {currentSector} → {selected.Top} / {selected.Sector}?\n\nCurrent IP: {currentIp}\n\nDispatch will receive this ticket in TOP Change status.",
             "Confirm TOP Change", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
@@ -157,7 +154,7 @@ public partial class TopChangeWindow : Window
                 new CreateTopChangeRequest
                 {
                     ClientRequestId = _requestId, NewSectorId = selected.SectorId,
-                    AlreadyChanged = TimingCombo.SelectedIndex == 1, RequestedBy = Actor,
+                    AlreadyChanged = false, RequestedBy = Actor,
                     CurrentTop = currentTop, CurrentSector = currentSector, CurrentIp = currentIp,
                     ExpectedTop = _context.CurrentTop, ExpectedSector = _context.CurrentSector, ExpectedIp = _context.CurrentIp
                 });
