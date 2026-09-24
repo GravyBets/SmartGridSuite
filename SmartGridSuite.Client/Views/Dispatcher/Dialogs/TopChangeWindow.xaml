@@ -132,11 +132,16 @@
                                        Margin="2,0,0,4"
                                        Style="{StaticResource FieldLabel}"/>
 
-                            <ComboBox x:Name="TopCombo" 
-                                      MinHeight="34" 
+                            <ComboBox x:Name="TopCombo"
+                                      MinHeight="34"
                                       HorizontalAlignment="Stretch"
                                       Width="Auto"
-                                    SelectionChanged="TopCombo_SelectionChanged"/>
+                                      IsEditable="True"
+                                      IsTextSearchEnabled="True"
+                                      StaysOpenOnEdit="True"
+                                      DisplayMemberPath="TopDisplay"
+                                      TextSearch.TextPath="TopDisplay"
+                                      SelectionChanged="TopCombo_SelectionChanged"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="2">
