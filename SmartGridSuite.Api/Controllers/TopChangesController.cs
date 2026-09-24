@@ -124,11 +124,25 @@ public sealed class TopChangesController : ControllerBase
         row.IpAssignedAt ??= DateTime.Now;
         row.IpAssignedBy = request.AssignedBy.Trim();
         var ticket = await _db.Tickets.SingleAsync(x => x.Id == ticketId, ct);
-        ticket.ActionRequiredOverride = $"TOP Change — IP ready: {row.NewIp}";
+
+        /*
+         * Once Dispatch assigns the IP, its part of the TOP-change workflow is done.
+         * Return the ticket to normal field work so it falls out of Dispatch Tasks.
+         *
+         * The TOP-change row remains active in IpReady state, so the technician's
+         * dashboard continues polling it and can show "New IP Ready". The next normal
+         * technician write-up will move the ticket back into the Dispatch review status
+         * through the existing write-up workflow and complete the TOP-change row.
+         */
+        ticket.Status = "Open";
+        ticket.ActionRequiredOverride = null;
+
         ticket.DispatchNotes = AppendDispatchNote(
             ticket.DispatchNotes,
             TopChangeWorkflow.DispatchNote(row));
+
         ticket.LastActivityAt = DateTime.Now;
+
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return Ok(row);
