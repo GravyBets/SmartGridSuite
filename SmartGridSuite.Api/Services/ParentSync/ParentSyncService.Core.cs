@@ -1,5 +1,6 @@
 ﻿using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Options;
 using SmartGridSuite.Api.Configuration;
 using SmartGridSuite.Api.Data;
@@ -74,6 +75,9 @@ namespace SmartGridSuite.Api.Services.ParentSync
             try
             {
                 await using var cmd = conn.CreateCommand();
+                // This connection belongs to EF. TOP Change submission can call this
+                // lookup inside its ticket transaction, so the raw command must enlist.
+                cmd.Transaction = _appDb.Database.CurrentTransaction?.GetDbTransaction();
 
                 var parameterNames = new List<string>();
 
