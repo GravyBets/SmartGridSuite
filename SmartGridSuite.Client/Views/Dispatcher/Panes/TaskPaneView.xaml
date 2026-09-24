@@ -218,9 +218,14 @@
                                     <TextBlock Text="Review the submitted TOP / sector details, copy the request, or record the assigned IP."
                                                TextWrapping="Wrap" Foreground="{DynamicResource TextSecondary}" Margin="0,4,0,0"/>
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="View Request / Assign IP"
-                                        Style="{StaticResource PrimaryButtonStyle}" Height="34" Padding="14,0"
-                                        VerticalAlignment="Center" Click="TopChangeTask_Click"/>
+                                <Button Grid.Column="1" 
+                                        Content="View Request / Assign IP"
+                                        Style="{StaticResource PrimaryButtonStyle}" 
+                                        Height="34" 
+                                        Width="172"
+                                        Padding="14,0"
+                                        VerticalAlignment="Center" 
+                                        Click="TopChangeTask_Click"/>
                             </Grid>
                         </Border>
                     <Grid Margin="0,0,6,0">
