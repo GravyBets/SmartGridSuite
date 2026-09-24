@@ -403,22 +403,30 @@
                         </Grid>
                     </StackPanel>
 
-                    <TextBlock Text="Assigned IP" 
-                               Style="{StaticResource FieldLabel}" 
+                    <TextBlock Text="Assigned IP"
+                               Style="{StaticResource FieldLabel}"
                                Margin="0,0,0,4"/>
-                    
-                    <TextBox x:Name="AssignedIpTextBox" 
-                             Style="{StaticResource ModernTextBox}" 
-                             IsReadOnly="True"/>
-                    
-                    <Button x:Name="CopyIpButton" 
-                            Content="Copy IP" 
-                            Click="CopyIp_Click"
-                            Style="{DynamicResource SecondaryButtonStyle}" 
-                            HorizontalAlignment="Left"
-                            MinHeight="32" 
-                            Margin="0,8,0,0" 
-                            Visibility="Collapsed"/>
+
+                    <Grid>
+                        <TextBox x:Name="AssignedIpTextBox"
+                                 Style="{StaticResource ModernTextBox}"
+                                 IsReadOnly="True"
+                                 Padding="12,0,44,0"/>
+
+                        <Button x:Name="CopyIpButton"
+                                Style="{StaticResource MiniIconButton}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"
+                                ToolTip="Copy assigned IP"
+                                AutomationProperties.Name="Copy assigned IP"
+                                Click="CopyIp_Click"
+                                Visibility="Collapsed">
+
+                            <TextBlock x:Name="IpCopyGlyph"
+                                       Style="{StaticResource CopyGlyph}"/>
+                        </Button>
+                    </Grid>
                     
                     <TextBlock x:Name="RequestStateText" 
                                Style="{StaticResource SectionHeading}" 
