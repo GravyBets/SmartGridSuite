@@ -20,7 +20,12 @@ public sealed class TopChangeSectorOption
     public int TopId { get; set; }
     public int SectorId { get; set; }
     public string Top { get; set; } = "";
+    public string TopDescription { get; set; } = "";
     public string Sector { get; set; } = "";
+
+    public string TopDisplay => string.IsNullOrWhiteSpace(TopDescription)
+        ? Top
+        : $"{Top} ({TopDescription})";
 }
 
 public class TopChangeDto
