@@ -125,10 +125,34 @@ public sealed class TopChangesController : ControllerBase
         row.IpAssignedBy = request.AssignedBy.Trim();
         var ticket = await _db.Tickets.SingleAsync(x => x.Id == ticketId, ct);
         ticket.ActionRequiredOverride = $"TOP Change — IP ready: {row.NewIp}";
+        ticket.DispatchNotes = AppendDispatchNote(
+            ticket.DispatchNotes,
+            TopChangeWorkflow.DispatchNote(row));
         ticket.LastActivityAt = DateTime.Now;
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return Ok(row);
+    }
+
+    private static string AppendDispatchNote(string? existing, string note)
+    {
+        var cleanExisting = (existing ?? string.Empty).Trim();
+        var cleanNote = (note ?? string.Empty).Trim();
+
+        if (cleanNote.Length == 0)
+            return cleanExisting;
+
+        var lines = cleanExisting
+            .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Trim())
+            .ToList();
+
+        if (lines.Any(x => x.Equals(cleanNote, StringComparison.OrdinalIgnoreCase)))
+            return cleanExisting;
+
+        return cleanExisting.Length == 0
+            ? cleanNote
+            : cleanExisting + Environment.NewLine + cleanNote;
     }
 
     private async Task PopulateRequestedBaseIpAsync(TopChangeContextDto context, TopChangeDto request, CancellationToken ct)
