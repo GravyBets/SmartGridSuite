@@ -28,6 +28,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             public string DashboardKind { get; set; } = "";
             public string MatchSource { get; set; } = "";
             public string MatchField { get; set; } = "";
+            public string AssociatedIp { get; set; } = "";
 
             public string DisplayText
             {
@@ -54,7 +55,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                         ? string.Empty
                         : $" — {string.Join(".", matchParts)}";
 
-                    return $"{siteId}  ({kind}){matchText}";
+                    var associatedIpText =
+                        string.IsNullOrWhiteSpace(AssociatedIp)
+                            ? string.Empty
+                            : $"{Environment.NewLine}LTE IP: {AssociatedIp.Trim()}";
+
+                    return $"{siteId}  ({kind}){matchText}{associatedIpText}";
                 }
             }
         }
