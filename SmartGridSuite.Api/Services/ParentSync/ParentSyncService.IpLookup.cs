@@ -263,6 +263,9 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 var matchField =
                     GetString(reader, "MatchField") ?? "";
 
+                var associatedIp =
+                    GetString(reader, "AssociatedIp") ?? "";
+
                 if (string.IsNullOrWhiteSpace(siteId))
                     continue;
 
@@ -274,7 +277,8 @@ namespace SmartGridSuite.Api.Services.ParentSync
                             GetDashboardKindForIpMatchSource(
                                 matchSource),
                         MatchSource = matchSource,
-                        MatchField = matchField
+                        MatchField = matchField,
+                        AssociatedIp = associatedIp
                     });
             }
 
@@ -574,8 +578,11 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 a.SiteId,
                 'AMS/MR' AS MatchSource,
                 'PMR SN' AS MatchField,
+                l.IP1 AS AssociatedIp,
                 10 AS MatchPriority
             FROM [sgc_comm].[AMS] a
+            LEFT JOIN [sgc_equip].[LTE] l
+                ON a.SiteId = l.SiteId
             WHERE LTRIM(RTRIM(
                 CONVERT(nvarchar(150), a.iTron_CR_Num))) = @SerialNumber
 
@@ -586,6 +593,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 r.SiteId,
                 'RX' AS MatchSource,
                 'RX SN' AS MatchField,
+                CAST(NULL AS nvarchar(150)) AS AssociatedIp,
                 20 AS MatchPriority
             FROM [sgc_comm].[RE] r
             WHERE LTRIM(RTRIM(
@@ -597,6 +605,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 SiteId,
                 MatchSource,
                 MatchField,
+                AssociatedIp,
                 MatchPriority,
                 ROW_NUMBER() OVER
                 (
@@ -611,7 +620,8 @@ namespace SmartGridSuite.Api.Services.ParentSync
         SELECT
             SiteId,
             MatchSource,
-            MatchField
+            MatchField,
+            AssociatedIp
         FROM CleanMatches
         WHERE SiteRank = 1
         ORDER BY MatchPriority, SiteId;
@@ -713,8 +723,34 @@ namespace SmartGridSuite.Api.Services.ParentSync
                             serialNumber)
                     .ToListAsync(cancellationToken);
 
+            var pmrSiteIds =
+                pmrRows
+                    .Select(x => x.SiteId)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+            var lteBySite =
+                await _appDb.CacheSiteLte
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.IsActive &&
+                        pmrSiteIds.Contains(x.SiteId))
+                    .GroupBy(x => x.SiteId)
+                    .Select(group => group
+                        .OrderByDescending(x => x.UpdatedAt)
+                        .First())
+                    .ToDictionaryAsync(
+                        x => x.SiteId,
+                        StringComparer.OrdinalIgnoreCase,
+                        cancellationToken);
+
             foreach (var row in pmrRows)
             {
+                lteBySite.TryGetValue(
+                    row.SiteId,
+                    out var lte);
+
                 AddAssociatedIpCandidate(
                     candidates,
                     row.SecondaryCommsIdentifier,
@@ -723,7 +759,8 @@ namespace SmartGridSuite.Api.Services.ParentSync
                     SiteDashboardKinds.AmsMr,
                     "AMS/MR",
                     "PMR SN",
-                    10);
+                    10,
+                    lte?.SecondaryWanIp ?? lte?.SecondaryWanIp2);
             }
 
             var rxRows =
@@ -778,7 +815,8 @@ namespace SmartGridSuite.Api.Services.ParentSync
             string dashboardKind,
             string matchSource,
             string matchField,
-            int priority)
+            int priority,
+            string? associatedIp = null)
         {
             var cleanCachedIp =
                 (cachedIp ?? string.Empty).Trim();
@@ -804,7 +842,8 @@ namespace SmartGridSuite.Api.Services.ParentSync
                         SiteId = cleanSiteId,
                         DashboardKind = dashboardKind,
                         MatchSource = matchSource,
-                        MatchField = matchField
+                        MatchField = matchField,
+                        AssociatedIp = (associatedIp ?? string.Empty).Trim()
                     },
                     priority
                 ));
