@@ -68,6 +68,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     $"Reason: {reasonText}");
             }
 
+            // If Dispatch has assigned the TOP-change IP, show the destination TOP
+            // in the preview immediately after Reason. The Network card remains the
+            // only source of the normal "New Primary IP:" line.
+            if (_activeTopChangeRequest is { State: "IpReady" } topChange &&
+                !string.IsNullOrWhiteSpace(topChange.NewTop))
+            {
+                sections.Add(
+                    SmartGridSuite.Contracts.Tickets.TopChangeWorkflow.WriteUpLine(topChange));
+            }
+
             /*
              * Refer To is part of the permanent write-up narrative,
              * so include the friendly selected destinations before the
