@@ -35,4 +35,11 @@ var expected = "Need to change the TOP site is going to.\n\nSite: 1234MR\n\n" +
     "Please provide IP and update tunnels, if applicable.";
 Check(TopChangeRequestText.Format(sample, "10.80.123.xxx") == expected, "Copy text matches requested format");
 Check(TopChangeRequestText.Format(sample, "").Contains("[unavailable"), "Missing base IP is clearly marked");
+sample.NewIp = "10.80.123.77";
+Check(TopChangeWorkflow.WriteUpHeader(sample) ==
+    "New TOP: ACKMWB-AP1" + Environment.NewLine + "New IP: 10.80.123.77",
+    "Completed TOP change write-up header contains new TOP and assigned IP");
+Check(TopChangeWorkflow.DispatchNote(sample) ==
+    "TOP Change — New TOP: ACKMWB-AP1 | New IP: 10.80.123.77",
+    "Dispatch note contains new TOP and assigned IP");
 Console.WriteLine("TOP change offline checks passed; no API or database was contacted.");
