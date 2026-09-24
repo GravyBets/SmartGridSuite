@@ -139,8 +139,6 @@
                                       IsEditable="True"
                                       IsTextSearchEnabled="True"
                                       StaysOpenOnEdit="True"
-                                      DisplayMemberPath="TopDisplay"
-                                      TextSearch.TextPath="TopDisplay"
                                       SelectionChanged="TopCombo_SelectionChanged"/>
                         </StackPanel>
 
@@ -157,18 +155,6 @@
                         </StackPanel>
                     </Grid>
 
-                    <TextBlock Text="Field work status" 
-                               Margin="2,6,0,4"
-                               Style="{StaticResource FieldLabel}"/>
-                    
-                    <ComboBox x:Name="TimingCombo" 
-                              HorizontalAlignment="Stretch"
-                              Width="Auto"
-                              MinHeight="34">
-                        <ComboBoxItem Content="Change planned — waiting for IP"/>
-                        <ComboBoxItem Content="TOP/sector already changed — waiting for IP"/>
-                    </ComboBox>
-                    
 
                 </StackPanel>
                 
