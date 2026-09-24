@@ -14,9 +14,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         private const string SnmpWriteUpHeader = "----------SNMP Polls----------";
         private const string TicketWriteUpHeader = "------------Ticket------------";
 
-        private void SubmitWriteUpButton_Click(object sender, RoutedEventArgs e)
+        private async void SubmitWriteUpButton_Click(object sender, RoutedEventArgs e)
         {
             FlushWriteUpTextChangedDebounce();
+
+            // Get the latest TOP-change state before building the preview so an IP
+            // assigned moments ago is reflected immediately.
+            await RefreshTopChangeNoticeAsync();
 
             if (!TryValidateEquipmentReplacementEntriesForSubmit())
                 return;
