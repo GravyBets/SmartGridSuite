@@ -195,7 +195,7 @@ public sealed class TopChangesController : ControllerBase
             where sector.IsActive && top.IsActive && sector.Sector != null && top.TopName != null
             orderby top.TopName, sector.Sector
             select new TopChangeSectorOption { TopId = top.TopNameId, SectorId = sector.TopSiteId,
-                Top = top.TopName!, Sector = sector.Sector! }).ToListAsync(ct);
+                Top = top.TopName!, TopDescription = top.TopDescription ?? "", Sector = sector.Sector! }).ToListAsync(ct);
         return new TopChangeContextDto { TicketId = ticket.Id, Site = ticket.Site, SiteKind = data.DashboardKind,
             CurrentTop = Value("TopName"), CurrentSector = Value("TopSector"), CurrentIp = Value("PrimaryCommsIp"),
             DataWarning = data.IsCached
