@@ -12,6 +12,7 @@ public partial class SiteDashboardWorkspaceView
     private readonly ApiClient _topChangeApi = ClientAppSettings.CreateApiClient();
     private bool _topChangeNoticeLoading;
     private bool _topChangeOpening;
+    private TopChangeDto? _activeTopChangeRequest;
 
     private void InitializeTopChangeRefresh()
     {
@@ -26,10 +27,15 @@ public partial class SiteDashboardWorkspaceView
         if (TopChangeButton == null) return;
         var supported = EquipmentDashboardKind == "AMS" || EquipmentDashboardKind == "DACs" || EquipmentDashboardKind == "IGSD";
         TopChangeButton.Visibility = supported ? Visibility.Visible : Visibility.Collapsed;
-        if (!supported) return;
+        if (!supported)
+        {
+            _activeTopChangeRequest = null;
+            return;
+        }
         var ticketId = CurrentTicketId;
         if (ticketId <= 0)
         {
+            _activeTopChangeRequest = null;
             TopChangeButton.Content = "Request TOP Change";
             TopChangeButton.ToolTip = "Open an existing ticket for this site first.";
             return;
@@ -41,6 +47,7 @@ public partial class SiteDashboardWorkspaceView
             var request = await _topChangeApi
                 .GetAsync<TopChangeDto>($"api/tickets/{ticketId}/top-change/notice");
             if (CurrentTicketId != ticketId) return;
+            _activeTopChangeRequest = request;
             TopChangeButton.Content = request == null ? "Request TOP Change"
                 : request.State == "IpReady" ? $"New IP Ready: {request.NewIp}" : "TOP Change — Waiting for IP";
             TopChangeButton.ToolTip = request == null ? "Request a new TOP and sector."
