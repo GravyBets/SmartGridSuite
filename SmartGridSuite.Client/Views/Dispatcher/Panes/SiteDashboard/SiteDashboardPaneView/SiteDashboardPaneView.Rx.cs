@@ -113,7 +113,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                         SiteId = siteId.Trim(),
                         DashboardKind = GetObjectPropertyText(rawMatch, "DashboardKind", "Kind", "SiteKind") ?? string.Empty,
                         MatchSource = GetObjectPropertyText(rawMatch, "MatchSource", "Source") ?? string.Empty,
-                        MatchField = GetObjectPropertyText(rawMatch, "MatchField", "Field") ?? string.Empty
+                        MatchField = GetObjectPropertyText(rawMatch, "MatchField", "Field") ?? string.Empty,
+                        AssociatedIp = GetObjectPropertyText(rawMatch, "AssociatedIp", "LteIp", "IpAddress") ?? string.Empty
                     });
                 }
             }
