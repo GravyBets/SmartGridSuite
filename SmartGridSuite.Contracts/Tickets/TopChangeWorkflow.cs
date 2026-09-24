@@ -15,6 +15,9 @@ public static class TopChangeWorkflow
     public static string WriteUpLine(TopChangeDto request) =>
         $"New TOP: {Destination(request)}";
 
+    public static string WriteUpHeader(TopChangeDto request) =>
+        $"{WriteUpLine(request)}{Environment.NewLine}New IP: {request.NewIp}";
+
     public static string DispatchNote(TopChangeDto request) =>
         $"TOP Change — New TOP: {Destination(request)} | New IP: {request.NewIp}";
 }
