@@ -27,5 +27,9 @@ namespace SmartGridSuite.Contracts.SiteDashboard
         public string DashboardKind { get; set; } = "";
         public string MatchSource { get; set; } = "";
         public string MatchField { get; set; } = "";
+
+        // Populated for serial-number lookups when the matched device has
+        // an associated LTE address (for PMR, this is LTE.IP1).
+        public string AssociatedIp { get; set; } = "";
     }
 }
