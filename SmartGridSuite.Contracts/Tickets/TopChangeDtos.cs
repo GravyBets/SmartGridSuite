@@ -11,6 +11,8 @@ public sealed class TopChangeContextDto
     public string DataWarning { get; set; } = "";
     public List<TopChangeSectorOption> Sectors { get; set; } = new();
     public TopChangeDto? Request { get; set; }
+    public string RequestedBaseIp { get; set; } = "";
+    public string RequestedBaseIpSource { get; set; } = "";
 }
 
 public sealed class TopChangeSectorOption

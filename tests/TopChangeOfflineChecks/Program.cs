@@ -21,4 +21,18 @@ Check(!TopChangeWorkflow.CanCompleteWithWriteUp(request, assignedAt), "Empty IP 
 request.NewIp = "10.2.3.4";
 request.State = "Completed";
 Check(!TopChangeWorkflow.CanCompleteWithWriteUp(request, assignedAt), "Completed request cannot complete twice");
+Check(TopChangeRequestText.TopSector("ACKMWB", "AP1") == "ACKMWB-AP1", "TOP and sector combined");
+Check(TopChangeRequestText.TopSector("ACKMWB", "ACKMWB-AP1") == "ACKMWB-AP1", "Already-qualified sector is not duplicated");
+Check(TopChangeRequestText.BaseIp("10.80.123.51") == "10.80.123.xxx", "Only final octet replaced");
+Check(TopChangeRequestText.BaseIp(null, "10.80.123.52") == "10.80.123.xxx", "IP A fallback when VIP missing");
+Check(TopChangeRequestText.BaseIp("10.80.999.1", "10.80.42.2") == "10.80.42.xxx", "Invalid VIP skipped");
+Check(TopChangeRequestText.BaseIp("", "10.80.1", "::1") == "", "Missing or invalid IP does not invent a subnet");
+var sample = new TopChangeDto { Site = "1234MR", OldTop = "NS_FOB", OldSector = "AP2",
+    OldIp = "10.80.244.51", NewTop = "ACKMWB", NewSector = "AP1" };
+var expected = "Need to change the TOP site is going to.\n\nSite: 1234MR\n\n" +
+    "Current TOP: NS_FOB-AP2\nCurrent IP: 10.80.244.51\n\n" +
+    "Requested TOP: ACKMWB-AP1 (Base IP: 10.80.123.xxx)\n\n" +
+    "Please provide IP and update tunnels, if applicable.";
+Check(TopChangeRequestText.Format(sample, "10.80.123.xxx") == expected, "Copy text matches requested format");
+Check(TopChangeRequestText.Format(sample, "").Contains("[unavailable"), "Missing base IP is clearly marked");
 Console.WriteLine("TOP change offline checks passed; no API or database was contacted.");

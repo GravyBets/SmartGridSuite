@@ -14,11 +14,17 @@ is selected. The Dispatch window opens at 960 × 850 (limited by available scree
 and can be resized; its sizing is defined in `TopChangeWindow.xaml`.
 
 
-- MR, DAC and IG: use **Copy Request Details** to copy the site, ticket, old/new TOP
-  and sector, current IP, requester and field-work status. Dispatch can paste this into
-  their usual email process. The app does not create or send IP-change emails.
-- Enter the assigned IP and select **Save Assigned IP**. The saved details remain visible
-  so Dispatch can copy them again, including the new IP.
+- Dispatch sees the requested TOP-sector (for example ACKMWB-AP1) and base IP first.
+  Existing TOP/IP details are in a collapsed reference section.
+- **Copy IP Request Text** copies the requested email wording: site, current TOP/IP,
+  requested TOP-sector with base IP, and the request to provide IP/update tunnels.
+  The app does not create or send emails.
+- Base IP is resolved from the requested sector's live tower data with the existing
+  eight-second cache fallback. It uses VIP, then IP A, then IP B, keeping the first
+  three octets and replacing only the fourth with `xxx`. It never uses the old site's IP.
+  The source is displayed; missing/invalid IP is marked unavailable for manual verification.
+- Enter the assigned IP and select **Save Assigned IP**. The assigned IP remains visible
+  separately; the copied message continues to use the IP-request template.
 - Saving the IP makes **New IP Ready** appear in the Site Dashboard (refreshes every
   30 seconds while open). Field Technician Tasks show the IP on their next refresh.
   No IP-ready email is sent. Existing assignment/write-up emails are unchanged.
@@ -52,6 +58,9 @@ values. Check a deliberately incorrect current TOP/sector/IP, submit corrections
 and confirm Dispatch's copied details match. Also check that changing the new TOP
 filters its sectors and the selected sector displays its name, not a contract type.
 Check Submit/Cancel placement on a small display.
+
+Deploy both API and client for the requested-sector base IP lookup. No DB script is needed.
+Verify the copied text against the requested sector's known IP, including cached and missing-IP cases.
 
 ## Editing the window
 

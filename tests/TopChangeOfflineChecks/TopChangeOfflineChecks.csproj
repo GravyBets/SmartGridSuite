@@ -8,5 +8,6 @@
   <ItemGroup>
     <Compile Include="../../SmartGridSuite.Contracts/Tickets/TopChangeDtos.cs" Link="TopChangeDtos.cs" />
     <Compile Include="../../SmartGridSuite.Contracts/Tickets/TopChangeWorkflow.cs" Link="TopChangeWorkflow.cs" />
+    <Compile Include="../../SmartGridSuite.Contracts/Tickets/TopChangeRequestText.cs" Link="TopChangeRequestText.cs" />
   </ItemGroup>
 </Project>

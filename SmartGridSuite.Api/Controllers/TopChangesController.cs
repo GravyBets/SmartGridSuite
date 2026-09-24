@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Api.Services.SiteDashboard;
+using SmartGridSuite.Api.Services.ParentSync.Models;
 using SmartGridSuite.Contracts.Tickets;
 using System.Net;
 using System.Net.Sockets;
@@ -26,6 +27,8 @@ public sealed class TopChangesController : ControllerBase
         if (ticket == null) return NotFound("Ticket not found.");
         var context = await LoadContextAsync(ticket, ct);
         if (context == null) return BadRequest("TOP changes support MR, DAC and IG sites with available site data.");
+        if (context.Request is { State: not "Completed" } request)
+            await PopulateRequestedBaseIpAsync(context, request, ct);
         return Ok(context);
     }
 
@@ -126,6 +129,27 @@ public sealed class TopChangesController : ControllerBase
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return Ok(row);
+    }
+
+    private async Task PopulateRequestedBaseIpAsync(TopChangeContextDto context, TopChangeDto request, CancellationToken ct)
+    {
+        // Resolve the requested sector, never the site's old TOP or an arbitrary tower sector.
+        var lookup = await _lookup.GetTowerAsync(request.NewTopId, ct);
+        var data = lookup.Dashboard;
+        if (data != null)
+        {
+            var tower = JsonSerializer.Deserialize<TowerDashboardRow>(
+                JsonSerializer.Serialize(data.Data),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var sector = tower?.Sectors.FirstOrDefault(x => x.TopSiteId == request.NewSectorId);
+            context.RequestedBaseIp = TopChangeRequestText.BaseIp(sector?.Vip, sector?.IPa, sector?.IPb);
+            context.RequestedBaseIpSource = string.IsNullOrEmpty(context.RequestedBaseIp)
+                ? "Requested sector IP unavailable. Verify the base IP before sending."
+                : data.IsCached ? "Base IP from cached requested-sector data; verify before sending."
+                                : "Base IP from live requested-sector data.";
+            return;
+        }
+        context.RequestedBaseIpSource = "Requested sector IP unavailable. Verify the base IP before sending.";
     }
 
     private async Task<TopChangeContextDto?> LoadContextAsync(TicketEntity ticket, CancellationToken ct)

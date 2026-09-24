@@ -65,7 +65,7 @@
         <ScrollViewer Grid.Row="1" 
                       VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <Border Background="{DynamicResource CardBackground}" 
+                <Border x:Name="CurrentSiteCard" Background="{DynamicResource CardBackground}" 
                         CornerRadius="8" 
                         Padding="10" 
                         Margin="0,0,0,4">
@@ -136,6 +136,15 @@
                 <StackPanel x:Name="ExistingRequestPanel" 
                             Visibility="Collapsed">
                     
+                    <Border Background="{DynamicResource CardBackground}" CornerRadius="8" Padding="16" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Requested TOP / sector" Style="{StaticResource SectionHeading}"/>
+                            <TextBox x:Name="RequestedTopText" Style="{StaticResource CopyableValue}" FontSize="26" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="RequestedBaseIpText" FontSize="18" Margin="0,8,0,0"/>
+                            <TextBlock x:Name="RequestedBaseIpSourceText" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondary}" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
                     <TextBlock x:Name="RequestStateText" 
                                Style="{StaticResource SectionHeading}"/>
                     
@@ -176,12 +185,12 @@
                                  TextWrapping="Wrap"
                                  AcceptsReturn="True" 
                                  VerticalScrollBarVisibility="Auto"
-                                 MinHeight="130" 
-                                 MaxHeight="220" 
+                                 MinHeight="230" 
+                                 MaxHeight="320" 
                                  Padding="10"/>
                         
                         <WrapPanel Margin="0,12,0,0">
-                            <Button Content="Copy Request Details" Click="CopyRequest_Click"
+                            <Button Content="Copy IP Request Text" Click="CopyRequest_Click"
                                     Style="{DynamicResource SecondaryButtonStyle}" 
                                     MinHeight="36" 
                                     Margin="0,0,12,8"/>
@@ -197,6 +206,11 @@
                     </StackPanel>
                 </StackPanel>
                 
+                <Expander x:Name="CurrentReferenceExpander" Header="Existing TOP / IP (reference)"
+                          IsExpanded="False" Visibility="Collapsed" Margin="0,16,0,0">
+                    <TextBox x:Name="CurrentReferenceText" Style="{StaticResource CopyableValue}" Margin="8"/>
+                </Expander>
+
                 <TextBlock x:Name="NoRequestText" 
                            Text="There is no active TOP-change request on this ticket."
                            Visibility="Collapsed" 

@@ -48,6 +48,8 @@ public partial class TopChangeWindow : Window
             .Select(x => x.Sector).Append(context.CurrentSector).Distinct().OrderBy(x => x).ToList();
         CurrentSectorCombo.SelectedItem = context.CurrentSector;
         CurrentIpTextBox.Text = context.CurrentIp;
+        CurrentSiteCard.Visibility = dispatch ? Visibility.Collapsed : Visibility.Visible;
+        CurrentReferenceExpander.Visibility = dispatch ? Visibility.Visible : Visibility.Collapsed;
         CurrentSitePanel.IsEnabled = !dispatch && (context.Request == null || context.Request.State == "Completed");
         if (context.Request is { State: not "Completed" } row)
         {
@@ -73,16 +75,15 @@ public partial class TopChangeWindow : Window
     private void ShowRequest(TopChangeDto row)
     {
         RequestStateText.Text = row.State == "IpReady" ? "New IP Ready" : "Waiting for IP";
-        RequestDetailsText.Text = $"New TOP: {row.NewTop}\nNew sector: {row.NewSector}\nRequested: {row.RequestedAt:g}\n" +
+        RequestedTopText.Text = TopChangeRequestText.TopSector(row.NewTop, row.NewSector);
+        RequestedBaseIpText.Text = $"Base IP: {(string.IsNullOrWhiteSpace(_context.RequestedBaseIp) ? "unavailable" : _context.RequestedBaseIp)}";
+        RequestedBaseIpSourceText.Text = _context.RequestedBaseIpSource;
+        CurrentReferenceText.Text = $"Current TOP: {TopChangeRequestText.TopSector(row.OldTop, row.OldSector)}\nCurrent IP: {row.OldIp}";
+        RequestDetailsText.Text = $"Requested: {row.RequestedAt:g}\n" +
             (row.AlreadyChanged ? "TOP/sector was already changed when requested." : "TOP/sector change was planned when requested.");
         AssignedIpTextBox.Text = row.NewIp;
         CopyIpButton.Visibility = row.State == "IpReady" ? Visibility.Visible : Visibility.Collapsed;
-        RequestSummaryTextBox.Text = $"Site: {row.Site}\nTicket: {row.TicketId}\n" +
-            $"Current TOP: {row.OldTop}\nCurrent sector: {row.OldSector}\nCurrent IP: {row.OldIp}\n" +
-            $"Requested TOP: {row.NewTop}\nRequested sector: {row.NewSector}\n" +
-            $"Field work: {(row.AlreadyChanged ? "TOP/sector already changed" : "Change planned")}\n" +
-            $"Requested by: {row.RequestedBy}\nRequested: {row.RequestedAt:g}\n" +
-            $"Assigned IP: {(string.IsNullOrWhiteSpace(row.NewIp) ? "Awaiting assignment" : row.NewIp)}";
+        RequestSummaryTextBox.Text = TopChangeRequestText.Format(row, _context.RequestedBaseIp);
     }
 
     private void TopCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
