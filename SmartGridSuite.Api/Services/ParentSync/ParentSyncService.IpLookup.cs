@@ -263,9 +263,6 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 var matchField =
                     GetString(reader, "MatchField") ?? "";
 
-                var associatedIp =
-                    GetString(reader, "AssociatedIp") ?? "";
-
                 if (string.IsNullOrWhiteSpace(siteId))
                     continue;
 
@@ -277,8 +274,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
                             GetDashboardKindForIpMatchSource(
                                 matchSource),
                         MatchSource = matchSource,
-                        MatchField = matchField,
-                        AssociatedIp = associatedIp
+                        MatchField = matchField
                     });
             }
 
@@ -657,6 +653,9 @@ namespace SmartGridSuite.Api.Services.ParentSync
                 var matchField =
                     GetString(reader, "MatchField") ?? "";
 
+                var associatedIp =
+                    GetString(reader, "AssociatedIp") ?? "";
+
                 if (string.IsNullOrWhiteSpace(siteId))
                     continue;
 
@@ -674,7 +673,8 @@ namespace SmartGridSuite.Api.Services.ParentSync
                                 : "RX",
 
                         MatchSource = matchSource,
-                        MatchField = matchField
+                        MatchField = matchField,
+                        AssociatedIp = associatedIp
                     });
             }
 
