@@ -78,6 +78,7 @@ namespace SmartGridSuite.Contracts.Tickets
     );
 
     public sealed record SapQueueWorkOrderUpdate(
+        int RowNumber,
         long TicketId,
         string Notification,
         string NewWorkOrder
