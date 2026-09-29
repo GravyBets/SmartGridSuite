@@ -115,6 +115,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             TopBarView.AddTabRequested += TopBarView_AddTabRequested;
             TopBarView.SelectedTabChanged += TopBarView_SelectedTabChanged;
             TopBarView.CloseTabRequested += TopBarView_CloseTabRequested;
+            TopBarView.TabReorderRequested += TopBarView_TabReorderRequested;
 
             TopBarView.PopOutRequested += TopBarView_PopOutRequested;
 
