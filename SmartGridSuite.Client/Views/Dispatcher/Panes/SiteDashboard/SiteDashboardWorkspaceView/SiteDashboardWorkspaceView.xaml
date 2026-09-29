@@ -145,6 +145,56 @@
             <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
         </Style>
 
+        <!--
+            Individual SNMP OID refresh button.
+            Use our own template so the native WPF Button chrome never appears
+            on hover in dark themes (especially Cobalt).
+        -->
+        <Style x:Key="SnmpOidRefreshButtonStyle"
+               TargetType="Button">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource HoverOverlay}"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource TextPrimary}"/>
+                            </Trigger>
+
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource PressedOverlay}"/>
+                            </Trigger>
+
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="DashboardCleanCopyButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="22"/>
             <Setter Property="Height" Value="22"/>
@@ -2064,15 +2114,11 @@
 
                                                                     <Button Grid.Row="0"
                                                                             Grid.Column="1"
-                                                                            Style="{StaticResource MiniIconButton}"
-                                                                            Foreground="{DynamicResource TextSecondary}"
+                                                                            Style="{StaticResource SnmpOidRefreshButtonStyle}"
                                                                             FontFamily="Segoe MDL2 Assets"
                                                                             Content="&#xE72C;"
-                                                                            Height="22"
-                                                                            MinWidth="26"
                                                                             FontSize="12"
                                                                             FontWeight="SemiBold"
-                                                                            Padding="0"
                                                                             Tag="{Binding}"
                                                                             VerticalAlignment="Center"
                                                                             Click="RunSnmpOidButton_Click"/>
