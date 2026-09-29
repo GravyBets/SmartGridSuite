@@ -77,13 +77,23 @@ namespace SmartGridSuite.Contracts.Tickets
         string? TargetStatus
     );
 
+    public sealed record SapQueueWorkOrderUpdate(
+        long TicketId,
+        string Notification,
+        string NewWorkOrder
+    );
+
     public sealed record SapQueueImportCommitRequest(
         string CreatedBy,
         List<SapQueueImportCommitRow> Rows,
 
         // Existing SmartGridSuite tickets surfaced during reconciliation.
         // Optional so older callers remain compatible.
-        List<SapQueueExistingTicketAction>? ExistingTicketActions = null
+        List<SapQueueExistingTicketAction>? ExistingTicketActions = null,
+
+        // Existing notification rows where SAP now reports a different
+        // nonblank Work Order. These are synchronized, not re-imported.
+        List<SapQueueWorkOrderUpdate>? WorkOrderUpdates = null
     );
 
     public sealed record SapQueueImportCommitResultRow(
