@@ -41,23 +41,41 @@ namespace SmartGridSuite.Api.Services.ParentSync
 
         private async Task<SqlConnection> OpenCacheSnapshotConnectionAsync(CancellationToken cancellationToken)
         {
-            var connectionStringBuilder =
-                new SqlConnectionStringBuilder(
-                    _connectionString)
-                {
-                    ConnectTimeout =
-                        CacheSnapshotConnectTimeoutSeconds
-                };
-
             for (var attempt = 1;
                  attempt <= CacheSnapshotConnectAttempts;
                  attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
+                /*
+                 * Use the same Parent DB connection factory as normal live
+                 * dashboard lookups and the Admin "Test Parent DB" action.
+                 *
+                 * On Linux, the factory may attach an explicit Windows SSPI
+                 * context provider. Creating a raw SqlConnection here bypasses
+                 * that provider and causes scheduled cache refreshes to fail
+                 * with errors such as:
+                 *
+                 *   "The target principal name is incorrect.
+                 *    Cannot generate SSPI context."
+                 *
+                 * Keep the cache snapshot's longer connect timeout, but apply
+                 * it to the factory-created connection so authentication is
+                 * identical to the known-good live lookup path.
+                 */
                 var conn =
-                    new SqlConnection(
-                        connectionStringBuilder.ConnectionString);
+                    _parentDatabaseConnectionFactory.CreateConnection();
+
+                var connectionStringBuilder =
+                    new SqlConnectionStringBuilder(
+                        conn.ConnectionString)
+                    {
+                        ConnectTimeout =
+                            CacheSnapshotConnectTimeoutSeconds
+                    };
+
+                conn.ConnectionString =
+                    connectionStringBuilder.ConnectionString;
 
                 try
                 {
