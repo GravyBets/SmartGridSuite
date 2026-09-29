@@ -383,7 +383,7 @@
                             Invalid and Already Exists rows intentionally show no action.
                         -->
                         <DataGridTemplateColumn Header="Action"
-                                                Width="168">
+                                                Width="180">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
 
@@ -392,7 +392,7 @@
                                                                      Mode=TwoWay,
                                                                      UpdateSourceTrigger=PropertyChanged}"
                                               MinWidth="95"
-                                              MaxWidth="146"
+                                              MaxWidth="180"
                                               Height="28"
                                               HorizontalContentAlignment="Stretch">
 
