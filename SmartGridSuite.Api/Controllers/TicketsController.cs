@@ -5134,6 +5134,49 @@ namespace SmartGridSuite.Api.Controllers
                         workOrderUpdateTicketsById[
                             update.TicketId];
 
+                    /*
+                     * Preview may have been open for several minutes. Lock and
+                     * reload the ticket inside this transaction before applying
+                     * SAP's Work Order so we cannot overwrite a ticket that was
+                     * closed or repurposed after preview.
+                     */
+                    await _db.LockTicketAsync(
+                        ticket.Id,
+                        ct);
+
+                    await _db.Entry(ticket)
+                        .ReloadAsync(ct);
+
+                    var expectedNotification =
+                        NormalizeNotification(
+                            update.Notification);
+
+                    var currentNotification =
+                        NormalizeNotification(
+                            ticket.Notification);
+
+                    if (!string.Equals(
+                            expectedNotification,
+                            currentNotification,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Conflict(
+                            $"Ticket {ticket.Id} no longer matches notification " +
+                            $"{update.Notification}. Reload the SAP preview.");
+                    }
+
+                    var currentStatus =
+                        (ticket.Status ?? string.Empty)
+                            .Trim();
+
+                    if (closedStatusNames.Contains(
+                            currentStatus))
+                    {
+                        return Conflict(
+                            $"Ticket {ticket.Id} is now closed. " +
+                            "Reload the SAP Queue preview before updating its Work Order.");
+                    }
+
                     var newWorkOrder =
                         NormalizeWorkOrder(
                             update.NewWorkOrder)!;
