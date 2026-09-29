@@ -3878,6 +3878,25 @@ namespace SmartGridSuite.Api.Controllers
                 await activeTicketQuery.ToListAsync(ct);
 
             /*
+             * Existing incoming notifications need more than a yes/no duplicate
+             * check. Keep the active ticket itself so SAP can synchronize a
+             * changed Work Order without creating a duplicate ticket.
+             */
+            var activeIncomingTicketByNotification =
+                activeAppTickets
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(x.Notification) &&
+                        incomingNotificationSet.Contains(
+                            NormalizeNotification(x.Notification)!))
+                    .GroupBy(
+                        x => NormalizeNotification(x.Notification)!,
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group.First(),
+                        StringComparer.OrdinalIgnoreCase);
+
+            /*
              * Build a complete CURRENT notification picture by site:
              *
              *     spreadsheet rows
@@ -4005,6 +4024,22 @@ namespace SmartGridSuite.Api.Controllers
                 var requiresReview = false;
                 var reviewReason = string.Empty;
 
+                activeIncomingTicketByNotification.TryGetValue(
+                    notif ?? string.Empty,
+                    out var existingTicket);
+
+                var existingWorkOrder =
+                    NormalizeWorkOrder(
+                        existingTicket?.CurrentWorkOrder);
+
+                var workOrderChanged =
+                    existingTicket is not null &&
+                    !string.IsNullOrWhiteSpace(workOrder) &&
+                    !string.Equals(
+                        existingWorkOrder ?? string.Empty,
+                        workOrder,
+                        StringComparison.OrdinalIgnoreCase);
+
                 if (string.IsNullOrWhiteSpace(notif))
                 {
                     status = "Invalid";
@@ -4020,10 +4055,24 @@ namespace SmartGridSuite.Api.Controllers
                 }
                 else if (existingNotifications.Contains(notif))
                 {
-                    status = "Already Exists";
+                    if (workOrderChanged)
+                    {
+                        status = "Work Order Update";
 
-                    message =
-                        $"Notification {notif} already exists.";
+                        message =
+                            $"Notification {notif} already exists. " +
+                            $"Work Order will update: " +
+                            $"{(string.IsNullOrWhiteSpace(existingWorkOrder) ? "(none)" : existingWorkOrder)} " +
+                            $"→ {workOrder}. " +
+                            "The existing WO Type will be cleared for review.";
+                    }
+                    else
+                    {
+                        status = "Already Exists";
+
+                        message =
+                            $"Notification {notif} already exists.";
+                    }
                 }
                 else if (row.NotificationDate is null)
                 {
@@ -4132,16 +4181,22 @@ namespace SmartGridSuite.Api.Controllers
                             "Spreadsheet",
 
                         ExistingTicketId:
-                            null,
+                            existingTicket?.Id,
 
                         CurrentTicketStatus:
-                            string.Empty,
+                            existingTicket?.Status ?? string.Empty,
 
                         RequiresReview:
                             requiresReview,
 
                         ReviewReason:
-                            reviewReason));
+                            reviewReason,
+
+                        ExistingWorkOrder:
+                            existingWorkOrder ?? string.Empty,
+
+                        WorkOrderChanged:
+                            workOrderChanged));
             }
 
             /*
