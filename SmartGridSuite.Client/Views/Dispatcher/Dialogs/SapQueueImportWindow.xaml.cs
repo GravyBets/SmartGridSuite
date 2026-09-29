@@ -376,7 +376,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                                 row.RequiresReview,
 
                             ReviewReason =
-                                row.ReviewReason ?? string.Empty
+                                row.ReviewReason ?? string.Empty,
+
+                            ExistingWorkOrder =
+                                row.ExistingWorkOrder ?? string.Empty,
+
+                            WorkOrderChanged =
+                                row.WorkOrderChanged
                         };
 
                     ConfigureReconciliationDefaults(displayRow);
@@ -496,6 +502,59 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
 
             /*
              * ------------------------------------------------------------
+             * EXISTING NOTIFICATION WORK-ORDER UPDATES
+             * ------------------------------------------------------------
+             */
+            var workOrderUpdateRows =
+                PreviewRows
+                    .Where(r =>
+                        r.IsSpreadsheetRow &&
+                        r.WorkOrderChanged &&
+                        string.Equals(
+                            r.SelectedAction,
+                            "Update Work Order",
+                            StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+            var invalidWorkOrderUpdate =
+                workOrderUpdateRows
+                    .FirstOrDefault(r =>
+                        !r.ExistingTicketId.HasValue ||
+                        r.ExistingTicketId.Value <= 0 ||
+                        string.IsNullOrWhiteSpace(r.WorkOrder));
+
+            if (invalidWorkOrderUpdate != null)
+            {
+                MessageBox.Show(
+                    $"The Work Order update for notification " +
+                    $"{invalidWorkOrderUpdate.Notification} is no longer valid. " +
+                    "Reload the SAP preview.",
+                    "SAP Queue Reconciliation",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
+                return;
+            }
+
+            var workOrderUpdates =
+                workOrderUpdateRows
+                    .Select(r =>
+                        new SapQueueWorkOrderUpdate(
+                            RowNumber:
+                                r.RowNumber,
+
+                            TicketId:
+                                r.ExistingTicketId!.Value,
+
+                            Notification:
+                                r.Notification,
+
+                            NewWorkOrder:
+                                r.WorkOrder))
+                    .ToList();
+
+            /*
+             * ------------------------------------------------------------
              * EXISTING SMARTGRIDSUITE TICKET ACTIONS
              * ------------------------------------------------------------
              *
@@ -602,7 +661,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
              * spreadsheet imports nor existing ticket reconciliation rows.
              */
             if (commitRows.Count == 0 &&
-                existingActions.Count == 0)
+                existingActions.Count == 0 &&
+                workOrderUpdates.Count == 0)
             {
                 MessageBox.Show(
                     "There are no SAP reconciliation actions to apply.",
@@ -620,7 +680,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                 $"  As Needs Review: {WillImportNeedsReviewCount}\n" +
                 $"  Other selected status: " +
                 $"{Math.Max(0, commitRows.Count - WillImportOpenCount - WillImportNeedsReviewCount)}\n" +
-                $"Spreadsheet rows skipped: {skippedSpreadsheetCount}\n\n" +
+                $"Spreadsheet rows skipped: {skippedSpreadsheetCount}\n" +
+                $"Existing Work Orders to update: {workOrderUpdates.Count}\n\n" +
                 $"Existing app tickets kept: {keepCurrentCount}\n" +
                 $"Existing app tickets changing status: {changeStatusCount}\n\n" +
                 $"SAP site conflicts found: {SpreadsheetReviewCount}\n" +
@@ -654,7 +715,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                                 commitRows,
 
                             ExistingTicketActions:
-                                existingActions));
+                                existingActions,
+
+                            WorkOrderUpdates:
+                                workOrderUpdates));
 
                 ApplyCommitResults(result);
 
@@ -666,7 +730,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                     $"Already existed: {result.AlreadyExistsCount}\n" +
                     $"Invalid: {result.InvalidCount}\n" +
                     $"Existing kept: {result.ExistingKeptCount}\n" +
-                    $"Existing status changed: {result.ExistingStatusChangedCount}";
+                    $"Existing status changed: {result.ExistingStatusChangedCount}\n" +
+                    $"Existing Work Orders updated: {result.ExistingWorkOrderUpdatedCount}";
 
                 MessageBox.Show(
                     resultMessage,
@@ -681,7 +746,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                  * TicketsPaneView will then refresh after this dialog closes.
                  */
                 if (result.ImportedCount > 0 ||
-                    result.ExistingStatusChangedCount > 0)
+                    result.ExistingStatusChangedCount > 0 ||
+                    result.ExistingWorkOrderUpdatedCount > 0)
                 {
                     DialogResult = true;
                     Close();
@@ -872,9 +938,19 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                 PreviewRows.Any(r =>
                     r.IsExistingAppRow);
 
+            var hasWorkOrderUpdate =
+                PreviewRows.Any(r =>
+                    r.IsSpreadsheetRow &&
+                    r.WorkOrderChanged &&
+                    string.Equals(
+                        r.SelectedAction,
+                        "Update Work Order",
+                        StringComparison.OrdinalIgnoreCase));
+
             return
                 hasSpreadsheetImport ||
-                hasExistingTicketReview;
+                hasExistingTicketReview ||
+                hasWorkOrderUpdate;
         }
 
         private void PreviewRow_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -913,6 +989,30 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                  */
                 row.TargetStatus =
                     row.CurrentTicketStatus;
+
+                return;
+            }
+
+            /*
+             * ------------------------------------------------------------
+             * EXISTING NOTIFICATION WITH CHANGED WORK ORDER
+             * ------------------------------------------------------------
+             *
+             * SAP is authoritative for the Work Order number on an existing
+             * active notification. Default to synchronizing it, while still
+             * allowing Dispatch to skip the row deliberately.
+             */
+            if (row.IsSpreadsheetRow &&
+                row.WorkOrderChanged)
+            {
+                row.ActionOptions.Add("Update Work Order");
+                row.ActionOptions.Add("Skip");
+
+                row.SelectedAction =
+                    "Update Work Order";
+
+                row.TargetStatus =
+                    string.Empty;
 
                 return;
             }
@@ -1315,6 +1415,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
         public string ReviewReason { get; set; } =
             string.Empty;
 
+        public string ExistingWorkOrder { get; set; } =
+            string.Empty;
+
+        public bool WorkOrderChanged { get; set; }
+
         public ObservableCollection<string> ActionOptions { get; } =
             new();
 
@@ -1422,11 +1527,31 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Dialogs
                 }
 
                 if (string.Equals(
+                        ImportStatus,
+                        "Work Order Updated",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return "WO Updated";
+                }
+
+                if (string.Equals(
+                        SelectedAction,
+                        "Update Work Order",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return string.IsNullOrWhiteSpace(WorkOrder)
+                        ? "Choose WO"
+                        : $"WO → {WorkOrder}";
+                }
+
+                if (string.Equals(
                         SelectedAction,
                         "Skip",
                         StringComparison.OrdinalIgnoreCase))
                 {
-                    return "Will Not Import";
+                    return WorkOrderChanged
+                        ? "WO Not Updated"
+                        : "Will Not Import";
                 }
 
                 if (string.Equals(
