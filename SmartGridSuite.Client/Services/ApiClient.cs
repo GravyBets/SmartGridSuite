@@ -470,7 +470,7 @@ namespace SmartGridSuite.Client.Services
                     throw new ApiException(
                         (int)response.StatusCode,
                         string.IsNullOrWhiteSpace(error)
-                            ? "The cache refresh request failt."
+                            ? "The cache refresh request failed."
                             : error);
                 }
 
