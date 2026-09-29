@@ -84,42 +84,75 @@ namespace SmartGridSuite.Client.Services
                 }
 
                 /*
-                 * Windows 11 lets us use the exact SmartGridSuite theme
-                 * colors instead of merely asking Windows for dark/light.
+                 * Resolve the active SmartGridSuite colors once, then apply
+                 * them to BOTH title-bar layers:
+                 *
+                 *   1. Native Windows/DWM chrome used by ordinary Window.
+                 *   2. Fluent.Ribbon's custom RibbonWindow title bar.
+                 *
+                 * RibbonWindow does not automatically inherit DWM caption
+                 * foreground colors, which is why its title could remain
+                 * nearly black on Cobalt/Graphite/etc.
                  */
-                var captionColor =
-                    ResolveThemeColor(
+                var captionBrush =
+                    ResolveThemeBrush(
                         "AppBackground",
                         ThemeService.IsDarkTheme
-                            ? Color.FromRgb(24, 24, 24)
-                            : Colors.White);
+                            ? new SolidColorBrush(
+                                Color.FromRgb(24, 24, 24))
+                            : Brushes.White);
 
-                var textColor =
-                    ResolveThemeColor(
+                var textBrush =
+                    ResolveThemeBrush(
                         "TextPrimary",
                         ThemeService.IsDarkTheme
-                            ? Colors.White
-                            : Colors.Black);
+                            ? Brushes.White
+                            : Brushes.Black);
 
-                var borderColor =
-                    ResolveThemeColor(
+                var borderBrush =
+                    ResolveThemeBrush(
                         "CardBorder",
-                        captionColor);
+                        captionBrush);
+
+                var hoverBrush =
+                    ResolveThemeBrush(
+                        "HoverOverlay",
+                        ThemeService.IsDarkTheme
+                            ? new SolidColorBrush(
+                                Color.FromArgb(24, 255, 255, 255))
+                            : new SolidColorBrush(
+                                Color.FromArgb(20, 0, 0, 0)));
+
+                var pressedBrush =
+                    ResolveThemeBrush(
+                        "PressedOverlay",
+                        ThemeService.IsDarkTheme
+                            ? new SolidColorBrush(
+                                Color.FromArgb(40, 255, 255, 255))
+                            : new SolidColorBrush(
+                                Color.FromArgb(34, 0, 0, 0)));
 
                 SetColorAttribute(
                     handle,
                     DwmwaCaptionColor,
-                    captionColor);
+                    captionBrush.Color);
 
                 SetColorAttribute(
                     handle,
                     DwmwaTextColor,
-                    textColor);
+                    textBrush.Color);
 
                 SetColorAttribute(
                     handle,
                     DwmwaBorderColor,
-                    borderColor);
+                    borderBrush.Color);
+
+                ApplyFluentRibbonTitleBar(
+                    window,
+                    captionBrush,
+                    textBrush,
+                    hoverBrush,
+                    pressedBrush);
             }
             catch
             {
@@ -177,9 +210,9 @@ namespace SmartGridSuite.Client.Services
             }
         }
 
-        private static Color ResolveThemeColor(
+        private static SolidColorBrush ResolveThemeBrush(
             string resourceKey,
-            Color fallback)
+            SolidColorBrush fallback)
         {
             try
             {
@@ -187,7 +220,7 @@ namespace SmartGridSuite.Client.Services
                         ?.TryFindResource(resourceKey)
                     is SolidColorBrush brush)
                 {
-                    return brush.Color;
+                    return brush;
                 }
             }
             catch
@@ -195,6 +228,101 @@ namespace SmartGridSuite.Client.Services
             }
 
             return fallback;
+        }
+
+        private static void ApplyFluentRibbonTitleBar(
+            Window window,
+            SolidColorBrush captionBrush,
+            SolidColorBrush textBrush,
+            SolidColorBrush hoverBrush,
+            SolidColorBrush pressedBrush)
+        {
+            /*
+             * Avoid coupling this service to Fluent.Ribbon's CLR types.
+             * RibbonWindow exposes TitleBackground and TitleForeground, so
+             * reflection lets the same global service work for both normal
+             * WPF Window instances and Fluent RibbonWindow instances.
+             */
+            var windowType =
+                window.GetType();
+
+            var titleBackgroundProperty =
+                windowType.GetProperty(
+                    "TitleBackground");
+
+            if (titleBackgroundProperty?.CanWrite == true &&
+                typeof(Brush).IsAssignableFrom(
+                    titleBackgroundProperty.PropertyType))
+            {
+                titleBackgroundProperty.SetValue(
+                    window,
+                    captionBrush);
+            }
+
+            var titleForegroundProperty =
+                windowType.GetProperty(
+                    "TitleForeground");
+
+            if (titleForegroundProperty?.CanWrite == true &&
+                typeof(Brush).IsAssignableFrom(
+                    titleForegroundProperty.PropertyType))
+            {
+                titleForegroundProperty.SetValue(
+                    window,
+                    textBrush);
+            }
+
+            /*
+             * Fluent.Ribbon 11 uses these resources for the custom title bar
+             * and its minimize/maximize/close controls. Window-local values
+             * deliberately override Fluent's default theme resources.
+             */
+            window.Resources[
+                "Fluent.Ribbon.Brushes.RibbonWindow.TitleBackground"] =
+                captionBrush;
+
+            window.Resources[
+                "Fluent.Ribbon.Brushes.WindowCommands.CaptionButton.Foreground"] =
+                textBrush;
+
+            window.Resources[
+                "Fluent.Ribbon.Brushes.WindowCommands.CaptionButton.Background"] =
+                Brushes.Transparent;
+
+            window.Resources[
+                "Fluent.Ribbon.Brushes.WindowCommands.CaptionButton.MouseOver.Background"] =
+                hoverBrush;
+
+            window.Resources[
+                "Fluent.Ribbon.Brushes.WindowCommands.CaptionButton.Pressed.Background"] =
+                pressedBrush;
+
+            /*
+             * Keep the close button readable as well. Its hover treatment is
+             * intentionally a conventional Windows red; normal state remains
+             * transparent with the same theme-aware caption glyph color.
+             */
+            window.Resources[
+                "Fluent.Ribbon.Brushes.WindowCommands.CloseButton.MouseOver.Background"] =
+                new SolidColorBrush(
+                    Color.FromRgb(196, 43, 28));
+
+            window.Resources[
+                "Fluent.Ribbon.Brushes.WindowCommands.CloseButton.Pressed.Background"] =
+                new SolidColorBrush(
+                    Color.FromRgb(153, 33, 22));
+
+            /*
+             * Some Fluent.Ribbon templates bind the title foreground back to
+             * RibbonWindow.Foreground. Setting it only on RibbonWindow types
+             * gives those templates the same theme-aware value without
+             * changing ordinary WPF windows.
+             */
+            if (titleForegroundProperty is not null)
+            {
+                window.Foreground =
+                    textBrush;
+            }
         }
 
         private static void SetColorAttribute(
