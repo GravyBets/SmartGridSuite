@@ -42,7 +42,15 @@ namespace SmartGridSuite.Contracts.Tickets
         bool RequiresReview = false,
 
         // More specific explanation of why the row requires review.
-        string ReviewReason = ""
+        string ReviewReason = "",
+
+        // Existing SmartGridSuite WO when a spreadsheet notification
+        // already exists in the application.
+        string ExistingWorkOrder = "",
+
+        // True when SAP has a different nonblank WO for an active
+        // SmartGridSuite ticket and commit should synchronize it.
+        bool WorkOrderChanged = false
     );
 
     public sealed record SapQueueImportCommitRow(
@@ -95,6 +103,7 @@ namespace SmartGridSuite.Contracts.Tickets
         List<SapQueueImportCommitResultRow> Rows,
 
         int ExistingKeptCount = 0,
-        int ExistingStatusChangedCount = 0
+        int ExistingStatusChangedCount = 0,
+        int ExistingWorkOrderUpdatedCount = 0
     );
 }
