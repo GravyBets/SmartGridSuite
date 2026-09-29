@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Threading.Tasks;
 
 namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
@@ -14,9 +15,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public event EventHandler? AddTabRequested;
         public event EventHandler<string?>? SelectedTabChanged;
         public event EventHandler<string?>? CloseTabRequested;
+        public event EventHandler<SiteDashboardTabReorderRequestedEventArgs>? TabReorderRequested;
         public event EventHandler? PopOutRequested;
 
         private bool _syncingTabs;
+
+        private Point _tabDragStartPoint;
+        private string? _tabDragSessionKey;
 
         public SiteDashboardTopBarView()
         {
@@ -184,6 +189,207 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 SelectedTabChanged?.Invoke(this, item.Tag as string);
         }
 
+        private void SiteTabsControl_PreviewMouseLeftButtonDown(
+            object sender,
+            MouseButtonEventArgs e)
+        {
+            _tabDragSessionKey = null;
+
+            /*
+             * Clicking the close button must never begin a tab drag.
+             */
+            if (FindVisualAncestor<Button>(
+                    e.OriginalSource as DependencyObject) is not null)
+            {
+                return;
+            }
+
+            var tab =
+                FindVisualAncestor<TabItem>(
+                    e.OriginalSource as DependencyObject);
+
+            if (tab?.Tag is not string sessionKey ||
+                string.IsNullOrWhiteSpace(sessionKey))
+            {
+                return;
+            }
+
+            _tabDragStartPoint =
+                e.GetPosition(SiteTabsControl);
+
+            _tabDragSessionKey =
+                sessionKey;
+        }
+
+        private void SiteTabsControl_PreviewMouseMove(
+            object sender,
+            MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed ||
+                string.IsNullOrWhiteSpace(_tabDragSessionKey))
+            {
+                return;
+            }
+
+            var currentPoint =
+                e.GetPosition(SiteTabsControl);
+
+            var horizontalDistance =
+                Math.Abs(
+                    currentPoint.X -
+                    _tabDragStartPoint.X);
+
+            var verticalDistance =
+                Math.Abs(
+                    currentPoint.Y -
+                    _tabDragStartPoint.Y);
+
+            if (horizontalDistance <
+                    SystemParameters.MinimumHorizontalDragDistance &&
+                verticalDistance <
+                    SystemParameters.MinimumVerticalDragDistance)
+            {
+                return;
+            }
+
+            var sessionKey =
+                _tabDragSessionKey;
+
+            _tabDragSessionKey =
+                null;
+
+            DragDrop.DoDragDrop(
+                SiteTabsControl,
+                new DataObject(
+                    SiteTabDragDataFormat,
+                    sessionKey),
+                DragDropEffects.Move);
+        }
+
+        private void SiteTabsControl_DragOver(
+            object sender,
+            DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(
+                    SiteTabDragDataFormat))
+            {
+                return;
+            }
+
+            e.Effects =
+                DragDropEffects.Move;
+
+            e.Handled =
+                true;
+        }
+
+        private void SiteTabsControl_Drop(
+            object sender,
+            DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(
+                    SiteTabDragDataFormat))
+            {
+                return;
+            }
+
+            var sessionKey =
+                e.Data.GetData(
+                    SiteTabDragDataFormat) as string;
+
+            if (string.IsNullOrWhiteSpace(
+                    sessionKey))
+            {
+                return;
+            }
+
+            var tabs =
+                SiteTabsControl.Items
+                    .OfType<TabItem>()
+                    .ToList();
+
+            var sourceIndex =
+                tabs.FindIndex(
+                    x => string.Equals(
+                        x.Tag as string,
+                        sessionKey,
+                        StringComparison.Ordinal));
+
+            if (sourceIndex < 0)
+                return;
+
+            var targetTab =
+                FindVisualAncestor<TabItem>(
+                    e.OriginalSource as DependencyObject);
+
+            var targetIndex =
+                targetTab is null
+                    ? tabs.Count
+                    : tabs.IndexOf(targetTab);
+
+            if (targetTab is not null &&
+                targetIndex >= 0)
+            {
+                var pointInTarget =
+                    e.GetPosition(
+                        targetTab);
+
+                if (pointInTarget.X >
+                    targetTab.ActualWidth / 2.0)
+                {
+                    targetIndex++;
+                }
+            }
+
+            if (sourceIndex < targetIndex)
+                targetIndex--;
+
+            targetIndex =
+                Math.Max(
+                    0,
+                    Math.Min(
+                        targetIndex,
+                        tabs.Count - 1));
+
+            if (targetIndex == sourceIndex)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            TabReorderRequested?.Invoke(
+                this,
+                new SiteDashboardTabReorderRequestedEventArgs(
+                    sessionKey,
+                    targetIndex));
+
+            e.Handled =
+                true;
+        }
+
+        private const string SiteTabDragDataFormat =
+            "SmartGridSuite.SiteDashboardTab";
+
+        private static T? FindVisualAncestor<T>(
+            DependencyObject? source)
+            where T : DependencyObject
+        {
+            var current =
+                source;
+
+            while (current is not null)
+            {
+                if (current is T match)
+                    return match;
+
+                current =
+                    VisualTreeHelper.GetParent(
+                        current);
+            }
+
+            return null;
+        }
+
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             e.Handled = true;
@@ -278,5 +484,24 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             glyphBlock.Text = TopBarCopyGlyph;
             button.ToolTip = originalToolTip ?? defaultToolTip;
         }
+    }
+
+    public sealed class SiteDashboardTabReorderRequestedEventArgs
+        : EventArgs
+    {
+        public SiteDashboardTabReorderRequestedEventArgs(
+            string sessionKey,
+            int targetIndex)
+        {
+            SessionKey =
+                sessionKey;
+
+            TargetIndex =
+                targetIndex;
+        }
+
+        public string SessionKey { get; }
+
+        public int TargetIndex { get; }
     }
 }
