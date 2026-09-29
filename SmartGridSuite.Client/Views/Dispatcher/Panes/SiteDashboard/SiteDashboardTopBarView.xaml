@@ -208,7 +208,12 @@
                         DockPanel.Dock="Left"
                         Background="Transparent"
                         BorderThickness="0"
-                        SelectionChanged="SiteTabsControl_SelectionChanged">
+                        AllowDrop="True"
+                        SelectionChanged="SiteTabsControl_SelectionChanged"
+                        PreviewMouseLeftButtonDown="SiteTabsControl_PreviewMouseLeftButtonDown"
+                        PreviewMouseMove="SiteTabsControl_PreviewMouseMove"
+                        DragOver="SiteTabsControl_DragOver"
+                        Drop="SiteTabsControl_Drop">
                 <TabControl.ItemContainerStyle>
                     <Style TargetType="TabItem" BasedOn="{StaticResource AttachedTabItemStyle}" />
                 </TabControl.ItemContainerStyle>
