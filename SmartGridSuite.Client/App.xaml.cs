@@ -43,6 +43,10 @@ namespace SmartGridSuite.Client
             // before any application windows are created.
             InterfaceScaleService.Initialize();
 
+            // Keep the native Windows caption/title bar readable and
+            // synchronized with the active SmartGridSuite theme.
+            WindowTitleBarService.Initialize();
+
             base.OnStartup(e);
         }
 
