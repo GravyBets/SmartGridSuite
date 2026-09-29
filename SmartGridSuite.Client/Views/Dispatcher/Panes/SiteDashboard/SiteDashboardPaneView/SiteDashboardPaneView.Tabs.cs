@@ -54,6 +54,61 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 selectedSession?.IsSnmpPollAllRunning == true);
         }
 
+        private void TopBarView_TabReorderRequested(
+            object? sender,
+            SiteDashboardTabReorderRequestedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(e.SessionKey) ||
+                _sessions.Count < 2)
+            {
+                return;
+            }
+
+            var sourceIndex =
+                _sessions.FindIndex(
+                    x => string.Equals(
+                        x.SessionKey,
+                        e.SessionKey,
+                        StringComparison.Ordinal));
+
+            if (sourceIndex < 0)
+                return;
+
+            var targetIndex =
+                Math.Max(
+                    0,
+                    Math.Min(
+                        e.TargetIndex,
+                        _sessions.Count - 1));
+
+            if (sourceIndex == targetIndex)
+                return;
+
+            /*
+             * Reorder the existing session object itself.
+             * Nothing is reloaded or recreated, so write-up text,
+             * equipment state, pings, SNMP state, and selected site
+             * all remain attached to the same tab.
+             */
+            var session =
+                _sessions[sourceIndex];
+
+            _sessions.RemoveAt(
+                sourceIndex);
+
+            _sessions.Insert(
+                targetIndex,
+                session);
+
+            /*
+             * Rebuild only the tab headers from the authoritative session
+             * order. Keep the same selected session key and workspace state.
+             */
+            TopBarView.SetTabs(
+                _sessions,
+                _selectedSessionKey);
+        }
+
         private void TopBarView_CloseTabRequested(object? sender, string? sessionKey)
         {
             if (string.IsNullOrWhiteSpace(sessionKey))
