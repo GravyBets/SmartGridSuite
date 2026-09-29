@@ -4362,6 +4362,10 @@ namespace SmartGridSuite.Api.Controllers
                 req.ExistingTicketActions ??
                 new List<SapQueueExistingTicketAction>();
 
+            var workOrderUpdates =
+                req.WorkOrderUpdates ??
+                new List<SapQueueWorkOrderUpdate>();
+
             var createdBy =
                 string.IsNullOrWhiteSpace(req.CreatedBy)
                     ? "Unknown"
@@ -4371,7 +4375,8 @@ namespace SmartGridSuite.Api.Controllers
                 DateTime.Now;
 
             if (rows.Count == 0 &&
-                existingActions.Count == 0)
+                existingActions.Count == 0 &&
+                workOrderUpdates.Count == 0)
             {
                 return Ok(
                     new SapQueueImportCommitResponse(
@@ -4380,7 +4385,8 @@ namespace SmartGridSuite.Api.Controllers
                         InvalidCount: 0,
                         Rows: new(),
                         ExistingKeptCount: 0,
-                        ExistingStatusChangedCount: 0));
+                        ExistingStatusChangedCount: 0,
+                        ExistingWorkOrderUpdatedCount: 0));
             }
 
             /*
@@ -4432,6 +4438,114 @@ namespace SmartGridSuite.Api.Controllers
                         .Where(char.IsLetterOrDigit)
                         .Select(char.ToLowerInvariant)
                         .ToArray());
+            }
+
+            /*
+             * ------------------------------------------------------------
+             * VALIDATE WORK-ORDER SYNCHRONIZATION BEFORE CHANGING ANY DATA
+             * ------------------------------------------------------------
+             */
+            var duplicateWorkOrderUpdate =
+                workOrderUpdates
+                    .Where(x => x.TicketId > 0)
+                    .GroupBy(x => x.TicketId)
+                    .FirstOrDefault(x => x.Count() > 1);
+
+            if (duplicateWorkOrderUpdate != null)
+            {
+                return BadRequest(
+                    $"Ticket {duplicateWorkOrderUpdate.Key} appears more than once " +
+                    "in the SAP Work Order updates.");
+            }
+
+            foreach (var update in workOrderUpdates)
+            {
+                if (update.TicketId <= 0)
+                {
+                    return BadRequest(
+                        "A valid ticket ID is required for every SAP Work Order update.");
+                }
+
+                var notification =
+                    NormalizeNotification(update.Notification);
+
+                if (string.IsNullOrWhiteSpace(notification))
+                {
+                    return BadRequest(
+                        $"Ticket {update.TicketId} is missing its SAP notification number.");
+                }
+
+                var newWorkOrder =
+                    NormalizeWorkOrder(update.NewWorkOrder);
+
+                if (string.IsNullOrWhiteSpace(newWorkOrder))
+                {
+                    return BadRequest(
+                        $"A nonblank Work Order is required for ticket {update.TicketId}.");
+                }
+
+                if (newWorkOrder.Length > TicketTextLimits.WorkOrder)
+                {
+                    return BadRequest(
+                        $"Work Order '{newWorkOrder}' is too long. " +
+                        $"Work Orders are limited to {TicketTextLimits.WorkOrder} characters.");
+                }
+            }
+
+            var workOrderUpdateTicketIds =
+                workOrderUpdates
+                    .Select(x => x.TicketId)
+                    .Distinct()
+                    .ToList();
+
+            var workOrderUpdateTickets =
+                workOrderUpdateTicketIds.Count == 0
+                    ? new List<TicketEntity>()
+                    : await _db.Tickets
+                        .Where(x =>
+                            workOrderUpdateTicketIds.Contains(x.Id))
+                        .ToListAsync(ct);
+
+            var workOrderUpdateTicketsById =
+                workOrderUpdateTickets
+                    .ToDictionary(x => x.Id);
+
+            foreach (var update in workOrderUpdates)
+            {
+                if (!workOrderUpdateTicketsById.TryGetValue(
+                        update.TicketId,
+                        out var ticket))
+                {
+                    return BadRequest(
+                        $"Existing SmartGridSuite ticket {update.TicketId} " +
+                        "could not be found. Reload the SAP preview.");
+                }
+
+                var expectedNotification =
+                    NormalizeNotification(update.Notification);
+
+                var currentNotification =
+                    NormalizeNotification(ticket.Notification);
+
+                if (!string.Equals(
+                        expectedNotification,
+                        currentNotification,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return Conflict(
+                        $"Ticket {ticket.Id} no longer matches notification " +
+                        $"{update.Notification}. Reload the SAP preview.");
+                }
+
+                var currentStatus =
+                    (ticket.Status ?? string.Empty).Trim();
+
+                if (closedStatusNames.Contains(currentStatus))
+                {
+                    return Conflict(
+                        $"Ticket {ticket.Id} is now closed. " +
+                        "Reload the SAP Queue preview before updating its Work Order.");
+                }
             }
 
             /*
@@ -4724,6 +4838,7 @@ namespace SmartGridSuite.Api.Controllers
 
             var existingKept = 0;
             var existingStatusChanged = 0;
+            var existingWorkOrderUpdated = 0;
 
             await using var transaction =
                 await _db.Database
@@ -5010,6 +5125,102 @@ namespace SmartGridSuite.Api.Controllers
 
                 /*
                  * --------------------------------------------------------
+                 * EXISTING NOTIFICATION WORK-ORDER SYNCHRONIZATION
+                 * --------------------------------------------------------
+                 */
+                foreach (var update in workOrderUpdates)
+                {
+                    var ticket =
+                        workOrderUpdateTicketsById[
+                            update.TicketId];
+
+                    var newWorkOrder =
+                        NormalizeWorkOrder(
+                            update.NewWorkOrder)!;
+
+                    var oldWorkOrder =
+                        NormalizeWorkOrder(
+                            ticket.CurrentWorkOrder);
+
+                    if (string.Equals(
+                            oldWorkOrder ?? string.Empty,
+                            newWorkOrder,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        results.Add(
+                            new SapQueueImportCommitResultRow(
+                                update.RowNumber,
+                                NormalizeNotification(
+                                    update.Notification) ?? update.Notification,
+                                "No Change",
+                                $"Work Order is already {newWorkOrder}.",
+                                ticket.Id));
+
+                        continue;
+                    }
+
+                    var oldWorkOrderType =
+                        (ticket.WorkOrderClass ?? string.Empty)
+                            .Trim();
+
+                    ticket.CurrentWorkOrder =
+                        newWorkOrder;
+
+                    /*
+                     * SAP Queue exports do not contain a reliable SmartGridSuite
+                     * Maint/Cap/Distribution classification. A changed WO can be
+                     * the result of a Maintenance -> Capital conversion, so keeping
+                     * the previous type would be worse than leaving it blank.
+                     *
+                     * Clearing the type deliberately feeds the existing
+                     * "Missing WO Type" dispatcher workflow.
+                     */
+                    ticket.WorkOrderClass =
+                        null;
+
+                    ticket.LastActivityAt =
+                        importTime;
+
+                    var auditEntry =
+                        $"[{importTime:MM-dd-yyyy HH:mm}] " +
+                        $"SAP Queue Work Order sync by {createdBy}" +
+                        Environment.NewLine +
+                        $"Work Order: " +
+                        $"{(string.IsNullOrWhiteSpace(oldWorkOrder) ? "(none)" : oldWorkOrder)} " +
+                        $"→ {newWorkOrder}";
+
+                    if (!string.IsNullOrWhiteSpace(
+                            oldWorkOrderType))
+                    {
+                        auditEntry +=
+                            Environment.NewLine +
+                            $"WO Type cleared: {oldWorkOrderType}";
+                    }
+
+                    ticket.DispatchNotes =
+                        string.IsNullOrWhiteSpace(
+                            ticket.DispatchNotes)
+                            ? auditEntry
+                            : ticket.DispatchNotes.Trim()
+                              + Environment.NewLine
+                              + Environment.NewLine
+                              + auditEntry;
+
+                    existingWorkOrderUpdated++;
+
+                    results.Add(
+                        new SapQueueImportCommitResultRow(
+                            update.RowNumber,
+                            NormalizeNotification(
+                                update.Notification) ?? update.Notification,
+                            "Work Order Updated",
+                            $"Work Order updated to {newWorkOrder}. " +
+                            "WO Type cleared for review.",
+                            ticket.Id));
+                }
+
+                /*
+                 * --------------------------------------------------------
                  * EXISTING SMARTGRIDSUITE TICKET ACTIONS
                  * --------------------------------------------------------
                  */
@@ -5130,7 +5341,8 @@ namespace SmartGridSuite.Api.Controllers
                     existingStatusChanged++;
                 }
 
-                if (existingStatusChanged > 0)
+                if (existingStatusChanged > 0 ||
+                    existingWorkOrderUpdated > 0)
                 {
                     await _db.SaveChangesAsync(ct);
                 }
@@ -5163,7 +5375,10 @@ namespace SmartGridSuite.Api.Controllers
                             existingKept,
 
                         ExistingStatusChangedCount:
-                            existingStatusChanged));
+                            existingStatusChanged,
+
+                        ExistingWorkOrderUpdatedCount:
+                            existingWorkOrderUpdated));
             }
             catch
             {
