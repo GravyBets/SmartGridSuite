@@ -784,13 +784,16 @@
                                                        VerticalAlignment="Center" />
 
                                             <Button x:Name="CopyTicketNotificationButton"
-                                                    Style="{StaticResource MiniIconButton}"
+                                                    Style="{StaticResource DashboardCleanCopyButtonStyle}"
                                                     Margin="6,0,0,0"
-                                                    Width="22"
-                                                    Height="22"
                                                     ToolTip="Copy notification"
                                                     Click="CopyTicketNotificationButton_Click">
-                                                <TextBlock Style="{StaticResource CopyGlyph}" />
+                                                <TextBlock Text="&#xE8C8;"
+                                                           FontFamily="Segoe MDL2 Assets"
+                                                           FontSize="14"
+                                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                           VerticalAlignment="Center"
+                                                           HorizontalAlignment="Center"/>
                                             </Button>
                                         </StackPanel>
                                     </Grid>
@@ -831,13 +834,16 @@
                                                        VerticalAlignment="Center" />
 
                                             <Button x:Name="CopyTicketWorkOrderButton"
-                                                    Style="{StaticResource MiniIconButton}"
+                                                    Style="{StaticResource DashboardCleanCopyButtonStyle}"
                                                     Margin="6,0,0,0"
-                                                    Width="22"
-                                                    Height="22"
                                                     ToolTip="Copy work order"
                                                     Click="CopyTicketWorkOrderButton_Click">
-                                                <TextBlock Style="{StaticResource CopyGlyph}" />
+                                                <TextBlock Text="&#xE8C8;"
+                                                           FontFamily="Segoe MDL2 Assets"
+                                                           FontSize="14"
+                                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                           VerticalAlignment="Center"
+                                                           HorizontalAlignment="Center"/>
                                             </Button>
                                         </StackPanel>
                                     </Grid>
