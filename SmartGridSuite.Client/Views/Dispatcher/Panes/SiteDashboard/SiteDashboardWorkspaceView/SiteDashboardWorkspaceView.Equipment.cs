@@ -613,20 +613,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             Grid.SetColumn(firstField, 0);
 
             var oldSerialField = CreateReplacementField(
-                "Found Serial Number - *Leave blank if applicable*",
+                "Found Serial #",
                 cleanOldSerial,
                 isReadOnly: false,
                 fieldKey: "ReplacementOldSerial",
-                watermark: "Found Serial #");
+                watermark: "Found Serial #",
+                labelToolTip: "Leave blank if not applicable.");
 
             Grid.SetColumn(oldSerialField, 2);
 
             var newSerialField = CreateReplacementField(
-                "Left Serial Number - *Leave blank if applicable*",
+                "Left Serial #",
                 string.Empty,
                 isReadOnly: false,
                 fieldKey: "ReplacementNewSerial",
-                watermark: "Left Serial #");
+                watermark: "Left Serial #",
+                labelToolTip: "Leave blank if not applicable.");
 
             Grid.SetColumn(newSerialField, 4);
 
@@ -661,8 +663,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 fieldsGrid.ColumnDefinitions[4].Width = isBad ? new GridLength(0) : normalLeftWidth;
                 if (oldSerialField is StackPanel serialPanel && serialPanel.Children[0] is TextBlock serialLabel)
                     serialLabel.Text = isBad
-                        ? "Bad From Stock Serial Number"
-                        : "Found Serial Number - *Leave blank if applicable*";
+                        ? "Bad From Stock SN"
+                        : "Found Serial #";
+
+                    serialLabel.ToolTip = isBad
+                        ? "Serial number of the defective stock unit."
+                        : "Leave blank if not applicable.";
             }
             badFromStockCheckBox.Checked += (_, _) => ApplyBadFromStockState();
             badFromStockCheckBox.Unchecked += (_, _) => ApplyBadFromStockState();
@@ -680,7 +686,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             string value,
             bool isReadOnly,
             string? fieldKey = null,
-            string? watermark = null)
+            string? watermark = null,
+            string? labelToolTip = null)
         {
             var stack = new StackPanel
             {
@@ -697,7 +704,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     Foreground =
                         TryFindResource("TextSecondary") as Brush,
                     TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 0, 0, 4)
+                    Margin = new Thickness(0, 0, 0, 4),
+                    ToolTip = string.IsNullOrWhiteSpace(labelToolTip)
+                        ? null
+                        : labelToolTip
                 });
 
             var textBox = new TextBox
