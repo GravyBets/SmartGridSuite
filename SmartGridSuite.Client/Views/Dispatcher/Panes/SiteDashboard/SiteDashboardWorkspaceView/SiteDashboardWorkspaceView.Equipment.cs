@@ -656,26 +656,43 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 Foreground = TryFindResource("TextPrimary") as Brush,
                 ToolTip = "Record a defective stock unit using the serial number shown on this card."
             };
-            var normalGapWidth = fieldsGrid.ColumnDefinitions[3].Width;
-            var normalLeftWidth = fieldsGrid.ColumnDefinitions[4].Width;
+            var normalFoundGapWidth =
+                fieldsGrid.ColumnDefinitions[1].Width;
+
+            var normalFoundWidth =
+                fieldsGrid.ColumnDefinitions[2].Width;
+
             void ApplyBadFromStockState()
             {
-                var isBad = canMarkBadFromStock && badFromStockCheckBox.IsChecked == true;
-                ((ReplacementEntryRowTag)outerBorder.Tag).BadFromStock = isBad;
-                newSerialField.Visibility = isBad ? Visibility.Collapsed : Visibility.Visible;
-                fieldsGrid.ColumnDefinitions[3].Width = isBad ? new GridLength(0) : normalGapWidth;
-                fieldsGrid.ColumnDefinitions[4].Width = isBad ? new GridLength(0) : normalLeftWidth;
-                if (oldSerialField is StackPanel serialPanel &&
-                    serialPanel.Children[0] is TextBlock serialLabel)
-                {
-                    serialLabel.Text = isBad
-                        ? "Bad From Stock SN"
-                        : "Found Serial #";
+                var isBad =
+                    canMarkBadFromStock &&
+                    badFromStockCheckBox.IsChecked == true;
 
-                    serialLabel.ToolTip = isBad
-                        ? "Serial number of the defective stock unit."
-                        : "Leave blank if not applicable.";
-                }
+                ((ReplacementEntryRowTag)outerBorder.Tag).BadFromStock =
+                    isBad;
+
+                /*
+                 * Bad From Stock describes the unit the technician is LEAVING
+                 * at the site / recording from stock. Keep Left Serial visible
+                 * and hide Found Serial so the card matches the write-up.
+                 */
+                oldSerialField.Visibility =
+                    isBad
+                        ? Visibility.Collapsed
+                        : Visibility.Visible;
+
+                fieldsGrid.ColumnDefinitions[1].Width =
+                    isBad
+                        ? new GridLength(0)
+                        : normalFoundGapWidth;
+
+                fieldsGrid.ColumnDefinitions[2].Width =
+                    isBad
+                        ? new GridLength(0)
+                        : normalFoundWidth;
+
+                newSerialField.Visibility =
+                    Visibility.Visible;
             }
             badFromStockCheckBox.Checked += (_, _) => ApplyBadFromStockState();
             badFromStockCheckBox.Unchecked += (_, _) => ApplyBadFromStockState();
