@@ -30,6 +30,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             public string MatchField { get; set; } = "";
             public string AssociatedIp { get; set; } = "";
 
+            public Visibility AssociatedIpVisibility =>
+                string.IsNullOrWhiteSpace(AssociatedIp)
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+
             public string DisplayText
             {
                 get
@@ -55,12 +60,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                         ? string.Empty
                         : $" — {string.Join(".", matchParts)}";
 
-                    var associatedIpText =
-                        string.IsNullOrWhiteSpace(AssociatedIp)
-                            ? string.Empty
-                            : $"{Environment.NewLine}LTE IP: {AssociatedIp.Trim()}";
-
-                    return $"{siteId}  ({kind}){matchText}{associatedIpText}";
+                    return $"{siteId}  ({kind}){matchText}";
                 }
             }
         }
