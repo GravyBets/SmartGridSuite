@@ -2042,16 +2042,28 @@
                                      VerticalContentAlignment="Center"
                                      LostFocus="SnmpTargetTextBox_LostFocus" />
 
-                            <Button x:Name="PollAllSnmpButton"
-                                    Grid.Column="12"
-                                    Style="{StaticResource PrimaryButtonStyle}"
-                                    Content="Poll All"
-                                    Height="28"
-                                    Width="66"
-                                    MinWidth="66"
-                                    MaxWidth="66"
-                                    Padding="8,0"
-                                    Click="PollAllSnmpButton_Click" />
+                            <StackPanel Grid.Column="12"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <Button x:Name="PollStatsSnmpButton"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        Content="Poll Stats"
+                                        Height="28"
+                                        MinWidth="82"
+                                        Padding="10,0"
+                                        Click="PollStatsSnmpButton_Click" />
+
+                                <Button x:Name="PollAllSnmpButton"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Content="Poll All"
+                                        Height="28"
+                                        Width="66"
+                                        MinWidth="66"
+                                        MaxWidth="66"
+                                        Margin="8,0,0,0"
+                                        Padding="8,0"
+                                        Click="PollAllSnmpButton_Click" />
+                            </StackPanel>
                         </Grid>
                     </Grid>
                 </Border>
