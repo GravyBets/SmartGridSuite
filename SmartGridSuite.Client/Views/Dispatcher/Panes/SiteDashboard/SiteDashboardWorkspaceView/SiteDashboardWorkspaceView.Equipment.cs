@@ -196,6 +196,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 hasSensitiveRows |= AddSensitiveEquipmentRow(
                     "Secondary WiFi Password",
                     GetEquipmentValue("Secondary WiFi Password", "Secondary Password"));
+
+                hasSensitiveRows |= AddSensitiveEquipmentRow(
+                    "SIM #",
+                    GetEquipmentValue("SIM #"));
             }
 
             if (!hasSensitiveRows)
