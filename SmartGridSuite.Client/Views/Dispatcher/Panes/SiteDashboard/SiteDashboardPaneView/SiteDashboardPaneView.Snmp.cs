@@ -523,6 +523,219 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
+        private async void WorkspaceView_PollStatsSnmpRequested(
+            object? sender,
+            EventArgs e)
+        {
+            var session =
+                GetSelectedSession();
+
+            if (session is null)
+                return;
+
+            if (session.IsSnmpPollAllRunning)
+            {
+                TopBarView.StatusText =
+                    "SNMP Poll All is already running for this site.";
+
+                return;
+            }
+
+            if (session.IsSnmpPollStatsRunning)
+                return;
+
+            if (session.SnmpProfile is null)
+            {
+                TopBarView.StatusText =
+                    "No active SNMP profile is loaded for this site.";
+
+                return;
+            }
+
+            var targetIp =
+                WorkspaceView.GetSnmpTargetIp();
+
+            if (string.IsNullOrWhiteSpace(targetIp))
+            {
+                TopBarView.StatusText =
+                    "Enter a target IP first.";
+
+                return;
+            }
+
+            var oids =
+                session.SnmpOids
+                    .Where(x =>
+                        x.ShowInWorkspace &&
+                        string.Equals(
+                            x.Category,
+                            "Stats",
+                            StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(x => x.SortOrder)
+                    .ThenBy(x => x.Label)
+                    .ToList();
+
+            if (oids.Count == 0)
+            {
+                TopBarView.StatusText =
+                    "No SNMP OIDs are configured in the Stats category.";
+
+                return;
+            }
+
+            var pollCts =
+                new CancellationTokenSource();
+
+            session.SnmpPollStatsCts?.Dispose();
+            session.SnmpPollStatsCts =
+                pollCts;
+
+            session.IsSnmpPollStatsRunning =
+                true;
+
+            session.SnmpTargetIp =
+                targetIp;
+
+            if (session.SessionKey ==
+                _selectedSessionKey)
+            {
+                WorkspaceView.SetSnmpPollStatsRunning(
+                    true,
+                    session.IsSnmpPollAllRunning);
+
+                TopBarView.StatusText =
+                    $"Polling SNMP Stats for {session.HeaderText}...";
+            }
+
+            try
+            {
+                foreach (var oid in oids)
+                {
+                    pollCts.Token.ThrowIfCancellationRequested();
+
+                    session.SnmpOidResults[oid.Id] =
+                        "Running...";
+
+                    if (session.SessionKey ==
+                        _selectedSessionKey)
+                    {
+                        WorkspaceView.SetSnmpOidResult(
+                            oid.Id,
+                            "Running...");
+                    }
+
+                    try
+                    {
+                        var result =
+                            await _localSnmpService.RunSelectedAsync(
+                                session.SnmpProfile,
+                                oid,
+                                targetIp,
+                                pollCts.Token);
+
+                        pollCts.Token.ThrowIfCancellationRequested();
+
+                        var display =
+                            result?.Success == true
+                                ? result.DisplayValue
+                                : $"ERROR: {result?.ErrorMessage}";
+
+                        session.SnmpOidResults[oid.Id] =
+                            display ?? string.Empty;
+
+                        if (session.SessionKey ==
+                            _selectedSessionKey)
+                        {
+                            WorkspaceView.SetSnmpOidResult(
+                                oid.Id,
+                                display ?? string.Empty);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                        when (pollCts.IsCancellationRequested)
+                    {
+                        session.SnmpOidResults[oid.Id] =
+                            "Not polled.";
+
+                        if (session.SessionKey ==
+                            _selectedSessionKey)
+                        {
+                            WorkspaceView.SetSnmpOidResult(
+                                oid.Id,
+                                "Not polled.");
+                        }
+
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        var error =
+                            $"ERROR: {ex.Message}";
+
+                        session.SnmpOidResults[oid.Id] =
+                            error;
+
+                        if (session.SessionKey ==
+                            _selectedSessionKey)
+                        {
+                            WorkspaceView.SetSnmpOidResult(
+                                oid.Id,
+                                error);
+                        }
+                    }
+                }
+
+                if (session.SessionKey ==
+                    _selectedSessionKey)
+                {
+                    TopBarView.StatusText =
+                        $"SNMP Stats poll complete for {session.HeaderText}.";
+                }
+            }
+            catch (OperationCanceledException)
+                when (pollCts.IsCancellationRequested)
+            {
+                if (session.SessionKey ==
+                    _selectedSessionKey)
+                {
+                    TopBarView.StatusText =
+                        $"SNMP Stats poll stopped for {session.HeaderText}.";
+                }
+            }
+            catch (Exception ex)
+            {
+                if (session.SessionKey ==
+                    _selectedSessionKey)
+                {
+                    TopBarView.StatusText =
+                        $"SNMP Stats poll failed: {ex.Message}";
+                }
+            }
+            finally
+            {
+                if (ReferenceEquals(
+                        session.SnmpPollStatsCts,
+                        pollCts))
+                {
+                    session.SnmpPollStatsCts =
+                        null;
+
+                    session.IsSnmpPollStatsRunning =
+                        false;
+                }
+
+                pollCts.Dispose();
+
+                if (session.SessionKey ==
+                    _selectedSessionKey)
+                {
+                    WorkspaceView.SetSnmpPollStatsRunning(
+                        false,
+                        session.IsSnmpPollAllRunning);
+                }
+            }
+        }
+
         private async void WorkspaceView_PollAllSnmpRequested(object? sender, EventArgs e)
         {
             /*
@@ -550,6 +763,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     TopBarView.StatusText =
                         $"Stopping SNMP poll for {session.HeaderText}...";
                 }
+
+                return;
+            }
+
+            if (session.IsSnmpPollStatsRunning)
+            {
+                TopBarView.StatusText =
+                    "SNMP Poll Stats is already running for this site.";
 
                 return;
             }
@@ -806,6 +1027,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             WorkspaceView.SetSnmpProfiles(session.SnmpProfiles, session.SnmpProfileId);
             WorkspaceView.SetSnmpOids(session.SnmpOids, session.SnmpOidResults);
             WorkspaceView.SetSnmpPollAllRunning(session.IsSnmpPollAllRunning);
+            WorkspaceView.SetSnmpPollStatsRunning(
+                session.IsSnmpPollStatsRunning,
+                session.IsSnmpPollAllRunning);
         }
     }
 }
