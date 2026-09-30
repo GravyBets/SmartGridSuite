@@ -22,6 +22,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         public event EventHandler<SnmpRunOidRequestedEventArgs>? RunSnmpOidRequested;
 
         public event EventHandler? PollAllSnmpRequested;
+        public event EventHandler? PollStatsSnmpRequested;
+
+        private void PollStatsSnmpButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            PollStatsSnmpRequested?.Invoke(
+                this,
+                EventArgs.Empty);
+        }
 
         private void PollAllSnmpButton_Click(
             object sender,
@@ -35,6 +45,28 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             PollAllSnmpRequested?.Invoke(
                 this,
                 EventArgs.Empty);
+        }
+
+        public void SetSnmpPollStatsRunning(
+            bool isRunning,
+            bool pollAllRunning = false)
+        {
+            PollStatsSnmpButton.Content =
+                isRunning
+                    ? "Polling..."
+                    : "Poll Stats";
+
+            PollStatsSnmpButton.ToolTip =
+                isRunning
+                    ? "Polling SNMP Stats OIDs"
+                    : "Poll only SNMP OIDs in the Stats category";
+
+            PollStatsSnmpButton.IsEnabled =
+                !isRunning &&
+                !pollAllRunning;
+
+            PollAllSnmpButton.IsEnabled =
+                !isRunning;
         }
 
         public void SetSnmpPollAllRunning(bool isRunning)
@@ -59,6 +91,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 isRunning
                     ? "DangerButtonStyle"
                     : "PrimaryButtonStyle");
+
+            PollStatsSnmpButton.IsEnabled =
+                !isRunning;
         }
 
         public void ResetSnmp()
@@ -98,6 +133,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             SetSelectedSnmpButton.IsEnabled = false;
             SnmpDecoderValuesTextBox.Text = string.Empty;
             SetSnmpPollAllRunning(false);
+            SetSnmpPollStatsRunning(false);
         }
 
         public void SetSnmpContext(bool supported, string supportMessage, string deviceFamily, string profileName, string? primaryIp, string? lanIp,
