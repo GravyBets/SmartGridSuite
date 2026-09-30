@@ -661,7 +661,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 newSerialField.Visibility = isBad ? Visibility.Collapsed : Visibility.Visible;
                 fieldsGrid.ColumnDefinitions[3].Width = isBad ? new GridLength(0) : normalGapWidth;
                 fieldsGrid.ColumnDefinitions[4].Width = isBad ? new GridLength(0) : normalLeftWidth;
-                if (oldSerialField is StackPanel serialPanel && serialPanel.Children[0] is TextBlock serialLabel)
+                if (oldSerialField is StackPanel serialPanel &&
+                    serialPanel.Children[0] is TextBlock serialLabel)
+                {
                     serialLabel.Text = isBad
                         ? "Bad From Stock SN"
                         : "Found Serial #";
@@ -669,6 +671,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     serialLabel.ToolTip = isBad
                         ? "Serial number of the defective stock unit."
                         : "Leave blank if not applicable.";
+                }
             }
             badFromStockCheckBox.Checked += (_, _) => ApplyBadFromStockState();
             badFromStockCheckBox.Unchecked += (_, _) => ApplyBadFromStockState();
