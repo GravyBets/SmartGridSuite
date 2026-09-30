@@ -134,7 +134,7 @@ namespace SmartGridSuite.Api.Services.ParentSync
                     p.UserName      AS SecondaryCommsUsername,
                     p.wifiSSID      AS SecondaryCommsSsid,
                     p.CAMPassword   AS SecondaryCommsPassword,
-                    p.ATTSlot1      AS SecondarySimNumber,
+                    p.SIM1          AS SecondarySimNumber,
 
                     ant.SN          AS AntennaSerialNumber,
                     enc.SN          AS EnclosureSerialNumber,
