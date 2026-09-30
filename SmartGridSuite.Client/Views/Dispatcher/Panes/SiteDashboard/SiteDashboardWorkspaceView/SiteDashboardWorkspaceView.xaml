@@ -1479,13 +1479,40 @@
                                                                 <ColumnDefinition Width="Auto"/>
                                                             </Grid.ColumnDefinitions>
 
-                                                            <TextBlock Grid.Column="0"
-                                                                       Text="{Binding DisplayText}"
-                                                                       FontSize="14"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{DynamicResource TextPrimary}"
-                                                                       TextWrapping="Wrap"
-                                                                       VerticalAlignment="Center"/>
+                                                            <StackPanel Grid.Column="0"
+                                                                        VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding DisplayText}"
+                                                                           FontSize="14"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{DynamicResource TextPrimary}"
+                                                                           TextWrapping="Wrap"/>
+
+                                                                <StackPanel Orientation="Horizontal"
+                                                                            Margin="0,4,0,0"
+                                                                            VerticalAlignment="Center"
+                                                                            Visibility="{Binding AssociatedIpVisibility}">
+                                                                    <TextBlock Text="LTE IP:"
+                                                                               FontSize="13"
+                                                                               Foreground="{DynamicResource TextSecondary}"
+                                                                               VerticalAlignment="Center"/>
+
+                                                                    <TextBlock Text="{Binding AssociatedIp}"
+                                                                               Margin="5,0,0,0"
+                                                                               FontSize="13"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{DynamicResource TextPrimary}"
+                                                                               VerticalAlignment="Center"/>
+
+                                                                    <Button Style="{StaticResource DashboardCleanCopyButtonStyle}"
+                                                                            Margin="6,0,0,0"
+                                                                            ToolTip="Copy LTE IP"
+                                                                            Tag="{Binding AssociatedIp}"
+                                                                            Click="CopyRxReferenceButton_Click">
+                                                                        <TextBlock Style="{StaticResource CopyGlyph}"
+                                                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                                    </Button>
+                                                                </StackPanel>
+                                                            </StackPanel>
 
                                                             <Button Grid.Column="2"
                                                                     Style="{StaticResource SecondaryButtonStyle}"
