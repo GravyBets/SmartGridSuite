@@ -421,11 +421,15 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             var oldSerial =
                 entry.OldSerial.Trim();
 
-            if (entry.BadFromStock)
-                return $"Bad From Stock {item} SN: {(string.IsNullOrWhiteSpace(oldSerial) ? "(not recorded)" : oldSerial)}";
-
             var newSerial =
                 entry.NewSerial.Trim();
+
+            if (entry.BadFromStock)
+            {
+                return
+                    $"Bad From Stock {item} SN: " +
+                    $"{(string.IsNullOrWhiteSpace(newSerial) ? "(not recorded)" : newSerial)}";
+            }
 
             var lines = new List<string>();
 
