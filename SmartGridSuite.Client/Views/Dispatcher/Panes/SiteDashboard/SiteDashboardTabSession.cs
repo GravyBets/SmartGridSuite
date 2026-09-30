@@ -86,6 +86,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
         public bool IsSnmpPollAllRunning { get; set; }
 
+        public CancellationTokenSource? SnmpPollStatsCts { get; set; }
+
+        public bool IsSnmpPollStatsRunning { get; set; }
+
         //Towers
         public int? TowerTopNameId { get; set; }
         public string TowerSummaryText { get; set; } = string.Empty;
