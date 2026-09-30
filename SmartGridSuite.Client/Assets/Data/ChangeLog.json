@@ -1,5 +1,21 @@
 [
   {
+    "version": "3.5.0.3",
+    "date": "September 30, 2026",
+    "title": "UI Polish, Equip Tab \u0026 Poll Stats Features",
+    "changes": [
+      "BUGS",
+      "Fixed the corrupted ChangeLog special characters.",
+      "FEATURES",
+      "Added PMR SIM1 to the Access \u0026 Security Block on the Equipment Tab of AMS Sites.",
+      "Added copy button next to LTE WAN IP after searching PMR SN on the RX Tab inside an RX View.",
+      "Shortened new Equipment tab textbox labels so word-wrap doesn\u0027t happen on laptop screens.",
+      "Checking Bad from Stock checkbox now leaves the \"Left SN\" instead of \"Found SN\"",
+      "Added Poll Stats button to the SNMP tab."
+    ]
+  },
+
+  {
     "version": "3.5.0.2",
     "date": "September 29, 2026",
     "title": "SAP Loader Update, Site Tab Drag \u0026 Drop, UI Fixes",
