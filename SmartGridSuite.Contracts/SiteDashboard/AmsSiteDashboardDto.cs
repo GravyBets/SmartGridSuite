@@ -21,7 +21,13 @@
         public string? SecondaryCommsUsername { get; set; }
         public string? SecondaryCommsSsid { get; set; }
         public string? SecondaryCommsPassword { get; set; }
+
+        // Keep the legacy single-SIM field for compatibility with older
+        // clients/cache payloads. It mirrors the AT&T slot.
         public string? SecondarySimNumber { get; set; }
+
+        public string? SecondaryAttSimNumber { get; set; }
+        public string? SecondaryVzwSimNumber { get; set; }
 
         public string? AntennaSerialNumber { get; set; }
         public string? EnclosureSerialNumber { get; set; }
