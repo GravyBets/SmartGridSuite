@@ -155,6 +155,8 @@ namespace SmartGridSuite.Api.Mappings
                 SecondaryCommsSsid = source.SecondaryCommsSsid,
                 SecondaryCommsPassword = source.SecondaryCommsPassword,
                 SecondarySimNumber = source.SecondarySimNumber,
+                SecondaryAttSimNumber = source.SecondaryAttSimNumber,
+                SecondaryVzwSimNumber = source.SecondaryVzwSimNumber,
 
                 AntennaSerialNumber = source.AntennaSerialNumber,
                 EnclosureSerialNumber = source.EnclosureSerialNumber,
