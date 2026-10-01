@@ -303,7 +303,6 @@
                                                 </Grid>
 
                                                 <TextBox Text="{Binding SubmittedWriteUp}"
-                                                         Style="{x:Null}"
                                                          IsReadOnly="True"
                                                          IsReadOnlyCaretVisible="True"
                                                          BorderThickness="0"
