@@ -161,7 +161,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 model: null,
                 serial: GetEquipmentValue("Secondary SN"),
                 swapLabel: "Secondary Communications",
-                usesCommunicationDeviceTypePicker: true);
+                usesCommunicationDeviceTypePicker: true,
+                showPmrSimSlots: isAmsMr,
+                attSim: GetEquipmentValue("AT&T SIM #"),
+                vzwSim: GetEquipmentValue("Verizon SIM #"));
 
             AddSerializedDeviceSection(
                 title: "Antenna",
@@ -196,10 +199,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 hasSensitiveRows |= AddSensitiveEquipmentRow(
                     "Secondary WiFi Password",
                     GetEquipmentValue("Secondary WiFi Password", "Secondary Password"));
-
-                hasSensitiveRows |= AddSensitiveEquipmentRow(
-                    "SIM #",
-                    GetEquipmentValue("SIM #"));
             }
 
             if (!hasSensitiveRows)
@@ -213,8 +212,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
         }
 
-        private void AddSerializedDeviceSection(string title, string? model, string? serial, string swapLabel,
-            bool showModelBesideSerial = false, bool usesCommunicationDeviceTypePicker = false)
+        private void AddSerializedDeviceSection(
+            string title,
+            string? model,
+            string? serial,
+            string swapLabel,
+            bool showModelBesideSerial = false,
+            bool usesCommunicationDeviceTypePicker = false,
+            bool showPmrSimSlots = false,
+            string? attSim = null,
+            string? vzwSim = null)
         {
             if (_serializedDeviceSectionCount > 0)
                 SerializedDevicesPanel.Children.Add(CreateSerializedDeviceSeparator());
@@ -291,6 +298,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     string.IsNullOrWhiteSpace(oldSerial)
                         ? "Not returned by database"
                         : oldSerial));
+            }
+
+            if (showPmrSimSlots)
+            {
+                section.Children.Add(
+                    CreateSideBySideEquipmentValues(
+                        "AT&T SIM",
+                        string.IsNullOrWhiteSpace(attSim)
+                            ? "No data"
+                            : attSim.Trim(),
+                        "Verizon SIM",
+                        string.IsNullOrWhiteSpace(vzwSim)
+                            ? "No data"
+                            : vzwSim.Trim()));
             }
 
             SerializedDevicesPanel.Children.Add(section);
