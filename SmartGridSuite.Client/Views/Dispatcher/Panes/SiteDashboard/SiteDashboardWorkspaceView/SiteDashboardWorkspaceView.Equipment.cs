@@ -161,10 +161,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 model: null,
                 serial: GetEquipmentValue("Secondary SN"),
                 swapLabel: "Secondary Communications",
-                usesCommunicationDeviceTypePicker: true,
-                showPmrSimSlots: isAmsMr,
-                attSim: GetEquipmentValue("AT&T SIM #"),
-                vzwSim: GetEquipmentValue("Verizon SIM #"));
+                usesCommunicationDeviceTypePicker: true);
 
             AddSerializedDeviceSection(
                 title: "Antenna",
@@ -193,6 +190,16 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             if (isAmsMr)
             {
                 hasSensitiveRows |= AddSensitiveEquipmentRow(
+                    "AT&T SIM",
+                    GetEquipmentValue("AT&T SIM #"),
+                    isSensitive: false);
+
+                hasSensitiveRows |= AddSensitiveEquipmentRow(
+                    "Verizon SIM",
+                    GetEquipmentValue("Verizon SIM #"),
+                    isSensitive: false);
+
+                hasSensitiveRows |= AddSensitiveEquipmentRow(
                     "Secondary WiFi SSID",
                     GetEquipmentValue("Secondary WiFi SSID", "Secondary SSID"));
 
@@ -218,10 +225,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             string? serial,
             string swapLabel,
             bool showModelBesideSerial = false,
-            bool usesCommunicationDeviceTypePicker = false,
-            bool showPmrSimSlots = false,
-            string? attSim = null,
-            string? vzwSim = null)
+            bool usesCommunicationDeviceTypePicker = false)
         {
             if (_serializedDeviceSectionCount > 0)
                 SerializedDevicesPanel.Children.Add(CreateSerializedDeviceSeparator());
@@ -300,20 +304,6 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                         : oldSerial));
             }
 
-            if (showPmrSimSlots)
-            {
-                section.Children.Add(
-                    CreateSideBySideEquipmentValues(
-                        "AT&T SIM",
-                        string.IsNullOrWhiteSpace(attSim)
-                            ? "No data"
-                            : attSim.Trim(),
-                        "Verizon SIM",
-                        string.IsNullOrWhiteSpace(vzwSim)
-                            ? "No data"
-                            : vzwSim.Trim()));
-            }
-
             SerializedDevicesPanel.Children.Add(section);
             _serializedDeviceSectionCount++;
         }
@@ -357,14 +347,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             return CreateValueStack(label, value, new Thickness(0, 0, 0, 2));
         }
 
-        private bool AddSensitiveEquipmentRow(string label, string? rawValue)
+        private bool AddSensitiveEquipmentRow(string label, string? rawValue, bool isSensitive = true)
         {
             if (string.IsNullOrWhiteSpace(rawValue))
                 return false;
 
             var cleanValue = rawValue.Trim();
 
-            var displayValue = _showSensitiveEquipmentValues
+            var displayValue = !isSensitive || _showSensitiveEquipmentValues
                 ? cleanValue
                 : MaskSensitiveValue(cleanValue);
 
