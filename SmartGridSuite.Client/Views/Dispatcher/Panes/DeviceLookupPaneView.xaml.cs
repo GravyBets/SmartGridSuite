@@ -41,6 +41,213 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             await SearchAsync();
         }
 
+        private void HistoryDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (HistoryDataGrid.SelectedItem is DeviceLookupHistoryDto row)
+            {
+                HistoryNarrativeTextBox.Text = CleanNarrativeText(row.Narrative);
+                HistorySourceTextBlock.Text = string.IsNullOrWhiteSpace(row.SourceType)
+                    ? string.Empty
+                    : row.SourceType;
+            }
+            else
+            {
+                HistoryNarrativeTextBox.Text = string.Empty;
+                HistorySourceTextBlock.Text = string.Empty;
+            }
+        }
+
+        private static string CleanNarrativeText(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            var normalized = text
+                .Replace("\r\n", "\n")
+                .Replace("\r", "\n");
+
+            while (normalized.Contains("\n\n\n"))
+                normalized = normalized.Replace("\n\n\n", "\n\n");
+
+            return normalized.Trim();
+        }
+
+        private static IReadOnlyList<DeviceLookupRecordDto> BuildDisplayParentRecords(
+            IEnumerable<DeviceLookupRecordDto> records)
+        {
+            return records
+                .Select(BuildDisplayParentRecord)
+                .Where(x => x.Fields.Count > 0)
+                .ToList();
+        }
+
+        private static DeviceLookupRecordDto BuildDisplayParentRecord(DeviceLookupRecordDto source)
+        {
+            var specs = GetDisplayFieldSpecs(source.RecordType);
+            if (specs.Length == 0)
+            {
+                return new DeviceLookupRecordDto
+                {
+                    Source = source.Source,
+                    RecordType = source.RecordType,
+                    SiteId = source.SiteId,
+                    MatchField = source.MatchField,
+                    Fields = source.Fields
+                };
+            }
+
+            var fields = new List<DeviceLookupFieldDto>();
+
+            foreach (var spec in specs)
+            {
+                var value = FindFieldValue(source.Fields, spec.SourceNames);
+                if (string.IsNullOrWhiteSpace(value))
+                    continue;
+
+                fields.Add(new DeviceLookupFieldDto
+                {
+                    Label = spec.DisplayLabel,
+                    Value = value
+                });
+            }
+
+            return new DeviceLookupRecordDto
+            {
+                Source = source.Source,
+                RecordType = source.RecordType,
+                SiteId = source.SiteId,
+                MatchField = source.MatchField,
+                Fields = fields
+            };
+        }
+
+        private static string FindFieldValue(
+            IEnumerable<DeviceLookupFieldDto> fields,
+            params string[] names)
+        {
+            foreach (var name in names)
+            {
+                var field = fields.FirstOrDefault(x =>
+                    string.Equals(x.Label, name, StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrWhiteSpace(field?.Value))
+                    return field.Value.Trim();
+            }
+
+            return string.Empty;
+        }
+
+        private static DisplayFieldSpec[] GetDisplayFieldSpecs(string recordType)
+        {
+            if (recordType.Equals("IGSD", StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                [
+                    new("Site Number", "SiteId", "SiteID"),
+                    new("Primary Comms", "PriComm"),
+                    new("Primary Comms Model", "PriDigiModl"),
+                    new("Secondary Comms", "SecComm"),
+                    new("Secondary Comms Model", "SecDigiModl"),
+                    new("Primary Comms SN", "RadioSN"),
+                    new("Cyberlock SN", "Cyberlock"),
+                    new("Site Type", "Config"),
+                    new("Primary IP", "RadioIP", "Radio IP"),
+                    new("Primary RTU IP", "PriProtLanRtu"),
+                    new("IPSEC Modem IP", "PriWanOut"),
+                    new("Secondary IP", "SecDigiWanOut"),
+                    new("Secondary Eth IP", "SecProtLanDigi"),
+                    new("Secondary RTU IP", "SecProtLanRtu")
+                ];
+            }
+
+            if (recordType.Equals("AMS / MR", StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                [
+                    new("Site Number", "SiteId", "SiteID"),
+                    new("Secondary Equip", "CommEquip"),
+                    new("Secondary SN", "iTron_CR_Num"),
+                    new("Primary SN", "RadioSN"),
+                    new("Primary IP", "RadioIP"),
+                    new("LAN IP", "EthernetIP"),
+                    new("Primary Type", "RadioFreq")
+                ];
+            }
+
+            if (recordType.Equals("LTE", StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                [
+                    new("Site Number", "SiteId", "SiteID"),
+                    new("SN", "SN"),
+                    new("Model", "Model"),
+                    new("Comm Type", "CommType"),
+                    new("Carrier", "Carrier1"),
+                    new("SIM 1", "SIM1"),
+                    new("IP", "IP1")
+                ];
+            }
+
+            if (recordType.Equals("Radio700 / DACS", StringComparison.OrdinalIgnoreCase))
+                return [new("Site Number", "SiteId", "SiteID")];
+
+            if (recordType.Equals("PMR", StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                [
+                    new("Site Name", "SiteId", "SiteID", "CurrentSiteId"),
+                    new("SN", "SN"),
+                    new("Username", "UserName"),
+                    new("Wifi SSID", "wifiSSID"),
+                    new("Password", "CAMPassword", "CAM Password"),
+                    new("RFLAN MAC", "RFLANMAC", "RFLAN_MAC", "RFLAN MAC"),
+                    new("SIM 1", "ATTSlot1"),
+                    new("IMEI", "IMEI"),
+                    new("Associated Radio SN", "AssociatedAmsRadioSN"),
+                    new("Associated Radio IP", "AssociatedAmsRadioIP"),
+                    new("Associated LAN IP", "AssociatedAmsEthernetIP")
+                ];
+            }
+
+            if (recordType.Equals("Antenna", StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                [
+                    new("Site Number", "SiteId", "SiteID"),
+                    new("SN", "SN")
+                ];
+            }
+
+            if (recordType.Equals("Enclosure", StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                [
+                    new("Site Number", "SiteId", "SiteID"),
+                    new("SN", "SN"),
+                    new("Model", "Model")
+                ];
+            }
+
+            if (recordType.Equals("Site", StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                [
+                    new("Site Number", "Site"),
+                    new("Status", "Status"),
+                    new("Type", "Type"),
+                    new("Primary Comm Type", "Primary Comm Type"),
+                    new("Secondary Comm Type", "Secondary Comm Type"),
+                    new("Config Description", "Config Description")
+                ];
+            }
+
+            return [];
+        }
+
+        private readonly record struct DisplayFieldSpec(
+            string DisplayLabel,
+            params string[] SourceNames);
+
         private async Task SearchAsync()
         {
             if (_searchCts != null)
@@ -66,7 +273,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             RelatedSitesItemsControl.ItemsSource = null;
             TicketsDataGrid.ItemsSource = null;
             HistoryDataGrid.ItemsSource = null;
-            SiteNotesDataGrid.ItemsSource = null;
+            HistoryDataGrid.SelectedItem = null;
+            HistoryNarrativeTextBox.Text = string.Empty;
+            HistorySourceTextBlock.Text = string.Empty;
 
             _searchCts =
                 new CancellationTokenSource();
@@ -96,7 +305,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     };
 
                 ParentRecordsItemsControl.ItemsSource =
-                    result.ParentRecords;
+                    BuildDisplayParentRecords(result.ParentRecords);
 
                 RelatedSitesItemsControl.ItemsSource =
                     result.RelatedSiteIds;
@@ -107,23 +316,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 HistoryDataGrid.ItemsSource =
                     result.SiteHistory;
 
-                SiteNotesDataGrid.ItemsSource =
-                    result.SiteNotes;
-
                 var total =
                     result.ParentRecords.Count +
                     result.Tickets.Count +
-                    result.SiteHistory.Count +
-                    result.SiteNotes.Count;
+                    result.SiteHistory.Count;
 
                 var summary =
                     total == 0
                         ? $"No records returned for {query}."
                         : $"Found {result.ParentRecords.Count} Parent DB/device record(s), " +
                           $"{result.RelatedSiteIds.Count} related site(s), " +
-                          $"{result.Tickets.Count} ticket(s), " +
-                          $"{result.SiteHistory.Count} Site History record(s), and " +
-                          $"{result.SiteNotes.Count} Site Note(s).";
+                          $"{result.Tickets.Count} ticket(s), and " +
+                          $"{result.SiteHistory.Count} Site History record(s).";
 
                 if (!string.IsNullOrWhiteSpace(
                         result.Warning))
