@@ -3,6 +3,17 @@ using System.Collections.Generic;
 
 namespace SmartGridSuite.Contracts.Dispatcher
 {
+    public enum DeviceLookupSearchType
+    {
+        DeviceSerialNumber,
+        Site,
+        IpAddress,
+        Sim,
+        Notification,
+        WorkOrder,
+        HistoryText
+    }
+
     public sealed class DeviceLookupResponseDto
     {
         public string Query { get; set; } = string.Empty;

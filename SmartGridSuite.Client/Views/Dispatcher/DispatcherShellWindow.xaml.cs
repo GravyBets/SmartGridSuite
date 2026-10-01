@@ -168,8 +168,8 @@ namespace SmartGridSuite.Client.Views
             // ShowPane can request a badge refresh during initial navigation.
             _ticketsApi = new TicketsApi(_api);
 
-            // Device Lookup is immediately after Site Dashboard, so Tasks is index 2.
-            SelectNavIndex(2);
+            // Tasks follows Site Dashboard; Device Lookup is the last pane.
+            SelectNavIndex(1);
 
             DataContext = this;
 

@@ -19,14 +19,15 @@ namespace SmartGridSuite.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<DeviceLookupResponseDto>> Search(
             [FromQuery] string query,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            [FromQuery] DeviceLookupSearchType searchType = DeviceLookupSearchType.DeviceSerialNumber)
         {
             query = (query ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(query))
             {
                 return BadRequest(
-                    "Enter a site, IP, SIM, serial number, notification, Work Order, or other identifier.");
+                    "Select a search type and enter its identifier.");
             }
 
             if (query.Length > 250)
@@ -35,9 +36,13 @@ namespace SmartGridSuite.Api.Controllers
                     "Device Lookup searches are limited to 250 characters.");
             }
 
+            if (!Enum.IsDefined(searchType))
+                return BadRequest("Select a valid Device Lookup search type.");
+
             var result =
                 await _deviceLookupService.SearchAsync(
                     query,
+                    searchType,
                     cancellationToken);
 
             return Ok(result);

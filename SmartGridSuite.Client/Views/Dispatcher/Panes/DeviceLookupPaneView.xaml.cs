@@ -18,6 +18,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             InitializeComponent();
         }
 
+        private void DeviceLookupPaneView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _searchCts?.Cancel();
+        }
+
         private async void SearchButton_Click(
             object sender,
             RoutedEventArgs e)
@@ -38,6 +43,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private async Task SearchAsync()
         {
+            if (_searchCts != null)
+                return;
+
             var query =
                 (SearchTextBox.Text ?? string.Empty)
                     .Trim();
@@ -45,13 +53,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             if (string.IsNullOrWhiteSpace(query))
             {
                 StatusTextBlock.Text =
-                    "Enter a site, IP, SIM, serial number, notification, Work Order, or other identifier.";
+                    "Select a search type and enter its identifier.";
 
                 return;
             }
 
-            _searchCts?.Cancel();
-            _searchCts?.Dispose();
+            if (!Enum.TryParse<DeviceLookupSearchType>(
+                    (SearchTypeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var searchType))
+                return;
+
+            ParentRecordsItemsControl.ItemsSource = null;
+            RelatedSitesItemsControl.ItemsSource = null;
+            TicketsDataGrid.ItemsSource = null;
+            HistoryDataGrid.ItemsSource = null;
+            SiteNotesDataGrid.ItemsSource = null;
 
             _searchCts =
                 new CancellationTokenSource();
@@ -59,6 +74,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             var ct =
                 _searchCts.Token;
 
+            SearchTypeComboBox.IsEnabled = false;
             SearchButton.IsEnabled = false;
             SearchTextBox.IsEnabled = false;
 
@@ -69,7 +85,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             {
                 var result =
                     await _api.GetAsync<DeviceLookupResponseDto>(
-                        $"api/device-lookup?query={Uri.EscapeDataString(query)}",
+                        $"api/device-lookup?query={Uri.EscapeDataString(query)}&searchType={searchType}",
                         ct);
 
                 if (ct.IsCancellationRequested)
@@ -104,7 +120,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 var summary =
                     total == 0
-                        ? $"No records found for {query}."
+                        ? $"No records returned for {query}."
                         : $"Found {result.ParentRecords.Count} Parent DB/device record(s), " +
                           $"{result.RelatedSiteIds.Count} related site(s), " +
                           $"{result.Tickets.Count} ticket(s), " +
@@ -123,6 +139,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
             catch (OperationCanceledException)
             {
+                StatusTextBlock.Text = "Search canceled.";
             }
             catch (Exception ex)
             {
@@ -131,12 +148,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
             finally
             {
-                if (!ct.IsCancellationRequested)
-                {
-                    SearchButton.IsEnabled = true;
-                    SearchTextBox.IsEnabled = true;
+                _searchCts?.Dispose();
+                _searchCts = null;
+                SearchTypeComboBox.IsEnabled = true;
+                SearchButton.IsEnabled = true;
+                SearchTextBox.IsEnabled = true;
+                if (IsLoaded)
                     SearchTextBox.Focus();
-                }
             }
         }
     }

@@ -125,28 +125,6 @@
                             </Grid>
                         </ListBoxItem>
 
-                        <ListBoxItem Tag="Device Lookup">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="36"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <Border Style="{StaticResource NavBadgeStyle}">
-                                    <Path Style="{StaticResource NavRailPathIconStyle}"
-                                          Data="M10 3A7 7 0 1 0 10 17A7 7 0 0 0 10 3ZM10 5A5 5 0 1 1 10 15A5 5 0 0 1 10 5ZM15.5 14.1L22 20.6L20.6 22L14.1 15.5L15.5 14.1Z"/>
-                                </Border>
-
-                                <StackPanel Grid.Column="1"
-                                            Margin="10,0,0,0"
-                                            VerticalAlignment="Center">
-                                    <TextBlock Text="Device Lookup"
-                                               Style="{StaticResource NavRailItemTitleTextStyle}"/>
-                                    <TextBlock Text="Deep equipment and history research"
-                                               Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
-                                </StackPanel>
-                            </Grid>
-                        </ListBoxItem>
 
                         <ListBoxItem Tag="Tasks">
                             <Grid>
@@ -351,6 +329,28 @@
                                 </StackPanel>
                             </Grid>
                         </ListBoxItem>
+                        <ListBoxItem Tag="Device Lookup">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Style="{StaticResource NavBadgeStyle}">
+                                    <Path Style="{StaticResource NavRailPathIconStyle}"
+                                          Data="M10 3A7 7 0 1 0 10 17A7 7 0 0 0 10 3ZM10 5A5 5 0 1 1 10 15A5 5 0 0 1 10 5ZM15.5 14.1L22 20.6L20.6 22L14.1 15.5L15.5 14.1Z"/>
+                                </Border>
+
+                                <StackPanel Grid.Column="1"
+                                            Margin="10,0,0,0"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Text="Device Lookup"
+                                               Style="{StaticResource NavRailItemTitleTextStyle}"/>
+                                    <TextBlock Text="Deep equipment and history research"
+                                               Style="{StaticResource NavRailItemSubtitleTextStyle}"/>
+                                </StackPanel>
+                            </Grid>
+                        </ListBoxItem>
                     </ListBox>
 
                     <!-- Collapsed nav -->
@@ -368,12 +368,6 @@
                             </Border>
                         </ListBoxItem>
 
-                        <ListBoxItem Tag="Device Lookup" ToolTip="Device Lookup">
-                            <Border Style="{StaticResource NavBadgeStyle}">
-                                <Path Style="{StaticResource NavRailPathIconStyle}"
-                                      Data="M10 3A7 7 0 1 0 10 17A7 7 0 0 0 10 3ZM10 5A5 5 0 1 1 10 15A5 5 0 0 1 10 5ZM15.5 14.1L22 20.6L20.6 22L14.1 15.5L15.5 14.1Z"/>
-                            </Border>
-                        </ListBoxItem>
 
                         <ListBoxItem Tag="Tasks" ToolTip="Tasks">
                             <Grid>
@@ -489,6 +483,12 @@
                             <Border Style="{StaticResource NavBadgeStyle}">
                                 <Path Style="{StaticResource NavRailPathIconStyle}"
                                       Data="M12 2C6.48 2 2 6.48 2 12S6.48 22 12 22 22 17.52 22 12 17.52 2 12 2ZM12 20C7.58 20 4 16.42 4 12S7.58 4 12 4 20 7.58 20 12 16.42 20 12 20ZM13 7H11V13L16 16L17 14.3L13 12V7Z"/>
+                            </Border>
+                        </ListBoxItem>
+                        <ListBoxItem Tag="Device Lookup" ToolTip="Device Lookup">
+                            <Border Style="{StaticResource NavBadgeStyle}">
+                                <Path Style="{StaticResource NavRailPathIconStyle}"
+                                      Data="M10 3A7 7 0 1 0 10 17A7 7 0 0 0 10 3ZM10 5A5 5 0 1 1 10 15A5 5 0 0 1 10 5ZM15.5 14.1L22 20.6L20.6 22L14.1 15.5L15.5 14.1Z"/>
                             </Border>
                         </ListBoxItem>
                     </ListBox>
