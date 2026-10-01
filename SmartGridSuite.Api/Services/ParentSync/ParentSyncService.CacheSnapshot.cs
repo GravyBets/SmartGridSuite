@@ -134,7 +134,8 @@ namespace SmartGridSuite.Api.Services.ParentSync
                     p.UserName      AS SecondaryCommsUsername,
                     p.wifiSSID      AS SecondaryCommsSsid,
                     p.CAMPassword   AS SecondaryCommsPassword,
-                    p.SIM1          AS SecondarySimNumber,
+                    p.ATTSlot1      AS SecondaryAttSimNumber,
+                    p.VzwSlot2      AS SecondaryVzwSimNumber,
 
                     ant.SN          AS AntennaSerialNumber,
                     enc.SN          AS EnclosureSerialNumber,
@@ -240,8 +241,12 @@ namespace SmartGridSuite.Api.Services.ParentSync
                         GetString(reader, "SecondaryCommsSsid"),
                     SecondaryCommsPassword =
                         GetString(reader, "SecondaryCommsPassword"),
+                    SecondaryAttSimNumber =
+                        GetString(reader, "SecondaryAttSimNumber"),
+                    SecondaryVzwSimNumber =
+                        GetString(reader, "SecondaryVzwSimNumber"),
                     SecondarySimNumber =
-                        GetString(reader, "SecondarySimNumber"),
+                        GetString(reader, "SecondaryAttSimNumber"),
 
                     AntennaSerialNumber =
                         GetString(reader, "AntennaSerialNumber"),
