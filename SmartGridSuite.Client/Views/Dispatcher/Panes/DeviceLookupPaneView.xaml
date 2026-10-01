@@ -1,0 +1,261 @@
+<UserControl x:Class="SmartGridSuite.Client.Views.Dispatcher.Panes.DeviceLookupPaneView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="4"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Style="{StaticResource Card}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Device Lookup"
+                           FontSize="22"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimary}"/>
+
+                <TextBlock Grid.Row="2"
+                           Text="Deep Dispatcher research across Parent DB equipment plus SmartGridSuite tickets and Site History. Search by site, IP, SIM, serial number, notification, Work Order, or other known identifier."
+                           Foreground="{DynamicResource TextSecondary}"
+                           TextWrapping="Wrap"/>
+
+                <Grid Grid.Row="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox x:Name="SearchTextBox"
+                             Grid.Column="0"
+                             Style="{StaticResource ModernTextBox}"
+                             Height="34"
+                             MinWidth="260"
+                             Padding="10,0"
+                             Tag="Site, IP, SIM, SN, notification, WO..."
+                             VerticalContentAlignment="Center"
+                             KeyDown="SearchTextBox_KeyDown"/>
+
+                    <Button x:Name="SearchButton"
+                            Grid.Column="2"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Content="Search"
+                            Height="34"
+                            MinWidth="96"
+                            Padding="16,0"
+                            Click="SearchButton_Click"/>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="8"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock x:Name="StatusTextBlock"
+                       Grid.Row="0"
+                       Text="Enter an identifier to search."
+                       Foreground="{DynamicResource TextSecondary}"
+                       TextWrapping="Wrap"
+                       Margin="4,0"/>
+
+            <TabControl Grid.Row="2">
+                <TabItem Header="Device Records">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="8">
+                            <Border Style="{StaticResource Card}"
+                                    Margin="0,0,0,8">
+                                <StackPanel>
+                                    <TextBlock Text="Related Sites"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}"/>
+
+                                    <ItemsControl x:Name="RelatedSitesItemsControl"
+                                                  Margin="0,8,0,0">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="0,0,6,6"
+                                                        Padding="10,5"
+                                                        CornerRadius="8"
+                                                        BorderBrush="{DynamicResource SurfaceBorder}"
+                                                        BorderThickness="1"
+                                                        Background="{DynamicResource SurfaceBg}">
+                                                    <TextBlock Text="{Binding}"
+                                                               Foreground="{DynamicResource TextPrimary}"
+                                                               FontWeight="SemiBold"/>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <ItemsControl x:Name="ParentRecordsItemsControl">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource Card}"
+                                                Margin="0,0,0,8">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding RecordType}"
+                                                                   FontSize="16"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextPrimary}"/>
+
+                                                        <TextBlock Margin="0,3,0,0"
+                                                                   Foreground="{DynamicResource TextSecondary}">
+                                                            <Run Text="Match: "/>
+                                                            <Run Text="{Binding MatchField}"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
+
+                                                    <Border Grid.Column="1"
+                                                            Padding="9,4"
+                                                            CornerRadius="8"
+                                                            Background="{DynamicResource SurfaceBg}"
+                                                            Visibility="Visible">
+                                                        <TextBlock Text="{Binding SiteId}"
+                                                                   Foreground="{DynamicResource TextSecondary}"
+                                                                   FontWeight="SemiBold"/>
+                                                    </Border>
+                                                </Grid>
+
+                                                <ItemsControl ItemsSource="{Binding Fields}"
+                                                              Margin="0,10,0,0">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Margin="0,0,0,5">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="170"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <TextBlock Grid.Column="0"
+                                                                           Text="{Binding Label}"
+                                                                           Foreground="{DynamicResource TextSecondary}"
+                                                                           FontWeight="SemiBold"/>
+
+                                                                <TextBlock Grid.Column="1"
+                                                                           Text="{Binding Value}"
+                                                                           Foreground="{DynamicResource TextPrimary}"
+                                                                           TextWrapping="Wrap"/>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="Tickets">
+                    <Border Style="{StaticResource Card}"
+                            Margin="8"
+                            Padding="0">
+                        <DataGrid x:Name="TicketsDataGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  RowHeaderWidth="0"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  BorderThickness="0"
+                                  Background="{DynamicResource CardBackground}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Site"
+                                                    Binding="{Binding Site}"
+                                                    Width="105"/>
+                                <DataGridTextColumn Header="Notification"
+                                                    Binding="{Binding Notification}"
+                                                    Width="115"/>
+                                <DataGridTextColumn Header="WO"
+                                                    Binding="{Binding WorkOrder}"
+                                                    Width="115"/>
+                                <DataGridTextColumn Header="Type"
+                                                    Binding="{Binding WorkOrderClass}"
+                                                    Width="70"/>
+                                <DataGridTextColumn Header="Status"
+                                                    Binding="{Binding Status}"
+                                                    Width="135"/>
+                                <DataGridTextColumn Header="Summary / Problem"
+                                                    Binding="{Binding Problem}"
+                                                    Width="*"/>
+                                <DataGridTextColumn Header="Last Activity"
+                                                    Binding="{Binding LastActivityAt, StringFormat={}{0:g}}"
+                                                    Width="145"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </TabItem>
+
+                <TabItem Header="Site History">
+                    <Border Style="{StaticResource Card}"
+                            Margin="8"
+                            Padding="0">
+                        <DataGrid x:Name="HistoryDataGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  RowHeaderWidth="0"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  BorderThickness="0"
+                                  Background="{DynamicResource CardBackground}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Date"
+                                                    Binding="{Binding VisitDate, StringFormat={}{0:d}}"
+                                                    Width="105"/>
+                                <DataGridTextColumn Header="Site"
+                                                    Binding="{Binding SiteId}"
+                                                    Width="110"/>
+                                <DataGridTextColumn Header="Tech"
+                                                    Binding="{Binding PrimaryTech}"
+                                                    Width="140"/>
+                                <DataGridTextColumn Header="Issue"
+                                                    Binding="{Binding IssueText}"
+                                                    Width="220"/>
+                                <DataGridTextColumn Header="Narrative"
+                                                    Binding="{Binding Narrative}"
+                                                    Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Grid>
+</UserControl>
