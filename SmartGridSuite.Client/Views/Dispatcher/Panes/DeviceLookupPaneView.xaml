@@ -55,7 +55,7 @@
                            Foreground="{DynamicResource TextPrimary}"/>
 
                 <TextBlock Grid.Row="2"
-                           Text="Choose the identifier type to find equipment and related tickets, Site History, and Site Notes."
+                           Text="Choose the identifier type to find equipment, related tickets, and Site History."
                            Foreground="{DynamicResource TextSecondary}"
                            TextWrapping="Wrap"/>
 
