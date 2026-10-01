@@ -634,6 +634,18 @@ namespace SmartGridSuite.Api.Services
                     .Take(MaxSmartGridRows)
                     .ToListAsync(cancellationToken);
 
+            var directSiteNotes =
+                await _db.SiteNotes
+                    .AsNoTracking()
+                    .Where(note =>
+                        note.SiteId == query ||
+                        note.NoteText.Contains(query) ||
+                        (note.NoteType != null &&
+                         note.NoteType.Contains(query)))
+                    .OrderByDescending(note => note.UpdatedAt ?? note.CreatedAt)
+                    .Take(MaxSmartGridRows)
+                    .ToListAsync(cancellationToken);
+
             var relatedSiteIds =
                 new HashSet<string>(
                     response.ParentRecords
@@ -654,6 +666,12 @@ namespace SmartGridSuite.Api.Services
                     relatedSiteIds.Add(history.SiteId.Trim());
             }
 
+            foreach (var note in directSiteNotes)
+            {
+                if (!string.IsNullOrWhiteSpace(note.SiteId))
+                    relatedSiteIds.Add(note.SiteId.Trim());
+            }
+
             if (response.ParentRecords.Any(x =>
                     string.Equals(
                         x.RecordType,
@@ -668,6 +686,9 @@ namespace SmartGridSuite.Api.Services
 
             var historyById =
                 directHistory.ToDictionary(x => x.HistoryId);
+
+            var siteNoteById =
+                directSiteNotes.ToDictionary(x => x.Id);
 
             if (relatedSiteIds.Count > 0)
             {
@@ -701,6 +722,18 @@ namespace SmartGridSuite.Api.Services
 
                 foreach (var history in siteHistory)
                     historyById[history.HistoryId] = history;
+
+                var siteNotes =
+                    await _db.SiteNotes
+                        .AsNoTracking()
+                        .Where(note =>
+                            sites.Contains(note.SiteId))
+                        .OrderByDescending(note => note.UpdatedAt ?? note.CreatedAt)
+                        .Take(MaxSmartGridRows)
+                        .ToListAsync(cancellationToken);
+
+                foreach (var note in siteNotes)
+                    siteNoteById[note.Id] = note;
             }
 
             response.RelatedSiteIds.AddRange(
@@ -744,6 +777,25 @@ namespace SmartGridSuite.Api.Services
                             IssueText = history.IssueText ?? string.Empty,
                             Narrative = history.Narrative ?? string.Empty,
                             SourceType = history.SourceType ?? string.Empty
+                        })
+                    .ToList();
+
+            response.SiteNotes =
+                siteNoteById.Values
+                    .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
+                    .Take(MaxSmartGridRows)
+                    .Select(note =>
+                        new DeviceLookupSiteNoteDto
+                        {
+                            Id = note.Id,
+                            SiteId = note.SiteId ?? string.Empty,
+                            NoteType = note.NoteType ?? string.Empty,
+                            NoteText = note.NoteText ?? string.Empty,
+                            IsActive = note.IsActive,
+                            CreatedBy = note.CreatedBy ?? string.Empty,
+                            CreatedAt = note.CreatedAt,
+                            UpdatedBy = note.UpdatedBy ?? string.Empty,
+                            UpdatedAt = note.UpdatedAt
                         })
                     .ToList();
         }
