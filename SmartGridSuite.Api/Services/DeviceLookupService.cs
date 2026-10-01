@@ -329,7 +329,7 @@ namespace SmartGridSuite.Api.Services
             var predicate = searchType switch
             {
                 DeviceLookupSearchType.Site => ParentPredicate("sgc_equip.LTE", "l", query, "SiteId"),
-                DeviceLookupSearchType.IpAddress => ParentPredicate("sgc_equip.LTE", "l", query, "IP1"),
+                DeviceLookupSearchType.IpAddress => ParentPredicate("sgc_equip.LTE", "l", query, "IP1", "IP2"),
                 _ => ParentPredicate("sgc_equip.LTE", "l", query, "SN")
             };
 
@@ -647,7 +647,10 @@ namespace SmartGridSuite.Api.Services
                     .ToList();
 
             if (sites.Count == 0)
+            {
+                await PopulateTicketWriteUpsAsync(response, cancellationToken);
                 return;
+            }
 
             var parameterNames =
                 sites
@@ -776,10 +779,6 @@ namespace SmartGridSuite.Api.Services
                         (x.IssueText != null && x.IssueText.Contains(query))))
                     .OrderByDescending(x => x.VisitDate).ThenByDescending(x => x.HistoryId)
                     .Take(MaxSmartGridRows).ToListAsync(cancellationToken));
-                AddSiteNotes(response, await _db.SiteNotes.AsNoTracking()
-                    .Where(x => x.NoteText.Contains(query))
-                    .OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
-                    .Take(MaxSmartGridRows).ToListAsync(cancellationToken));
             }
 
             var sites = response.RelatedSiteIds.Where(x => !string.IsNullOrWhiteSpace(x))
@@ -792,13 +791,64 @@ namespace SmartGridSuite.Api.Services
             AddTickets(response, await _db.Tickets.AsNoTracking()
                 .Where(x => sites.Contains(x.Site)).OrderByDescending(x => x.LastActivityAt)
                 .Take(MaxSmartGridRows).ToListAsync(cancellationToken));
-            AddHistory(response, await _db.SiteHistory.AsNoTracking()
-                .Where(x => !x.IsDeleted && sites.Contains(x.SiteId))
-                .OrderByDescending(x => x.VisitDate).ThenByDescending(x => x.HistoryId)
-                .Take(MaxSmartGridRows).ToListAsync(cancellationToken));
-            AddSiteNotes(response, await _db.SiteNotes.AsNoTracking()
-                .Where(x => sites.Contains(x.SiteId)).OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt)
-                .Take(MaxSmartGridRows).ToListAsync(cancellationToken));
+
+            var historyQuery = _db.SiteHistory.AsNoTracking()
+                .Where(x => !x.IsDeleted && sites.Contains(x.SiteId));
+
+            // A Site search is explicitly asking for the site's complete history.
+            // Identifier searches should only return the history rows that actually
+            // mention the identifier instead of every visit ever recorded at a
+            // site where that device happened to be installed.
+            if (searchType != DeviceLookupSearchType.Site)
+            {
+                historyQuery = historyQuery.Where(x =>
+                    (x.Narrative != null && x.Narrative.Contains(query)) ||
+                    (x.IssueText != null && x.IssueText.Contains(query)));
+            }
+
+            AddHistory(response, await historyQuery
+                .OrderByDescending(x => x.VisitDate)
+                .ThenByDescending(x => x.HistoryId)
+                .Take(MaxSmartGridRows)
+                .ToListAsync(cancellationToken));
+
+            await PopulateTicketWriteUpsAsync(response, cancellationToken);
+        }
+
+        private async Task PopulateTicketWriteUpsAsync(
+            DeviceLookupResponseDto response,
+            CancellationToken cancellationToken)
+        {
+            var ticketIds = response.Tickets
+                .Select(x => x.TicketId)
+                .Distinct()
+                .ToList();
+
+            if (ticketIds.Count == 0)
+                return;
+
+            var submissions = await _db.TicketWriteUpSubmissions
+                .AsNoTracking()
+                .Where(x => ticketIds.Contains(x.TicketId) && !x.IsDeleted)
+                .OrderByDescending(x => x.SubmittedAt)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync(cancellationToken);
+
+            var latestByTicket = submissions
+                .GroupBy(x => x.TicketId)
+                .ToDictionary(x => x.Key, x => x.First());
+
+            foreach (var ticket in response.Tickets)
+            {
+                if (!latestByTicket.TryGetValue(ticket.TicketId, out var submission))
+                    continue;
+
+                ticket.SubmittedWriteUp = submission.SubmittedNarrative ?? string.Empty;
+                ticket.WriteUpSubmittedBy = string.IsNullOrWhiteSpace(submission.SubmittedByName)
+                    ? submission.SubmittedByEmployeeId ?? string.Empty
+                    : submission.SubmittedByName.Trim();
+                ticket.WriteUpSubmittedAt = submission.SubmittedAt;
+            }
         }
 
         private static void AddTickets(DeviceLookupResponseDto response, List<TicketEntity> tickets)
