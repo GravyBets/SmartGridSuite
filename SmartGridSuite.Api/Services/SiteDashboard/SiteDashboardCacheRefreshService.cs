@@ -488,8 +488,6 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                     .Where(
                         row =>
                             !string.IsNullOrWhiteSpace(
-                                row.SecondarySimNumber) ||
-                            !string.IsNullOrWhiteSpace(
                                 row.SecondaryWanIp))
                     .Select(
                         row =>
@@ -497,10 +495,6 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                             {
                                 SiteId =
                                     NormalizeSiteId(row.SiteId),
-
-                                SimNumber =
-                                    NullIfBlank(
-                                        row.SecondarySimNumber),
 
                                 SecondaryWanIp =
                                     NullIfBlank(
@@ -525,7 +519,11 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                             !string.IsNullOrWhiteSpace(
                                 row.SecondaryCommsSsid) ||
                             !string.IsNullOrWhiteSpace(
-                                row.SecondaryCommsPassword))
+                                row.SecondaryCommsPassword) ||
+                            !string.IsNullOrWhiteSpace(
+                                row.SecondaryAttSimNumber) ||
+                            !string.IsNullOrWhiteSpace(
+                                row.SecondaryVzwSimNumber))
                     .Select(
                         row =>
                             new CacheSitePmrEntity
@@ -548,6 +546,14 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                                 SecondaryCommsPassword =
                                     NullIfBlank(
                                         row.SecondaryCommsPassword),
+
+                                AttSimNumber =
+                                    NullIfBlank(
+                                        row.SecondaryAttSimNumber),
+
+                                VzwSimNumber =
+                                    NullIfBlank(
+                                        row.SecondaryVzwSimNumber),
 
                                 LastSyncedAt = syncedAtUtc,
                                 SyncRunId = syncRunId,
