@@ -79,14 +79,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             SearchTextBox.IsEnabled = false;
 
             StatusTextBlock.Text =
-                $"Searching for {query}...";
+                $"Searching for {query}... This may take up to a minute.";
 
             try
             {
                 var result =
-                    await _api.GetAsync<DeviceLookupResponseDto>(
-                        $"api/device-lookup?query={Uri.EscapeDataString(query)}&searchType={searchType}",
-                        ct);
+                    await _api.GetDeviceLookupAsync(query, searchType, ct);
 
                 if (ct.IsCancellationRequested)
                     return;

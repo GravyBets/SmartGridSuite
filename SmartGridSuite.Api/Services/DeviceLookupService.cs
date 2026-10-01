@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Api.Services.ParentSync;
@@ -11,22 +12,29 @@ namespace SmartGridSuite.Api.Services
 {
     public sealed class DeviceLookupService
     {
-        private const int ParentCommandTimeoutSeconds = 3;
-        private const int ParentSearchBudgetSeconds = 6;
-        private const int SearchBudgetSeconds = 12;
+        private const int ParentCommandTimeoutSeconds = 15;
+        private const int ParentSearchBudgetSeconds = 40;
+        private const int SearchBudgetSeconds = 50;
         private const int MaxSmartGridRows = 250;
 
         // Scoped service: metadata belongs to this search/connection, not a
         // process-wide cache that can mix different Parent DB schemas.
         private readonly Dictionary<string, (string SqlType, int? MaxLength)> _parentColumnTypes = new();
 
+        private readonly HashSet<string> _loadedParentTables = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _parentTextFallbackColumns = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ILogger<DeviceLookupService> _logger;
+        private string _parentStage = "connection";
+
         private readonly SmartGridDbContext _db;
         private readonly ParentDatabaseConnectionFactory _parentDatabaseConnectionFactory;
 
         public DeviceLookupService(
             SmartGridDbContext db,
-            ParentDatabaseConnectionFactory parentDatabaseConnectionFactory)
+            ParentDatabaseConnectionFactory parentDatabaseConnectionFactory,
+            ILogger<DeviceLookupService>? logger = null)
         {
+            _logger = logger ?? NullLogger<DeviceLookupService>.Instance;
             _db = db;
             _parentDatabaseConnectionFactory = parentDatabaseConnectionFactory;
         }
@@ -43,7 +51,7 @@ namespace SmartGridSuite.Api.Services
             if (!Enum.IsDefined(searchType))
                 throw new ArgumentOutOfRangeException(nameof(searchType));
 
-            // The client has a 15-second timeout. Reserve time for related history
+            // Device Lookup has a dedicated 60-second client timeout. Reserve time for related history
             // and return records already read if either database is slow.
             using var searchBudget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             searchBudget.CancelAfter(TimeSpan.FromSeconds(SearchBudgetSeconds));
@@ -59,13 +67,16 @@ namespace SmartGridSuite.Api.Services
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                 {
-                    AddWarning(response, "Parent DB search reached its time limit; device results may be incomplete.");
+                    _logger.LogWarning("Device Lookup Parent DB budget expired during {Stage}", _parentStage);
+                    AddWarning(response, $"Parent DB search reached its 40-second time limit during {_parentStage}; device results may be incomplete.");
                 }
                 catch (Exception ex) when (ex is SqlException or InvalidOperationException or TimeoutException)
                 {
-                    AddWarning(response, "Parent DB search could not finish; showing available results.");
+                    ReportParentFailure(response, _parentStage, ex);
                 }
             }
+
+            CorrelatePmrRecords(response);
 
             try
             {
@@ -75,8 +86,9 @@ namespace SmartGridSuite.Api.Services
             {
                 AddWarning(response, "Related-record search reached its time limit; results may be incomplete.");
             }
-            catch (DbException)
+            catch (DbException ex)
             {
+                _logger.LogWarning(ex, "Device Lookup could not load SmartGridSuite records");
                 AddWarning(response, "SmartGridSuite records could not be loaded; showing available device results.");
             }
 
@@ -101,47 +113,135 @@ namespace SmartGridSuite.Api.Services
             DeviceLookupSearchType searchType,
             CancellationToken cancellationToken)
         {
+            _parentStage = "connection";
             await using var connection = _parentDatabaseConnectionFactory.CreateConnection();
             await connection.OpenAsync(cancellationToken);
-            await ReadParentColumnTypesAsync(connection, cancellationToken);
+
+            Task ReadTable(string table, Func<Task> read) => RunParentCategoryAsync(response, table, async () =>
+            {
+                _parentStage = table + " schema";
+                await ReadParentColumnTypesAsync(connection, table, cancellationToken);
+                _parentStage = table + " query";
+                await read();
+            }, cancellationToken);
 
             if (searchType == DeviceLookupSearchType.Sim)
             {
-                await ReadPmrMatchesAsync(connection, response, query, searchType, cancellationToken);
+                await ReadTable("sgc_equip.PMR", () => ReadPmrMatchesAsync(connection, response, query, searchType, cancellationToken));
+                // A detached PMR remains visible even when association lookup fails.
+                var pmrSerials = response.ParentRecords.Where(x => x.RecordType == "PMR")
+                    .SelectMany(x => x.Fields).Where(x => x.Label.Equals("SN", StringComparison.OrdinalIgnoreCase))
+                    .Select(x => x.Value).Distinct(StringComparer.OrdinalIgnoreCase).Take(10).ToList();
+                foreach (var serial in pmrSerials)
+                    await ReadTable("sgc_comm.AMS", () => ReadAmsMatchesAsync(connection, response, serial,
+                        DeviceLookupSearchType.DeviceSerialNumber, cancellationToken));
             }
             else
             {
-                if (searchType == DeviceLookupSearchType.DeviceSerialNumber)
-                    await ReadPmrMatchesAsync(connection, response, query, searchType, cancellationToken);
-                await ReadLteMatchesAsync(connection, response, query, searchType, cancellationToken);
-                await ReadAmsMatchesAsync(connection, response, query, searchType, cancellationToken);
-                await ReadIgsdMatchesAsync(connection, response, query, searchType, cancellationToken);
-                if (searchType is DeviceLookupSearchType.Site or DeviceLookupSearchType.IpAddress)
-                    await ReadRadio700MatchesAsync(connection, response, query, searchType, cancellationToken);
-                if (searchType is DeviceLookupSearchType.Site or DeviceLookupSearchType.DeviceSerialNumber)
+                // Search communications records before auxiliary equipment so a
+                // slow/unavailable PMR table cannot prevent radio serial matches.
+                await ReadTable("sgc_comm.AMS", () => ReadAmsMatchesAsync(connection, response, query, searchType, cancellationToken));
+                await ReadTable("sgc_comm.IGSD", () => ReadIgsdMatchesAsync(connection, response, query, searchType, cancellationToken));
+                await ReadTable("sgc_equip.LTE", () => ReadLteMatchesAsync(connection, response, query, searchType, cancellationToken));
+                await ReadTable("sgc_equip.Radio700", () => ReadRadio700MatchesAsync(connection, response, query, searchType, cancellationToken));
+
+                if (searchType != DeviceLookupSearchType.IpAddress)
+                    await ReadTable("sgc_equip.PMR", () => ReadPmrMatchesAsync(connection, response, query, searchType, cancellationToken));
+
+                if (searchType is DeviceLookupSearchType.IpAddress or DeviceLookupSearchType.DeviceSerialNumber)
                 {
-                    await ReadRangeExtenderMatchesAsync(connection, response, query, searchType, cancellationToken);
-                    await ReadAntennaMatchesAsync(connection, response, query, searchType, cancellationToken);
-                    await ReadEnclosureMatchesAsync(connection, response, query, searchType, cancellationToken);
-                }
-                if (searchType == DeviceLookupSearchType.Site)
-                    await ReadPmrMatchesAsync(connection, response, query, searchType, cancellationToken);
-                else if (searchType == DeviceLookupSearchType.IpAddress)
-                {
-                    // Only look up PMRs for AMS rows actually matched by the IP.
                     var serials = response.ParentRecords.Where(x => x.RecordType == "AMS / MR")
-                        .SelectMany(x => x.Fields).Where(x => x.Label == "iTron_CR_Num")
+                        .SelectMany(x => x.Fields).Where(x => x.Label.Equals("iTron_CR_Num", StringComparison.OrdinalIgnoreCase))
                         .Select(x => x.Value).Distinct(StringComparer.OrdinalIgnoreCase).Take(10).ToList();
                     foreach (var serial in serials)
-                        await ReadPmrMatchesAsync(connection, response, serial,
-                            DeviceLookupSearchType.DeviceSerialNumber, cancellationToken);
+                    {
+                        if (response.ParentRecords.Any(x => x.RecordType == "PMR" &&
+                            x.Fields.Any(f => f.Label.Equals("SN", StringComparison.OrdinalIgnoreCase) &&
+                                f.Value.Equals(serial, StringComparison.OrdinalIgnoreCase))))
+                            continue;
+                        await ReadTable("sgc_equip.PMR", () => ReadPmrMatchesAsync(connection, response, serial,
+                            DeviceLookupSearchType.DeviceSerialNumber, cancellationToken));
+                    }
+                }
+
+                if (searchType is DeviceLookupSearchType.Site or DeviceLookupSearchType.DeviceSerialNumber)
+                {
+                    await ReadTable("sgc_comm.RE", () => ReadRangeExtenderMatchesAsync(connection, response, query, searchType, cancellationToken));
+                    await ReadTable("sgc_equip.Antenna", () => ReadAntennaMatchesAsync(connection, response, query, searchType, cancellationToken));
+                    await ReadTable("sgc_equip.Enclosure", () => ReadEnclosureMatchesAsync(connection, response, query, searchType, cancellationToken));
                 }
             }
 
+            CorrelatePmrRecords(response);
             var parentSiteIds = response.RelatedSiteIds.ToList();
             if (searchType == DeviceLookupSearchType.Site)
                 parentSiteIds.Add(query);
-            await ReadSiteMetadataAsync(connection, response, parentSiteIds, cancellationToken);
+            _parentStage = "site metadata";
+            await RunParentCategoryAsync(response, _parentStage,
+                () => ReadSiteMetadataAsync(connection, response, parentSiteIds, cancellationToken), cancellationToken);
+        }
+
+        private async Task RunParentCategoryAsync(DeviceLookupResponseDto response, string category,
+            Func<Task> read, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await read();
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested &&
+                ex is SqlException or InvalidOperationException or TimeoutException)
+            {
+                ReportParentFailure(response, category, ex);
+            }
+        }
+
+        private void ReportParentFailure(DeviceLookupResponseDto response, string stage, Exception ex)
+        {
+            _logger.LogWarning(ex, "Device Lookup Parent DB failure during {Stage}", stage);
+            var reason = ex is SqlException sql && sql.Number == -2
+                ? $"SQL command exceeded {ParentCommandTimeoutSeconds} seconds"
+                : ex is SqlException sqlError ? $"SQL {sqlError.Number}: {ConciseError(ex.Message)}"
+                : ConciseError(ex.Message);
+            AddWarning(response, $"Parent DB {stage} failed: {reason}. Results may be incomplete.");
+        }
+
+        private static string ConciseError(string message)
+        {
+            var line = message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Unknown error";
+            return line.Length > 250 ? line[..250] + "…" : line.TrimEnd('.');
+        }
+
+        private static void CorrelatePmrRecords(DeviceLookupResponseDto response)
+        {
+            foreach (var pmr in response.ParentRecords.Where(x => x.RecordType == "PMR"))
+            {
+                var sn = pmr.Fields.FirstOrDefault(x => x.Label.Equals("SN", StringComparison.OrdinalIgnoreCase))?.Value;
+                if (string.IsNullOrWhiteSpace(sn))
+                    continue;
+                var associations = response.ParentRecords.Where(x => x.RecordType == "AMS / MR" &&
+                    x.Fields.Any(f => f.Label.Equals("iTron_CR_Num", StringComparison.OrdinalIgnoreCase) &&
+                        f.Value.Equals(sn, StringComparison.OrdinalIgnoreCase))).ToList();
+                foreach (var ams in associations)
+                {
+                    if (!string.IsNullOrWhiteSpace(ams.SiteId))
+                    {
+                        response.RelatedSiteIds.Add(ams.SiteId);
+                        if (string.IsNullOrWhiteSpace(pmr.SiteId))
+                            pmr.SiteId = ams.SiteId;
+                        AddContextField(pmr, "CurrentSiteId", ams.SiteId);
+                    }
+                    foreach (var (source, label) in new[] { ("RadioSN", "AssociatedAmsRadioSN"),
+                        ("RadioIP", "AssociatedAmsRadioIP"), ("EthernetIP", "AssociatedAmsEthernetIP") })
+                        AddContextField(pmr, label, ams.Fields.FirstOrDefault(x => x.Label.Equals(source, StringComparison.OrdinalIgnoreCase))?.Value);
+                }
+            }
+        }
+
+        private static void AddContextField(DeviceLookupRecordDto record, string label, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value) && !record.Fields.Any(x => x.Label == label && x.Value == value))
+                record.Fields.Add(new DeviceLookupFieldDto { Label = label, Value = value });
         }
 
         private async Task ReadPmrMatchesAsync(
@@ -159,19 +259,9 @@ namespace SmartGridSuite.Api.Services
             };
 
             var sql = $"""
-                SELECT TOP (50)
-                    p.*,
-                    a.SiteId AS CurrentSiteId,
-                    a.RadioSN AS AssociatedAmsRadioSN,
-                    a.RadioIP AS AssociatedAmsRadioIP,
-                    a.EthernetIP AS AssociatedAmsEthernetIP,
-                    l.IP1 AS AssociatedLteWanIp
-                FROM (SELECT TOP (50) p.* FROM [sgc_equip].[PMR] p WHERE {predicate}) p
-                LEFT JOIN [sgc_comm].[AMS] a
-                    ON a.iTron_CR_Num = {ParentValueExpression("sgc_comm.AMS", "iTron_CR_Num", "p.SN")}
-                LEFT JOIN [sgc_equip].[LTE] l
-                    ON a.SiteId = l.SiteId
-                ;
+                SELECT TOP (50) p.*
+                FROM [sgc_equip].[PMR] p
+                WHERE {predicate};
                 """;
 
             await using var command =
@@ -257,8 +347,8 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 rowsRead++;
-                var siteId = ReadText(reader, "SiteId");
                 var fields = ReadAllFields(reader);
+                var siteId = GetFieldValue(fields, "SiteId");
 
                 AddParentRecord(
                     response,
@@ -303,8 +393,8 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 rowsRead++;
-                var siteId = ReadText(reader, "SiteId");
                 var fields = ReadAllFields(reader);
+                var siteId = GetFieldValue(fields, "SiteId");
 
                 AddParentRecord(
                     response,
@@ -349,8 +439,8 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 rowsRead++;
-                var siteId = ReadText(reader, "SiteId");
                 var fields = ReadAllFields(reader);
+                var siteId = GetFieldValue(fields, "SiteId");
 
                 AddParentRecord(
                     response,
@@ -371,9 +461,16 @@ namespace SmartGridSuite.Api.Services
             DeviceLookupSearchType searchType,
             CancellationToken cancellationToken)
         {
-            var predicate = searchType == DeviceLookupSearchType.Site
-                ? ParentPredicate("sgc_equip.Radio700", "r", "SiteId")
-                : ParentPredicate("sgc_equip.Radio700", "r", "RadioIP", "RtuWanVLAN", "RtuWanVLANGateway");
+            if (searchType == DeviceLookupSearchType.DeviceSerialNumber &&
+                !new[] { "SN", "RadioSN", "SerialNumber" }.Any(column =>
+                    _parentColumnTypes.ContainsKey($"sgc_equip.Radio700.{column}".ToUpperInvariant())))
+                return;
+            var predicate = searchType switch
+            {
+                DeviceLookupSearchType.Site => ParentPredicate("sgc_equip.Radio700", "r", "SiteId"),
+                DeviceLookupSearchType.DeviceSerialNumber => ParentPredicate("sgc_equip.Radio700", "r", "SN", "RadioSN", "SerialNumber"),
+                _ => ParentPredicate("sgc_equip.Radio700", "r", "RadioIP", "RtuWanVLAN", "RtuWanVLANGateway")
+            };
 
             var sql = $"""
                 SELECT TOP (50)
@@ -392,8 +489,8 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 rowsRead++;
-                var siteId = ReadText(reader, "SiteId");
                 var fields = ReadAllFields(reader);
+                var siteId = GetFieldValue(fields, "SiteId");
 
                 AddParentRecord(
                     response,
@@ -435,8 +532,8 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 rowsRead++;
-                var siteId = ReadText(reader, "SiteId");
                 var fields = ReadAllFields(reader);
+                var siteId = GetFieldValue(fields, "SiteId");
 
                 AddParentRecord(
                     response,
@@ -476,8 +573,8 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 rowsRead++;
-                var siteId = ReadText(reader, "SiteId");
                 var fields = ReadAllFields(reader);
+                var siteId = GetFieldValue(fields, "SiteId");
 
                 AddParentRecord(
                     response,
@@ -517,8 +614,8 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 rowsRead++;
-                var siteId = ReadText(reader, "SiteId");
                 var fields = ReadAllFields(reader);
+                var siteId = GetFieldValue(fields, "SiteId");
 
                 AddParentRecord(
                     response,
@@ -770,37 +867,44 @@ namespace SmartGridSuite.Api.Services
                     ? warning : response.Warning + " " + warning;
         }
 
-        private async Task ReadParentColumnTypesAsync(SqlConnection connection, CancellationToken cancellationToken)
+        private async Task ReadParentColumnTypesAsync(SqlConnection connection, string table, CancellationToken cancellationToken)
         {
-            const string sql = """
-                SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE,
-                       CHARACTER_MAXIMUM_LENGTH, NUMERIC_PRECISION, NUMERIC_SCALE
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE (TABLE_SCHEMA = 'sgc_equip' AND TABLE_NAME IN ('PMR', 'LTE', 'Radio700', 'Antenna', 'Enclosure'))
-                   OR (TABLE_SCHEMA = 'sgc_comm' AND TABLE_NAME IN ('AMS', 'IGSD', 'RE'));
-                """;
+            if (_loadedParentTables.Contains(table))
+                return;
+            var names = table.Split('.');
+            var sql = $"SELECT TOP (0) * FROM [{names[0]}].[{names[1]}];";
             await using var command = new SqlCommand(sql, connection) { CommandTimeout = ParentCommandTimeoutSeconds };
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            _parentColumnTypes.Clear();
-            while (await reader.ReadAsync(cancellationToken))
+            RegisterParentColumns(table, reader.GetColumnSchema());
+            _loadedParentTables.Add(table);
+        }
+
+        private void RegisterParentColumns(string table, IEnumerable<DbColumn> columns)
+        {
+            foreach (var column in columns)
             {
-                var type = ReadText(reader, "DATA_TYPE").ToLowerInvariant();
+                var type = (column.DataTypeName ?? string.Empty).ToLowerInvariant();
+                var key = $"{table}.{column.ColumnName}".ToUpperInvariant();
                 int? maxLength = null;
                 if (type is "char" or "varchar" or "nchar" or "nvarchar")
                 {
-                    var length = Convert.ToInt32(reader["CHARACTER_MAXIMUM_LENGTH"]);
-                    if (length > 0)
+                    var length = column.ColumnSize ?? 250;
+                    var isMax = length <= 0 || length > (type.StartsWith('n') ? 4000 : 8000);
+                    if (!isMax)
                         maxLength = length;
-                    type += length == -1 ? "(max)" : $"({length})";
+                    type += isMax ? "(max)" : $"({length})";
                 }
                 else if (type is "decimal" or "numeric")
-                    type += $"({Convert.ToInt32(reader["NUMERIC_PRECISION"])},{Convert.ToInt32(reader["NUMERIC_SCALE"])})";
+                    type += $"({column.NumericPrecision ?? 38},{column.NumericScale ?? 0})";
+                else if (type is "text" or "ntext")
+                {
+                    type = "nvarchar(250)";
+                    _parentTextFallbackColumns.Add(key);
+                }
                 else if (type is not ("tinyint" or "smallint" or "int" or "bigint" or "bit" or "float" or
                     "real" or "money" or "smallmoney" or "uniqueidentifier"))
                     continue;
-
-                var key = $"{ReadText(reader, "TABLE_SCHEMA")}.{ReadText(reader, "TABLE_NAME")}.{ReadText(reader, "COLUMN_NAME")}";
-                _parentColumnTypes[key.ToUpperInvariant()] = (type, maxLength);
+                _parentColumnTypes[key] = (type, maxLength);
             }
         }
 
@@ -813,23 +917,34 @@ namespace SmartGridSuite.Api.Services
 
         private string PmrSitePredicate()
         {
-            var associatedSite = "p.SN IN (SELECT " +
-                ParentValueExpression("sgc_equip.PMR", "SN", "a.iTron_CR_Num") +
-                " FROM [sgc_comm].[AMS] a WHERE " + ParentPredicate("sgc_comm.AMS", "a", "SiteId") + ")";
-            return _parentColumnTypes.ContainsKey("SGC_EQUIP.PMR.SITEID")
-                ? ParentPredicate("sgc_equip.PMR", "p", "SiteId") + " OR " + associatedSite
-                : associatedSite;
+            var predicates = new List<string>();
+            if (_parentColumnTypes.ContainsKey("SGC_EQUIP.PMR.SITEID"))
+                predicates.Add(ParentPredicate("sgc_equip.PMR", "p", "SiteId"));
+            if (_parentColumnTypes.ContainsKey("SGC_COMM.AMS.ITRON_CR_NUM") &&
+                _parentColumnTypes.ContainsKey("SGC_COMM.AMS.SITEID"))
+                predicates.Add("p.SN IN (SELECT " +
+                    ParentValueExpression("sgc_equip.PMR", "SN", "a.iTron_CR_Num") +
+                    " FROM [sgc_comm].[AMS] a WHERE " + ParentPredicate("sgc_comm.AMS", "a", "SiteId") + ")");
+            if (predicates.Count == 0)
+                throw new InvalidOperationException("PMR has no available site association columns");
+            return string.Join(" OR ", predicates);
         }
 
         private string ParentPredicate(string table, string alias, params string[] columns)
         {
-            // Convert the parameter to the column's native type, never the
-            // indexed column to text. TRY_CONVERT also lets an alphanumeric SN
-            // safely pass tables whose identifiers are numeric.
-            return string.Join(" OR ", columns.Select(column =>
+            // Optional fields vary between Parent DB schemas. Search the fields
+            // actually present rather than letting one absent field abort the source.
+            var available = columns.Where(column =>
+                _parentColumnTypes.ContainsKey($"{table}.{column}".ToUpperInvariant())).ToList();
+            if (available.Count == 0)
+                throw new InvalidOperationException($"No supported identifier columns in {table}: {string.Join(", ", columns)}");
+            return string.Join(" OR ", available.Select(column =>
             {
+                var key = $"{table}.{column}".ToUpperInvariant();
+                if (_parentTextFallbackColumns.Contains(key))
+                    return $"(CONVERT(nvarchar(250), {alias}.{column}) = @Query)";
                 var value = ParentValueExpression(table, column, "@Query");
-                var metadata = _parentColumnTypes[$"{table}.{column}".ToUpperInvariant()];
+                var metadata = _parentColumnTypes[key];
                 var lengthGuard = metadata.MaxLength is int length ? $"LEN(@Query) <= {length} AND " : string.Empty;
                 return $"({lengthGuard}{alias}.{column} = {value})";
             }));

@@ -1,6 +1,7 @@
 ﻿using SmartGridSuite.Contracts.Settings;
 using SmartGridSuite.Contracts.SiteDashboard;
 using SmartGridSuite.Contracts.Administration;
+using SmartGridSuite.Contracts.Dispatcher;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Net;
@@ -73,6 +74,28 @@ namespace SmartGridSuite.Client.Services
                 ct);
 
             return await ReadJsonOrDefaultAsync<T>(response, ct);
+        }
+
+        public async Task<DeviceLookupResponseDto?> GetDeviceLookupAsync(string query,
+            DeviceLookupSearchType searchType, CancellationToken ct = default)
+        {
+            var path = $"api/device-lookup?query={Uri.EscapeDataString(query)}&searchType={searchType}";
+            // Give only this research request a longer budget. The linked token
+            // covers response-body reading as well as waiting for HTTP headers.
+            using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            budget.CancelAfter(TimeSpan.FromSeconds(60));
+            using var client = new HttpClient { BaseAddress = _http.BaseAddress, Timeout = Timeout.InfiniteTimeSpan };
+            try
+            {
+                using var response = await SendAsync(HttpMethod.Get, path, null, budget.Token, client);
+                return await ReadJsonOrDefaultAsync<DeviceLookupResponseDto>(response, budget.Token);
+            }
+            catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+            {
+                throw new ApiConnectionException(
+                    "Device Lookup did not finish within 60 seconds. Narrow the search or retry.",
+                    path, isTimeout: true, ex);
+            }
         }
 
         // Sends a JSON POST request while distinguishing API validation failures
@@ -518,7 +541,7 @@ namespace SmartGridSuite.Client.Services
         // Executes every API request through one connection/error boundary so weak or
         // missing field connectivity cannot surface as inconsistent raw HTTP exceptions.
         private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, HttpContent? content,
-            CancellationToken ct)
+            CancellationToken ct, HttpClient? client = null)
         {
             using var request = new HttpRequestMessage(method, path)
             {
@@ -527,7 +550,7 @@ namespace SmartGridSuite.Client.Services
 
             try
             {
-                var response = await _http.SendAsync(
+                var response = await (client ?? _http).SendAsync(
                     request,
                     HttpCompletionOption.ResponseHeadersRead,
                     ct);
