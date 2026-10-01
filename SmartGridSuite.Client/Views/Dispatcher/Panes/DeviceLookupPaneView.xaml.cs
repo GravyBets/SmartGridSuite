@@ -41,6 +41,20 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             await SearchAsync();
         }
 
+        private void ToggleTicketRowDetails_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button)
+                return;
+
+            var row = ItemsControl.ContainerFromElement(TicketsDataGrid, button) as DataGridRow;
+            if (row is null)
+                return;
+
+            row.DetailsVisibility = row.DetailsVisibility == Visibility.Visible
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
+
         private void HistoryDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (HistoryDataGrid.SelectedItem is DeviceLookupHistoryDto row)
@@ -202,7 +216,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     new("Comm Type", "CommType"),
                     new("Carrier", "Carrier1"),
                     new("SIM 1", "SIM1"),
-                    new("IP", "IP1")
+                    new("IP 1", "IP1"),
+                    new("IP 2", "IP2")
                 ];
             }
 
@@ -220,6 +235,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     new("Password", "CAMPassword", "CAM Password"),
                     new("RFLAN MAC", "RFLANMAC", "RFLAN_MAC", "RFLAN MAC"),
                     new("SIM 1", "ATTSlot1"),
+                    new("SIM 2", "VzwSlot2"),
                     new("IMEI", "IMEI"),
                     new("Associated Radio SN", "AssociatedAmsRadioSN"),
                     new("Associated Radio IP", "AssociatedAmsRadioIP"),
