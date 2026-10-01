@@ -13,6 +13,7 @@
 
                 <!-- Controls -->
                 <ResourceDictionary Source="Controls/Controls.xaml"/>
+                <ResourceDictionary Source="Controls/WorkspaceTabs.xaml"/>
 
                 <!-- Initial theme; ThemeService replaces this -->
                 <ResourceDictionary Source="Themes/LightTheme.xaml"/>

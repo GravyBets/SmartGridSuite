@@ -94,9 +94,10 @@
                        Margin="4,0"/>
 
             <TabControl Grid.Row="2"
-                        Style="{StaticResource InnerTabStyle}"
+                        Margin="16,0,0,0"
+                        Style="{StaticResource WorkspaceTabControlStyle}"
                         Foreground="{DynamicResource TextPrimary}">
-                <TabItem Header="Device Records" Style="{StaticResource InnerTabItemStyle}">
+                <TabItem Header="Device Records" Margin="0" Style="{StaticResource WorkspaceTabItemStyle}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="8">
@@ -201,7 +202,7 @@
                     </ScrollViewer>
                 </TabItem>
 
-                <TabItem Header="Tickets" Style="{StaticResource InnerTabItemStyle}">
+                <TabItem Header="Tickets" Style="{StaticResource WorkspaceTabItemStyle}">
                     <Border Style="{StaticResource Card}"
                             Margin="8"
                             Padding="0">
@@ -256,7 +257,7 @@
                     </Border>
                 </TabItem>
 
-                <TabItem Header="Site History" Style="{StaticResource InnerTabItemStyle}">
+                <TabItem Header="Site History" Style="{StaticResource WorkspaceTabItemStyle}">
                     <Border Style="{StaticResource Card}"
                             Margin="8"
                             Padding="0">
@@ -300,7 +301,7 @@
                     </Border>
                 </TabItem>
 
-                <TabItem Header="Site Notes" Style="{StaticResource InnerTabItemStyle}">
+                <TabItem Header="Site Notes" Style="{StaticResource WorkspaceTabItemStyle}">
                     <Border Style="{StaticResource Card}"
                             Margin="8"
                             Padding="0">

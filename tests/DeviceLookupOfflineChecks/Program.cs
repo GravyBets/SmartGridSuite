@@ -105,8 +105,8 @@ var collapsed = navs[1].Elements(wpf + "ListBoxItem").Select(x => (string?)x.Att
 Check(expanded.SequenceEqual(collapsed) && expanded.Last() == "Device Lookup" && expanded[1] == "Tasks",
     "Expanded and collapsed navigation keep identical ordering with Device Lookup last and Tasks second");
 var pane = XDocument.Load(Path.Combine(root, "SmartGridSuite.Client/Views/Dispatcher/Panes/DeviceLookupPaneView.xaml"));
-Check(pane.Descendants(wpf + "TabControl").All(x => (string?)x.Attribute("Style") == "{StaticResource InnerTabStyle}") &&
-    pane.Descendants(wpf + "TabItem").All(x => (string?)x.Attribute("Style") == "{StaticResource InnerTabItemStyle}") &&
+Check(pane.Descendants(wpf + "TabControl").All(x => (string?)x.Attribute("Style") == "{StaticResource WorkspaceTabControlStyle}") &&
+    pane.Descendants(wpf + "TabItem").All(x => (string?)x.Attribute("Style") == "{StaticResource WorkspaceTabItemStyle}") &&
     pane.Descendants(wpf + "DataGrid").All(x => (string?)x.Attribute("Style") == "{StaticResource ThemedDataGridStyle}"),
     "Every result tab and grid uses existing theme-aware styles");
 Check(pane.Descendants(wpf + "ComboBoxItem").Select(x => (string?)x.Attribute("Tag"))
