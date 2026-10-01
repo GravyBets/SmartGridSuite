@@ -198,9 +198,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 "SecondaryCommsPassword",
                 "SecondaryPassword"));
 
-            AddLine(sb, "SIM #", GetDashboardDataFieldText(
+            AddLine(sb, "AT&T SIM #", GetDashboardDataFieldText(
                 dashboard,
+                "SecondaryAttSimNumber",
                 "SecondarySimNumber"));
+
+            AddLine(sb, "Verizon SIM #", GetDashboardDataFieldText(
+                dashboard,
+                "SecondaryVzwSimNumber"));
 
             AddLine(sb, "Primary WiFi SSID", GetDashboardDataFieldText(
                 dashboard,
