@@ -193,7 +193,8 @@
                                   HeadersVisibility="Column"
                                   GridLinesVisibility="Horizontal"
                                   BorderThickness="0"
-                                  Background="{DynamicResource CardBackground}">
+                                  Background="{DynamicResource CardBackground}"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Site"
                                                     Binding="{Binding Site}"
@@ -210,9 +211,21 @@
                                 <DataGridTextColumn Header="Status"
                                                     Binding="{Binding Status}"
                                                     Width="135"/>
-                                <DataGridTextColumn Header="Summary / Problem"
+                                <DataGridTextColumn Header="Summary"
+                                                    Binding="{Binding Summary}"
+                                                    Width="220"/>
+                                <DataGridTextColumn Header="Problem"
                                                     Binding="{Binding Problem}"
-                                                    Width="*"/>
+                                                    Width="260"/>
+                                <DataGridTextColumn Header="Dispatch Notes"
+                                                    Binding="{Binding DispatchNotes}"
+                                                    Width="300"/>
+                                <DataGridTextColumn Header="Write-Up / Notes"
+                                                    Binding="{Binding Notes}"
+                                                    Width="300"/>
+                                <DataGridTextColumn Header="Created"
+                                                    Binding="{Binding CreatedAt, StringFormat={}{0:g}}"
+                                                    Width="145"/>
                                 <DataGridTextColumn Header="Last Activity"
                                                     Binding="{Binding LastActivityAt, StringFormat={}{0:g}}"
                                                     Width="145"/>
@@ -234,7 +247,8 @@
                                   HeadersVisibility="Column"
                                   GridLinesVisibility="Horizontal"
                                   BorderThickness="0"
-                                  Background="{DynamicResource CardBackground}">
+                                  Background="{DynamicResource CardBackground}"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Date"
                                                     Binding="{Binding VisitDate, StringFormat={}{0:d}}"
@@ -242,15 +256,68 @@
                                 <DataGridTextColumn Header="Site"
                                                     Binding="{Binding SiteId}"
                                                     Width="110"/>
-                                <DataGridTextColumn Header="Tech"
+                                <DataGridTextColumn Header="Tech 1"
                                                     Binding="{Binding PrimaryTech}"
+                                                    Width="140"/>
+                                <DataGridTextColumn Header="Tech 2"
+                                                    Binding="{Binding SecondaryTech}"
                                                     Width="140"/>
                                 <DataGridTextColumn Header="Issue"
                                                     Binding="{Binding IssueText}"
                                                     Width="220"/>
                                 <DataGridTextColumn Header="Narrative"
                                                     Binding="{Binding Narrative}"
-                                                    Width="*"/>
+                                                    Width="*"
+                                                    MinWidth="320"/>
+                                <DataGridTextColumn Header="Source"
+                                                    Binding="{Binding SourceType}"
+                                                    Width="110"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </TabItem>
+
+                <TabItem Header="Site Notes">
+                    <Border Style="{StaticResource Card}"
+                            Margin="8"
+                            Padding="0">
+                        <DataGrid x:Name="SiteNotesDataGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  RowHeaderWidth="0"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  BorderThickness="0"
+                                  Background="{DynamicResource CardBackground}"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Site"
+                                                    Binding="{Binding SiteId}"
+                                                    Width="110"/>
+                                <DataGridTextColumn Header="Type"
+                                                    Binding="{Binding NoteType}"
+                                                    Width="130"/>
+                                <DataGridCheckBoxColumn Header="Active"
+                                                        Binding="{Binding IsActive}"
+                                                        Width="70"/>
+                                <DataGridTextColumn Header="Note"
+                                                    Binding="{Binding NoteText}"
+                                                    Width="*"
+                                                    MinWidth="360"/>
+                                <DataGridTextColumn Header="Created By"
+                                                    Binding="{Binding CreatedBy}"
+                                                    Width="130"/>
+                                <DataGridTextColumn Header="Created"
+                                                    Binding="{Binding CreatedAt, StringFormat={}{0:g}}"
+                                                    Width="145"/>
+                                <DataGridTextColumn Header="Updated By"
+                                                    Binding="{Binding UpdatedBy}"
+                                                    Width="130"/>
+                                <DataGridTextColumn Header="Updated"
+                                                    Binding="{Binding UpdatedAt, StringFormat={}{0:g}}"
+                                                    Width="145"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </Border>
