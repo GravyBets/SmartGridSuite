@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
@@ -88,12 +90,21 @@ var metadata = (Dictionary<string, (string SqlType, int? MaxLength)>)metadataFie
 metadata["SGC_EQUIP.PMR.ATTSLOT1"] = ("decimal(20,0)", null);
 metadata["SGC_EQUIP.PMR.SN"] = ("varchar(12)", 12);
 var predicateMethod = typeof(DeviceLookupService).GetMethod("ParentPredicate", BindingFlags.NonPublic | BindingFlags.Instance)!;
-var numericPredicate = (string)predicateMethod.Invoke(service, new object[] { "sgc_equip.PMR", "p", new[] { "ATTSlot1" } })!;
-var textPredicate = (string)predicateMethod.Invoke(service, new object[] { "sgc_equip.PMR", "p", new[] { "SN" } })!;
-Check(numericPredicate.Contains("p.ATTSlot1 = TRY_CONVERT(decimal(20,0), @Query)"),
-    "SIM comparison preserves 20-digit precision and converts the parameter rather than the indexed column");
-Check(textPredicate.Contains("LEN(@Query) <= 12") && textPredicate.Contains("p.SN = TRY_CONVERT(varchar(12), @Query)"),
-    "Text identifier comparison prevents false matches caused by parameter truncation");
+var numericPredicate = (string)predicateMethod.Invoke(service, new object[] { "sgc_equip.PMR", "p", "89011234567890123456", new[] { "ATTSlot1" } })!;
+var pendingField = typeof(DeviceLookupService).GetField("_parentQueryParameters", BindingFlags.NonPublic | BindingFlags.Instance)!;
+var pending = (List<SqlParameter>)pendingField.GetValue(service)!;
+Check(numericPredicate.Contains("p.ATTSlot1 = @Lookup0") && pending[0].SqlDbType == SqlDbType.Decimal &&
+    pending[0].Precision == 20 && (decimal)pending[0].Value == 89011234567890123456m,
+    "20-digit SIM uses an exact numeric parameter without a SQL conversion function");
+pending.Clear();
+var textPredicate = (string)predicateMethod.Invoke(service, new object[] { "sgc_equip.PMR", "p", "too-long-for-column", new[] { "SN" } })!;
+Check(textPredicate.Contains("p.SN = @Lookup0") && pending[0].SqlDbType == SqlDbType.VarChar &&
+    pending[0].Value == DBNull.Value, "Oversized text identifiers cannot match truncated values");
+pending.Clear();
+metadata["SGC_EQUIP.PMR.SN"] = ("bigint", null);
+predicateMethod.Invoke(service, new object[] { "sgc_equip.PMR", "p", "R6340009595", new[] { "SN" } });
+Check(pending[0].SqlDbType == SqlDbType.BigInt && pending[0].Value == DBNull.Value,
+    "Alphanumeric serial safely skips a numeric identifier column");
 
 var root = FindRepositoryRoot();
 XNamespace wpf = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";

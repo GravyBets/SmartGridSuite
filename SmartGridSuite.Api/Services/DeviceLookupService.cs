@@ -7,6 +7,7 @@ using SmartGridSuite.Api.Services.ParentSync;
 using SmartGridSuite.Contracts.Dispatcher;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 
 namespace SmartGridSuite.Api.Services
 {
@@ -23,6 +24,7 @@ namespace SmartGridSuite.Api.Services
 
         private readonly HashSet<string> _loadedParentTables = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _parentTextFallbackColumns = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<SqlParameter> _parentQueryParameters = new();
         private readonly ILogger<DeviceLookupService> _logger;
         private string _parentStage = "connection";
 
@@ -119,6 +121,7 @@ namespace SmartGridSuite.Api.Services
 
             Task ReadTable(string table, Func<Task> read) => RunParentCategoryAsync(response, table, async () =>
             {
+                _parentQueryParameters.Clear();
                 _parentStage = table + " schema";
                 await ReadParentColumnTypesAsync(connection, table, cancellationToken);
                 _parentStage = table + " query";
@@ -253,9 +256,9 @@ namespace SmartGridSuite.Api.Services
         {
             var predicate = searchType switch
             {
-                DeviceLookupSearchType.Sim => ParentPredicate("sgc_equip.PMR", "p", "ATTSlot1", "VzwSlot2"),
-                DeviceLookupSearchType.Site => PmrSitePredicate(),
-                _ => ParentPredicate("sgc_equip.PMR", "p", "SN")
+                DeviceLookupSearchType.Sim => ParentPredicate("sgc_equip.PMR", "p", query, "ATTSlot1", "VzwSlot2"),
+                DeviceLookupSearchType.Site => PmrSitePredicate(response, query),
+                _ => ParentPredicate("sgc_equip.PMR", "p", query, "SN")
             };
 
             var sql = $"""
@@ -325,9 +328,9 @@ namespace SmartGridSuite.Api.Services
         {
             var predicate = searchType switch
             {
-                DeviceLookupSearchType.Site => ParentPredicate("sgc_equip.LTE", "l", "SiteId"),
-                DeviceLookupSearchType.IpAddress => ParentPredicate("sgc_equip.LTE", "l", "IP1"),
-                _ => ParentPredicate("sgc_equip.LTE", "l", "SN")
+                DeviceLookupSearchType.Site => ParentPredicate("sgc_equip.LTE", "l", query, "SiteId"),
+                DeviceLookupSearchType.IpAddress => ParentPredicate("sgc_equip.LTE", "l", query, "IP1"),
+                _ => ParentPredicate("sgc_equip.LTE", "l", query, "SN")
             };
 
             var sql = $"""
@@ -371,9 +374,9 @@ namespace SmartGridSuite.Api.Services
         {
             var predicate = searchType switch
             {
-                DeviceLookupSearchType.Site => ParentPredicate("sgc_comm.AMS", "a", "SiteId"),
-                DeviceLookupSearchType.IpAddress => ParentPredicate("sgc_comm.AMS", "a", "RadioIP", "EthernetIP"),
-                _ => ParentPredicate("sgc_comm.AMS", "a", "RadioSN", "iTron_CR_Num")
+                DeviceLookupSearchType.Site => ParentPredicate("sgc_comm.AMS", "a", query, "SiteId"),
+                DeviceLookupSearchType.IpAddress => ParentPredicate("sgc_comm.AMS", "a", query, "RadioIP", "EthernetIP"),
+                _ => ParentPredicate("sgc_comm.AMS", "a", query, "RadioSN", "iTron_CR_Num")
             };
 
             var sql = $"""
@@ -417,9 +420,9 @@ namespace SmartGridSuite.Api.Services
         {
             var predicate = searchType switch
             {
-                DeviceLookupSearchType.Site => ParentPredicate("sgc_comm.IGSD", "i", "SiteId"),
-                DeviceLookupSearchType.IpAddress => ParentPredicate("sgc_comm.IGSD", "i", "RadioIP", "PriProtLanDigi", "PriWanOut", "PriDigiWanOut", "PriProtLanSubN", "PriProtLanRtu", "SecDigiWanOut", "SecProtLanDigi", "SecProtLanSubN", "SecProtLanRtu"),
-                _ => ParentPredicate("sgc_comm.IGSD", "i", "RadioSN", "Cyberlock")
+                DeviceLookupSearchType.Site => ParentPredicate("sgc_comm.IGSD", "i", query, "SiteId"),
+                DeviceLookupSearchType.IpAddress => ParentPredicate("sgc_comm.IGSD", "i", query, "RadioIP", "PriProtLanDigi", "PriWanOut", "PriDigiWanOut", "PriProtLanSubN", "PriProtLanRtu", "SecDigiWanOut", "SecProtLanDigi", "SecProtLanSubN", "SecProtLanRtu"),
+                _ => ParentPredicate("sgc_comm.IGSD", "i", query, "RadioSN", "Cyberlock")
             };
 
             var sql = $"""
@@ -467,9 +470,9 @@ namespace SmartGridSuite.Api.Services
                 return;
             var predicate = searchType switch
             {
-                DeviceLookupSearchType.Site => ParentPredicate("sgc_equip.Radio700", "r", "SiteId"),
-                DeviceLookupSearchType.DeviceSerialNumber => ParentPredicate("sgc_equip.Radio700", "r", "SN", "RadioSN", "SerialNumber"),
-                _ => ParentPredicate("sgc_equip.Radio700", "r", "RadioIP", "RtuWanVLAN", "RtuWanVLANGateway")
+                DeviceLookupSearchType.Site => ParentPredicate("sgc_equip.Radio700", "r", query, "SiteId"),
+                DeviceLookupSearchType.DeviceSerialNumber => ParentPredicate("sgc_equip.Radio700", "r", query, "SN", "RadioSN", "SerialNumber"),
+                _ => ParentPredicate("sgc_equip.Radio700", "r", query, "RadioIP", "RtuWanVLAN", "RtuWanVLANGateway")
             };
 
             var sql = $"""
@@ -512,8 +515,8 @@ namespace SmartGridSuite.Api.Services
             CancellationToken cancellationToken)
         {
             var predicate = searchType == DeviceLookupSearchType.Site
-                ? ParentPredicate("sgc_comm.RE", "r", "SiteId")
-                : ParentPredicate("sgc_comm.RE", "r", "MeterNumber", "MACAddress");
+                ? ParentPredicate("sgc_comm.RE", "r", query, "SiteId")
+                : ParentPredicate("sgc_comm.RE", "r", query, "MeterNumber", "MACAddress");
 
             var sql = $"""
                 SELECT TOP (50)
@@ -554,7 +557,7 @@ namespace SmartGridSuite.Api.Services
             DeviceLookupSearchType searchType,
             CancellationToken cancellationToken)
         {
-            var predicate = searchType == DeviceLookupSearchType.Site ? ParentPredicate("sgc_equip.Antenna", "a", "SiteId") : ParentPredicate("sgc_equip.Antenna", "a", "SN");
+            var predicate = searchType == DeviceLookupSearchType.Site ? ParentPredicate("sgc_equip.Antenna", "a", query, "SiteId") : ParentPredicate("sgc_equip.Antenna", "a", query, "SN");
 
             var sql = $"""
                 SELECT TOP (50)
@@ -595,7 +598,7 @@ namespace SmartGridSuite.Api.Services
             DeviceLookupSearchType searchType,
             CancellationToken cancellationToken)
         {
-            var predicate = searchType == DeviceLookupSearchType.Site ? ParentPredicate("sgc_equip.Enclosure", "e", "SiteId") : ParentPredicate("sgc_equip.Enclosure", "e", "SN");
+            var predicate = searchType == DeviceLookupSearchType.Site ? ParentPredicate("sgc_equip.Enclosure", "e", query, "SiteId") : ParentPredicate("sgc_equip.Enclosure", "e", query, "SN");
 
             var sql = $"""
                 SELECT TOP (50)
@@ -908,32 +911,24 @@ namespace SmartGridSuite.Api.Services
             }
         }
 
-        private string ParentValueExpression(string table, string column, string value)
-        {
-            if (!_parentColumnTypes.TryGetValue($"{table}.{column}".ToUpperInvariant(), out var metadata))
-                throw new InvalidOperationException($"Parent DB identifier column is unavailable: {table}.{column}");
-            return $"TRY_CONVERT({metadata.SqlType}, {value})";
-        }
-
-        private string PmrSitePredicate()
+        private string PmrSitePredicate(DeviceLookupResponseDto response, string query)
         {
             var predicates = new List<string>();
             if (_parentColumnTypes.ContainsKey("SGC_EQUIP.PMR.SITEID"))
-                predicates.Add(ParentPredicate("sgc_equip.PMR", "p", "SiteId"));
-            if (_parentColumnTypes.ContainsKey("SGC_COMM.AMS.ITRON_CR_NUM") &&
-                _parentColumnTypes.ContainsKey("SGC_COMM.AMS.SITEID"))
-                predicates.Add("p.SN IN (SELECT " +
-                    ParentValueExpression("sgc_equip.PMR", "SN", "a.iTron_CR_Num") +
-                    " FROM [sgc_comm].[AMS] a WHERE " + ParentPredicate("sgc_comm.AMS", "a", "SiteId") + ")");
-            if (predicates.Count == 0)
-                throw new InvalidOperationException("PMR has no available site association columns");
-            return string.Join(" OR ", predicates);
+                predicates.Add(ParentPredicate("sgc_equip.PMR", "p", query, "SiteId"));
+            // AMS rows have already been read for this site. Bind their PMR
+            // identifiers directly instead of converting identifiers in a SQL join.
+            var serials = response.ParentRecords.Where(x => x.RecordType == "AMS / MR" &&
+                    x.SiteId.Equals(query, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(x => x.Fields).Where(x => x.Label.Equals("iTron_CR_Num", StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.Value).Distinct(StringComparer.OrdinalIgnoreCase).Take(50);
+            foreach (var serial in serials)
+                predicates.Add(ParentPredicate("sgc_equip.PMR", "p", serial, "SN"));
+            return predicates.Count == 0 ? "1 = 0" : string.Join(" OR ", predicates);
         }
 
-        private string ParentPredicate(string table, string alias, params string[] columns)
+        private string ParentPredicate(string table, string alias, string query, params string[] columns)
         {
-            // Optional fields vary between Parent DB schemas. Search the fields
-            // actually present rather than letting one absent field abort the source.
             var available = columns.Where(column =>
                 _parentColumnTypes.ContainsKey($"{table}.{column}".ToUpperInvariant())).ToList();
             if (available.Count == 0)
@@ -941,35 +936,94 @@ namespace SmartGridSuite.Api.Services
             return string.Join(" OR ", available.Select(column =>
             {
                 var key = $"{table}.{column}".ToUpperInvariant();
+                var name = $"@Lookup{_parentQueryParameters.Count}";
+                _parentQueryParameters.Add(CreateNativeParameter(name, _parentColumnTypes[key], query));
                 if (_parentTextFallbackColumns.Contains(key))
-                    return $"(CONVERT(nvarchar(250), {alias}.{column}) = @Query)";
-                var value = ParentValueExpression(table, column, "@Query");
-                var metadata = _parentColumnTypes[key];
-                var lengthGuard = metadata.MaxLength is int length ? $"LEN(@Query) <= {length} AND " : string.Empty;
-                return $"({lengthGuard}{alias}.{column} = {value})";
+                    return $"(CONVERT(nvarchar(250), {alias}.{column}) = {name})";
+                // Bare columns and native parameters allow existing indexes to
+                // be used without requiring newer SQL conversion functions.
+                return $"({alias}.{column} = {name})";
             }));
         }
 
-        private static SqlCommand CreateParentCommand(
-            SqlConnection connection,
-            string sql,
-            string query)
+        private static SqlParameter CreateNativeParameter(string name,
+            (string SqlType, int? MaxLength) metadata, string query)
         {
-            var command =
-                new SqlCommand(sql, connection)
-                {
-                    CommandTimeout = ParentCommandTimeoutSeconds
-                };
+            var typeName = metadata.SqlType.Split('(')[0];
+            var type = typeName == "numeric" ? SqlDbType.Decimal : Enum.Parse<SqlDbType>(typeName, true);
+            var parameter = new SqlParameter(name, type);
+            object? value = null;
+            var invariant = CultureInfo.InvariantCulture;
+            switch (type)
+            {
+                case SqlDbType.Char:
+                case SqlDbType.VarChar:
+                case SqlDbType.NChar:
+                case SqlDbType.NVarChar:
+                    parameter.Size = metadata.MaxLength ?? -1;
+                    if (metadata.MaxLength is not int length || query.Length <= length)
+                        value = query;
+                    break;
+                case SqlDbType.TinyInt:
+                    if (byte.TryParse(query, NumberStyles.Integer, invariant, out var tiny)) value = tiny;
+                    break;
+                case SqlDbType.SmallInt:
+                    if (short.TryParse(query, NumberStyles.Integer, invariant, out var small)) value = small;
+                    break;
+                case SqlDbType.Int:
+                    if (int.TryParse(query, NumberStyles.Integer, invariant, out var integer)) value = integer;
+                    break;
+                case SqlDbType.BigInt:
+                    if (long.TryParse(query, NumberStyles.Integer, invariant, out var big)) value = big;
+                    break;
+                case SqlDbType.Decimal:
+                    var specification = metadata.SqlType.Split('(', ')')[1].Split(',');
+                    parameter.Precision = byte.Parse(specification[0], invariant);
+                    parameter.Scale = byte.Parse(specification[1], invariant);
+                    if (decimal.TryParse(query, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                        invariant, out var number) && decimal.Round(number, Math.Min(parameter.Scale, (byte)28)) == number)
+                    {
+                        var whole = decimal.Truncate(number).ToString("0", invariant).TrimStart('-');
+                        var digits = whole == "0" ? 0 : whole.Length;
+                        if (number == 0 || digits <= parameter.Precision - parameter.Scale)
+                            value = number;
+                    }
+                    break;
+                case SqlDbType.Float:
+                    if (double.TryParse(query, NumberStyles.Float, invariant, out var floating) && double.IsFinite(floating)) value = floating;
+                    break;
+                case SqlDbType.Real:
+                    if (float.TryParse(query, NumberStyles.Float, invariant, out var real) && float.IsFinite(real)) value = real;
+                    break;
+                case SqlDbType.Money:
+                case SqlDbType.SmallMoney:
+                    if (decimal.TryParse(query, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint,
+                        invariant, out var money) && decimal.Round(money, 4) == money &&
+                        (type == SqlDbType.Money ? money >= -922337203685477.5808m && money <= 922337203685477.5807m
+                            : money >= -214748.3648m && money <= 214748.3647m)) value = money;
+                    break;
+                case SqlDbType.Bit:
+                    if (query == "0") value = false;
+                    else if (query == "1") value = true;
+                    else if (bool.TryParse(query, out var bit)) value = bit;
+                    break;
+                case SqlDbType.UniqueIdentifier:
+                    if (Guid.TryParse(query, out var guid)) value = guid;
+                    break;
+            }
+            // An identifier that cannot fit a numeric/text column should not
+            // cause a conversion error or match a truncated/rounded value.
+            parameter.Value = value ?? DBNull.Value;
+            return parameter;
+        }
 
-            command.Parameters.Add(
-                new SqlParameter(
-                    "@Query",
-                    SqlDbType.NVarChar,
-                    250)
-                {
-                    Value = query
-                });
-
+        private SqlCommand CreateParentCommand(SqlConnection connection, string sql, string query)
+        {
+            var command = new SqlCommand(sql, connection) { CommandTimeout = ParentCommandTimeoutSeconds };
+            command.Parameters.Add(new SqlParameter("@Query", SqlDbType.NVarChar, 250) { Value = query });
+            foreach (var parameter in _parentQueryParameters)
+                command.Parameters.Add(parameter);
+            _parentQueryParameters.Clear();
             return command;
         }
 
