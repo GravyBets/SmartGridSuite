@@ -10,7 +10,6 @@ namespace SmartGridSuite.Api.Services
     public sealed class DeviceLookupService
     {
         private const int ParentCommandTimeoutSeconds = 45;
-        private const int MaxParentRowsPerSource = 50;
         private const int MaxSmartGridRows = 250;
 
         private readonly SmartGridDbContext _db;
@@ -197,11 +196,26 @@ namespace SmartGridSuite.Api.Services
 
             while (await reader.ReadAsync(cancellationToken))
             {
-                var siteId =
-                    ReadText(reader, "CurrentSiteId");
-
                 var fields =
                     ReadAllFields(reader);
+
+                /*
+                 * A PMR may no longer have a current AMS association. If the
+                 * PMR table itself carries a SiteId, preserve it as historical/
+                 * equipment context before falling back to the current AMS site.
+                 */
+                var siteId =
+                    GetFieldValue(
+                        fields,
+                        "SiteId");
+
+                if (string.IsNullOrWhiteSpace(siteId))
+                {
+                    siteId =
+                        GetFieldValue(
+                            fields,
+                            "CurrentSiteId");
+                }
 
                 AddParentRecord(
                     response,
@@ -555,7 +569,7 @@ namespace SmartGridSuite.Api.Services
                     new SqlParameter(
                         parameterNames[index],
                         SqlDbType.NVarChar,
-                        100)
+                        250)
                     {
                         Value = sites[index]
                     });
@@ -881,6 +895,20 @@ namespace SmartGridSuite.Api.Services
             }
 
             return fields.ToArray();
+        }
+
+        private static string GetFieldValue(
+            IEnumerable<(string Label, string Value)> fields,
+            string label)
+        {
+            return fields
+                .FirstOrDefault(x =>
+                    string.Equals(
+                        x.Label,
+                        label,
+                        StringComparison.OrdinalIgnoreCase))
+                .Value
+                ?? string.Empty;
         }
 
         private static string DetermineMatchField(
