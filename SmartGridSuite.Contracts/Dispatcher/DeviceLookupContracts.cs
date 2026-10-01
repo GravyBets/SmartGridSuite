@@ -73,6 +73,12 @@ namespace SmartGridSuite.Contracts.Dispatcher
 
         public string Notes { get; set; } = string.Empty;
 
+        public string SubmittedWriteUp { get; set; } = string.Empty;
+
+        public string WriteUpSubmittedBy { get; set; } = string.Empty;
+
+        public DateTime? WriteUpSubmittedAt { get; set; }
+
         public DateTime CreatedAt { get; set; }
 
         public DateTime LastActivityAt { get; set; }
