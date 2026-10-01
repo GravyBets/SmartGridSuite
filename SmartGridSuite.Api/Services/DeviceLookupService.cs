@@ -163,17 +163,12 @@ namespace SmartGridSuite.Api.Services
         {
             const string sql = """
                 SELECT TOP (50)
-                    p.SN,
-                    p.ATTSlot1,
-                    p.VzwSlot2,
-                    p.UserName,
-                    p.wifiSSID,
-                    p.CAMPassword,
-                    a.SiteId,
-                    a.RadioSN,
-                    a.RadioIP,
-                    a.EthernetIP,
-                    l.IP1
+                    p.*,
+                    a.SiteId AS CurrentSiteId,
+                    a.RadioSN AS AssociatedAmsRadioSN,
+                    a.RadioIP AS AssociatedAmsRadioIP,
+                    a.EthernetIP AS AssociatedAmsEthernetIP,
+                    l.IP1 AS AssociatedLteWanIp
                 FROM [sgc_equip].[PMR] p
                 LEFT JOIN [sgc_comm].[AMS] a
                     ON LTRIM(RTRIM(CONVERT(nvarchar(150), a.iTron_CR_Num))) =
@@ -202,14 +197,11 @@ namespace SmartGridSuite.Api.Services
 
             while (await reader.ReadAsync(cancellationToken))
             {
-                var serial = ReadText(reader, "SN");
-                var attSim = ReadText(reader, "ATTSlot1");
-                var vzwSim = ReadText(reader, "VzwSlot2");
-                var siteId = ReadText(reader, "SiteId");
-                var radioSn = ReadText(reader, "RadioSN");
-                var radioIp = ReadText(reader, "RadioIP");
-                var ethernetIp = ReadText(reader, "EthernetIP");
-                var wanIp = ReadText(reader, "IP1");
+                var siteId =
+                    ReadText(reader, "CurrentSiteId");
+
+                var fields =
+                    ReadAllFields(reader);
 
                 AddParentRecord(
                     response,
@@ -218,25 +210,8 @@ namespace SmartGridSuite.Api.Services
                     siteId,
                     DetermineMatchField(
                         query,
-                        ("PMR SN", serial),
-                        ("AT&T SIM", attSim),
-                        ("Verizon SIM", vzwSim),
-                        ("Site", siteId),
-                        ("AMS Radio SN", radioSn),
-                        ("AMS Radio IP", radioIp),
-                        ("AMS Ethernet IP", ethernetIp),
-                        ("LTE WAN IP", wanIp)),
-                    ("PMR SN", serial),
-                    ("AT&T SIM", attSim),
-                    ("Verizon SIM", vzwSim),
-                    ("Current Site", siteId),
-                    ("AMS Radio SN", radioSn),
-                    ("AMS Radio IP", radioIp),
-                    ("AMS Ethernet IP", ethernetIp),
-                    ("LTE WAN IP", wanIp),
-                    ("PMR Username", ReadText(reader, "UserName")),
-                    ("PMR WiFi SSID", ReadText(reader, "wifiSSID")),
-                    ("PMR Password", ReadText(reader, "CAMPassword")));
+                        fields),
+                    fields);
             }
         }
 
@@ -248,9 +223,7 @@ namespace SmartGridSuite.Api.Services
         {
             const string sql = """
                 SELECT TOP (50)
-                    l.SiteId,
-                    l.SN,
-                    l.IP1
+                    l.*
                 FROM [sgc_equip].[LTE] l
                 WHERE
                     LTRIM(RTRIM(ISNULL(l.SiteId, ''))) = @Query OR
@@ -267,22 +240,15 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 var siteId = ReadText(reader, "SiteId");
-                var serial = ReadText(reader, "SN");
-                var ip = ReadText(reader, "IP1");
+                var fields = ReadAllFields(reader);
 
                 AddParentRecord(
                     response,
                     "Parent DB",
                     "LTE",
                     siteId,
-                    DetermineMatchField(
-                        query,
-                        ("Site", siteId),
-                        ("LTE SN", serial),
-                        ("LTE IP", ip)),
-                    ("Site", siteId),
-                    ("LTE SN", serial),
-                    ("LTE IP", ip));
+                    DetermineMatchField(query, fields),
+                    fields);
             }
         }
 
@@ -294,11 +260,7 @@ namespace SmartGridSuite.Api.Services
         {
             const string sql = """
                 SELECT TOP (50)
-                    a.SiteId,
-                    a.RadioSN,
-                    a.RadioIP,
-                    a.EthernetIP,
-                    a.iTron_CR_Num
+                    a.*
                 FROM [sgc_comm].[AMS] a
                 WHERE
                     LTRIM(RTRIM(ISNULL(a.SiteId, ''))) = @Query OR
@@ -317,28 +279,15 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 var siteId = ReadText(reader, "SiteId");
-                var radioSn = ReadText(reader, "RadioSN");
-                var radioIp = ReadText(reader, "RadioIP");
-                var ethernetIp = ReadText(reader, "EthernetIP");
-                var pmrSn = ReadText(reader, "iTron_CR_Num");
+                var fields = ReadAllFields(reader);
 
                 AddParentRecord(
                     response,
                     "Parent DB",
                     "AMS / MR",
                     siteId,
-                    DetermineMatchField(
-                        query,
-                        ("Site", siteId),
-                        ("Radio SN", radioSn),
-                        ("Radio IP", radioIp),
-                        ("Ethernet IP", ethernetIp),
-                        ("PMR SN", pmrSn)),
-                    ("Site", siteId),
-                    ("Radio SN", radioSn),
-                    ("Radio IP", radioIp),
-                    ("Ethernet IP", ethernetIp),
-                    ("PMR SN", pmrSn));
+                    DetermineMatchField(query, fields),
+                    fields);
             }
         }
 
@@ -350,19 +299,7 @@ namespace SmartGridSuite.Api.Services
         {
             const string sql = """
                 SELECT TOP (50)
-                    i.SiteId,
-                    i.RadioSN,
-                    i.RadioIP,
-                    i.PriProtLanDigi,
-                    i.PriWanOut,
-                    i.PriDigiWanOut,
-                    i.PriProtLanSubN,
-                    i.PriProtLanRtu,
-                    i.SecDigiWanOut,
-                    i.SecProtLanDigi,
-                    i.SecProtLanSubN,
-                    i.SecProtLanRtu,
-                    i.Cyberlock
+                    i.*
                 FROM [sgc_comm].[IGSD] i
                 WHERE
                     LTRIM(RTRIM(ISNULL(i.SiteId, ''))) = @Query OR
@@ -389,22 +326,7 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 var siteId = ReadText(reader, "SiteId");
-                var fields = new (string Label, string Value)[]
-                {
-                    ("Site", siteId),
-                    ("Radio SN", ReadText(reader, "RadioSN")),
-                    ("Radio IP", ReadText(reader, "RadioIP")),
-                    ("Primary LAN IP", ReadText(reader, "PriProtLanDigi")),
-                    ("Primary WAN IP", ReadText(reader, "PriWanOut")),
-                    ("Primary Digi WAN", ReadText(reader, "PriDigiWanOut")),
-                    ("Primary Tunnel IP", ReadText(reader, "PriProtLanSubN")),
-                    ("Primary RTU IP", ReadText(reader, "PriProtLanRtu")),
-                    ("Secondary WAN IP", ReadText(reader, "SecDigiWanOut")),
-                    ("Secondary LAN IP", ReadText(reader, "SecProtLanDigi")),
-                    ("Secondary Tunnel IP", ReadText(reader, "SecProtLanSubN")),
-                    ("Secondary RTU IP", ReadText(reader, "SecProtLanRtu")),
-                    ("Cyberlock SN", ReadText(reader, "Cyberlock"))
-                };
+                var fields = ReadAllFields(reader);
 
                 AddParentRecord(
                     response,
@@ -424,10 +346,7 @@ namespace SmartGridSuite.Api.Services
         {
             const string sql = """
                 SELECT TOP (50)
-                    r.SiteId,
-                    r.RadioIP,
-                    r.RtuWanVLAN,
-                    r.RtuWanVLANGateway
+                    r.*
                 FROM [sgc_equip].[Radio700] r
                 WHERE
                     LTRIM(RTRIM(ISNULL(r.SiteId, ''))) = @Query OR
@@ -445,13 +364,7 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 var siteId = ReadText(reader, "SiteId");
-                var fields = new (string Label, string Value)[]
-                {
-                    ("Site", siteId),
-                    ("Radio IP", ReadText(reader, "RadioIP")),
-                    ("RTU WAN VLAN", ReadText(reader, "RtuWanVLAN")),
-                    ("RTU WAN Gateway", ReadText(reader, "RtuWanVLANGateway"))
-                };
+                var fields = ReadAllFields(reader);
 
                 AddParentRecord(
                     response,
@@ -471,11 +384,7 @@ namespace SmartGridSuite.Api.Services
         {
             const string sql = """
                 SELECT TOP (50)
-                    r.SiteId,
-                    r.MeterNumber,
-                    r.MACAddress,
-                    r.PolePoint,
-                    r.TransfGLN
+                    r.*
                 FROM [sgc_comm].[RE] r
                 WHERE
                     LTRIM(RTRIM(ISNULL(r.SiteId, ''))) = @Query OR
@@ -494,14 +403,7 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 var siteId = ReadText(reader, "SiteId");
-                var fields = new (string Label, string Value)[]
-                {
-                    ("Site", siteId),
-                    ("RX / Meter SN", ReadText(reader, "MeterNumber")),
-                    ("MAC Address", ReadText(reader, "MACAddress")),
-                    ("Pole Point", ReadText(reader, "PolePoint")),
-                    ("Transformer GLN", ReadText(reader, "TransfGLN"))
-                };
+                var fields = ReadAllFields(reader);
 
                 AddParentRecord(
                     response,
@@ -521,8 +423,7 @@ namespace SmartGridSuite.Api.Services
         {
             const string sql = """
                 SELECT TOP (50)
-                    a.SiteId,
-                    a.SN
+                    a.*
                 FROM [sgc_equip].[Antenna] a
                 WHERE
                     LTRIM(RTRIM(ISNULL(a.SiteId, ''))) = @Query OR
@@ -538,19 +439,15 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 var siteId = ReadText(reader, "SiteId");
-                var serial = ReadText(reader, "SN");
+                var fields = ReadAllFields(reader);
 
                 AddParentRecord(
                     response,
                     "Parent DB",
                     "Antenna",
                     siteId,
-                    DetermineMatchField(
-                        query,
-                        ("Site", siteId),
-                        ("Antenna SN", serial)),
-                    ("Site", siteId),
-                    ("Antenna SN", serial));
+                    DetermineMatchField(query, fields),
+                    fields);
             }
         }
 
@@ -562,9 +459,7 @@ namespace SmartGridSuite.Api.Services
         {
             const string sql = """
                 SELECT TOP (50)
-                    e.SiteId,
-                    e.SN,
-                    e.Model
+                    e.*
                 FROM [sgc_equip].[Enclosure] e
                 WHERE
                     LTRIM(RTRIM(ISNULL(e.SiteId, ''))) = @Query OR
@@ -580,20 +475,15 @@ namespace SmartGridSuite.Api.Services
             while (await reader.ReadAsync(cancellationToken))
             {
                 var siteId = ReadText(reader, "SiteId");
-                var serial = ReadText(reader, "SN");
+                var fields = ReadAllFields(reader);
 
                 AddParentRecord(
                     response,
                     "Parent DB",
                     "Enclosure",
                     siteId,
-                    DetermineMatchField(
-                        query,
-                        ("Site", siteId),
-                        ("Enclosure SN", serial)),
-                    ("Site", siteId),
-                    ("Enclosure SN", serial),
-                    ("Model", ReadText(reader, "Model")));
+                    DetermineMatchField(query, fields),
+                    fields);
             }
         }
 
@@ -895,6 +785,50 @@ namespace SmartGridSuite.Api.Services
                        reader.GetValue(ordinal))
                    ?.Trim()
                    ?? string.Empty;
+        }
+
+        private static (string Label, string Value)[] ReadAllFields(
+            SqlDataReader reader)
+        {
+            var fields =
+                new List<(string Label, string Value)>();
+
+            for (var index = 0;
+                 index < reader.FieldCount;
+                 index++)
+            {
+                if (reader.IsDBNull(index))
+                    continue;
+
+                var name =
+                    reader.GetName(index);
+
+                var raw =
+                    reader.GetValue(index);
+
+                string value;
+
+                if (raw is byte[] bytes)
+                {
+                    value =
+                        Convert.ToHexString(bytes);
+                }
+                else
+                {
+                    value =
+                        Convert.ToString(raw)
+                        ?.Trim()
+                        ?? string.Empty;
+                }
+
+                if (string.IsNullOrWhiteSpace(value))
+                    continue;
+
+                fields.Add(
+                    (name, value));
+            }
+
+            return fields.ToArray();
         }
 
         private static string DetermineMatchField(
