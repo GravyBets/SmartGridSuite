@@ -74,14 +74,14 @@
                               Height="34"
                               Style="{StaticResource ModernComboBox}"
                               SelectedIndex="0"
-                              ToolTip="Choose which identifier to search. History / Notes Text is a broader search.">
+                              ToolTip="Choose which identifier to search. History Text is a broader search.">
                         <ComboBoxItem Content="Device Serial Number" Tag="DeviceSerialNumber"/>
                         <ComboBoxItem Content="Site #" Tag="Site"/>
                         <ComboBoxItem Content="IP Address" Tag="IpAddress"/>
                         <ComboBoxItem Content="SIM Number" Tag="Sim"/>
                         <ComboBoxItem Content="Notification" Tag="Notification"/>
                         <ComboBoxItem Content="Work Order" Tag="WorkOrder"/>
-                        <ComboBoxItem Content="History / Notes Text" Tag="HistoryText"/>
+                        <ComboBoxItem Content="History Text" Tag="HistoryText"/>
                     </ComboBox>
 
                     <TextBox x:Name="SearchTextBox"
@@ -267,8 +267,127 @@
                                       GridLinesVisibility="Horizontal"
                                       HorizontalGridLinesBrush="{DynamicResource SurfaceBorder}"
                                       ColumnHeaderStyle="{StaticResource DeviceLookupGridColumnHeaderStyle}"
+                                      RowDetailsVisibilityMode="Collapsed"
                                       HorizontalScrollBarVisibility="Auto">
+                                <DataGrid.RowDetailsTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="74,4,10,12"
+                                                Padding="12"
+                                                CornerRadius="8"
+                                                BorderBrush="{DynamicResource SurfaceBorder}"
+                                                BorderThickness="1"
+                                                Background="{DynamicResource SurfaceBg}">
+                                            <StackPanel>
+                                                <Grid Margin="0,0,0,6">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Text="Submitted Write-Up"
+                                                               FontSize="11"
+                                                               FontWeight="Bold"
+                                                               Foreground="{DynamicResource TextSecondary}"/>
+
+                                                    <StackPanel Grid.Column="1"
+                                                                Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding WriteUpSubmittedBy}"
+                                                                   FontSize="11"
+                                                                   Foreground="{DynamicResource TextSecondary}"/>
+                                                        <TextBlock Text="  "
+                                                                   FontSize="11"/>
+                                                        <TextBlock Text="{Binding WriteUpSubmittedAt, StringFormat={}{0:g}}"
+                                                                   FontSize="11"
+                                                                   Foreground="{DynamicResource TextSecondary}"/>
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <TextBox Text="{Binding SubmittedWriteUp}"
+                                                         Style="{x:Null}"
+                                                         IsReadOnly="True"
+                                                         IsReadOnlyCaretVisible="True"
+                                                         BorderThickness="0"
+                                                         Background="Transparent"
+                                                         Foreground="{DynamicResource TextPrimary}"
+                                                         TextWrapping="Wrap"
+                                                         AcceptsReturn="True"
+                                                         FontSize="13"
+                                                         MinHeight="28"
+                                                         MaxHeight="300"
+                                                         VerticalScrollBarVisibility="Auto">
+                                                    <TextBox.Style>
+                                                        <Style TargetType="TextBox">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding SubmittedWriteUp}" Value="">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding SubmittedWriteUp}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBox.Style>
+                                                </TextBox>
+
+                                                <TextBlock Text="No submitted write-up is associated with this ticket."
+                                                           FontSize="12"
+                                                           FontStyle="Italic"
+                                                           Foreground="{DynamicResource TextSecondary}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding SubmittedWriteUp}" Value="">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding SubmittedWriteUp}" Value="{x:Null}">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGrid.RowDetailsTemplate>
                                 <DataGrid.Columns>
+                                    <DataGridTemplateColumn Width="42"
+                                                            CanUserResize="False"
+                                                            CanUserSort="False">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Width="24"
+                                                        Height="24"
+                                                        Padding="0"
+                                                        Margin="0"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        ToolTip="Show or hide submitted write-up"
+                                                        Click="ToggleTicketRowDetails_Click">
+                                                    <Grid Width="18" Height="18">
+                                                        <Ellipse Width="18"
+                                                                 Height="18"
+                                                                 Fill="Transparent"
+                                                                 Stroke="{DynamicResource TextPrimary}"
+                                                                 StrokeThickness=".75"/>
+                                                        <Path Width="8"
+                                                              Height="6"
+                                                              Margin="0,0,0,-2"
+                                                              Data="M 0,0 L 4,4 L 8,0"
+                                                              Stroke="{DynamicResource TextPrimary}"
+                                                              StrokeThickness="1.1"
+                                                              StrokeStartLineCap="Round"
+                                                              StrokeEndLineCap="Round"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"/>
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
                                     <DataGridTextColumn Header="Last Activity"
                                                         Width="150"
                                                         Binding="{Binding LastActivityAt, StringFormat={}{0:ddd\, MM/dd/yy HH:mm}}"
@@ -411,6 +530,10 @@
                                     </DataGrid.Resources>
 
                                     <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Site"
+                                                            Width="110"
+                                                            Binding="{Binding SiteId}"
+                                                            ElementStyle="{StaticResource LookupHistoryGridTextStyle}"/>
                                         <DataGridTextColumn Header="Date"
                                                             Width="110"
                                                             Binding="{Binding VisitDate, StringFormat={}{0:MM/dd/yyyy}}"
