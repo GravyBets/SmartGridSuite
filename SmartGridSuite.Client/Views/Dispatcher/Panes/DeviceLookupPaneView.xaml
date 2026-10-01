@@ -193,9 +193,16 @@
                                                             CornerRadius="8"
                                                             Background="{DynamicResource SurfaceBg}"
                                                             Visibility="Visible">
-                                                        <TextBlock Text="{Binding SiteId}"
-                                                                   Foreground="{DynamicResource TextSecondary}"
-                                                                   FontWeight="SemiBold"/>
+                                                        <TextBox Text="{Binding SiteId}"
+                                                                 Style="{x:Null}"
+                                                                 IsReadOnly="True"
+                                                                 IsReadOnlyCaretVisible="True"
+                                                                 Background="Transparent"
+                                                                 BorderThickness="0"
+                                                                 Padding="0"
+                                                                 Foreground="{DynamicResource TextSecondary}"
+                                                                 FontWeight="SemiBold"
+                                                                 MinWidth="0"/>
                                                     </Border>
                                                 </Grid>
 
