@@ -93,18 +93,23 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 HistoryDataGrid.ItemsSource =
                     result.SiteHistory;
 
+                SiteNotesDataGrid.ItemsSource =
+                    result.SiteNotes;
+
                 var total =
                     result.ParentRecords.Count +
                     result.Tickets.Count +
-                    result.SiteHistory.Count;
+                    result.SiteHistory.Count +
+                    result.SiteNotes.Count;
 
                 var summary =
                     total == 0
                         ? $"No records found for {query}."
                         : $"Found {result.ParentRecords.Count} Parent DB/device record(s), " +
                           $"{result.RelatedSiteIds.Count} related site(s), " +
-                          $"{result.Tickets.Count} ticket(s), and " +
-                          $"{result.SiteHistory.Count} Site History record(s).";
+                          $"{result.Tickets.Count} ticket(s), " +
+                          $"{result.SiteHistory.Count} Site History record(s), and " +
+                          $"{result.SiteNotes.Count} Site Note(s).";
 
                 if (!string.IsNullOrWhiteSpace(
                         result.Warning))
