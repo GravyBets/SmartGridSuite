@@ -1511,6 +1511,14 @@ namespace SmartGridSuite.Api.Data
                     .HasColumnName("secondary_comms_password")
                     .HasMaxLength(255);
 
+                e.Property(x => x.AttSimNumber)
+                    .HasColumnName("att_sim_number")
+                    .HasMaxLength(100);
+
+                e.Property(x => x.VzwSimNumber)
+                    .HasColumnName("vzw_sim_number")
+                    .HasMaxLength(100);
+
                 e.Property(x => x.SourceAddedAt)
                     .HasColumnName("source_added_at");
 
