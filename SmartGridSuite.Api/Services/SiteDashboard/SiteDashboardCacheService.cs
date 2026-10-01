@@ -536,8 +536,14 @@ namespace SmartGridSuite.Api.Services.SiteDashboard
                     SecondaryCommsPassword =
                         pmr?.SecondaryCommsPassword,
 
+                    SecondaryAttSimNumber =
+                        pmr?.AttSimNumber,
+
+                    SecondaryVzwSimNumber =
+                        pmr?.VzwSimNumber,
+
                     SecondarySimNumber =
-                        lte?.SimNumber,
+                        pmr?.AttSimNumber,
 
                     AntennaSerialNumber =
                         ams?.AntennaSerialNumber,
