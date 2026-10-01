@@ -15,6 +15,8 @@ namespace SmartGridSuite.Contracts.Dispatcher
 
         public List<DeviceLookupHistoryDto> SiteHistory { get; set; } = new();
 
+        public List<DeviceLookupSiteNoteDto> SiteNotes { get; set; } = new();
+
         public string Warning { get; set; } = string.Empty;
     }
 
@@ -63,6 +65,27 @@ namespace SmartGridSuite.Contracts.Dispatcher
         public DateTime CreatedAt { get; set; }
 
         public DateTime LastActivityAt { get; set; }
+    }
+
+    public sealed class DeviceLookupSiteNoteDto
+    {
+        public ulong Id { get; set; }
+
+        public string SiteId { get; set; } = string.Empty;
+
+        public string NoteType { get; set; } = string.Empty;
+
+        public string NoteText { get; set; } = string.Empty;
+
+        public bool IsActive { get; set; }
+
+        public string CreatedBy { get; set; } = string.Empty;
+
+        public DateTime CreatedAt { get; set; }
+
+        public string UpdatedBy { get; set; } = string.Empty;
+
+        public DateTime? UpdatedAt { get; set; }
     }
 
     public sealed class DeviceLookupHistoryDto
