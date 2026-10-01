@@ -121,14 +121,15 @@
                        TextWrapping="Wrap"
                        Margin="4,0"/>
 
-            <TabControl Grid.Row="2"
-                        Margin="16,0,0,0"
+            <TabControl x:Name="ResultsTabControl"
+                        Grid.Row="2"
+                        Margin="8,4,8,0"
                         Style="{StaticResource WorkspaceTabControlStyle}"
                         Foreground="{DynamicResource TextPrimary}">
                 <TabItem Header="Device Records" Margin="0" Style="{StaticResource WorkspaceTabItemStyle}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="8">
+                        <StackPanel Margin="0">
                             <Border Style="{StaticResource Card}"
                                     Margin="0,0,0,8">
                                 <StackPanel>
@@ -213,10 +214,18 @@
                                                                            Foreground="{DynamicResource TextSecondary}"
                                                                            FontWeight="SemiBold"/>
 
-                                                                <TextBlock Grid.Column="1"
-                                                                           Text="{Binding Value}"
-                                                                           Foreground="{DynamicResource TextPrimary}"
-                                                                           TextWrapping="Wrap"/>
+                                                                <TextBox Grid.Column="1"
+                                                                         Text="{Binding Value}"
+                                                                         Style="{x:Null}"
+                                                                         IsReadOnly="True"
+                                                                         IsReadOnlyCaretVisible="True"
+                                                                         Background="Transparent"
+                                                                         BorderThickness="0"
+                                                                         Padding="0"
+                                                                         MinHeight="20"
+                                                                         VerticalContentAlignment="Center"
+                                                                         Foreground="{DynamicResource TextPrimary}"
+                                                                         TextWrapping="Wrap"/>
                                                             </Grid>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
@@ -232,7 +241,7 @@
 
                 <TabItem Header="Tickets" Style="{StaticResource WorkspaceTabItemStyle}">
                     <Border Style="{StaticResource Card}"
-                            Margin="8"
+                            Margin="0"
                             Padding="14">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -273,6 +282,7 @@
                                     <DataTemplate>
                                         <Border Margin="74,4,10,12"
                                                 Padding="12"
+                                                MinHeight="160"
                                                 CornerRadius="8"
                                                 BorderBrush="{DynamicResource SurfaceBorder}"
                                                 BorderThickness="1"
@@ -311,8 +321,8 @@
                                                          TextWrapping="Wrap"
                                                          AcceptsReturn="True"
                                                          FontSize="13"
-                                                         MinHeight="28"
-                                                         MaxHeight="300"
+                                                         MinHeight="120"
+                                                         MaxHeight="420"
                                                          VerticalScrollBarVisibility="Auto">
                                                     <TextBox.Style>
                                                         <Style TargetType="TextBox">
@@ -399,14 +409,73 @@
                                                         Width="2*"
                                                         Binding="{Binding Problem}"
                                                         ElementStyle="{StaticResource DeviceLookupGridTextStyle}"/>
-                                    <DataGridTextColumn Header="Notification"
-                                                        Width="138"
-                                                        Binding="{Binding Notification}"
-                                                        ElementStyle="{StaticResource DeviceLookupGridTextStyle}"/>
-                                    <DataGridTextColumn Header="Work Order"
-                                                        Width="145"
-                                                        Binding="{Binding WorkOrder}"
-                                                        ElementStyle="{StaticResource DeviceLookupWorkOrderTextStyle}"/>
+                                    <DataGridTemplateColumn Header="Notification"
+                                                            Width="150">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="28"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{Binding Notification}"
+                                                               Style="{StaticResource DeviceLookupGridTextStyle}"/>
+
+                                                    <Button Grid.Column="1"
+                                                            Width="24"
+                                                            Height="24"
+                                                            Margin="4,0,0,0"
+                                                            Tag="{Binding Notification}"
+                                                            ToolTip="Copy Notification"
+                                                            Style="{StaticResource FlatCopyIconButton}"
+                                                            Click="CopyTicketGridValue_Click">
+                                                        <TextBlock Text="&#xE8C8;"
+                                                                   FontFamily="Segoe MDL2 Assets"
+                                                                   FontSize="13"
+                                                                   Foreground="{DynamicResource TextSecondary}"
+                                                                   VerticalAlignment="Center"
+                                                                   HorizontalAlignment="Center"/>
+                                                    </Button>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+
+                                    <DataGridTemplateColumn Header="Work Order"
+                                                            Width="155">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="28"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{Binding WorkOrder}"
+                                                               Style="{StaticResource DeviceLookupWorkOrderTextStyle}"/>
+
+                                                    <Button Grid.Column="1"
+                                                            Width="24"
+                                                            Height="24"
+                                                            Margin="4,0,0,0"
+                                                            Tag="{Binding WorkOrder}"
+                                                            ToolTip="Copy Work Order"
+                                                            Style="{StaticResource FlatCopyIconButton}"
+                                                            Click="CopyTicketGridValue_Click">
+                                                        <TextBlock Text="&#xE8C8;"
+                                                                   FontFamily="Segoe MDL2 Assets"
+                                                                   FontSize="13"
+                                                                   Foreground="{DynamicResource TextSecondary}"
+                                                                   VerticalAlignment="Center"
+                                                                   HorizontalAlignment="Center"/>
+                                                    </Button>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                     <DataGridTextColumn Header="WO Type"
                                                         Width="90"
                                                         Binding="{Binding WorkOrderClass}"
@@ -426,7 +495,7 @@
                 </TabItem>
 
                 <TabItem Header="Site History" Style="{StaticResource WorkspaceTabItemStyle}">
-                    <Grid Margin="8">
+                    <Grid Margin="0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="240"/>
                             <RowDefinition Height="4"/>
