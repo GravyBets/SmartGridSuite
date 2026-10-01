@@ -18,6 +18,7 @@ namespace SmartGridSuite.Client.Views
         private bool _navCollapsed;
         private bool _syncingNav;
         private SiteDashboardPaneView? _siteDashboardPaneView;
+        private DeviceLookupPaneView? _deviceLookupPaneView;
         private TaskPaneView? _taskPaneView;
         private TicketsPaneView? _ticketsPaneView;
         private TechniciansPaneView? _techniciansPaneView;
@@ -167,7 +168,8 @@ namespace SmartGridSuite.Client.Views
             // ShowPane can request a badge refresh during initial navigation.
             _ticketsApi = new TicketsApi(_api);
 
-            SelectNavIndex(1);
+            // Device Lookup is immediately after Site Dashboard, so Tasks is index 2.
+            SelectNavIndex(2);
 
             DataContext = this;
 
@@ -262,6 +264,11 @@ namespace SmartGridSuite.Client.Views
                 case "Site Dashboard":
                     _siteDashboardPaneView ??= new SiteDashboardPaneView();
                     MainPaneHost.Content = _siteDashboardPaneView;
+                    break;
+
+                case "Device Lookup":
+                    _deviceLookupPaneView ??= new DeviceLookupPaneView();
+                    MainPaneHost.Content = _deviceLookupPaneView;
                     break;
 
                 case "Tasks":
