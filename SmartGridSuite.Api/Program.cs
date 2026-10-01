@@ -104,6 +104,8 @@ namespace SmartGridSuite.Api
 
             builder.Services.AddScoped<SiteDashboardLookupService>();
 
+            builder.Services.AddScoped<DeviceLookupService>();
+
             builder.Services.AddScoped<SiteDashboardCacheRefreshService>();
 
             builder.Services.Configure<SiteDashboardCacheRefreshOptions>(builder.Configuration.GetSection(
