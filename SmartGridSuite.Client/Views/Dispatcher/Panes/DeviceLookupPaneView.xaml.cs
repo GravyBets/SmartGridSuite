@@ -116,9 +116,27 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 Source = source.Source,
                 RecordType = source.RecordType,
                 SiteId = source.SiteId,
-                MatchField = source.MatchField,
+                MatchField = GetDisplayMatchField(source.MatchField, specs),
                 Fields = fields
             };
+        }
+
+        private static string GetDisplayMatchField(
+            string matchField,
+            IEnumerable<DisplayFieldSpec> specs)
+        {
+            foreach (var spec in specs)
+            {
+                if (spec.SourceNames.Any(x =>
+                    string.Equals(x, matchField, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return spec.DisplayLabel;
+                }
+            }
+
+            return string.Equals(matchField, "Related", StringComparison.OrdinalIgnoreCase)
+                ? "Related"
+                : matchField;
         }
 
         private static string FindFieldValue(
@@ -244,9 +262,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             return [];
         }
 
-        private readonly record struct DisplayFieldSpec(
-            string DisplayLabel,
-            params string[] SourceNames);
+        private sealed class DisplayFieldSpec
+        {
+            public DisplayFieldSpec(string displayLabel, params string[] sourceNames)
+            {
+                DisplayLabel = displayLabel;
+                SourceNames = sourceNames;
+            }
+
+            public string DisplayLabel { get; }
+
+            public string[] SourceNames { get; }
+        }
 
         private async Task SearchAsync()
         {
@@ -304,8 +331,11 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                         Query = query
                     };
 
-                ParentRecordsItemsControl.ItemsSource =
+                var displayParentRecords =
                     BuildDisplayParentRecords(result.ParentRecords);
+
+                ParentRecordsItemsControl.ItemsSource =
+                    displayParentRecords;
 
                 RelatedSitesItemsControl.ItemsSource =
                     result.RelatedSiteIds;
@@ -317,14 +347,14 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     result.SiteHistory;
 
                 var total =
-                    result.ParentRecords.Count +
+                    displayParentRecords.Count +
                     result.Tickets.Count +
                     result.SiteHistory.Count;
 
                 var summary =
                     total == 0
                         ? $"No records returned for {query}."
-                        : $"Found {result.ParentRecords.Count} Parent DB/device record(s), " +
+                        : $"Found {displayParentRecords.Count} Parent DB/device record(s), " +
                           $"{result.RelatedSiteIds.Count} related site(s), " +
                           $"{result.Tickets.Count} ticket(s), and " +
                           $"{result.SiteHistory.Count} Site History record(s).";
