@@ -21,7 +21,12 @@
         public string? SecondaryCommsUsername { get; init; }
         public string? SecondaryCommsSsid { get; init; }
         public string? SecondaryCommsPassword { get; init; }
+
+        // Legacy single-SIM field retained for compatibility; mirrors AT&T.
         public string? SecondarySimNumber { get; init; }
+
+        public string? SecondaryAttSimNumber { get; init; }
+        public string? SecondaryVzwSimNumber { get; init; }
 
         public string? AntennaSerialNumber { get; init; }
         public string? EnclosureSerialNumber { get; init; }
