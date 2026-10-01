@@ -18,6 +18,10 @@ namespace SmartGridSuite.Api.Data.Entities
 
         public string? SecondaryCommsPassword { get; set; }
 
+        public string? AttSimNumber { get; set; }
+
+        public string? VzwSimNumber { get; set; }
+
         public DateTime? SourceAddedAt { get; set; }
 
         public string? SourceAddedBy { get; set; }
