@@ -41,6 +41,44 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             await SearchAsync();
         }
 
+        private async void CopyTicketGridValue_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button button)
+                return;
+
+            var value = button.Tag?.ToString()?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(value))
+                return;
+
+            try
+            {
+                Clipboard.SetText(value);
+            }
+            catch
+            {
+                button.ToolTip = "Could not copy. Try again.";
+                return;
+            }
+
+            if (button.Content is not TextBlock glyph)
+                return;
+
+            const string copyGlyph = "\uE8C8";
+            const string checkGlyph = "\uE73E";
+
+            var originalToolTip = button.ToolTip?.ToString() ?? "Copy";
+            glyph.Text = checkGlyph;
+            button.ToolTip = "Copied!";
+
+            await Task.Delay(TimeSpan.FromSeconds(3));
+
+            if (!IsLoaded)
+                return;
+
+            glyph.Text = copyGlyph;
+            button.ToolTip = originalToolTip;
+        }
+
         private void ToggleTicketRowDetails_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Button button)
@@ -361,6 +399,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 HistoryDataGrid.ItemsSource =
                     result.SiteHistory;
+
+                // Every new search starts on Device Records so the result set
+                // never opens on a stale secondary tab from the prior search.
+                ResultsTabControl.SelectedIndex = 0;
 
                 var total =
                     displayParentRecords.Count +
