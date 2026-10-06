@@ -123,10 +123,11 @@
 
             <TabControl x:Name="ResultsTabControl"
                         Grid.Row="2"
-                        Margin="8,4,8,0"
+                        Margin="4,0,4,0"
                         Style="{StaticResource WorkspaceTabControlStyle}"
                         Foreground="{DynamicResource TextPrimary}">
-                <TabItem Header="Device Records" Margin="0" Style="{StaticResource WorkspaceTabItemStyle}">
+                <TabItem Header="Device Records" 
+                         Margin="8,0,-8,0" Style="{StaticResource WorkspaceTabItemStyle}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0">
@@ -246,7 +247,7 @@
                     </ScrollViewer>
                 </TabItem>
 
-                <TabItem Header="Tickets" Style="{StaticResource WorkspaceTabItemStyle}">
+                <TabItem Header="Tickets" Style="{StaticResource WorkspaceTabItemStyle}" Margin="8,0,-8,0">
                     <Border Style="{StaticResource Card}"
                             Margin="0"
                             Padding="14">
@@ -369,7 +370,7 @@
                                     </DataTemplate>
                                 </DataGrid.RowDetailsTemplate>
                                 <DataGrid.Columns>
-                                    <DataGridTemplateColumn Width="42"
+                                    <DataGridTemplateColumn Width="62"
                                                             CanUserResize="False"
                                                             CanUserSort="False">
                                         <DataGridTemplateColumn.CellTemplate>
@@ -501,7 +502,7 @@
                     </Border>
                 </TabItem>
 
-                <TabItem Header="Site History" Style="{StaticResource WorkspaceTabItemStyle}">
+                <TabItem Header="Site History" Style="{StaticResource WorkspaceTabItemStyle}" Margin="8,0,-8,0">
                     <Grid Margin="0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="240"/>
@@ -606,9 +607,17 @@
 
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Site"
-                                                            Width="110"
-                                                            Binding="{Binding SiteId}"
-                                                            ElementStyle="{StaticResource LookupHistoryGridTextStyle}"/>
+                                                            Width="70"
+                                                            Binding="{Binding SiteId}">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock"
+                                                       BasedOn="{StaticResource LookupHistoryGridTextStyle}">
+                                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                    <Setter Property="TextAlignment" Value="Center"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>                                                           
+                                                            
                                         <DataGridTextColumn Header="Date"
                                                             Width="110"
                                                             Binding="{Binding VisitDate, StringFormat={}{0:MM/dd/yyyy}}"
