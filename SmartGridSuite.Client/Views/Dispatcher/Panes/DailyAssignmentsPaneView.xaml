@@ -662,7 +662,7 @@
                             <TextBlock Text="Ticket Pool"
                                        Style="{StaticResource SectionHeaderTextStyle}"/>
 
-                            <TextBlock Text="Defaults to unassigned, non-closed tickets."
+                            <TextBlock Text="Defaults to unassigned, active tickets."
                                        Margin="0,4,0,0"
                                        Style="{StaticResource PaneSubtitleTextStyle}"/>
                         </StackPanel>
@@ -693,12 +693,13 @@
                                  Tag="Search site, WO, notification, problem..."
                                  TextChanged="TicketPoolSearchBox_TextChanged"/>
 
-                        <CheckBox x:Name="IncludeAssignedTicketsCheckBox"
+                        <CheckBox x:Name="IncludeAllExceptClosedCheckBox"
                                   Grid.Row="2"
-                                  Content="Include assigned tickets"
+                                  Content="Include all except Closed"
                                   Foreground="{DynamicResource TextPrimary}"
-                                  Checked="IncludeAssignedTickets_Changed"
-                                  Unchecked="IncludeAssignedTickets_Changed"/>
+                                  ToolTip="Show assigned tickets and statuses normally treated as closed, except the literal Closed status."
+                                  Checked="IncludeAllExceptClosed_Changed"
+                                  Unchecked="IncludeAllExceptClosed_Changed"/>
 
                         <TextBlock Grid.Row="4"
                                    Text="{Binding TicketPoolSummaryText}"
