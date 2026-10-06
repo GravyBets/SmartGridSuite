@@ -1,5 +1,18 @@
 [
   {
+    "version": "3.6.1.1",
+    "date": "October 6, 2026",
+    "title": "Dispatch Lookup Service",
+    "changes": [
+      "Added a full Lookup Service Pane to the Dispatch Module. Search returns all data associated with the search term to include tickets and site history as well.",
+      "Added Drop-down to have more specific search parameters to reduce API lag.",
+      "Included all Site History that includes the search terms.",
+      "Changed \"Include Assigned Tickets\" checkbox in Dispatch Daily Assignments to \"Include all except Closed\" tickets.",
+      "Added AT\u0026T \u0026 VZW SIMs on the Equipment Tab with copy icons."
+    ]
+  },
+
+  {
     "version": "3.5.0.3",
     "date": "September 30, 2026",
     "title": "UI Polish, Equip Tab \u0026 Poll Stats Features",
