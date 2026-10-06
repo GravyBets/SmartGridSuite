@@ -54,7 +54,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
         private bool _hasLoaded;
         private bool _busyLoading;
         private bool _syncingTicketSelection;
-        private bool _includeAssignedTickets;
+        private bool _includeAllExceptClosed;
 
         private DateTime _selectedWorkDate = DateTime.Today;
         private bool _syncingWorkDate;
@@ -408,9 +408,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _ticketSearchTimer.Start();
         }
 
-        private void IncludeAssignedTickets_Changed(object sender, RoutedEventArgs e)
+        private void IncludeAllExceptClosed_Changed(object sender, RoutedEventArgs e)
         {
-            _includeAssignedTickets = IncludeAssignedTicketsCheckBox.IsChecked == true;
+            _includeAllExceptClosed = IncludeAllExceptClosedCheckBox.IsChecked == true;
             ApplyTicketPoolFilter();
         }
 
@@ -443,15 +443,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
 
             /*
-             * By default, also hide tickets assigned to any other target. When
-             * "Include assigned tickets" is enabled, tickets assigned elsewhere may
-             * appear, but tickets already in the selected route remain excluded.
+             * Default view stays intentionally small: unassigned tickets whose
+             * configured status is not closed. Some workflow statuses (for example
+             * IG Pre-Comms) are deliberately configured as closed so they do not
+             * stack up the normal active queue.
+             *
+             * When "Include all except Closed" is checked, keep assigned tickets
+             * and those closed-like workflow statuses visible. The API hard-excludes
+             * only the literal "Closed" status, so truly closed work never enters
+             * this pool.
              */
-            if (!_includeAssignedTickets)
+            if (!_includeAllExceptClosed)
             {
                 filtered = filtered.Where(
                     ticket =>
-                        ticket.CurrentAssignmentId == null);
+                        ticket.CurrentAssignmentId == null &&
+                        !ticket.IsClosed);
             }
 
             if (!string.IsNullOrWhiteSpace(q))
