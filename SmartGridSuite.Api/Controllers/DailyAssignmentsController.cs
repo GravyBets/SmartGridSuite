@@ -30,6 +30,7 @@ namespace SmartGridSuite.Api.Controllers
         private const string AssignmentStatusActive = "Active";
         private const string AssignmentStatusCompleted = "Completed";
         private const string AssignmentStatusRemoved = "Removed";
+        private const string HardClosedTicketStatus = "Closed";
 
         public DailyAssignmentsController(
             SmartGridDbContext db,
@@ -105,15 +106,18 @@ namespace SmartGridSuite.Api.Controllers
                 .ToListAsync(ct);
 
             /*
-             * Closed tickets remain stored in assignment history, but they are no longer
-             * active work and must not appear in Dispatcher Daily Assignment lists.
-             * Field-complete tickets remain visible because they are not closed.
+             * Daily Assignments has one hard-stop status: literal "Closed".
+             * Other statuses may be configured IsClosed for queue-management purposes
+             * (for example IG Pre-Comms), but Dispatch can still surface and assign them
+             * through the "Include all except Closed" option.
              */
             var visibleAssignments = assignments
                 .Where(x => x.Ticket != null)
                 .Where(x =>
-                    !closedStatusNames.Contains(
-                        x.Ticket!.Status ?? string.Empty))
+                    !string.Equals(
+                        x.Ticket!.Status,
+                        HardClosedTicketStatus,
+                        StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
             var assignmentByTicketId = visibleAssignments
@@ -122,13 +126,20 @@ namespace SmartGridSuite.Api.Controllers
                     g => g.Key,
                     g => g.OrderByDescending(x => x.UpdatedAt).First());
 
-            var nonClosedTickets = await _db.Tickets
+            var assignmentEligibleTickets = await _db.Tickets
                 .AsNoTracking()
                 .Include(t => t.TaskCategory)
-                .Where(t => !closedStatusNames.Contains(t.Status))
+                .Where(t => t.Status == null || t.Status != HardClosedTicketStatus)
                 .OrderBy(t => t.PriorityDays == 0 ? 999 : t.PriorityDays)
                 .ThenByDescending(t => t.LastActivityAt)
                 .ToListAsync(ct);
+
+            assignmentEligibleTickets = assignmentEligibleTickets
+                .Where(t => !string.Equals(
+                    t.Status,
+                    HardClosedTicketStatus,
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
             var trucks = await _db.Trucks
                 .AsNoTracking()
@@ -332,7 +343,7 @@ namespace SmartGridSuite.Api.Controllers
                 .OrderBy(x => x.TechnicianName)
                 .ToList();
 
-            var ticketPool = nonClosedTickets
+            var ticketPool = assignmentEligibleTickets
                 .Select(t => MapTicketPoolItem(t, assignmentByTicketId, closedStatusNames, fieldCompleteStatusNames))
                 .ToList();
 
@@ -511,16 +522,11 @@ namespace SmartGridSuite.Api.Controllers
                 return NotFound($"One or more tickets were not found: {string.Join(", ", missingIds)}");
             }
 
-            var closedStatusNames = await _db.TicketStatuses
-                .AsNoTracking()
-                .Where(x => x.IsActive && x.IsClosed)
-                .Select(x => x.Name)
-                .ToListAsync(ct);
-
-            var closedStatusSet = closedStatusNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
-
             var closedTickets = tickets
-                .Where(t => closedStatusSet.Contains(t.Status ?? string.Empty))
+                .Where(t => string.Equals(
+                    t.Status,
+                    HardClosedTicketStatus,
+                    StringComparison.OrdinalIgnoreCase))
                 .Select(t => t.Id)
                 .ToList();
 
@@ -1524,14 +1530,20 @@ namespace SmartGridSuite.Api.Controllers
                 .ToListAsync(ct);
 
             var protectedStatusNames = statusRows
-                .Where(x => x.IsClosed || x.IsFieldComplete)
+                .Where(x =>
+                    x.IsFieldComplete ||
+                    string.Equals(
+                        x.Name,
+                        HardClosedTicketStatus,
+                        StringComparison.OrdinalIgnoreCase))
                 .Select(x => x.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            var closedStatusNamesForPublish = statusRows
-                .Where(x => x.IsClosed)
-                .Select(x => x.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var closedStatusNamesForPublish = new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                HardClosedTicketStatus
+            };
 
             /*
              * Technician route ownership is by TechnicianId only.
@@ -2609,7 +2621,12 @@ namespace SmartGridSuite.Api.Controllers
                 .ToListAsync(ct);
 
             var terminalStatusNames = statusRows
-                .Where(x => x.IsClosed || x.IsFieldComplete)
+                .Where(x =>
+                    x.IsFieldComplete ||
+                    string.Equals(
+                        x.Name,
+                        HardClosedTicketStatus,
+                        StringComparison.OrdinalIgnoreCase))
                 .Select(x => x.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
