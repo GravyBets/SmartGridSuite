@@ -1196,9 +1196,9 @@ public sealed class TrucksController : ControllerBase
         var assignmentDate = new DateTime(2000, 1, 1);
 
         /*
-         * When truck membership changes, published crew-route tickets need their
-         * AssignedTech display recalculated. Otherwise a removed non-lead technician
-         * can keep seeing old crew tickets under Field Tech > Other Assigned Tickets.
+         * When truck membership changes, crew-route members are added to the
+         * ticket association. Changing today's roster must not erase previously
+         * assigned technicians or Linemen from a shared ticket.
          */
 
         var statusRows = await _db.TicketStatuses
@@ -1213,7 +1213,7 @@ public sealed class TrucksController : ControllerBase
             .ToListAsync(ct);
 
         var protectedStatusNames = statusRows
-            .Where(x => x.IsClosed || x.IsFieldComplete)
+            .Where(x => x.IsClosed)
             .Select(x => x.Name)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -1326,15 +1326,22 @@ public sealed class TrucksController : ControllerBase
             if (string.IsNullOrWhiteSpace(newAssignedTech))
                 continue;
 
+            var mergedAssignedTech = TicketAssigneeText.Merge(
+                ticket.AssignedTech, newAssignedTech);
+
+            if (mergedAssignedTech.Length > SmartGridSuite.Contracts.Tickets.TicketTextLimits.AssignedTech)
+                throw new InvalidOperationException(
+                    $"Assigned To exceeds the ticket limit for ticket {ticket.Id}.");
+
             if (string.Equals(
                     ticket.AssignedTech ?? "",
-                    newAssignedTech,
-                    StringComparison.OrdinalIgnoreCase))
+                    mergedAssignedTech,
+                    StringComparison.Ordinal))
             {
                 continue;
             }
 
-            ticket.AssignedTech = newAssignedTech;
+            ticket.AssignedTech = mergedAssignedTech;
 
             /*
              * Do not touch LastActivityAt here. This is roster-display cleanup,
