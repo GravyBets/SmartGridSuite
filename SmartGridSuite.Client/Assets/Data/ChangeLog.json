@@ -1,5 +1,16 @@
 [
   {
+    "version": "3.6.2.1",
+    "date": "October 12, 2026",
+    "title": "Lineman-\u003eAssignment Patch",
+    "changes": [
+      "Allow the Lineman Role to be assigned via the Tasks Pane.",
+      "Once a Lineman has been assigned ticket, their name gets added alongside the already assigned techs.",
+      "Corrected the all caps Lineman Role definition in Admin-\u003eTechnician Pane."
+    ]
+  },
+
+  {
     "version": "3.6.1.1",
     "date": "October 6, 2026",
     "title": "Dispatch Lookup Service",
