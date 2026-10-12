@@ -211,6 +211,7 @@ public partial class AdminTechnicianRow : ObservableObject
         => (code ?? "").Trim().ToUpperInvariant() switch
         {
             "TECHNICIAN" => "Technician",
+            "LINEMAN" => "Lineman",
             "DISPATCH" => "Dispatch",
             "ADMIN" => "Admin",
             _ => code ?? ""

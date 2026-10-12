@@ -1188,9 +1188,13 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 var techNames = technicians
                     .Where(x =>
                         x.IsActive &&
+                        x.RoleCodes != null &&
                         x.RoleCodes.Any(role =>
                             role.Equals(
                                 "Technician",
+                                StringComparison.OrdinalIgnoreCase) ||
+                            role.Equals(
+                                "Lineman",
                                 StringComparison.OrdinalIgnoreCase)))
                     .Select(x => x.Name?.Trim())
                     .Where(x =>
