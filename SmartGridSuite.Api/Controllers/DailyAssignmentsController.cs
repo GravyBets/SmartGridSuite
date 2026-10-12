@@ -5,6 +5,7 @@ using SmartGridSuite.Api.Data;
 using SmartGridSuite.Api.Data.Entities;
 using SmartGridSuite.Api.Services;
 using SmartGridSuite.Contracts.Dispatcher.DailyAssignments;
+using SmartGridSuite.Contracts.Tickets;
 using System.Text;
 using System.Net;
 
@@ -1059,57 +1060,8 @@ namespace SmartGridSuite.Api.Controllers
                     removedBy;
             }
 
-            /*
-             * Removing a ticket from Daily Assignments must also keep the
-             * ticket's assignment display in sync.
-             *
-             * Only clear AssignedTech / AssignedCrewId when the ticket has
-             * no other active Daily Assignment rows remaining.
-             *
-             * Ticket Status is intentionally left unchanged.
-             */
-            var removedAssignmentIds =
-                assignments
-                    .Select(x => x.Id)
-                    .ToList();
-
-            var stillAssignedTicketIds =
-                await _db.DailyTicketAssignments
-                    .AsNoTracking()
-                    .Where(x =>
-                        x.AssignmentDate == workDate &&
-                        x.AssignmentStatus == AssignmentStatusActive &&
-                        removedTicketIds.Contains(x.TicketId) &&
-                        !removedAssignmentIds.Contains(x.Id))
-                    .Select(x => x.TicketId)
-                    .Distinct()
-                    .ToListAsync(ct);
-
-            var nowUnassignedTicketIds =
-                removedTicketIds
-                    .Except(stillAssignedTicketIds)
-                    .ToList();
-
-            if (nowUnassignedTicketIds.Count > 0)
-            {
-                var ticketsNowUnassigned =
-                    await _db.Tickets
-                        .Where(x =>
-                            nowUnassignedTicketIds.Contains(x.Id))
-                        .ToListAsync(ct);
-
-                foreach (var ticket in ticketsNowUnassigned)
-                {
-                    ticket.AssignedTech =
-                        "(Unassigned)";
-
-                    ticket.AssignedCrewId =
-                        null;
-
-                    ticket.LastActivityAt =
-                        now;
-                }
-            }
+            // Removing work-list membership does not undo the ticket association.
+            // A dispatcher can explicitly edit Assigned To on the ticket if needed.
 
             await _db.SaveChangesAsync(ct);
 
@@ -1511,34 +1463,8 @@ namespace SmartGridSuite.Api.Controllers
 
             var now = DateTime.Now;
 
-            /*
-             * Resolve configurable workflow statuses before loading the publishable draft.
-             * Closed tickets may still have old draft assignment rows, but they must not be
-             * republished into the field technician route.
-             */
-            var statusRows = await _db.TicketStatuses
-                .AsNoTracking()
-                .Where(x => x.IsActive)
-                .Select(x => new
-                {
-                    x.Name,
-                    x.IsClosed,
-                    x.IsFieldComplete,
-                    x.IsAssignmentPublishTarget,
-                    x.IsUnassignmentTarget
-                })
-                .ToListAsync(ct);
-
-            var protectedStatusNames = statusRows
-                .Where(x =>
-                    x.IsFieldComplete ||
-                    string.Equals(
-                        x.Name,
-                        HardClosedTicketStatus,
-                        StringComparison.OrdinalIgnoreCase))
-                .Select(x => x.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
+            // A completed write-up must not prevent later assignment to a Lineman.
+            // Only Closed tickets are excluded from new publication.
             var closedStatusNamesForPublish = new HashSet<string>(
                 StringComparer.OrdinalIgnoreCase)
             {
@@ -1644,49 +1570,8 @@ namespace SmartGridSuite.Api.Controllers
                     $"One or more tickets were not found: {string.Join(", ", missingCurrentTicketIds)}");
             }
 
-            /*
-             * A released ticket should not be returned to unassigned if it has already been
-             * published somewhere else.
-             */
-            var publishedElsewhereTicketIds = new HashSet<long>();
-
-            if (releasedTicketIds.Count > 0)
-            {
-                var publishedElsewhereQuery = _db.DailyTicketAssignments
-                    .AsNoTracking()
-                    .Where(x =>
-                        x.AssignmentDate == workDate &&
-                        x.IsPublished &&
-                        releasedTicketIds.Contains(x.TicketId));
-
-                if (cleanTargetType.Equals("Technician", StringComparison.OrdinalIgnoreCase))
-                {
-                    publishedElsewhereQuery = publishedElsewhereQuery
-                        .Where(x =>
-                            !(x.TargetType == "Technician" &&
-                              x.TechnicianId == technicianId));
-                }
-                else
-                {
-                    publishedElsewhereQuery = publishedElsewhereQuery
-                        .Where(x =>
-                            !(x.TargetType == "Truck" &&
-                              x.TruckId == truckId));
-                }
-
-
-                publishedElsewhereTicketIds = (await publishedElsewhereQuery
-                        .Select(x => x.TicketId)
-                        .Distinct()
-                        .ToListAsync(ct))
-                    .ToHashSet();
-            }
-
-            var ticketsToUnassign = releasedTicketIds
-                .Where(id => ticketsById.ContainsKey(id))
-                .Where(id => !publishedElsewhereTicketIds.Contains(id))
-                .Where(id => !protectedStatusNames.Contains(ticketsById[id].Status ?? ""))
-                .ToList();
+            // Released work-list rows are retained in the publication history,
+            // but never erase Assigned To on their tickets.
 
             /*
              * Load display context for published assignments.
@@ -1785,19 +1670,38 @@ namespace SmartGridSuite.Api.Controllers
                 var ticket = ticketsById[assignment.TicketId];
 
                 /*
-                 * Publishing a Daily Assignment changes assignment ownership only.
-                 * Ticket status is independent from technician/crew assignment.
+                 * Publishing adds the target to Assigned To without replacing
+                 * existing technicians or altering status/write-up participation.
+                 * A field-complete ticket may receive a later Lineman assignment.
                  */
-                if (!protectedStatusNames.Contains(ticket.Status ?? ""))
+                if (!closedStatusNamesForPublish.Contains(ticket.Status ?? ""))
                 {
-                    ticket.AssignedTech = BuildPublishedAssignedTechText(
+                    var incomingNames = BuildPublishedAssignedTechText(
                         assignment,
                         trucksById,
                         truckTechNamesByTruckId,
                         techniciansById);
 
-                    ticket.AssignedCrewId = assignment.CrewId;
-                    ticket.LastActivityAt = now;
+                    var mergedNames = TicketAssigneeText.Merge(
+                        ticket.AssignedTech,
+                        incomingNames);
+
+                    if (mergedNames.Length > TicketTextLimits.AssignedTech)
+                    {
+                        return BadRequest(
+                            $"Assigned To exceeds {TicketTextLimits.AssignedTech} characters " +
+                            $"for ticket {ticket.Id}. Remove unused assignees before publishing.");
+                    }
+
+                    if (!string.Equals(ticket.AssignedTech, mergedNames, StringComparison.Ordinal))
+                    {
+                        ticket.AssignedTech = mergedNames;
+                        ticket.LastActivityAt = now;
+                    }
+
+                    // An individual Lineman target must not clear another crew's link.
+                    if (assignment.CrewId.HasValue && !ticket.AssignedCrewId.HasValue)
+                        ticket.AssignedCrewId = assignment.CrewId;
                 }
 
                 assignment.IsPublished = true;
@@ -1826,15 +1730,6 @@ namespace SmartGridSuite.Api.Controllers
                     PublishedAt = now,
                     PublishedBy = publishedBy
                 });
-            }
-
-            foreach (var ticketId in ticketsToUnassign)
-            {
-                var ticket = ticketsById[ticketId];
-
-                ticket.AssignedTech = "(Unassigned)";
-                ticket.AssignedCrewId = null;
-                ticket.LastActivityAt = now;
             }
 
             if (draftAssignments.Count == 0)
