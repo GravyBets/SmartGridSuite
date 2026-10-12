@@ -47,3 +47,4 @@ namespace SmartGridSuite.Api.Services
                 .ToList();
         }
     }
+}
