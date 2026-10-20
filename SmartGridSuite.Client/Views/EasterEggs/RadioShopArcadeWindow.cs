@@ -640,6 +640,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Focusable = false;
             }
 
+            // Custom FrameworkElement has no children, so explicitly request
+            // the arcade surface's design size during WPF measure/layout.
+            protected override Size MeasureOverride(Size availableSize)
+            {
+                return new Size(940, 600);
+            }
+
             protected override void OnRender(DrawingContext drawingContext)
             {
                 base.OnRender(drawingContext);
