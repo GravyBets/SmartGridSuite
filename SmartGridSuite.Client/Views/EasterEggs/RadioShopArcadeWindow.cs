@@ -28,6 +28,19 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private const double BoardWidth = Columns * Cell;
         private const double BoardHeight = Rows * Cell;
 
+        // Two distinct roadside service locations at the center of the city.
+        // Both are valid road cells (row 7 is a horizontal road).
+        private const int ShopX = 9;
+        private const int ShopY = 7;
+        private const int GarageX = 10;
+        private const int GarageY = 7;
+
+        private const int BaseTruckCapacity = 4;
+        private const int CapacityPerUpgrade = 2;
+        private const int MaximumTruckCapacity = 12;
+        private const int FirstTruckUpgradePrice = 350;
+        private const int UpgradePriceStep = 250;
+
         private static RadioShopArcadeWindow? _active;
 
         private static readonly Brush BackgroundBrush = Brush("#080f23");
@@ -53,12 +66,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private int _truckY = 1;
         private int _direction = 2;
         private int _wave;
-        private int _score;
-        private int _highScore;
+        private int _cash;
+        private int _bestCash;
         private int _repairs;
-        private const int TruckCapacity = 4;
-        private int _spareRadios = TruckCapacity;
+        private int _truckCapacity = BaseTruckCapacity;
+        private int _upgradeLevel;
+        private int _spareRadios = BaseTruckCapacity;
         private int _missedPriorities;
+        private bool _started;
         private double _secondsRemaining;
         private bool _leaderboardVisible;
         private bool _leaderboardAutoPaused;
@@ -70,7 +85,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private double _lastTickSeconds;
         private double _nextWaveAt = -1;
         private DateTime _lastMoveUtc = DateTime.MinValue;
-        private string _radioMessage = "DISPATCH: Three sites are down.";
+        private string _radioMessage = "DISPATCH: Press SPACE to begin your shift.";
+
+        private int? NextUpgradePrice => _truckCapacity >= MaximumTruckCapacity
+            ? null
+            : FirstTruckUpgradePrice + _upgradeLevel * UpgradePriceStep;
         private bool _paused;
         private bool _gameOver;
 
@@ -108,7 +127,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 }
             }
 
-            _highScore = ReadHighScore();
+            _bestCash = ReadHighScore();
 
             PreviewKeyDown += HandleKey;
             _host.Closed += HostClosed;
@@ -124,7 +143,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             };
             Deactivated += (_, _) =>
             {
-                if (!_gameOver && !_paused)
+                if (_started && !_gameOver && !_paused)
                     TogglePause();
             };
         }
@@ -159,13 +178,16 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private void NewGame()
         {
             _timer.Stop();
-            _truckX = 1;
-            _truckY = 1;
+            _truckX = ShopX;
+            _truckY = ShopY;
             _direction = 2;
             _wave = 0;
-            _score = 0;
+            _cash = 0;
             _repairs = 0;
-            _spareRadios = TruckCapacity;
+            _truckCapacity = BaseTruckCapacity;
+            _upgradeLevel = 0;
+            _spareRadios = _truckCapacity;
+            _started = false;
             _missedPriorities = 0;
             _secondsRemaining = 105;
             _lastTickSeconds = 0;
@@ -174,11 +196,12 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _gameOver = false;
             _leaderboardVisible = false;
             _leaderboardAutoPaused = false;
-            _radioMessage = "DISPATCH: Three sites are down.";
+            _radioMessage = "DISPATCH: Press SPACE to begin your shift.";
             _lastMoveUtc = DateTime.MinValue;
-            _gameClock.Restart();
+            _gameClock.Reset();
             BeginWave();
-            _timer.Start();
+            _radioMessage = "PRESS SPACE TO START!";
+            // Timer and stopwatch stay stopped until the player explicitly starts.
             _canvas.InvalidateVisual();
         }
 
@@ -276,7 +299,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _leaderboardVisible = !_leaderboardVisible;
                 if (_leaderboardVisible)
                 {
-                    _leaderboardAutoPaused = !_paused && !_gameOver;
+                    _leaderboardAutoPaused = _started && !_paused && !_gameOver;
                     if (_leaderboardAutoPaused)
                         TogglePause();
 
@@ -295,6 +318,20 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (_leaderboardVisible)
             {
                 e.Handled = true;
+                return;
+            }
+
+            if (!_started && !_gameOver)
+            {
+                if (e.Key == Key.Space)
+                {
+                    e.Handled = true;
+                    _started = true;
+                    _radioMessage = "DISPATCH: First round of outages. Good luck!";
+                    _gameClock.Start();
+                    _timer.Start();
+                    _canvas.InvalidateVisual();
+                }
                 return;
             }
 
@@ -333,7 +370,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     break;
                 case Key.Space:
                     e.Handled = true;
-                    RepairNearest();
+                    Interact();
                     return;
                 default:
                     return;
@@ -355,14 +392,19 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
         }
 
-        private void RepairNearest()
+        private void Interact()
         {
-            // Depot is the starting intersection, so returning to it matters.
-            if (_truckX == 1 && _truckY == 1)
+            if (_truckX == ShopX && _truckY == ShopY)
             {
-                _spareRadios = TruckCapacity;
-                _radioMessage = "SHOP: TRUCK RESTOCKED. GET BACK OUT!";
+                _spareRadios = _truckCapacity;
+                _radioMessage = "SHOP: Restocked for free. Now get back to work!";
                 _canvas.InvalidateVisual();
+                return;
+            }
+
+            if (_truckX == GarageX && _truckY == GarageY)
+            {
+                BuyTruckUpgrade();
                 return;
             }
 
@@ -388,7 +430,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             site.PriorityDeadline = null;
             _spareRadios--;
             _repairs++;
-            _score += 100 + Math.Min(_wave - 1, 10) * 20;
+            _cash += 100 + Math.Min(_wave - 1, 10) * 20;
             _radioMessage = _random.Next(4) switch
             {
                 0 => "DISPATCH: Good copy. Next site!",
@@ -399,9 +441,33 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             if (_sites.All(s => !s.IsOffline))
             {
-                _score += 200;
-                _radioMessage = "ALL LINKS RESTORED! +200 PTS / +5 SEC";
+                _cash += 200;
+                _radioMessage = "ALL LINKS RESTORED! +$200 / +5 SEC";
                 _nextWaveAt = _gameClock.Elapsed.TotalSeconds + 1.5;
+            }
+
+            _canvas.InvalidateVisual();
+        }
+
+        private void BuyTruckUpgrade()
+        {
+            var price = NextUpgradePrice;
+            if (!price.HasValue)
+            {
+                _radioMessage = "GARAGE: Truck is fully upgraded (12 radios)!";
+            }
+            else if (_cash < price.Value)
+            {
+                _radioMessage = $"GARAGE: Need ${price.Value:N0}. You have ${_cash:N0}.";
+            }
+            else
+            {
+                // Purchases directly reduce the player's cash/leaderboard score.
+                _cash -= price.Value;
+                _upgradeLevel++;
+                _truckCapacity += CapacityPerUpgrade;
+                _spareRadios = Math.Min(_truckCapacity, _spareRadios + CapacityPerUpgrade);
+                _radioMessage = $"GARAGE: -${price.Value:N0}! Truck holds {_truckCapacity} radios.";
             }
 
             _canvas.InvalidateVisual();
@@ -474,7 +540,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     new ArcadeScoreRequest
                     {
                         EmployeeId = _employeeId,
-                        Score = _score,
+                        Score = _cash,
                         Wave = _wave,
                         Repairs = _repairs
                     });
@@ -507,10 +573,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _gameOver = true;
             _radioMessage = "END OF SHIFT. DISPATCH GOES HOME.";
             _ = SubmitScoreAsync();
-            if (_score > _highScore)
+            if (_cash > _bestCash)
             {
-                _highScore = _score;
-                SaveHighScore(_score);
+                _bestCash = _cash;
+                SaveHighScore(_cash);
             }
             _canvas.InvalidateVisual();
         }
@@ -531,7 +597,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Text(dc, _playerName, 608, 30, 14, GreenBrush, pixelsPerDip, true);
             Text(dc, "A TOTALLY UNAUTHORIZED TRAINING SIMULATOR", 28, 69,
                 12, DimBrush, pixelsPerDip);
-            Text(dc, "CYAN S = SHOP (SPACE TO RESTOCK)    GOLD = PRIORITY OUTAGE",
+            Text(dc, "S = RESTOCK   U = TRUCK UPGRADES ($)   GOLD = PRIORITY",
                 28, 96, 13, GoldBrush, pixelsPerDip, true);
 
             DrawCity(dc, pixelsPerDip);
@@ -540,12 +606,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             dc.DrawRectangle(PanelBrush, new Pen(Brush("#335c85"), 1),
                 new Rect(25, 537, 859, 43));
             Text(dc, "WASD / ARROWS  DRIVE", 39, 549, 13, WhiteBrush, pixelsPerDip, true);
-            Text(dc, "SPACE  FIX RADIO", 268, 549, 13, GreenBrush, pixelsPerDip, true);
+            Text(dc, "SPACE  INTERACT", 268, 549, 13, GreenBrush, pixelsPerDip, true);
             Text(dc, "P  PAUSE", 461, 549, 13, GoldBrush, pixelsPerDip, true);
             Text(dc, "L  TOP 10", 597, 549, 13, CyanBrush, pixelsPerDip, true);
             Text(dc, "ESC  QUIT", 751, 549, 13, DimBrush, pixelsPerDip, true);
 
-            if (_paused || _gameOver)
+            if (!_started && !_gameOver)
+                DrawStartOverlay(dc, pixelsPerDip);
+            else if (_paused || _gameOver)
                 DrawEndOverlay(dc, pixelsPerDip);
 
             // Draw last, including after Game Over, so standings stay visible.
@@ -594,15 +662,35 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             foreach (var site in _sites)
                 DrawTower(dc, site, pixelsPerDip);
 
-            // Cyan bordered depot is where spare radios are restocked.
-            var shopX = BoardLeft + Cell;
-            var shopY = BoardTop + Cell;
+            // Center of the map: the shop (S) and separate upgrade garage (U).
+            double shopLeft = BoardLeft + ShopX * Cell;
+            double shopTop = BoardTop + ShopY * Cell;
             dc.DrawRectangle(Brush("#18495e"), new Pen(CyanBrush, 2),
-                new Rect(shopX + 1, shopY + 1, Cell - 2, Cell - 2));
-            Text(dc, "S", shopX + 10, shopY + 6, 21,
+                new Rect(shopLeft + 1, shopTop + 1, Cell - 2, Cell - 2));
+            Text(dc, "S", shopLeft + 10, shopTop + 6, 21,
                 CyanBrush, pixelsPerDip, true);
 
+            double garageLeft = BoardLeft + GarageX * Cell;
+            double garageTop = BoardTop + GarageY * Cell;
+            dc.DrawRectangle(Brush("#49325e"), new Pen(GoldBrush, 2),
+                new Rect(garageLeft + 1, garageTop + 1, Cell - 2, Cell - 2));
+            Text(dc, "U", garageLeft + 9, garageTop + 6, 21,
+                GoldBrush, pixelsPerDip, true);
+
             DrawTruck(dc);
+            DrawInventoryHud(dc, pixelsPerDip);
+        }
+
+        private void DrawInventoryHud(DrawingContext dc, double pixelsPerDip)
+        {
+            // Supplies belong IN the playable city rather than the side panel.
+            double left = BoardLeft + 8;
+            double top = BoardTop + 8;
+            dc.DrawRectangle(Brush("#07172b"), new Pen(CyanBrush, 1.5),
+                new Rect(left, top, 157, 37));
+            Text(dc, $"RADIOS  {_spareRadios}/{_truckCapacity}",
+                left + 11, top + 8, 17,
+                _spareRadios == 0 ? RedBrush : WhiteBrush, pixelsPerDip, true);
         }
 
         private void DrawTower(DrawingContext dc, RadioSite site, double pixelsPerDip)
@@ -666,13 +754,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Text(dc, ((int)Math.Ceiling(_secondsRemaining)).ToString("000", CultureInfo.InvariantCulture) + " SEC",
                 x + 15, 192, 27,
                 _secondsRemaining < 20 ? RedBrush : GoldBrush, pixelsPerDip, true);
-            Text(dc, "SCORE", x + 154, 174, 12, DimBrush, pixelsPerDip, true);
-            Text(dc, _score.ToString("000000", CultureInfo.InvariantCulture),
-                x + 154, 198, 21, WhiteBrush, pixelsPerDip, true);
+            Text(dc, "CASH / SCORE", x + 154, 174, 12, DimBrush, pixelsPerDip, true);
+            Text(dc, "$" + _cash.ToString("N0", CultureInfo.InvariantCulture),
+                x + 154, 198, 21, GreenBrush, pixelsPerDip, true);
 
             Text(dc, "WAVE " + _wave, x + 15, 251, 16, GreenBrush, pixelsPerDip, true);
-            Text(dc, "SPARES " + _spareRadios + "/" + TruckCapacity, x + 128, 253, 14,
-                _spareRadios == 0 ? RedBrush : GoldBrush, pixelsPerDip, true);
+            Text(dc, "TRUCK " + _truckCapacity + "-RADIO", x + 120, 253, 13,
+                GoldBrush, pixelsPerDip, true);
 
             dc.DrawLine(new Pen(Brush("#335c85"), 1),
                 new Point(x + 14, 283), new Point(x + 262, 283));
@@ -698,16 +786,20 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             dc.DrawLine(new Pen(Brush("#335c85"), 1),
                 new Point(x + 14, 453), new Point(x + 262, 453));
 
-            Text(dc, "DISPATCH RADIO", x + 15, 465, 14, GoldBrush, pixelsPerDip, true);
-            Text(dc, _radioMessage, x + 15, 488, 12,
-                WhiteBrush, pixelsPerDip, false, 246);
+            Text(dc, "UPGRADE GARAGE", x + 15, 456, 14, GoldBrush, pixelsPerDip, true);
+            Text(dc, NextUpgradePrice.HasValue
+                    ? $"U SQUARE: ${NextUpgradePrice.Value:N0} FOR +2 SPARES"
+                    : "U SQUARE: MAX CAPACITY",
+                x + 15, 477, 12, WhiteBrush, pixelsPerDip, false, 249);
+            Text(dc, _radioMessage, x + 15, 504, 12,
+                CyanBrush, pixelsPerDip, false, 248);
         }
 
         private void DrawLeaderboard(DrawingContext dc, double pixelsPerDip)
         {
             dc.DrawRectangle(Brush("#081326"), new Pen(CyanBrush, 2),
                 new Rect(105, 92, 726, 433));
-            Text(dc, "SHOP HIGH SCORES", 128, 110, 26,
+            Text(dc, "SHOP HIGH SCORES — CASH KEPT", 128, 110, 26,
                 CyanBrush, pixelsPerDip, true);
             Text(dc, _leaderboardStatus, 128, 149, 14,
                 DimBrush, pixelsPerDip);
@@ -719,11 +811,30 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Text(dc, item.Rank.ToString("00") + ".  " + item.TechnicianName,
                     131, y, 17, item.Rank == 1 ? GoldBrush : WhiteBrush,
                     pixelsPerDip, true, 440);
-                Text(dc, item.Score.ToString("N0", CultureInfo.InvariantCulture),
+                Text(dc, "$" + item.Score.ToString("N0", CultureInfo.InvariantCulture),
                     645, y, 17, GreenBrush, pixelsPerDip, true);
                 position++;
             }
             Text(dc, "L TO RETURN TO GAME", 132, 487, 14,
+                DimBrush, pixelsPerDip, true);
+        }
+
+        private void DrawStartOverlay(DrawingContext dc, double pixelsPerDip)
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(243, 5, 11, 27)),
+                new Pen(CyanBrush, 3), new Rect(123, 167, 676, 305));
+
+            Text(dc, "RADIO SHOP ARCADE", 157, 193, 31,
+                CyanBrush, pixelsPerDip, true);
+            Text(dc, "RUN THE SHOP. FIX RADIOS. MAKE MONEY.", 158, 248, 17,
+                WhiteBrush, pixelsPerDip, true);
+            Text(dc, "Repairs earn cash. Return to S for spares.", 158, 284, 16,
+                DimBrush, pixelsPerDip);
+            Text(dc, "Buy bigger trucks at U; upgrades CUT your score.", 158, 310, 16,
+                GoldBrush, pixelsPerDip);
+            Text(dc, "PRESS SPACE TO START", 158, 385, 25,
+                GreenBrush, pixelsPerDip, true);
+            Text(dc, "L TO VIEW SHOP LEADERBOARD    ESC TO QUIT", 158, 430, 13,
                 DimBrush, pixelsPerDip, true);
         }
 
@@ -736,9 +847,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             if (_gameOver)
             {
-                Text(dc, "RADIOS FIXED: " + _repairs + "    SCORE: " + _score,
+                Text(dc, "RADIOS FIXED: " + _repairs + "    CASH: $" + _cash.ToString("N0", CultureInfo.InvariantCulture),
                     166, 289, 19, WhiteBrush, pixelsPerDip, true);
-                Text(dc, _score >= _highScore && _score > 0
+                Text(dc, _cash >= _bestCash && _cash > 0
                         ? "NEW PERSONAL HIGH SCORE!"
                         : "DISPATCH: SEE YOU TOMORROW.",
                     166, 329, 17, GreenBrush, pixelsPerDip);
@@ -780,7 +891,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static string ScoreFile =>
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "SmartGridSuite", "Arcade", "highscore-v2.txt");
+                "SmartGridSuite", "Arcade", "highscore-v3-cash.txt");
 
         private static int ReadHighScore()
         {
