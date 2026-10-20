@@ -157,7 +157,7 @@ namespace SmartGridSuite.Api.Data
         {
             modelBuilder.Entity<ArcadeHighScoreEntity>(e =>
             {
-                e.ToTable("arcade_high_scores");
+                e.ToTable("arcade_cash_high_scores");
                 e.HasKey(x => x.TechnicianId);
                 e.Property(x => x.TechnicianId).HasColumnName("technician_id");
                 e.Property(x => x.BestScore).HasColumnName("best_score");
