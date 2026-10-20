@@ -4,6 +4,9 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
+using SmartGridSuite.Client.Services;
+using SmartGridSuite.Contracts.Arcade;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -53,7 +56,16 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private int _score;
         private int _highScore;
         private int _repairs;
+        private const int TruckCapacity = 4;
+        private int _spareRadios = TruckCapacity;
+        private int _missedPriorities;
         private double _secondsRemaining;
+        private bool _leaderboardVisible;
+        private List<ArcadeLeaderboardEntryDto> _leaderboard = new();
+        private string _leaderboardStatus = "Loading shop leaderboard...";
+        private string _playerName = "Guest (local only)";
+        private string? _employeeId;
+        private readonly ApiClient _arcadeApi = ClientAppSettings.CreateApiClient();
         private double _lastTickSeconds;
         private double _nextWaveAt = -1;
         private DateTime _lastMoveUtc = DateTime.MinValue;
@@ -105,6 +117,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Loaded += (_, _) =>
             {
                 NewGame();
+                _ = LoadLeaderboardAsync();
                 Activate();
                 Keyboard.Focus(this);
             };
@@ -151,6 +164,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _wave = 0;
             _score = 0;
             _repairs = 0;
+            _spareRadios = TruckCapacity;
+            _missedPriorities = 0;
             _secondsRemaining = 105;
             _lastTickSeconds = 0;
             _nextWaveAt = -1;
@@ -168,11 +183,21 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         {
             _wave++;
             foreach (var site in _sites)
+            {
                 site.IsOffline = false;
+                site.PriorityDeadline = null;
+            }
 
             int targetCount = Math.Min(_sites.Count, 2 + _wave);
-            foreach (var site in _sites.OrderBy(_ => _random.Next()).Take(targetCount))
+            var outages = _sites.OrderBy(_ => _random.Next()).Take(targetCount).ToList();
+            foreach (var site in outages)
                 site.IsOffline = true;
+
+            // From wave 2 onwards, one site has an urgent repair deadline.
+            // Miss the deadline and dispatch costs you 8 seconds, once only.
+            if (_wave >= 2 && outages.Count > 0)
+                outages[0].PriorityDeadline = _gameClock.Elapsed.TotalSeconds +
+                    Math.Max(18, 38 - _wave * 1.5);
 
             _nextWaveAt = -1;
             _radioMessage = _wave == 1
@@ -198,9 +223,28 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
             }
 
+            foreach (var site in _sites)
+            {
+                if (!site.IsOffline || !site.PriorityDeadline.HasValue ||
+                    elapsed < site.PriorityDeadline.Value)
+                    continue;
+
+                site.PriorityDeadline = null;
+                _missedPriorities++;
+                _secondsRemaining = Math.Max(0, _secondsRemaining - 8);
+                _radioMessage = "DISPATCH: PRIORITY MISSED. -8 SEC!";
+            }
+
+            if (_secondsRemaining <= 0)
+            {
+                EndGame();
+                return;
+            }
+
             if (_nextWaveAt >= 0 && elapsed >= _nextWaveAt)
             {
-                _secondsRemaining = Math.Min(130, _secondsRemaining + 18);
+                // Old +18 seconds enabled virtually endless play; +5 is scarce.
+                _secondsRemaining = Math.Min(105, _secondsRemaining + 5);
                 BeginWave();
             }
 
@@ -227,6 +271,22 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             {
                 e.Handled = true;
                 TogglePause();
+                return;
+            }
+
+            if (e.Key == Key.L)
+            {
+                e.Handled = true;
+                _leaderboardVisible = !_leaderboardVisible;
+                _canvas.InvalidateVisual();
+                return;
+            }
+
+            if (_leaderboardVisible)
+            {
+                _leaderboardVisible = false;
+                _canvas.InvalidateVisual();
+                e.Handled = true;
                 return;
             }
 
@@ -282,6 +342,22 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void RepairNearest()
         {
+            // Depot is the starting intersection, so returning to it matters.
+            if (_truckX == 1 && _truckY == 1)
+            {
+                _spareRadios = TruckCapacity;
+                _radioMessage = "SHOP: TRUCK RESTOCKED. GET BACK OUT!";
+                _canvas.InvalidateVisual();
+                return;
+            }
+
+            if (_spareRadios <= 0)
+            {
+                _radioMessage = "NO SPARES! RETURN TO THE SHOP AT START!";
+                _canvas.InvalidateVisual();
+                return;
+            }
+
             var site = _sites.FirstOrDefault(s =>
                 s.IsOffline &&
                 Math.Abs(s.X - _truckX) + Math.Abs(s.Y - _truckY) == 1);
@@ -294,6 +370,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
 
             site.IsOffline = false;
+            site.PriorityDeadline = null;
+            _spareRadios--;
             _repairs++;
             _score += 100 + Math.Min(_wave - 1, 10) * 20;
             _radioMessage = _random.Next(4) switch
@@ -307,11 +385,93 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (_sites.All(s => !s.IsOffline))
             {
                 _score += 200;
-                _radioMessage = "ALL LINKS RESTORED! +200 BONUS";
+                _radioMessage = "ALL LINKS RESTORED! +200 PTS / +5 SEC";
                 _nextWaveAt = _gameClock.Elapsed.TotalSeconds + 1.5;
             }
 
             _canvas.InvalidateVisual();
+        }
+
+        private async Task LoadLeaderboardAsync()
+        {
+            try
+            {
+                var user = await CurrentUserService.LoadCurrentTechnicianAsync();
+                if (!IsLoaded)
+                    return;
+
+                if (user != null && user.IsActive)
+                {
+                    _employeeId = user.EmployeeId;
+                    _playerName = user.Name;
+                }
+                else
+                {
+                    _employeeId = null;
+                    _playerName = "Guest (local only)";
+                }
+
+                await RefreshLeaderboardAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Arcade player lookup failed: " + ex);
+                _leaderboardStatus = "Shop leaderboard unavailable";
+                _canvas.InvalidateVisual();
+            }
+        }
+
+        private async Task RefreshLeaderboardAsync()
+        {
+            try
+            {
+                var response = await _arcadeApi.GetAsync<List<ArcadeLeaderboardEntryDto>>(
+                    "api/arcade/leaderboard");
+                if (!IsLoaded)
+                    return;
+
+                _leaderboard = response ?? new List<ArcadeLeaderboardEntryDto>();
+                _leaderboardStatus = _leaderboard.Count == 0
+                    ? "No shop scores yet. Be the first!"
+                    : "Shop leaderboard";
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Arcade leaderboard request failed: " + ex);
+                _leaderboardStatus = "Shop leaderboard unavailable";
+            }
+            _canvas.InvalidateVisual();
+        }
+
+        private async Task SubmitScoreAsync()
+        {
+            if (string.IsNullOrWhiteSpace(_employeeId))
+            {
+                _leaderboardStatus = "Not on tech roster: local score only";
+                _canvas.InvalidateVisual();
+                return;
+            }
+
+            try
+            {
+                await _arcadeApi.PostAsync<ArcadeScoreRequest, ArcadeLeaderboardEntryDto>(
+                    "api/arcade/scores",
+                    new ArcadeScoreRequest
+                    {
+                        EmployeeId = _employeeId,
+                        Score = _score,
+                        Wave = _wave,
+                        Repairs = _repairs
+                    });
+
+                await RefreshLeaderboardAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Arcade score submission failed: " + ex);
+                _leaderboardStatus = "Score not uploaded (network/API offline)";
+                _canvas.InvalidateVisual();
+            }
         }
 
         private void TogglePause()
@@ -331,6 +491,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _gameClock.Stop();
             _gameOver = true;
             _radioMessage = "END OF SHIFT. DISPATCH GOES HOME.";
+            _ = SubmitScoreAsync();
             if (_score > _highScore)
             {
                 _highScore = _score;
@@ -352,18 +513,23 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 new Rect(14, 14, 892, 578));
 
             Text(dc, "RADIO SHOP ARCADE", 27, 24, 31, CyanBrush, pixelsPerDip, true);
+            Text(dc, _playerName, 608, 30, 14, GreenBrush, pixelsPerDip, true);
             Text(dc, "A TOTALLY UNAUTHORIZED TRAINING SIMULATOR", 28, 69,
                 12, DimBrush, pixelsPerDip);
 
             DrawCity(dc, pixelsPerDip);
             DrawSidebar(dc, pixelsPerDip);
 
+            if (_leaderboardVisible)
+                DrawLeaderboard(dc, pixelsPerDip);
+
             dc.DrawRectangle(PanelBrush, new Pen(Brush("#335c85"), 1),
                 new Rect(25, 537, 859, 43));
             Text(dc, "WASD / ARROWS  DRIVE", 39, 549, 13, WhiteBrush, pixelsPerDip, true);
             Text(dc, "SPACE  FIX RADIO", 268, 549, 13, GreenBrush, pixelsPerDip, true);
-            Text(dc, "P  PAUSE", 487, 549, 13, GoldBrush, pixelsPerDip, true);
-            Text(dc, "ESC  QUIT", 663, 549, 13, DimBrush, pixelsPerDip, true);
+            Text(dc, "P  PAUSE", 461, 549, 13, GoldBrush, pixelsPerDip, true);
+            Text(dc, "L  TOP 10", 597, 549, 13, CyanBrush, pixelsPerDip, true);
+            Text(dc, "ESC  QUIT", 751, 549, 13, DimBrush, pixelsPerDip, true);
 
             if (_paused || _gameOver)
                 DrawEndOverlay(dc, pixelsPerDip);
@@ -410,6 +576,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             foreach (var site in _sites)
                 DrawTower(dc, site, pixelsPerDip);
 
+            // Cyan bordered depot is where spare radios are restocked.
+            var shopX = BoardLeft + Cell;
+            var shopY = BoardTop + Cell;
+            dc.DrawRectangle(Brush("#18495e"), new Pen(CyanBrush, 2),
+                new Rect(shopX + 1, shopY + 1, Cell - 2, Cell - 2));
+            Text(dc, "S", shopX + 10, shopY + 6, 21,
+                CyanBrush, pixelsPerDip, true);
+
             DrawTruck(dc);
         }
 
@@ -421,7 +595,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             var pen = new Pen(glow, 2.2);
             var cx = x + Cell / 2;
 
-            dc.DrawRectangle(Brush("#071123"), new Pen(glow, site.IsOffline ? 2 : 1),
+            dc.DrawRectangle(Brush("#071123"),
+                new Pen(site.PriorityDeadline.HasValue ? GoldBrush : glow, site.IsOffline ? 2 : 1),
                 new Rect(x + 2, y + 2, Cell - 4, Cell - 4));
             dc.DrawLine(pen, new Point(cx, y + 5), new Point(x + 8, y + 27));
             dc.DrawLine(pen, new Point(cx, y + 5), new Point(x + 25, y + 27));
@@ -478,7 +653,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 x + 154, 198, 21, WhiteBrush, pixelsPerDip, true);
 
             Text(dc, "WAVE " + _wave, x + 15, 251, 16, GreenBrush, pixelsPerDip, true);
-            Text(dc, "BEST " + _highScore, x + 154, 253, 12, DimBrush, pixelsPerDip);
+            Text(dc, "SPARES " + _spareRadios + "/" + TruckCapacity, x + 128, 253, 14,
+                _spareRadios == 0 ? RedBrush : GoldBrush, pixelsPerDip, true);
 
             dc.DrawLine(new Pen(Brush("#335c85"), 1),
                 new Point(x + 14, 283), new Point(x + 262, 283));
@@ -488,8 +664,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             for (int i = 0; i < Math.Min(5, offline.Count); i++)
             {
                 var site = offline[i];
-                Text(dc, "■  " + site.Code, x + 18, 328 + i * 21,
-                    14, RedBrush, pixelsPerDip, true);
+                var priority = site.PriorityDeadline.HasValue;
+                Text(dc, (priority ? "!  " : "■  ") + site.Code, x + 18, 328 + i * 21,
+                    14, priority ? GoldBrush : RedBrush, pixelsPerDip, true);
+                if (priority)
+                    Text(dc, Math.Max(0, (int)Math.Ceiling(
+                            site.PriorityDeadline.Value - _gameClock.Elapsed.TotalSeconds)) + "s",
+                        x + 171, 328 + i * 21, 14, GoldBrush, pixelsPerDip, true);
             }
 
             if (offline.Count > 5)
@@ -502,6 +683,30 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Text(dc, "DISPATCH RADIO", x + 15, 465, 14, GoldBrush, pixelsPerDip, true);
             Text(dc, _radioMessage, x + 15, 488, 12,
                 WhiteBrush, pixelsPerDip, false, 246);
+        }
+
+        private void DrawLeaderboard(DrawingContext dc, double pixelsPerDip)
+        {
+            dc.DrawRectangle(Brush("#081326"), new Pen(CyanBrush, 2),
+                new Rect(105, 92, 726, 433));
+            Text(dc, "SHOP HIGH SCORES", 128, 110, 26,
+                CyanBrush, pixelsPerDip, true);
+            Text(dc, _leaderboardStatus, 128, 149, 14,
+                DimBrush, pixelsPerDip);
+
+            int position = 0;
+            foreach (var item in _leaderboard.Take(10))
+            {
+                var y = 187 + position * 30;
+                Text(dc, item.Rank.ToString("00") + ".  " + item.TechnicianName,
+                    131, y, 17, item.Rank == 1 ? GoldBrush : WhiteBrush,
+                    pixelsPerDip, true, 440);
+                Text(dc, item.Score.ToString("N0", CultureInfo.InvariantCulture),
+                    645, y, 17, GreenBrush, pixelsPerDip, true);
+                position++;
+            }
+            Text(dc, "L TO RETURN TO GAME", 132, 487, 14,
+                DimBrush, pixelsPerDip, true);
         }
 
         private void DrawEndOverlay(DrawingContext dc, double pixelsPerDip)
@@ -617,6 +822,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private sealed class RadioSite
         {
+            public double? PriorityDeadline { get; set; }
             public int X { get; }
             public int Y { get; }
             public string Code { get; }
