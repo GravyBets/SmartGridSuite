@@ -32,14 +32,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         // Both are valid road cells (row 7 is a horizontal road).
         private const int ShopX = 9;
         private const int ShopY = 7;
-        private const int GarageX = 10;
+        private const int GarageX = 12;
         private const int GarageY = 7;
 
         private const int BaseTruckCapacity = 4;
         private const int CapacityPerUpgrade = 2;
         private const int MaximumTruckCapacity = 12;
-        private const int FirstTruckUpgradePrice = 350;
-        private const int UpgradePriceStep = 250;
+        private const int FirstTruckUpgradePrice = 1000;
+        private const int UpgradePriceStep = 1000;
 
         private static RadioShopArcadeWindow? _active;
 
@@ -544,11 +544,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             var price = NextUpgradePrice;
             if (!price.HasValue)
             {
-                _radioMessage = "GARAGE: Truck is fully upgraded (12 radios)!";
+                _radioMessage = "MECHANICS: Truck is fully upgraded (12 radios)!";
             }
             else if (_cash < price.Value)
             {
-                _radioMessage = $"GARAGE: Need ${price.Value:N0}. You have ${_cash:N0}.";
+                _radioMessage = $"MECHANICS: Need ${price.Value:N0}. You have ${_cash:N0}.";
             }
             else
             {
@@ -557,7 +557,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _upgradeLevel++;
                 _truckCapacity += CapacityPerUpgrade;
                 _spareRadios = Math.Min(_truckCapacity, _spareRadios + CapacityPerUpgrade);
-                _radioMessage = $"GARAGE: -${price.Value:N0}! Truck holds {_truckCapacity} radios.";
+                _radioMessage = $"MECHANICS: -${price.Value:N0}! Truck holds {_truckCapacity} radios.";
             }
 
             _canvas.InvalidateVisual();
@@ -740,7 +740,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Text(dc, _playerName, 608, 30, 14, GreenBrush, pixelsPerDip, true);
             Text(dc, "A TOTALLY UNAUTHORIZED TRAINING SIMULATOR", 28, 69,
                 12, DimBrush, pixelsPerDip);
-            Text(dc, "S = RESTOCK   U = TRUCK UPGRADES ($)   GOLD = PRIORITY",
+            Text(dc, "S = SHOP / SPARES   M = MECHANICS / UPGRADES   GOLD = PRIORITY",
                 28, 96, 13, GoldBrush, pixelsPerDip, true);
 
             DrawCity(dc, pixelsPerDip);
@@ -805,7 +805,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             foreach (var site in _sites)
                 DrawTower(dc, site, pixelsPerDip);
 
-            // Center of the map: the shop (S) and separate upgrade garage (U).
+            // Shop in the center; Mechanics (M) is two tiles east of its prior location.
             double shopLeft = BoardLeft + ShopX * Cell;
             double shopTop = BoardTop + ShopY * Cell;
             dc.DrawRectangle(Brush("#18495e"), new Pen(CyanBrush, 2),
@@ -817,7 +817,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             double garageTop = BoardTop + GarageY * Cell;
             dc.DrawRectangle(Brush("#49325e"), new Pen(GoldBrush, 2),
                 new Rect(garageLeft + 1, garageTop + 1, Cell - 2, Cell - 2));
-            Text(dc, "U", garageLeft + 9, garageTop + 6, 21,
+            Text(dc, "M", garageLeft + 8, garageTop + 6, 21,
                 GoldBrush, pixelsPerDip, true);
 
             DrawTruck(dc);
@@ -929,10 +929,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             dc.DrawLine(new Pen(Brush("#335c85"), 1),
                 new Point(x + 14, 453), new Point(x + 262, 453));
 
-            Text(dc, "UPGRADE GARAGE", x + 15, 456, 14, GoldBrush, pixelsPerDip, true);
+            Text(dc, "MECHANICS", x + 15, 456, 14, GoldBrush, pixelsPerDip, true);
             Text(dc, NextUpgradePrice.HasValue
-                    ? $"U SQUARE: ${NextUpgradePrice.Value:N0} FOR +2 SPARES"
-                    : "U SQUARE: MAX CAPACITY",
+                    ? $"M SQUARE: ${NextUpgradePrice.Value:N0} FOR +2 SPARES"
+                    : "M SQUARE: MAX CAPACITY",
                 x + 15, 477, 12, WhiteBrush, pixelsPerDip, false, 249);
             Text(dc, _radioMessage, x + 15, 504, 12,
                 CyanBrush, pixelsPerDip, false, 248);
@@ -969,12 +969,17 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             Text(dc, "RADIO SHOP ARCADE", 157, 193, 31,
                 CyanBrush, pixelsPerDip, true);
-            Text(dc, "RUN THE SHOP. FIX RADIOS. MAKE MONEY.", 158, 248, 17,
+            Text(dc, "Drive a Bucket Truck", 158, 248, 23,
                 WhiteBrush, pixelsPerDip, true);
-            Text(dc, "Repairs earn cash. Return to S for spares.", 158, 284, 16,
-                DimBrush, pixelsPerDip);
-            Text(dc, "Buy bigger trucks at U; upgrades CUT your score.", 158, 310, 16,
-                GoldBrush, pixelsPerDip);
+
+            // Show the same letter-in-colored-square symbols used on the map:
+            // [S]hop and [M]echanics, without guessing horizontal text offsets.
+            DrawSymbolInstruction(dc, "Repairs earn cash. Return to ", "S",
+                "hop for spare radios.", 158, 284, DimBrush, CyanBrush,
+                Brush("#18495e"), pixelsPerDip);
+            DrawSymbolInstruction(dc, "Buy bigger trucks at ", "M",
+                "echanics; upgrades CUT your score.", 158, 310, GoldBrush,
+                GoldBrush, Brush("#49325e"), pixelsPerDip);
             Text(dc, "PRESS SPACE TO START", 158, 385, 25,
                 GreenBrush, pixelsPerDip, true);
             Text(dc, "L TO VIEW SHOP LEADERBOARD    ESC TO QUIT", 158, 430, 13,
@@ -1006,6 +1011,29 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Text(dc, "P TO RESUME     ESC TO QUIT",
                     167, 322, 18, WhiteBrush, pixelsPerDip, true);
             }
+        }
+
+        private static void DrawSymbolInstruction(
+            DrawingContext dc, string before, string symbol, string after,
+            double x, double y, Brush textBrush, Brush symbolBrush,
+            Brush symbolBackground, double pixelsPerDip)
+        {
+            const double fontSize = 16;
+            var prefix = new FormattedText(
+                before, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                new Typeface(new FontFamily("Consolas"), FontStyles.Normal,
+                    FontWeights.Normal, FontStretches.Normal),
+                fontSize, textBrush, pixelsPerDip);
+
+            dc.DrawText(prefix, new Point(x, y));
+            double tileX = x + prefix.WidthIncludingTrailingWhitespace;
+
+            // Matches the square symbol and color used by the actual map tile.
+            dc.DrawRectangle(symbolBackground, new Pen(symbolBrush, 1.5),
+                new Rect(tileX, y - 1, 20, 20));
+            Text(dc, symbol, tileX + 5, y, fontSize, symbolBrush,
+                pixelsPerDip, true);
+            Text(dc, after, tileX + 22, y, fontSize, textBrush, pixelsPerDip);
         }
 
         private static void Text(
