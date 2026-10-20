@@ -351,6 +351,10 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
         private const int TicketPageSize = 500;
 
+        // Header sorting is server-side so it covers ALL matching tickets, not just one page.
+        private string _ticketSortColumn = nameof(DispatchTicket.CreatedAt);
+        private bool _ticketSortDescending = true;
+
         private int _currentTicketPageIndex;
         private int _totalMatchingTicketCount;
 
@@ -412,6 +416,12 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             _techniciansApi = new TechniciansApi(ClientAppSettings.CreateApiClient());
 
             TicketsGrid.ItemsSource = TicketsView;
+
+            // Show the default API ordering (newest tickets first) in the grid header.
+            var createdColumn = TicketsGrid.Columns.FirstOrDefault(
+                c => c.SortMemberPath == nameof(DispatchTicket.CreatedAt));
+            if (createdColumn != null)
+                createdColumn.SortDirection = ListSortDirection.Descending;
 
             _suppressFilterEvents = true;
             try
@@ -909,6 +919,33 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             }
         }
 
+        private async void TicketsGrid_Sorting(object sender, DataGridSortingEventArgs e)
+        {
+            // WPF's default sort only sees the 500 rows currently loaded. Do not use it.
+            e.Handled = true;
+
+            var selectedColumn = e.Column.SortMemberPath;
+            if (string.IsNullOrWhiteSpace(selectedColumn))
+                return;
+
+            // First click on a different column sorts ascending; subsequent clicks toggle.
+            var descending = selectedColumn == _ticketSortColumn
+                ? !_ticketSortDescending
+                : false;
+
+            _ticketSortColumn = selectedColumn;
+            _ticketSortDescending = descending;
+
+            foreach (var column in TicketsGrid.Columns)
+            {
+                column.SortDirection = column == e.Column
+                    ? (descending ? ListSortDirection.Descending : ListSortDirection.Ascending)
+                    : null;
+            }
+
+            await LoadTicketsFromApiAsync(resetPage: true);
+        }
+
         private TicketQueryRequest BuildTicketQueryRequest()
         {
             var (from, to) = GetLastActivityDateRangeFromUi();
@@ -962,6 +999,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
 
                 QuickFilter =
                     GetActiveQuickFilterApiValue(),
+
+                SortColumn = _ticketSortColumn,
+                SortDescending = _ticketSortDescending,
 
                 Skip =
                     _currentTicketPageIndex *
