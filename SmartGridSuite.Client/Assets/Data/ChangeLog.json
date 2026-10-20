@@ -1,5 +1,17 @@
 [
   {
+    "version": "3.6.2.3",
+    "date": "October 20, 2026",
+    "title": "Dispatch Ticket Filtering, Check for Updates",
+    "changes": [
+      "Changed the default Date Range on Dispatch-\u003eTickets to \"Last 3 Months\" when the Ticket Status \"Closed\" is selected.",
+      "Dispatch-\u003eTickets column sorting is now global sorting instead of just sorting the tickets on the selected page.",
+      "Added Ctrl+Shift+F12 controls.",
+      "Added a Check for Updates button to the About App Window."
+    ]
+  },
+
+  {
     "version": "3.6.2.1",
     "date": "October 12, 2026",
     "title": "Lineman-\u003eAssignment Patch",

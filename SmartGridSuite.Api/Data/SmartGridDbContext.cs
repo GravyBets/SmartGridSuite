@@ -12,6 +12,9 @@ namespace SmartGridSuite.Api.Data
         public DbSet<TicketEntity> Tickets => Set<TicketEntity>();
         public DbSet<TopChangeEntity> TopChanges => Set<TopChangeEntity>();
 
+        // Fake-game high scores only; no production ticket/assignment data.
+        public DbSet<ArcadeHighScoreEntity> ArcadeHighScores => Set<ArcadeHighScoreEntity>();
+
         public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
         {
             ChangeTracker.DetectChanges();
@@ -152,6 +155,21 @@ namespace SmartGridSuite.Api.Data
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<ArcadeHighScoreEntity>(e =>
+            {
+                e.ToTable("arcade_cash_high_scores");
+                e.HasKey(x => x.TechnicianId);
+                e.Property(x => x.TechnicianId).HasColumnName("technician_id");
+                e.Property(x => x.BestScore).HasColumnName("best_score");
+                e.Property(x => x.BestWave).HasColumnName("best_wave");
+                e.Property(x => x.BestRepairs).HasColumnName("best_repairs");
+                e.Property(x => x.AchievedAtUtc).HasColumnName("achieved_at_utc");
+                e.HasOne(x => x.Technician)
+                    .WithMany()
+                    .HasForeignKey(x => x.TechnicianId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
             modelBuilder.Entity<TopChangeEntity>(e =>
             {
                 e.ToTable("ticket_top_changes");
