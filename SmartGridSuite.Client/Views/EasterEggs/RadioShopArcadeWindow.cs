@@ -59,6 +59,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private readonly ArcadeCanvas _canvas;
         private readonly DispatcherTimer _timer;
         private readonly Stopwatch _gameClock = new();
+        private readonly MediaPlayer _chopChopPlayer = new();
+        private bool _chopChopAvailable;
+        private bool _chopChopPlayedAt60;
+        private bool _chopChopPlayedAt10;
         private readonly Random _random = new();
         private readonly List<RadioSite> _sites = new();
 
@@ -117,6 +121,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Interval = TimeSpan.FromMilliseconds(80)
             };
             _timer.Tick += Tick;
+            InitializeCountdownAudio();
 
             for (int y = 2; y <= 11; y += 3)
             {
@@ -199,6 +204,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _radioMessage = "DISPATCH: Press SPACE to begin your shift.";
             _lastMoveUtc = DateTime.MinValue;
             _gameClock.Reset();
+            _chopChopPlayedAt60 = false;
+            _chopChopPlayedAt10 = false;
+            _chopChopPlayer.Stop();
             BeginWave();
             _radioMessage = "PRESS SPACE TO START!";
             // Timer and stopwatch stay stopped until the player explicitly starts.
@@ -241,10 +249,12 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             double elapsed = _gameClock.Elapsed.TotalSeconds;
             double delta = Math.Max(0, elapsed - _lastTickSeconds);
             _lastTickSeconds = elapsed;
+            double previousSecondsRemaining = _secondsRemaining;
             _secondsRemaining = Math.Max(0, _secondsRemaining - delta);
 
             if (_secondsRemaining <= 0)
             {
+                CheckCountdownSound(previousSecondsRemaining);
                 EndGame();
                 return;
             }
@@ -261,6 +271,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _radioMessage = "DISPATCH: PRIORITY MISSED. -8 SEC!";
             }
 
+            // Includes both normal elapsed time and priority-miss penalties.
+            // Check before a wave-clear time bonus can raise the clock again.
+            CheckCountdownSound(previousSecondsRemaining);
+
             if (_secondsRemaining <= 0)
             {
                 EndGame();
@@ -275,6 +289,74 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
 
             _canvas.InvalidateVisual();
+        }
+
+        private void InitializeCountdownAudio()
+        {
+            // This WAV lives in the repo and is copied alongside the published client.
+            var filePath = Path.Combine(
+                AppContext.BaseDirectory, "Assets", "Sounds", "ChopChop.wav");
+
+            if (!File.Exists(filePath))
+            {
+                Debug.WriteLine("Arcade countdown sound missing: " + filePath);
+                return;
+            }
+
+            try
+            {
+                _chopChopPlayer.Volume = 0.85; // Only app playback volume.
+                _chopChopPlayer.MediaFailed += (_, e) =>
+                {
+                    _chopChopAvailable = false;
+                    Debug.WriteLine("Arcade countdown WAV failed: " + e.ErrorException);
+                };
+                _chopChopPlayer.Open(new Uri(filePath, UriKind.Absolute));
+                _chopChopAvailable = true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Arcade countdown WAV unavailable: " + ex);
+                _chopChopAvailable = false;
+            }
+        }
+
+        private void CheckCountdownSound(double previousSecondsRemaining)
+        {
+            // Flags are intentionally per GAME, not per wave. Re-crossing a
+            // threshold after a +5-second bonus must never play it twice.
+            if (!_chopChopPlayedAt60 &&
+                previousSecondsRemaining > 60 && _secondsRemaining <= 60)
+            {
+                _chopChopPlayedAt60 = true;
+                PlayChopChop();
+            }
+
+            if (!_chopChopPlayedAt10 &&
+                previousSecondsRemaining > 10 && _secondsRemaining <= 10)
+            {
+                _chopChopPlayedAt10 = true;
+                PlayChopChop();
+            }
+        }
+
+        private void PlayChopChop()
+        {
+            if (!_chopChopAvailable)
+                return;
+
+            try
+            {
+                // Rewind the same recording for the second warning at 10 sec.
+                _chopChopPlayer.Stop();
+                _chopChopPlayer.Position = TimeSpan.Zero;
+                _chopChopPlayer.Play();
+            }
+            catch (Exception ex)
+            {
+                _chopChopAvailable = false;
+                Debug.WriteLine("Arcade countdown playback failed: " + ex);
+            }
         }
 
         private void HandleKey(object sender, KeyEventArgs e)
@@ -941,6 +1023,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         {
             _timer.Stop();
             _gameClock.Stop();
+            _chopChopPlayer.Stop();
+            _chopChopPlayer.Close();
             _timer.Tick -= Tick;
             PreviewKeyDown -= HandleKey;
             _host.Closed -= HostClosed;
