@@ -1,4 +1,6 @@
 ﻿using SmartGridSuite.Client.Services;
+using SmartGridSuite.Client.Views.EasterEggs;
+using System.Windows.Input;
 using System.Threading;
 using System.Diagnostics;
 using System.Windows;
@@ -57,7 +59,34 @@ namespace SmartGridSuite.Client
             // synchronized with the active SmartGridSuite theme.
             WindowTitleBarService.Initialize();
 
+            // One secret keyboard shortcut, available from the launcher and all
+            // main modules. It only opens a visual overlay; app data is untouched.
+            EventManager.RegisterClassHandler(
+                typeof(Window),
+                UIElement.PreviewKeyDownEvent,
+                new KeyEventHandler(HandleShootingStarsShortcut),
+                handledEventsToo: true);
+
             base.OnStartup(e);
+        }
+
+        private static void HandleShootingStarsShortcut(
+            object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.F12 ||
+                Keyboard.Modifiers != (ModifierKeys.Control | ModifierKeys.Shift))
+                return;
+
+            e.Handled = true;
+
+            if (ShootingStarsWindow.IsRunning)
+            {
+                ShootingStarsWindow.Stop();
+                return;
+            }
+
+            if (sender is Window host)
+                ShootingStarsWindow.TryStart(host);
         }
 
         protected override void OnExit(ExitEventArgs e)
