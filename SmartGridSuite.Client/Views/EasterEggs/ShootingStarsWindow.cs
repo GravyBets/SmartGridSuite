@@ -99,6 +99,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _host.Closed += HostClosed;
             _host.LocationChanged += HostMoved;
             _host.SizeChanged += HostResized;
+            _host.IsVisibleChanged += HostVisibilityChanged;
+            _host.StateChanged += HostStateChanged;
             PreviewKeyDown += OnPreviewKeyDown;
             Loaded += OnLoaded;
             Closed += OnClosed;
@@ -565,6 +567,16 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private void HostClosed(object? sender, EventArgs e) => Close();
         private void HostMoved(object? sender, EventArgs e) => Close();
         private void HostResized(object sender, SizeChangedEventArgs e) => Close();
+        private void HostVisibilityChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (!_host.IsVisible)
+                Close();
+        }
+        private void HostStateChanged(object? sender, EventArgs e)
+        {
+            if (_host.WindowState == WindowState.Minimized)
+                Close();
+        }
 
         private void OnClosed(object? sender, EventArgs e)
         {
@@ -577,6 +589,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _host.Closed -= HostClosed;
             _host.LocationChanged -= HostMoved;
             _host.SizeChanged -= HostResized;
+            _host.IsVisibleChanged -= HostVisibilityChanged;
+            _host.StateChanged -= HostStateChanged;
             PreviewKeyDown -= OnPreviewKeyDown;
             Loaded -= OnLoaded;
             Closed -= OnClosed;
