@@ -283,8 +283,30 @@ namespace SmartGridSuite.Api.Controllers
 
             var totalCount = await query.CountAsync(ct);
 
-            var rows = await query
-                .OrderByDescending(t => t.CreatedAt)
+            // Sort the full filtered query in SQL BEFORE Skip/Take.
+            // Only these known columns are accepted; no dynamic SQL from the client.
+            // The Id tie-breaker keeps ordering deterministic across page boundaries.
+            var descending = req.SortDescending;
+            var orderedQuery = (req.SortColumn ?? "CreatedAt").Trim() switch
+            {
+                "Site" => descending ? query.OrderByDescending(t => t.Site) : query.OrderBy(t => t.Site),
+                "NotificationName" => descending ? query.OrderByDescending(t => t.NotificationName) : query.OrderBy(t => t.NotificationName),
+                "Problem" => descending ? query.OrderByDescending(t => t.Problem) : query.OrderBy(t => t.Problem),
+                "Notification" => descending ? query.OrderByDescending(t => t.Notification) : query.OrderBy(t => t.Notification),
+                "CurrentWorkOrder" => descending ? query.OrderByDescending(t => t.CurrentWorkOrder) : query.OrderBy(t => t.CurrentWorkOrder),
+                "WorkOrderType" => descending ? query.OrderByDescending(t => t.WorkOrderClass) : query.OrderBy(t => t.WorkOrderClass),
+                "Status" => descending
+                    ? query.OrderByDescending(t => t.Status == null || t.Status == "" ? "Needs Review" : t.Status)
+                    : query.OrderBy(t => t.Status == null || t.Status == "" ? "Needs Review" : t.Status),
+                "AssignedTech" => descending
+                    ? query.OrderByDescending(t => t.AssignedTech == null || t.AssignedTech == "" ? "(Unassigned)" : t.AssignedTech)
+                    : query.OrderBy(t => t.AssignedTech == null || t.AssignedTech == "" ? "(Unassigned)" : t.AssignedTech),
+                "CreatedAt" => descending ? query.OrderByDescending(t => t.CreatedAt) : query.OrderBy(t => t.CreatedAt),
+                "LastActivityAt" => descending ? query.OrderByDescending(t => t.LastActivityAt) : query.OrderBy(t => t.LastActivityAt),
+                _ => query.OrderByDescending(t => t.CreatedAt)
+            };
+
+            var rows = await orderedQuery
                 .ThenByDescending(t => t.Id)
                 .Skip(skip)
                 .Take(take)

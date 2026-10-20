@@ -20,6 +20,12 @@ public sealed class TicketQueryRequest
     public string? QuickFilter { get; set; }
     // None, MissingProblems, MissingWorkOrderType, Unassigned, Assigned
 
+    // Applied by the API before pagination; matches the Dispatch Tickets grid columns.
+    public string SortColumn { get; set; } = "CreatedAt";
+
+    // Preserve newest-created-first for existing API clients.
+    public bool SortDescending { get; set; } = true;
+
     public int Skip { get; set; } = 0;
 
     public int Take { get; set; } = 500;

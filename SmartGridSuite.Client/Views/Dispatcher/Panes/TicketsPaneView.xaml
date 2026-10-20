@@ -652,6 +652,7 @@
                               HorizontalGridLinesBrush="{DynamicResource SurfaceBorder}"
                               ColumnHeaderStyle="{StaticResource TicketsGridColumnHeaderStyle}"
                               SelectionChanged="TicketsGrid_SelectionChanged"
+                              Sorting="TicketsGrid_Sorting"
                               MouseDoubleClick="TicketsGrid_MouseDoubleClick">
 
                         <DataGrid.Columns>
@@ -680,21 +681,25 @@
                             </DataGridTemplateColumn>
 
                             <DataGridTextColumn Header="Site"
+                                                SortMemberPath="Site"
                                                 Width="105"
                                                 Binding="{Binding Site}"
                                                 ElementStyle="{StaticResource TrimCellText}"/>
 
                             <DataGridTextColumn Header="Notification Name"
+                                                SortMemberPath="NotificationName"
                                                 Width="2*"
                                                 Binding="{Binding NotificationName}"
                                                 ElementStyle="{StaticResource TrimCellText}"/>
 
                             <DataGridTextColumn Header="Problem / Issue"
+                                                SortMemberPath="Problem"
                                                 Width="2*"
                                                 Binding="{Binding Problem}"
                                                 ElementStyle="{StaticResource TrimCellText}"/>
 
                             <DataGridTemplateColumn Header="Notification"
+                                                    SortMemberPath="Notification"
                                                     Width="128">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -742,6 +747,7 @@
                             </DataGridTemplateColumn>
 
                             <DataGridTemplateColumn Header="Work Order"
+                                                    SortMemberPath="CurrentWorkOrder"
                                                     Width="130">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -789,26 +795,31 @@
                             </DataGridTemplateColumn>
 
                             <DataGridTextColumn Header="WO Type"
+                                                SortMemberPath="WorkOrderType"
                                                 Width="105"
                                                 Binding="{Binding WorkOrderType}"
                                                 ElementStyle="{StaticResource TrimCellText}"/>
 
                             <DataGridTextColumn Header="Status"
+                                                SortMemberPath="Status"
                                                 Width="115"
                                                 Binding="{Binding Status}"
                                                 ElementStyle="{StaticResource TrimCellText}"/>
 
                             <DataGridTextColumn Header="Tech"
+                                                SortMemberPath="AssignedTech"
                                                 Width="140"
                                                 Binding="{Binding AssignedTech}"
                                                 ElementStyle="{StaticResource TrimCellText}"/>
 
                             <DataGridTextColumn Header="Created"
+                                                SortMemberPath="CreatedAt"
                                                 Width="95"
                                                 Binding="{Binding CreatedAt, StringFormat={}{0:MM/dd/yyyy}}"
                                                 ElementStyle="{StaticResource TrimCellText}"/>
 
                             <DataGridTextColumn Header="Last Activity"
+                                                SortMemberPath="LastActivityAt"
                                                 Width="132"
                                                 Binding="{Binding LastActivityAt, StringFormat={}{0:MM/dd/yyyy HH:mm}}"
                                                 ElementStyle="{StaticResource TrimCellText}"/>
