@@ -1,5 +1,6 @@
 ﻿using SmartGridSuite.Client.Services;
 using System.Threading;
+using System.Diagnostics;
 using System.Windows;
 
 namespace SmartGridSuite.Client
@@ -13,6 +14,15 @@ namespace SmartGridSuite.Client
 
         private Mutex? _singleInstanceMutex;
         private bool _ownsSingleInstanceMutex;
+        private Uri? _pendingClickOnceUpdateUri;
+
+        // Called only after the About dialog has confirmed a newer published
+        // version and an absolute ClickOnce .application deployment URL.
+        internal void ScheduleClickOnceUpdate(Uri deploymentUri)
+        {
+            ArgumentNullException.ThrowIfNull(deploymentUri);
+            _pendingClickOnceUpdateUri = deploymentUri;
+        }
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -61,6 +71,41 @@ namespace SmartGridSuite.Client
 
             _singleInstanceMutex?.Dispose();
             _singleInstanceMutex = null;
+
+            var updateUri = _pendingClickOnceUpdateUri;
+            _pendingClickOnceUpdateUri = null;
+
+            if (updateUri != null)
+            {
+                try
+                {
+                    // The original application has released its single-instance
+                    // mutex. Let ClickOnce fetch and launch the new published app.
+                    var start = new ProcessStartInfo("rundll32.exe")
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+
+                    start.ArgumentList.Add("dfshim.dll,ShOpenVerbApplication");
+                    start.ArgumentList.Add(updateUri.AbsoluteUri);
+
+                    using var updater = Process.Start(start)
+                        ?? throw new InvalidOperationException(
+                            "Windows could not launch the ClickOnce deployment.");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        "Smart Grid Suite has closed, but the update could not " +
+                        "be started automatically. Open Smart Grid Suite from " +
+                        "its usual shortcut to update, or use your internal " +
+                        "installation page.\n\n" + ex.Message,
+                        "Smart Grid Suite Update",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+            }
 
             base.OnExit(e);
         }
