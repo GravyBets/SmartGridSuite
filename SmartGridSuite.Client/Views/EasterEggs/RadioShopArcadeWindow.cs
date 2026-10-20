@@ -370,7 +370,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     break;
                 case Key.Space:
                     e.Handled = true;
-                    Interact();
+                    // One purchase per physical key press; holding Space must
+                    // never accidentally buy multiple expensive upgrades.
+                    if (!e.IsRepeat)
+                        Interact();
                     return;
                 default:
                     return;
