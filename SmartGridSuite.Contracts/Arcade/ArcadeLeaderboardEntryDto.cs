@@ -4,6 +4,7 @@ public sealed class ArcadeLeaderboardEntryDto
 {
     public int Rank { get; set; }
     public string TechnicianName { get; set; } = "";
+    // Leaderboard ranks by ending cash, not total earnings.
     public int Score { get; set; }
     public int Wave { get; set; }
     public int Repairs { get; set; }
