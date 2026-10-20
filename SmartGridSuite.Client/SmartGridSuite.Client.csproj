@@ -54,6 +54,9 @@
     <Content Include="Assets\Sounds\MessageTone.mp3">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="Assets\Sounds\ChopChop.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <Compile Update="Views\Lineman\LinemanShellWindow.xaml.cs">
