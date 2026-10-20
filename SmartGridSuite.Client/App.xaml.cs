@@ -1,4 +1,6 @@
 ﻿using SmartGridSuite.Client.Services;
+using SmartGridSuite.Client.Views.EasterEggs;
+using System.Windows.Input;
 using System.Threading;
 using System.Diagnostics;
 using System.Windows;
@@ -57,7 +59,29 @@ namespace SmartGridSuite.Client
             // synchronized with the active SmartGridSuite theme.
             WindowTitleBarService.Initialize();
 
+            // Secret Radio Shop Arcade shortcut works from the launcher or any
+            // main module. The game is a standalone WPF window and never
+            // interacts with the application's tickets, tasks, or API.
+            EventManager.RegisterClassHandler(
+                typeof(Window),
+                UIElement.PreviewKeyDownEvent,
+                new KeyEventHandler(HandleArcadeShortcut),
+                handledEventsToo: true);
+
             base.OnStartup(e);
+        }
+
+        private static void HandleArcadeShortcut(
+            object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.F12 ||
+                Keyboard.Modifiers != (ModifierKeys.Control | ModifierKeys.Shift))
+                return;
+
+            e.Handled = true;
+
+            if (sender is Window host)
+                RadioShopArcadeWindow.Toggle(host);
         }
 
         protected override void OnExit(ExitEventArgs e)
