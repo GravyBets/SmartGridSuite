@@ -83,6 +83,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private bool _leaderboardAutoPaused;
         private List<ArcadeLeaderboardEntryDto> _leaderboard = new();
         private string _leaderboardStatus = "Loading shop leaderboard...";
+        private string _scoreUploadStatus = "Your score is saved after the shift.";
         private string _playerName = "Guest (local only)";
         private string? _employeeId;
         private readonly ApiClient _arcadeApi = ClientAppSettings.CreateApiClient();
@@ -142,7 +143,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Loaded += (_, _) =>
             {
                 NewGame();
-                _ = LoadLeaderboardAsync();
+                // The scoreboard is public: it must load even if resolving the
+                // local Windows account to a technician fails or times out.
+                _ = LoadPlayerAsync();
+                _ = RefreshLeaderboardAsync();
                 Activate();
                 Keyboard.Focus(this);
             };
@@ -202,6 +206,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _leaderboardVisible = false;
             _leaderboardAutoPaused = false;
             _radioMessage = "DISPATCH: Press SPACE to begin your shift.";
+            _scoreUploadStatus = "Your score is saved after the shift.";
             _lastMoveUtc = DateTime.MinValue;
             _gameClock.Reset();
             _chopChopPlayedAt60 = false;
@@ -558,7 +563,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _canvas.InvalidateVisual();
         }
 
-        private async Task LoadLeaderboardAsync()
+        private async Task LoadPlayerAsync()
         {
             try
             {
@@ -575,48 +580,94 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 {
                     _employeeId = null;
                     _playerName = "Guest (local only)";
+                    _scoreUploadStatus = "No matching active technician; local scores only.";
                 }
-
-                await RefreshLeaderboardAsync();
             }
             catch (Exception ex)
             {
+                // Identity lookup failures must NOT stop public leaderboard GET.
                 Debug.WriteLine("Arcade player lookup failed: " + ex);
-                _leaderboardStatus = "Shop leaderboard unavailable";
-                _canvas.InvalidateVisual();
+                if (!IsLoaded)
+                    return;
+
+                _employeeId = null;
+                _playerName = "Guest (local only)";
+                _scoreUploadStatus = "Technician lookup failed; local scores only.";
             }
+
+            _canvas.InvalidateVisual();
         }
+
+        private static string GetLeaderboardErrorMessage(Exception ex) => ex switch
+        {
+            ApiClient.ApiException { StatusCode: 404 } =>
+                "Leaderboard API missing (404). Deploy the arcade API.",
+            ApiClient.ApiException { StatusCode: 500 } =>
+                "Leaderboard server error (500). Check API logs / DB table.",
+            ApiClient.ApiException apiEx =>
+                $"Leaderboard API returned HTTP {apiEx.StatusCode}.",
+            ApiClient.ApiConnectionException =>
+                "Cannot reach the shop API. Check network/VPN.",
+            _ => "Leaderboard failed to load. Check client logs."
+        };
+
+        private static string GetUploadErrorMessage(Exception ex) => ex switch
+        {
+            ApiClient.ApiException { StatusCode: 404 } =>
+                "Score not saved (404). Check API and technician roster.",
+            ApiClient.ApiException { StatusCode: 400 } =>
+                "Score rejected (400). Check API validation.",
+            ApiClient.ApiException { StatusCode: 500 } =>
+                "Score not saved (500). Check API logs / DB table.",
+            ApiClient.ApiException apiEx =>
+                $"Score not saved (HTTP {apiEx.StatusCode}).",
+            ApiClient.ApiConnectionException =>
+                "Score not saved: cannot reach the shop API.",
+            _ => "Score upload failed. Check client logs."
+        };
 
         private async Task RefreshLeaderboardAsync()
         {
+            _leaderboardStatus = "Loading shop leaderboard...";
+            _canvas.InvalidateVisual();
+
             try
             {
                 var response = await _arcadeApi.GetAsync<List<ArcadeLeaderboardEntryDto>>(
                     "api/arcade/leaderboard");
+
                 if (!IsLoaded)
                     return;
 
                 _leaderboard = response ?? new List<ArcadeLeaderboardEntryDto>();
                 _leaderboardStatus = _leaderboard.Count == 0
-                    ? "No shop scores yet. Be the first!"
-                    : "Shop leaderboard";
+                    ? "No shop scores yet. Finish a shift to submit one!"
+                    : "Top 10 technicians by cash kept";
             }
             catch (Exception ex)
             {
                 Debug.WriteLine("Arcade leaderboard request failed: " + ex);
-                _leaderboardStatus = "Shop leaderboard unavailable";
+                if (!IsLoaded)
+                    return;
+
+                _leaderboardStatus = GetLeaderboardErrorMessage(ex);
             }
-            _canvas.InvalidateVisual();
+
+            if (IsLoaded)
+                _canvas.InvalidateVisual();
         }
 
         private async Task SubmitScoreAsync()
         {
             if (string.IsNullOrWhiteSpace(_employeeId))
             {
-                _leaderboardStatus = "Not on tech roster: local score only";
+                _scoreUploadStatus = "Not on tech roster: local score only.";
                 _canvas.InvalidateVisual();
                 return;
             }
+
+            _scoreUploadStatus = "Uploading shop score...";
+            _canvas.InvalidateVisual();
 
             try
             {
@@ -630,12 +681,19 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                         Repairs = _repairs
                     });
 
+                if (!IsLoaded)
+                    return;
+
+                _scoreUploadStatus = "Score submitted to shop leaderboard!";
                 await RefreshLeaderboardAsync();
             }
             catch (Exception ex)
             {
                 Debug.WriteLine("Arcade score submission failed: " + ex);
-                _leaderboardStatus = "Score not uploaded (network/API offline)";
+                if (!IsLoaded)
+                    return;
+
+                _scoreUploadStatus = GetUploadErrorMessage(ex);
                 _canvas.InvalidateVisual();
             }
         }
@@ -938,8 +996,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                         ? "NEW PERSONAL HIGH SCORE!"
                         : "DISPATCH: SEE YOU TOMORROW.",
                     166, 329, 17, GreenBrush, pixelsPerDip);
-                Text(dc, "R TO TRY AGAIN     ESC TO QUIT",
-                    166, 387, 16, DimBrush, pixelsPerDip, true);
+                Text(dc, _scoreUploadStatus, 166, 363, 13,
+                    CyanBrush, pixelsPerDip, false, 555);
+                Text(dc, "R TO TRY AGAIN     L FOR TOP 10     ESC TO QUIT",
+                    166, 404, 15, DimBrush, pixelsPerDip, true);
             }
             else
             {
