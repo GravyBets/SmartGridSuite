@@ -187,6 +187,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 : "";
 
         private bool _suppressFilterEvents;
+        // The user's date choice before enabling Closed (null means no override is active).
+        private string? _dateRangeBeforeClosed;
         private bool _hasLoadedOnce;
         private bool _isInitialLoadRunning;
         private bool _filtersInitialized;
@@ -1097,6 +1099,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                 nameof(StagedStatusesSummary));
 
             UpdateStatusBulkToggleText();
+            SyncDateRangeWithClosedStatus();
         }
 
         private static DispatchTicket Map(TicketListItemDto dto)
@@ -1311,8 +1314,48 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             StatusPopup.IsOpen =
                 false;
 
+            SyncDateRangeWithClosedStatus();
+
             await LoadTicketsFromApiAsync(
                 resetPage: true);
+        }
+
+        // Apply the Closed date-range shortcut only when the selection becomes active.
+        // Users can still manually change the date range while viewing Closed tickets.
+        private void SyncDateRangeWithClosedStatus()
+        {
+            var closedSelected = _appliedStatusNames.Contains("Closed");
+
+            if (closedSelected && _dateRangeBeforeClosed == null)
+            {
+                _dateRangeBeforeClosed =
+                    DateRangeFilter.SelectedItem as string ?? "All";
+
+                SetDateRangeWithoutReload("Last 3 Months");
+            }
+            else if (!closedSelected && _dateRangeBeforeClosed is string previousRange)
+            {
+                _dateRangeBeforeClosed = null;
+                SetDateRangeWithoutReload(previousRange);
+            }
+        }
+
+        private void SetDateRangeWithoutReload(string range)
+        {
+            var previousSuppress = _suppressFilterEvents;
+            _suppressFilterEvents = true;
+
+            try
+            {
+                DateRangeFilter.SelectedItem = range;
+            }
+            finally
+            {
+                _suppressFilterEvents = previousSuppress;
+            }
+
+            // Also restore the Custom date pickers when that was the user's choice.
+            UpdateCustomDateVisibility();
         }
 
         private (DateTime? from, DateTime? to) GetLastActivityDateRangeFromUi()
@@ -1678,6 +1721,8 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             StatusPopup.IsOpen =
                 false;
 
+            SyncDateRangeWithClosedStatus();
+
             await LoadTicketsFromApiAsync(
                 resetPage: true);
         }
@@ -1749,6 +1794,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                     null;
 
                 SetDefaultStatusSelectionWithoutRefresh();
+                _dateRangeBeforeClosed = null;
 
                 // Clear the clicked Summary Card selection.
                 _selectedSummaryCardStatus =
