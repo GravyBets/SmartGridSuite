@@ -162,18 +162,14 @@ namespace SmartGridSuite.Client.Views
                     // .NET 8 has no ApplicationDeployment.Update() API.
                     // Re-activate the published ClickOnce deployment, which checks
                     // for the current published version before starting the app.
-                    var start = new ProcessStartInfo("rundll32.exe")
-                    {
-                        UseShellExecute = false
-                    };
-                    start.ArgumentList.Add("dfshim.dll,ShOpenVerbApplication");
-                    start.ArgumentList.Add(deploymentUri.AbsoluteUri);
+                    // Trigger the ClickOnce deployment only after SmartGridSuite
+                    // fully exits and releases its single-instance mutex. Launching
+                    // it here can race with our own single-instance protection.
+                    if (Application.Current is not SmartGridSuite.Client.App app)
+                        throw new InvalidOperationException(
+                            "The Smart Grid Suite application could not start an update.");
 
-                    using var updater = Process.Start(start)
-                        ?? throw new InvalidOperationException(
-                            "Windows could not start the ClickOnce updater.");
-
-                    // Release our single-instance mutex before the updated app starts.
+                    app.ScheduleClickOnceUpdate(deploymentUri);
                     Application.Current.Shutdown();
                     return;
                 }
@@ -223,16 +219,18 @@ namespace SmartGridSuite.Client.Views
         {
             deploymentUri = null!;
 
-            // Only trust the ClickOnce deployment environment for an installed
-            // ClickOnce app; do not launch arbitrary locations returned by the API.
+            // A Visual Studio/debug run is not a ClickOnce installation and
+            // cannot safely relaunch itself through the ClickOnce updater.
             var isClickOnce = string.Equals(
                 Environment.GetEnvironmentVariable("ClickOnce_IsNetworkDeployed"),
                 "true",
                 StringComparison.OrdinalIgnoreCase);
 
-            var updateLocation = isClickOnce
-                ? Environment.GetEnvironmentVariable("ClickOnce_UpdateLocation")
-                : null;
+            if (!isClickOnce)
+                return false;
+
+            var updateLocation =
+                Environment.GetEnvironmentVariable("ClickOnce_UpdateLocation");
 
             // The API may explicitly provide a manifest URL in the future.
             // Today it provides a landing page instead.
