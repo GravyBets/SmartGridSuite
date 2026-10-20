@@ -69,7 +69,6 @@ public sealed class ArcadeController : ControllerBase
             request.Score > 650_000 ||
             request.Wave is < 1 or > 100 ||
             request.Repairs is < 0 or > 2000 ||
-            request.Score < request.Repairs * 100 ||
             request.Score > request.Repairs * 300 + request.Wave * 200)
         {
             return BadRequest("Invalid Radio Shop Arcade game score.");
@@ -96,7 +95,7 @@ public sealed class ArcadeController : ControllerBase
         // MariaDB/MySQL atomic upsert: simultaneous submissions cannot replace
         // a higher personal best with a lower one. best_score is updated LAST.
         await _db.Database.ExecuteSqlInterpolatedAsync(
-            $@"INSERT INTO arcade_high_scores
+            $@"INSERT INTO arcade_cash_high_scores
                 (technician_id, best_score, best_wave, best_repairs, achieved_at_utc)
                VALUES ({technician.Id}, {request.Score}, {request.Wave},
                        {request.Repairs}, {timestampUtc})
