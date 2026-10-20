@@ -61,6 +61,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private int _missedPriorities;
         private double _secondsRemaining;
         private bool _leaderboardVisible;
+        private bool _leaderboardAutoPaused;
         private List<ArcadeLeaderboardEntryDto> _leaderboard = new();
         private string _leaderboardStatus = "Loading shop leaderboard...";
         private string _playerName = "Guest (local only)";
@@ -171,6 +172,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _nextWaveAt = -1;
             _paused = false;
             _gameOver = false;
+            _leaderboardVisible = false;
+            _leaderboardAutoPaused = false;
             _radioMessage = "DISPATCH: Three sites are down.";
             _lastMoveUtc = DateTime.MinValue;
             _gameClock.Restart();
@@ -267,26 +270,38 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
             }
 
-            if (e.Key == Key.P && !_gameOver)
-            {
-                e.Handled = true;
-                TogglePause();
-                return;
-            }
-
             if (e.Key == Key.L)
             {
                 e.Handled = true;
                 _leaderboardVisible = !_leaderboardVisible;
+                if (_leaderboardVisible)
+                {
+                    _leaderboardAutoPaused = !_paused && !_gameOver;
+                    if (_leaderboardAutoPaused)
+                        TogglePause();
+
+                    _ = RefreshLeaderboardAsync();
+                }
+                else if (_leaderboardAutoPaused && !_gameOver)
+                {
+                    _leaderboardAutoPaused = false;
+                    TogglePause();
+                }
+
                 _canvas.InvalidateVisual();
                 return;
             }
 
             if (_leaderboardVisible)
             {
-                _leaderboardVisible = false;
-                _canvas.InvalidateVisual();
                 e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.P && !_gameOver)
+            {
+                e.Handled = true;
+                TogglePause();
                 return;
             }
 
@@ -516,12 +531,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Text(dc, _playerName, 608, 30, 14, GreenBrush, pixelsPerDip, true);
             Text(dc, "A TOTALLY UNAUTHORIZED TRAINING SIMULATOR", 28, 69,
                 12, DimBrush, pixelsPerDip);
+            Text(dc, "CYAN S = SHOP (SPACE TO RESTOCK)    GOLD = PRIORITY OUTAGE",
+                28, 96, 13, GoldBrush, pixelsPerDip, true);
 
             DrawCity(dc, pixelsPerDip);
             DrawSidebar(dc, pixelsPerDip);
-
-            if (_leaderboardVisible)
-                DrawLeaderboard(dc, pixelsPerDip);
 
             dc.DrawRectangle(PanelBrush, new Pen(Brush("#335c85"), 1),
                 new Rect(25, 537, 859, 43));
@@ -533,6 +547,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             if (_paused || _gameOver)
                 DrawEndOverlay(dc, pixelsPerDip);
+
+            // Draw last, including after Game Over, so standings stay visible.
+            if (_leaderboardVisible)
+                DrawLeaderboard(dc, pixelsPerDip);
         }
 
         private void DrawCity(DrawingContext dc, double pixelsPerDip)
@@ -762,7 +780,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static string ScoreFile =>
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "SmartGridSuite", "Arcade", "highscore.txt");
+                "SmartGridSuite", "Arcade", "highscore-v2.txt");
 
         private static int ReadHighScore()
         {
