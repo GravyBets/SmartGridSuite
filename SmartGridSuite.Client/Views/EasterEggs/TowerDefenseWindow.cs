@@ -484,7 +484,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 (1 + _lightningLevel * 0.58) /
                 (1 + _surgeLevel * 0.42);
             damage = Math.Max(0.5, damage);
-            _health -= damage;
+            DamageTower(damage);
             _message = "LIGHTNING STRIKE! -" +
                 damage.ToString("0.0", MoneyCulture) + " TOWER HP.";
 
@@ -498,11 +498,37 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private void EndWave()
         {
             _waveActive = false;
-            int reward = 120 + _wave * 65;
-            _cash += reward;
-            _score += 90 * _wave + (int)Math.Ceiling(_health);
-            _message = "WAVE " + _wave + " SURVIVED! +$" +
-                reward.ToString(MoneyCulture) + ". SPACE FOR NEXT WAVE.";
+            int reward = 120 + _wave * 65 +
+                _progression.Level(16) * (24 + _wave * 3);
+            _cash = AddCash(_cash, reward);
+            _score = AddCash(_score, 90 * _wave + (int)Math.Ceiling(_health));
+            int research = 8 + _wave * 3 + _progression.Level(19) * 5;
+            _progression.AddResearchCredits(research);
+
+            _health = Math.Min(MaxTowerHealth, _health +
+                _progression.Level(23) * 3);
+
+            _message = "WAVE " + _wave + " CLEARED! +$" +
+                reward.ToString("N0", MoneyCulture) + " / +" +
+                research.ToString(MoneyCulture) + " RESEARCH.";
+
+            if (_progression.Level(21) > 0 &&
+                _random.NextDouble() < Math.Min(0.75,
+                    _progression.Level(21) * 0.06))
+            {
+                var choices = Enumerable.Range(0, TowerDefenseProgression.Catalog.Length)
+                    .Where(i => _progression.Unlocked(i, _wave)).ToArray();
+                if (choices.Length > 0)
+                {
+                    int index = choices[_random.Next(choices.Length)];
+                    double previousMaxHp = MaxTowerHealth;
+                    double previousFenceHp = FenceMaxHealth;
+                    _progression.FreeUpgrade(index);
+                    ApplyUpgradeEffects(index, previousMaxHp, previousFenceHp);
+                    _message += " FREE " +
+                        TowerDefenseProgression.Catalog[index].Name.ToUpperInvariant() + "!";
+                }
+            }
         }
 
         private void EndGame()
@@ -511,6 +537,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _timer.Stop();
             _clock.Stop();
             _message = "RADIO SILENCE. DISPATCH IS NOT HAPPY.";
+            _progression.BankRun(_wave, _score);
             if (_score > _bestScore)
             {
                 _bestScore = _score;
@@ -667,16 +694,18 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
             else
             {
-                int count = Math.Min(_thieves.Count, 1 + _fenceLevel / 2);
+                int count = Math.Min(_thieves.Count,
+                    1 + _progression.Level(3) / 2 + _progression.Level(0) / 4);
                 for (int i = 0; i < count; i++)
                 {
                     _thieves.RemoveAt(IndexOfNearestThief());
                     _thievesStopped++;
-                    _cash += 22;
-                    _score += 35;
+                    _cash = AddCash(_cash, 22 + _progression.Level(17) * 4);
+                    _score = AddCash(_score, 35);
                 }
 
-                _securitySweepCooldown = Math.Max(3.0, 8.0 - _fenceLevel * 0.14);
+                _securitySweepCooldown = Math.Max(1.0,
+                    8.0 / (1 + _progression.Level(18) * 0.18));
                 _message = "SECURITY SWEEP: " + count + " THIEVES CHASED OFF! +$" +
                     (count * 22).ToString(MoneyCulture) + ".";
             }
@@ -696,12 +725,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
             else
             {
-                int count = Math.Min(_jammers.Count, 1 + _filterLevel / 2);
+                int count = Math.Min(_jammers.Count,
+                    1 + _progression.Level(4) / 2);
                 _jammers.RemoveRange(0, count);
                 _interferenceRemoved += count;
-                _cash += count * 40;
-                _score += count * 60;
-                _rfSweepCooldown = Math.Max(4.0, 11.0 - _filterLevel * 0.15);
+                _cash = AddCash(_cash, count * 40);
+                _score = AddCash(_score, count * 60);
+                _rfSweepCooldown = Math.Max(1.5,
+                    11.0 / (1 + _progression.Level(18) * 0.16));
                 _message = "RF SWEEP: " + count + " INTERFERENCE TOWERS REMOVED! +$" +
                     (count * 40).ToString(MoneyCulture) + ".";
             }
@@ -805,7 +836,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _surface.InvalidateVisual();
         }
 
-        private double FenceMaxHealth => _fenceLevel == 0 ? 0 : 24 + _fenceLevel * 20;
+        private double FenceMaxHealth => _fenceLevel == 0 ? 0 :
+            Math.Min(3000, 24 + _fenceLevel * 20 +
+                _progression.Level(13) * 16);
 
         private void Draw(DrawingContext dc, double dpi)
         {
@@ -1176,6 +1209,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         {
             _timer.Stop();
             _clock.Stop();
+            _progression.BankRun(_wave, _score);
             _timer.Tick -= Tick;
             PreviewKeyDown -= HandleKey;
             _host.Closed -= HostClosed;
