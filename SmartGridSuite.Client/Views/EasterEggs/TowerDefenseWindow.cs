@@ -72,7 +72,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private Button _towerRepairButton = null!;
         private Button _fenceRepairButton = null!;
         private Button _nextWaveButton = null!;
+        private readonly Button[] _perkButtons = new Button[3];
         private string _lastUpgradeSignature = "";
+        private DateTime _lastControlsRefreshUtc = DateTime.MinValue;
         private readonly DispatcherTimer _timer;
         private readonly Stopwatch _clock = new();
         private readonly Random _random = new();
@@ -179,6 +181,371 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 if (_started && !_paused && !_gameOver)
                     SetPaused(true);
             };
+        }
+
+        private static ControlTemplate MakeButtonTemplate()
+        {
+            var template = new ControlTemplate(typeof(Button));
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.Name = "chrome";
+            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(7));
+            border.SetValue(Border.BorderThicknessProperty, new Thickness(1.2));
+            border.SetValue(Border.PaddingProperty, new Thickness(10, 4, 10, 4));
+            var source = new RelativeSource(RelativeSourceMode.TemplatedParent);
+            border.SetBinding(Border.BackgroundProperty,
+                new Binding("Background") { RelativeSource = source });
+            border.SetBinding(Border.BorderBrushProperty,
+                new Binding("BorderBrush") { RelativeSource = source });
+
+            var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenter.SetValue(FrameworkElement.HorizontalAlignmentProperty,
+                HorizontalAlignment.Stretch);
+            presenter.SetValue(FrameworkElement.VerticalAlignmentProperty,
+                VerticalAlignment.Center);
+            presenter.SetBinding(ContentPresenter.ContentProperty,
+                new Binding("Content") { RelativeSource = source });
+            border.AppendChild(presenter);
+            template.VisualTree = border;
+
+            var hover = new Trigger
+            {
+                Property = Button.IsMouseOverProperty,
+                Value = true
+            };
+            hover.Setters.Add(new Setter(Border.BackgroundProperty,
+                Paint("#315574"), "chrome"));
+            hover.Setters.Add(new Setter(Border.BorderBrushProperty,
+                Gold, "chrome"));
+            template.Triggers.Add(hover);
+
+            var pressed = new Trigger
+            {
+                Property = Button.IsPressedProperty,
+                Value = true
+            };
+            pressed.Setters.Add(new Setter(Border.BackgroundProperty,
+                Paint("#426483"), "chrome"));
+            template.Triggers.Add(pressed);
+
+            var disabled = new Trigger
+            {
+                Property = Button.IsEnabledProperty,
+                Value = false
+            };
+            disabled.Setters.Add(new Setter(UIElement.OpacityProperty, 0.54));
+            template.Triggers.Add(disabled);
+            return template;
+        }
+
+        private static Button ArcadeButton(string title, double width,
+            double height, Brush accent)
+        {
+            return new Button
+            {
+                Content = title,
+                Width = width,
+                Height = height,
+                Background = ButtonFace,
+                BorderBrush = accent,
+                Foreground = White,
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new FontFamily("Consolas"),
+                Cursor = Cursors.Hand,
+                Focusable = false,
+                Template = MakeButtonTemplate()
+            };
+        }
+
+        private static TextBlock CardText(
+            double size, Brush color, bool bold = false)
+        {
+            return new TextBlock
+            {
+                FontSize = size,
+                Foreground = color,
+                FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
+                FontFamily = new FontFamily("Consolas"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private void BuildUpgradeControls()
+        {
+            for (int category = 0; category < 3; category++)
+            {
+                int selectedCategory = category;
+                var button = ArcadeButton(
+                    CategoryNames[category], 148, 37, Cyan);
+                button.Click += (_, _) =>
+                {
+                    _progression.SelectedCategory = selectedCategory;
+                    DescribeSelection();
+                    RefreshUpgradeControls();
+                };
+                _categoryButtons[category] = button;
+                _controls.Children.Add(button);
+            }
+
+            for (int row = 0; row < 8; row++)
+            {
+                int selectedRow = row;
+                var button = ArcadeButton("", PanelWidth - 22,
+                    50, GridInk);
+                button.BorderBrush = GridInk;
+                var grid = new Grid();
+                grid.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength(1, GridUnitType.Star)
+                });
+                grid.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength(122)
+                });
+                grid.RowDefinitions.Add(new RowDefinition
+                {
+                    Height = new GridLength(1, GridUnitType.Star)
+                });
+                grid.RowDefinitions.Add(new RowDefinition
+                {
+                    Height = new GridLength(1, GridUnitType.Star)
+                });
+
+                _upgradeNames[row] = CardText(15.6, White, true);
+                _upgradeDetails[row] = CardText(12, Muted);
+                _upgradeLevels[row] = CardText(11.7, Cyan, true);
+                _upgradePrices[row] = CardText(15, Green, true);
+                _upgradeLevels[row].TextAlignment = TextAlignment.Right;
+                _upgradePrices[row].TextAlignment = TextAlignment.Right;
+
+                Grid.SetRow(_upgradeNames[row], 0);
+                Grid.SetColumn(_upgradeNames[row], 0);
+                Grid.SetRow(_upgradeDetails[row], 1);
+                Grid.SetColumn(_upgradeDetails[row], 0);
+                Grid.SetRow(_upgradeLevels[row], 1);
+                Grid.SetColumn(_upgradeLevels[row], 1);
+                Grid.SetRow(_upgradePrices[row], 0);
+                Grid.SetColumn(_upgradePrices[row], 1);
+
+                grid.Children.Add(_upgradeNames[row]);
+                grid.Children.Add(_upgradeDetails[row]);
+                grid.Children.Add(_upgradeLevels[row]);
+                grid.Children.Add(_upgradePrices[row]);
+                button.Content = grid;
+                button.Click += (_, _) =>
+                {
+                    BuySelected(selectedRow);
+                    RefreshUpgradeControls();
+                };
+                _upgradeButtons[row] = button;
+                _controls.Children.Add(button);
+            }
+
+            _workshopButton = ArcadeButton("RESEARCH WORKSHOP", 180, 36, Purple);
+            _workshopButton.Click += (_, _) =>
+            {
+                ToggleWorkshop();
+                RefreshUpgradeControls();
+            };
+            _controls.Children.Add(_workshopButton);
+
+            _towerRepairButton = ArcadeButton("REPAIR TOWER", 164, 36, Green);
+            _towerRepairButton.Click += (_, _) =>
+            {
+                RepairTower();
+                RefreshUpgradeControls();
+            };
+            _controls.Children.Add(_towerRepairButton);
+
+            _fenceRepairButton = ArcadeButton("REPAIR FENCE", 160, 36, Cyan);
+            _fenceRepairButton.Click += (_, _) =>
+            {
+                RepairFence();
+                RefreshUpgradeControls();
+            };
+            _controls.Children.Add(_fenceRepairButton);
+
+            _nextWaveButton = ArcadeButton("PREPARE", 177, 36, Gold);
+            _nextWaveButton.Click += (_, _) =>
+            {
+                PrepareOrStartWave();
+                RefreshUpgradeControls();
+            };
+            _controls.Children.Add(_nextWaveButton);
+
+            string[] choices =
+            {
+                "OVERTIME PAY • CASH",
+                "STORM RECOVERY • HEAL",
+                "R&D GRANT • RESEARCH"
+            };
+            for (int choice = 0; choice < 3; choice++)
+            {
+                int selectedChoice = choice + 1;
+                _perkButtons[choice] = ArcadeButton(
+                    choices[choice], 690, 50,
+                    choice == 0 ? Green : choice == 1 ? Cyan : Purple);
+                _perkButtons[choice].Click += (_, _) =>
+                {
+                    SelectPerk(selectedChoice);
+                    RefreshUpgradeControls();
+                };
+                Canvas.SetLeft(_perkButtons[choice], 62);
+                Canvas.SetTop(_perkButtons[choice], 328 + 63 * choice);
+                _controls.Children.Add(_perkButtons[choice]);
+            }
+        }
+
+        private void RefreshControlsOnTick(object? sender, EventArgs e)
+        {
+            if ((DateTime.UtcNow - _lastControlsRefreshUtc).TotalMilliseconds < 170)
+                return;
+            _lastControlsRefreshUtc = DateTime.UtcNow;
+            RefreshUpgradeControls();
+        }
+
+        private void RefreshUpgradeControls()
+        {
+            if (_upgradeButtons[0] == null)
+                return;
+
+            bool workshop = _progression.WorkshopOpen;
+            bool gameUsable = _started && !_gameOver && !_paused &&
+                !_showHelp && !_perkPending;
+            bool rowsVisible = workshop || gameUsable;
+
+            string signature = string.Join("|",
+                workshop, _started, _paused, _gameOver, _showHelp,
+                _perkPending, _wave, _cash, _progression.Credits,
+                _progression.SelectedCategory, _progression.SelectedRow,
+                _health.ToString("0", MoneyCulture),
+                _fenceHealth.ToString("0", MoneyCulture),
+                string.Join(",", Enumerable.Range(0, 8).Select(row =>
+                {
+                    int index = _progression.SelectedCategory * 8 + row;
+                    return _progression.Level(index) + ":" +
+                        _progression.PermanentLevel(index);
+                })));
+
+            if (signature == _lastUpgradeSignature)
+                return;
+            _lastUpgradeSignature = signature;
+
+            for (int category = 0; category < 3; category++)
+            {
+                var button = _categoryButtons[category];
+                button.Visibility = rowsVisible
+                    ? Visibility.Visible : Visibility.Collapsed;
+                button.Background = _progression.SelectedCategory == category
+                    ? Paint("#294D69") : ButtonFace;
+                button.BorderBrush = _progression.SelectedCategory == category
+                    ? Gold : GridInk;
+                Canvas.SetLeft(button, workshop ? 183 + category * 315
+                    : PanelX + 10 + category * 155);
+                Canvas.SetTop(button, workshop ? 217 : 258);
+                button.Width = workshop ? 302 : 148;
+            }
+
+            for (int row = 0; row < 8; row++)
+            {
+                int index = _progression.SelectedCategory * 8 + row;
+                var upgrade = TowerDefenseProgression.Catalog[index];
+                bool unlocked = _progression.Unlocked(index, _wave);
+                long price = workshop
+                    ? _progression.WorkshopPrice(index)
+                    : _progression.RunPrice(index);
+                bool affordable = workshop
+                    ? _progression.Credits >= price
+                    : _cash >= price;
+
+                var button = _upgradeButtons[row];
+                button.Visibility = rowsVisible
+                    ? Visibility.Visible : Visibility.Collapsed;
+                button.IsEnabled = unlocked && affordable && rowsVisible;
+                button.BorderBrush = row == _progression.SelectedRow
+                    ? Gold : GridInk;
+                button.Background = row == _progression.SelectedRow
+                    ? Paint("#223A56") : ButtonFace;
+                button.Width = workshop ? 947 : PanelWidth - 22;
+                button.Height = workshop ? 51 : 50;
+                Canvas.SetLeft(button, workshop ? 182 : PanelX + 11);
+                Canvas.SetTop(button, workshop ? 266 + row * 55
+                    : FirstUpgradeY + row * UpgradePitch);
+
+                _upgradeNames[row].Text = upgrade.Name;
+                _upgradeDetails[row].Text = upgrade.Detail;
+                _upgradeLevels[row].Text = "LV " +
+                    (workshop ? _progression.PermanentLevel(index)
+                              : _progression.Level(index));
+                _upgradePrices[row].Text = !unlocked
+                    ? "WAVE " + upgrade.UnlockWave : Money(price);
+                _upgradePrices[row].Foreground = !unlocked
+                    ? Red : affordable ? Green : Gold;
+                button.ToolTip = upgrade.Detail + Environment.NewLine +
+                    (workshop ? "Permanent research" : "Current run") +
+                    " • " + (!unlocked
+                        ? "Unlock at wave " + upgrade.UnlockWave
+                        : "Price: " + Money(price)) +
+                    (affordable ? "" : " • Not enough funds");
+            }
+
+            bool showFooter = !workshop && !_showHelp && !_perkPending;
+            _workshopButton.Visibility = !_showHelp && !_perkPending &&
+                (workshop || !_waveActive && (!_started || _gameOver))
+                    ? Visibility.Visible : Visibility.Collapsed;
+            _workshopButton.Content = workshop
+                ? "CLOSE WORKSHOP" : "RESEARCH WORKSHOP";
+            Canvas.SetLeft(_workshopButton, workshop ? 1052 : 949);
+            Canvas.SetTop(_workshopButton, workshop ? 711 : 764);
+            _workshopButton.Width = workshop ? 168 : 180;
+
+            _towerRepairButton.Visibility = showFooter && _started && !_gameOver
+                ? Visibility.Visible : Visibility.Collapsed;
+            _towerRepairButton.IsEnabled = gameUsable &&
+                _health < MaxTowerHealth;
+            Canvas.SetLeft(_towerRepairButton, 596);
+            Canvas.SetTop(_towerRepairButton, 764);
+
+            _fenceRepairButton.Visibility = showFooter && _started && !_gameOver
+                ? Visibility.Visible : Visibility.Collapsed;
+            _fenceRepairButton.IsEnabled = gameUsable &&
+                _fenceLevel > 0 && _fenceHealth < FenceMaxHealth;
+            Canvas.SetLeft(_fenceRepairButton, 772);
+            Canvas.SetTop(_fenceRepairButton, 764);
+
+            _nextWaveButton.Visibility = showFooter && !_gameOver
+                ? Visibility.Visible : Visibility.Collapsed;
+            _nextWaveButton.IsEnabled = !workshop && !_paused &&
+                !_waveActive && !_perkPending && !_showHelp;
+            _nextWaveButton.Content = !_started ? "PREPARE" :
+                _wave == 0 ? "START WAVE 1" : "NEXT WAVE";
+            Canvas.SetLeft(_nextWaveButton, 1120);
+            Canvas.SetTop(_nextWaveButton, 764);
+
+            for (int choice = 0; choice < 3; choice++)
+                _perkButtons[choice].Visibility = _perkPending &&
+                    !_showHelp && !workshop
+                    ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void PrepareOrStartWave()
+        {
+            if (_progression.WorkshopOpen || _perkPending ||
+                _paused || _gameOver)
+                return;
+            if (!_started)
+            {
+                _started = true;
+                _clock.Restart();
+                _lastTickTime = 0;
+                _timer.Start();
+                _message = "BUILD YOUR RADIO DEFENSES, THEN SPACE FOR WAVE 1.";
+                _surface.InvalidateVisual();
+            }
+            else if (!_waveActive)
+                StartWave();
+            RefreshUpgradeControls();
         }
 
         public static bool IsRunning => _active != null;
