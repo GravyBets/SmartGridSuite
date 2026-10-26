@@ -565,11 +565,25 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (e.Key == Key.Escape)
             {
                 e.Handled = true;
-                Close();
+                if (_progression.WorkshopOpen)
+                {
+                    _progression.WorkshopOpen = false;
+                    _surface.InvalidateVisual();
+                }
+                else
+                    Close();
                 return;
             }
 
-            if (_gameOver && e.Key == Key.R)
+            if (e.Key == Key.W)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                    ToggleWorkshop();
+                return;
+            }
+
+            if (_gameOver && e.Key == Key.R && !_progression.WorkshopOpen)
             {
                 e.Handled = true;
                 if (!e.IsRepeat)
@@ -577,7 +591,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
             }
 
-            if (e.Key == Key.H)
+            if (e.Key == Key.H && !_progression.WorkshopOpen)
             {
                 e.Handled = true;
                 if (!e.IsRepeat)
@@ -586,6 +600,62 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
 
             if (_showHelp)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            // 24 upgrades: 3 tab pages x 8 rows. Entirely usable on laptop
+            // keyboards, including purchases within the permanent workshop.
+            if (e.Key is Key.Tab or Key.Left or Key.Right)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                {
+                    int step = e.Key == Key.Left || Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)
+                        ? -1 : 1;
+                    _progression.SelectedCategory =
+                        (_progression.SelectedCategory + step + 3) % 3;
+                    _surface.InvalidateVisual();
+                }
+                return;
+            }
+
+            if (e.Key is Key.Up or Key.Down)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                {
+                    int step = e.Key == Key.Up ? -1 : 1;
+                    _progression.SelectedRow = (_progression.SelectedRow + step + 8) % 8;
+                    _surface.InvalidateVisual();
+                }
+                return;
+            }
+
+            int row = e.Key switch
+            {
+                Key.D1 or Key.NumPad1 => 0,
+                Key.D2 or Key.NumPad2 => 1,
+                Key.D3 or Key.NumPad3 => 2,
+                Key.D4 or Key.NumPad4 => 3,
+                Key.D5 or Key.NumPad5 => 4,
+                Key.D6 or Key.NumPad6 => 5,
+                Key.D7 or Key.NumPad7 => 6,
+                Key.D8 or Key.NumPad8 => 7,
+                Key.Enter or Key.B => _progression.SelectedRow,
+                _ => -1
+            };
+
+            if (row >= 0)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                    BuySelected(row);
+                return;
+            }
+
+            if (_progression.WorkshopOpen)
             {
                 e.Handled = true;
                 return;
@@ -603,7 +673,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     _clock.Restart();
                     _lastTickTime = 0;
                     _timer.Start();
-                    _message = "PREPARE YOUR TOWER. BUY PROTECTION, THEN SPACE FOR WAVE 1.";
+                    _message = "BUILD YOUR RADIO DEFENSES, THEN SPACE FOR WAVE 1.";
                     _surface.InvalidateVisual();
                 }
                 else if (!_paused && !_waveActive)
@@ -614,42 +684,26 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (e.Key == Key.P && _started && !_gameOver)
             {
                 e.Handled = true;
-                SetPaused(!_paused);
+                if (!e.IsRepeat)
+                    SetPaused(!_paused);
                 return;
             }
 
             if (!_started || _paused || _gameOver)
                 return;
 
-            int option = e.Key switch
-            {
-                Key.D1 or Key.NumPad1 => 1,
-                Key.D2 or Key.NumPad2 => 2,
-                Key.D3 or Key.NumPad3 => 3,
-                Key.D4 or Key.NumPad4 => 4,
-                Key.D5 or Key.NumPad5 => 5,
-                Key.D6 or Key.NumPad6 => 6,
-                _ => 0
-            };
-
-            if (option > 0)
+            if (e.Key is Key.Q or Key.E or Key.T or Key.F)
             {
                 e.Handled = true;
-                if (!e.IsRepeat)
-                    Purchase(option);
-                return;
-            }
-
-            if (e.Key == Key.Q || e.Key == Key.E)
-            {
-                e.Handled = true;
-                if (!e.IsRepeat)
-                {
-                    if (e.Key == Key.Q)
-                        CallSecuritySweep();
-                    else
-                        CallRfSweep();
-                }
+                if (e.IsRepeat) return;
+                if (e.Key == Key.Q)
+                    CallSecuritySweep();
+                else if (e.Key == Key.E)
+                    CallRfSweep();
+                else if (e.Key == Key.T)
+                    RepairTower();
+                else
+                    RepairFence();
             }
         }
 
