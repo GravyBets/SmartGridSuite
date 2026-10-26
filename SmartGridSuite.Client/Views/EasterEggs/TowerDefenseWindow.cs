@@ -32,7 +32,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private const double FirstUpgradeY = 303;
         private const double UpgradePitch = 54.5;
         private const double TowerX = FieldX + FieldWidth / 2;
-        private const double TowerY = FieldY + FieldHeight / 2;
+        private const double TowerY = FieldY + FieldHeight / 2 - 22;
         private const double HubRadius = 31;
         private static readonly CultureInfo MoneyCulture = CultureInfo.InvariantCulture;
 
@@ -1154,7 +1154,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 thief.Distance = Math.Max(0, thief.Distance - thief.Speed * dt);
 
                 if (_fenceLevel > 0 && _fenceHealth > 0 &&
-                    thief.Distance <= FenceRadius && !thief.FenceHitDone)
+                    !thief.FenceHitDone &&
+                    TowerDefenseEnvironmentArt.WithinFence(
+                        ThiefPoint(thief),
+                        new Point(TowerX, TowerY), FenceRadius))
                 {
                     double wear = Math.Max(0.3, (4.5 + _wave * 0.18) /
                         (1 + _fenceLevel * 0.18 +
@@ -1255,14 +1258,34 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 (1 + _surgeLevel * 0.42) *
                 (1 + _progression.Level(15) * 0.10));
 
+        private double OrbAngle(int index, int count)
+        {
+            double seconds = _clock.Elapsed.TotalSeconds + _savedElapsedOffset;
+            return seconds * (1.45 + _progression.Level(6) * 0.025) +
+                index * Math.PI * 2 / count;
+        }
+
         private Point OrbPosition(int index, int count)
         {
-            double orbit = (_clock.Elapsed.TotalSeconds + _savedElapsedOffset) *
-                (1.45 + _progression.Level(6) * 0.025);
-            double angle = orbit + index * Math.PI * 2 / count;
-            double radius = Math.Min(125, 79 + _progression.Level(7) * 4);
-            return new Point(TowerX + Math.Cos(angle) * radius,
-                TowerY + Math.Sin(angle) * radius);
+            double radius = Math.Min(142, 91 + _progression.Level(7) * 4);
+            return TowerDefenseEnvironmentArt.OrbitPoint(
+                new Point(TowerX, TowerY), radius, OrbAngle(index, count));
+        }
+
+        private void DrawOrbitingDrones(DrawingContext dc, bool foreground)
+        {
+            int level = _progression.Level(6);
+            if (level <= 0) return;
+            int count = level >= 3 ? 2 : 1;
+            double seconds = _clock.Elapsed.TotalSeconds + _savedElapsedOffset;
+            for (int i = 0; i < count; i++)
+            {
+                double angle = OrbAngle(i, count);
+                bool isFront = Math.Sin(angle) >= 0;
+                if (isFront != foreground) continue;
+                TowerDefenseEnvironmentArt.DrawDroneOrb(dc,
+                    OrbPosition(i, count), angle, isFront, seconds);
+            }
         }
 
         private void FireMountedGun(double now, bool right)
@@ -1457,7 +1480,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 TowerY + dy * thief.Distance + dx * wobble);
         }
 
-        private double FenceRadius => Math.Min(145, 58 + _fenceLevel * 7);
+        // Large enough for the actual building footprint at Level 1, with
+        // a shared projected-ellipse hit test matching the visible fence.
+        private double FenceRadius => Math.Min(166, 106 + _fenceLevel * 6);
 
         private void LightningStrike()
         {
@@ -2083,7 +2108,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (_fenceLevel > 0)
                 TowerDefenseEnvironmentArt.DrawFence(dc,
                     new Point(TowerX, TowerY), FenceRadius,
-                    _fenceHealth > 0, _fenceLevel);
+                    _fenceHealth > 0, _fenceLevel, false);
+
+            // Far-side drones disappear partly behind the tall tower,
+            // reinforcing the elevated viewing angle.
+            DrawOrbitingDrones(dc, false);
 
             // A cohesive site drawing: tapered four-leg lattice, concrete
             // foundations, equipment cabinet, microwave dish, sector panels,
@@ -2094,6 +2123,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _lightningLevel, _surgeLevel, _filterLevel);
             DrawMountedGun(dc, false);
             DrawMountedGun(dc, true);
+
+            // The front fence rail crosses the compound foreground, not
+            // the full height of the tower sprite.
+            if (_fenceLevel > 0)
+                TowerDefenseEnvironmentArt.DrawFence(dc,
+                    new Point(TowerX, TowerY), FenceRadius,
+                    _fenceHealth > 0, _fenceLevel, true);
 
             // The tower's integrity can be read directly beneath it.
             dc.DrawRectangle(DarkSteel, null,
@@ -2162,20 +2198,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     FieldY + 41, boss.Health, boss.MaxHealth, 350);
             }
 
-            // Orbiting blue interceptor orb(s), visually linked to the
-            // Drone Interceptor workshop purchase and real attacks.
-            int droneLevel = _progression.Level(6);
-            if (droneLevel > 0)
-            {
-                int orbCount = droneLevel >= 3 ? 2 : 1;
-                for (int orb = 0; orb < orbCount; orb++)
-                {
-                    Point p = OrbPosition(orb, orbCount);
-                    dc.DrawEllipse(null, new Pen(Cyan, 1.5), p, 16, 16);
-                    dc.DrawEllipse(Purple, new Pen(White, 1.5), p, 9, 9);
-                    dc.DrawEllipse(Cyan, null, p, 4, 4);
-                }
-            }
+            // Near-side drone floats in front of the tower; smaller
+            // far-side drone was drawn behind it.
+            DrawOrbitingDrones(dc, true);
 
             foreach (var flash in _defenseFlashes)
                 dc.DrawLine(new Pen(flash.Ink, 2.5), flash.From, flash.To);
