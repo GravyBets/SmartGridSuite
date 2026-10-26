@@ -102,7 +102,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             return Math.Max(1, (long)Math.Ceiling(Math.Min(cost, 1e15)));
         }
 
-        public bool BuyRun(int index, ref long cash, int currentWave)
+        public bool BuyRun(int index, ref int cash, int currentWave)
         {
             if (!Unlocked(index, currentWave))
                 return false;
