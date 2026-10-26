@@ -1001,6 +1001,22 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _rfRingTime = Math.Max(0, _rfRingTime - dt);
             _defenseFlashes.RemoveAll(flash => flash.EndTime <= now);
 
+            // Auto Next is an optional purchased convenience, not an idle
+            // prerequisite. Never skip milestone decisions or run while
+            // paused (the early return above already handles pausing).
+            if (_autoNextRemaining >= 0 && !_waveActive &&
+                _autoNextPurchased && _autoNextEnabled &&
+                !_perkPending && !_showHelp && !_progression.WorkshopOpen)
+            {
+                _autoNextRemaining -= dt;
+                if (_autoNextRemaining <= 0)
+                {
+                    _autoNextRemaining = -1;
+                    StartWave();
+                    return;
+                }
+            }
+
             if (!_waveActive)
             {
                 _surface.InvalidateVisual();
@@ -1505,6 +1521,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _perkPending = true;
                 _message = "MILESTONE BONUS! CHOOSE 1 CASH / 2 REPAIR / 3 RESEARCH.";
             }
+            QueueAutoNextWave();
         }
 
         private void SelectPerk(int option)
@@ -1537,6 +1554,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                         research.ToString(MoneyCulture) + " RESEARCH CREDITS.";
                     break;
             }
+            QueueAutoNextWave();
             _surface.InvalidateVisual();
             RefreshUpgradeControls();
         }
@@ -2008,7 +2026,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             dc.DrawRectangle(Panel, new Pen(GridInk, 1),
                 new Rect(24, 759, 1274, 47));
-            Text(dc, "AUTO: GUNS / SECURITY / RF    H HELP  P PAUSE",
+            Text(dc, "AUTO GUNS / SECURITY / RF    H HELP  P PAUSE",
                 35, 773, 12, White, dpi, true);
 
             if (!_started || _paused || _gameOver)
