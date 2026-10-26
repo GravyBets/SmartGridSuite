@@ -721,10 +721,15 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             // Autonomous countermeasures give keyboard-only players meaningful
             // choices without requiring a trackpad and pixel-perfect aiming.
+            // Mounted guns deal real damage before automated cleanup teams.
+            FireMountedGun(now, false);
+            FireMountedGun(now, true);
+            ResolveDefeatedThreats();
+
             if (_patrolCooldown <= 0)
             {
                 int count = Math.Min(_thieves.Count,
-                    1 + patrol / 3 + vehicles / 2);
+                    1 + vehicles / 2);
                 double radius = Math.Min(450, 105 + coverage * 17);
                 for (int i = 0; i < count; i++)
                 {
@@ -739,8 +744,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     _cash = AddCash(_cash, 14 + _progression.Level(17) * 4);
                     _score = AddCash(_score, 24);
                 }
-                _patrolCooldown = Math.Max(0.2,
-                    3.4 / (1 + patrolSpeed * 0.20 + patrol * 0.07));
+                _patrolCooldown = Math.Max(0.8,
+                    4.5 / (1 + vehicles * 0.13));
             }
 
             // The drone intercepts nearby trouble without manual targeting.
@@ -780,6 +785,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 }
                 _droneCooldown = Math.Max(0.25, 3.1 / (1 + drone * 0.20));
             }
+
+            // Q and E are no longer required. Nearby threats automatically
+            // trigger each response service as soon as its cooldown ends.
+            if (_securitySweepCooldown <= 0 &&
+                _thieves.Any(t => t.Distance <= 165))
+                CallSecuritySweep();
+            if (_rfSweepCooldown <= 0 && _jammers.Count > 0)
+                CallRfSweep();
 
             for (int i = _thieves.Count - 1; i >= 0; i--)
             {
@@ -847,6 +860,81 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 EndWave();
 
             _surface.InvalidateVisual();
+        }
+
+        private void FireMountedGun(double now, bool right)
+        {
+            double cooldown = right ? _rightGunCooldown : _leftGunCooldown;
+            if (cooldown > 0)
+                return;
+
+            int gunPower = _progression.Level(0);
+            int fireRate = _progression.Level(1);
+            int rangeLevel = _progression.Level(2);
+            double range = Math.Min(500, 225 + rangeLevel * 23);
+
+            CopperThief? thief = _thieves
+                .Where(t => t.Health > 0 && t.Distance <= range)
+                .OrderBy(t => t.Distance).FirstOrDefault();
+            InterferenceTower? rf = _jammers
+                .Where(t => t.Health > 0 &&
+                    Distance(new Point(t.X, t.Y), new Point(TowerX, TowerY)) <= range)
+                .OrderBy(t => Distance(new Point(t.X, t.Y),
+                    new Point(TowerX, TowerY))).FirstOrDefault();
+
+            Point from = new(TowerX + (right ? 21 : -21), TowerY - 23);
+            Point? target = null;
+            Brush ink;
+            double damage = (right ? 12 : 14) +
+                gunPower * (right ? 5.5 : 6.5);
+
+            if ((right && rf != null) || (thief == null && rf != null))
+            {
+                rf!.Health -= damage;
+                target = new Point(rf.X, rf.Y);
+                ink = Purple;
+            }
+            else if (thief != null)
+            {
+                thief.Health -= damage;
+                target = ThiefPoint(thief);
+                ink = Gold;
+            }
+            else
+            {
+                if (right) _rightGunCooldown = 0.12;
+                else _leftGunCooldown = 0.12;
+                return;
+            }
+
+            _defenseFlashes.Add(new DefenseFlash(from, target.Value,
+                now + 0.13, ink));
+            if (right) _rightGunAim = target;
+            else _leftGunAim = target;
+            double reload = Math.Max(0.17, (right ? 1.35 : 1.02) /
+                (1 + fireRate * 0.17));
+            if (right) _rightGunCooldown = reload;
+            else _leftGunCooldown = reload;
+        }
+
+        private void ResolveDefeatedThreats()
+        {
+            for (int i = _thieves.Count - 1; i >= 0; i--)
+            {
+                if (_thieves[i].Health > 0) continue;
+                _thieves.RemoveAt(i);
+                _thievesStopped++;
+                _cash = AddCash(_cash, 25 + _progression.Level(17) * 4);
+                _score = AddCash(_score, 40);
+            }
+            for (int i = _jammers.Count - 1; i >= 0; i--)
+            {
+                if (_jammers[i].Health > 0) continue;
+                _jammers.RemoveAt(i);
+                _interferenceRemoved++;
+                _cash = AddCash(_cash, 45);
+                _score = AddCash(_score, 65);
+            }
         }
 
         private static int AddCash(int value, int delta) =>
