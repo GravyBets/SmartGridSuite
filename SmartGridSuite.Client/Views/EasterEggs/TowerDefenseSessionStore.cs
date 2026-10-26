@@ -48,6 +48,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
     internal sealed class TowerDefenseThreatSnapshot
     {
         public int Kind { get; set; }
+        public bool FenceHitDone { get; set; }
         public double Angle { get; set; }
         public double Distance { get; set; }
         public double Speed { get; set; }
