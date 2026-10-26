@@ -74,9 +74,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         {
             dc.PushTransform(new TranslateTransform(center.X, center.Y));
 
+            // A small rectangular equipment-pad glow, not more concentric
+            // circles competing with the main site's fence and UI overlays.
             dc.DrawEllipse(Shadow, null, new Point(5, 46), 78, 23);
-            dc.DrawEllipse(Grass, RingPen, new Point(0, 17), 67, 47);
-            dc.DrawEllipse(CyanGlow, null, new Point(0, 12), 48, 34);
+            dc.DrawRoundedRectangle(Grass, null,
+                new Rect(-73, -2, 146, 76), 11, 11);
+            dc.DrawRoundedRectangle(CyanGlow, null,
+                new Rect(-57, 12, 114, 47), 7, 7);
 
             // Heavy concrete slab with depth, tie-down bolts, warning stripes.
             dc.DrawGeometry(Concrete, DarkEdge, BasePlatform);
@@ -194,9 +198,16 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
             if (filtering > 0)
             {
-                dc.DrawEllipse(null, RingPen, new Point(0, 2),
-                    42 + Math.Min(3, filtering) * 5,
-                    29 + Math.Min(3, filtering) * 5);
+                // RF filtering is indicated on the cabinet and sector feed
+                // rather than a large inaccurate radio-wave ellipse.
+                for (int i = 0; i < Math.Min(3, filtering); i++)
+                {
+                    double x = 33 + i * 6;
+                    dc.DrawLine(RingPen,
+                        new Point(x, 17), new Point(x, 10));
+                    dc.DrawEllipse(Turquoise, null,
+                        new Point(x, 8), 1.7, 1.7);
+                }
             }
 
             dc.Pop();
