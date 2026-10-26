@@ -107,6 +107,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private double _rfSweepCooldown;
         private double _patrolCooldown;
         private double _droneCooldown;
+        private double _leftGunCooldown;
+        private double _rightGunCooldown;
+        private Point? _leftGunAim;
+        private Point? _rightGunAim;
         private bool _perkPending;
         private double _securityRingTime;
         private double _rfRingTime;
@@ -598,6 +602,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _rfSweepCooldown = 0;
             _patrolCooldown = 1.6;
             _droneCooldown = 0.8;
+            _leftGunCooldown = 0.15;
+            _rightGunCooldown = 0.65;
+            _leftGunAim = null;
+            _rightGunAim = null;
             _perkPending = false;
             _securityRingTime = 0;
             _rfRingTime = 0;
@@ -649,6 +657,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _rfSweepCooldown = Math.Max(0, _rfSweepCooldown - dt);
             _patrolCooldown = Math.Max(0, _patrolCooldown - dt);
             _droneCooldown = Math.Max(0, _droneCooldown - dt);
+            _leftGunCooldown = Math.Max(0, _leftGunCooldown - dt);
+            _rightGunCooldown = Math.Max(0, _rightGunCooldown - dt);
             _flashRemaining = Math.Max(0, _flashRemaining - dt);
             _securityRingTime = Math.Max(0, _securityRingTime - dt);
             _rfRingTime = Math.Max(0, _rfRingTime - dt);
@@ -866,7 +876,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             {
                 Angle = angle,
                 Distance = radius,
-                Speed = 22 + _wave * 2.2 + _random.NextDouble() * 9
+                Speed = 22 + _wave * 2.2 + _random.NextDouble() * 9,
+                MaxHealth = 22 + _wave * 5,
+                Health = 22 + _wave * 5
             });
         }
 
@@ -879,7 +891,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _jammers.Add(new InterferenceTower
             {
                 X = TowerX + Math.Cos(angle) * radius,
-                Y = TowerY + Math.Sin(angle) * radius
+                Y = TowerY + Math.Sin(angle) * radius,
+                MaxHealth = 42 + _wave * 9,
+                Health = 42 + _wave * 9
             });
             _message = "INTERFERENCE TOWER DETECTED! E = RF SWEEP.";
         }
@@ -1873,6 +1887,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             public double Angle { get; set; }
             public double Distance { get; set; }
             public double Speed { get; set; }
+            public double Health { get; set; }
+            public double MaxHealth { get; set; }
         }
 
         private sealed record DefenseFlash(
@@ -1883,6 +1899,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             public double X { get; set; }
             public double Y { get; set; }
             public double Age { get; set; }
+            public double Health { get; set; }
+            public double MaxHealth { get; set; }
         }
 
         private sealed class GameSurface : FrameworkElement
