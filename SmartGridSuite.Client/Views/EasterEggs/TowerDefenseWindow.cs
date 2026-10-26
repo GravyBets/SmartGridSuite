@@ -5,7 +5,9 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -17,10 +19,18 @@ namespace SmartGridSuite.Client.Views.EasterEggs
     /// </summary>
     public sealed class TowerDefenseWindow : Window
     {
-        private const double FieldX = 27;
-        private const double FieldY = 126;
-        private const double FieldWidth = 544;
-        private const double FieldHeight = 388;
+        // Virtual design is scaled by Viewbox to fit available laptop space.
+        // Hit testing uses unscaled design coordinates inside the Viewbox.
+        private const double DesignWidth = 1320;
+        private const double DesignHeight = 820;
+        private const double FieldX = 24;
+        private const double FieldY = 129;
+        private const double FieldWidth = 768;
+        private const double FieldHeight = 608;
+        private const double PanelX = 814;
+        private const double PanelWidth = 484;
+        private const double FirstUpgradeY = 303;
+        private const double UpgradePitch = 54.5;
         private const double TowerX = FieldX + FieldWidth / 2;
         private const double TowerY = FieldY + FieldHeight / 2;
         private const double HubRadius = 31;
@@ -51,6 +61,18 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private readonly Window _host;
         private readonly GameSurface _surface;
+        private readonly Canvas _controls = new();
+        private readonly Button[] _upgradeButtons = new Button[8];
+        private readonly TextBlock[] _upgradeNames = new TextBlock[8];
+        private readonly TextBlock[] _upgradeDetails = new TextBlock[8];
+        private readonly TextBlock[] _upgradeLevels = new TextBlock[8];
+        private readonly TextBlock[] _upgradePrices = new TextBlock[8];
+        private readonly Button[] _categoryButtons = new Button[3];
+        private Button _workshopButton = null!;
+        private Button _towerRepairButton = null!;
+        private Button _fenceRepairButton = null!;
+        private Button _nextWaveButton = null!;
+        private string _lastUpgradeSignature = "";
         private readonly DispatcherTimer _timer;
         private readonly Stopwatch _clock = new();
         private readonly Random _random = new();
@@ -102,11 +124,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _host = host;
             Owner = host;
             Title = "Grid Under Attack — 360° Tower Defense";
-            Width = 940;
-            Height = 650;
-            MinWidth = Width;
-            MinHeight = Height;
-            ResizeMode = ResizeMode.NoResize;
+            Width = Math.Min(1360, Math.Max(760, SystemParameters.WorkArea.Width - 24));
+            Height = Math.Min(890, Math.Max(535, SystemParameters.WorkArea.Height - 18));
+            MinWidth = 760;
+            MinHeight = 535;
+            ResizeMode = ResizeMode.CanResize;
             ShowInTaskbar = false;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             Background = Backdrop;
@@ -114,12 +136,31 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Focusable = true;
 
             _surface = new GameSurface(this);
-            Content = _surface;
+            var design = new Grid
+            {
+                Width = DesignWidth,
+                Height = DesignHeight
+            };
+            design.Children.Add(_surface);
+            _controls.Width = DesignWidth;
+            _controls.Height = DesignHeight;
+            design.Children.Add(_controls);
+            BuildUpgradeControls();
+
+            // Larger by default, with graceful downscaling for small screens.
+            // This keeps the radio tower, panel, and buttons inside the window.
+            Content = new Viewbox
+            {
+                Stretch = Stretch.Uniform,
+                Child = design
+            };
+
             _timer = new DispatcherTimer(DispatcherPriority.Background)
             {
                 Interval = TimeSpan.FromMilliseconds(45)
             };
             _timer.Tick += Tick;
+            _timer.Tick += RefreshControlsOnTick;
             PreviewKeyDown += HandleKey;
 
             _host.Closed += HostClosed;
@@ -129,6 +170,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Loaded += (_, _) =>
             {
                 NewGame();
+                RefreshUpgradeControls();
                 Activate();
                 Keyboard.Focus(this);
             };
@@ -1030,11 +1072,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void Draw(DrawingContext dc, double dpi)
         {
-            dc.DrawRectangle(Backdrop, null, new Rect(0, 0, 940, 650));
-            dc.DrawRectangle(Panel, new Pen(GridInk, 2), new Rect(12, 12, 894, 580));
+            dc.DrawRectangle(Backdrop, null,
+                new Rect(0, 0, DesignWidth, DesignHeight));
+            dc.DrawRectangle(Panel, new Pen(GridInk, 2),
+                new Rect(12, 12, 1296, 735));
             Text(dc, "GRID UNDER ATTACK", 27, 23, 29, Cyan, dpi, true);
             Text(dc, "360 DEGREE RADIO TOWER DEFENSE", 28, 64, 13, Muted, dpi);
-            Text(dc, _message, 28, 97, 12, Gold, dpi, true, 858);
+            Text(dc, _message, 28, 96, 15, Gold, dpi, true, 1250);
 
             DrawField(dc, dpi);
             DrawSidebar(dc, dpi);
@@ -1048,13 +1092,12 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 ? "READY"
                 : Math.Ceiling(_rfSweepCooldown).ToString(MoneyCulture) + "s";
             Text(dc, "Q SECURITY: " + patrol + "     E RF SWEEP: " + rf,
-                37, 518, 11, Cyan, dpi, true);
+                38, 738, 13, Cyan, dpi, true);
 
-            dc.DrawRectangle(Panel, new Pen(GridInk, 1), new Rect(25, 539, 859, 42));
-            Text(dc, "Q SECURITY  E RF  T TOWER REPAIR  F FENCE",
-                37, 551, 11, White, dpi, true);
-            Text(dc, "1-8 BUY  TAB CATEGORY  W WORKSHOP  SPACE WAVE",
-                478, 551, 10.5, Cyan, dpi, true, 400);
+            dc.DrawRectangle(Panel, new Pen(GridInk, 1),
+                new Rect(24, 759, 1274, 47));
+            Text(dc, "Q SECURITY  E RF  H HELP  P PAUSE",
+                35, 773, 13, White, dpi, true);
 
             if (!_started || _paused || _gameOver)
                 DrawOverlay(dc, dpi);
@@ -1071,8 +1114,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             dc.DrawRectangle(Ground, new Pen(Cyan, 2),
                 new Rect(FieldX - 2, FieldY - 2, FieldWidth + 4, FieldHeight + 4));
 
-            for (int y = 0; y < 12; y++)
-            for (int x = 0; x < 17; x++)
+            for (int y = 0; y < 19; y++)
+            for (int x = 0; x < 24; x++)
             {
                 double xx = FieldX + x * 32, yy = FieldY + y * 32;
                 dc.DrawRectangle(Ground, TileOutline,
@@ -1520,6 +1563,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _clock.Stop();
             _progression.BankRun(_wave, _score);
             _timer.Tick -= Tick;
+            _timer.Tick -= RefreshControlsOnTick;
             PreviewKeyDown -= HandleKey;
             _host.Closed -= HostClosed;
             _host.IsVisibleChanged -= HostVisibilityChanged;
@@ -1557,7 +1601,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
 
             protected override Size MeasureOverride(Size availableSize) =>
-                new(940, 600);
+                new(DesignWidth, DesignHeight);
 
             protected override void OnRender(DrawingContext drawingContext)
             {
