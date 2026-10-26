@@ -612,6 +612,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _jammers.Clear();
             _bestScore = Math.Max(ReadBestScore(), _progression.BestScore);
             _surface.InvalidateVisual();
+            RefreshUpgradeControls();
         }
 
         private void StartWave()
@@ -632,6 +633,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _waveActive = true;
             _message = "WAVE " + _wave + ": TROUBLE IN EVERY DIRECTION!";
             _surface.InvalidateVisual();
+            RefreshUpgradeControls();
         }
 
         private void Tick(object? sender, EventArgs e)
@@ -1000,6 +1002,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     break;
             }
             _surface.InvalidateVisual();
+            RefreshUpgradeControls();
         }
 
         private void EndGame()
@@ -1015,6 +1018,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 SaveBestScore(_score);
             }
             _surface.InvalidateVisual();
+            RefreshUpgradeControls();
         }
 
         private void SetPaused(bool paused)
@@ -1029,6 +1033,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             // Account for stopwatch stopping without a large simulation jump.
             _lastTickTime = _clock.Elapsed.TotalSeconds;
             _surface.InvalidateVisual();
+            RefreshUpgradeControls();
         }
 
         private void HandleKey(object sender, KeyEventArgs e)
@@ -1152,20 +1157,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (e.Key == Key.Space)
             {
                 e.Handled = true;
-                if (e.IsRepeat || _gameOver)
-                    return;
-
-                if (!_started)
-                {
-                    _started = true;
-                    _clock.Restart();
-                    _lastTickTime = 0;
-                    _timer.Start();
-                    _message = "BUILD YOUR RADIO DEFENSES, THEN SPACE FOR WAVE 1.";
-                    _surface.InvalidateVisual();
-                }
-                else if (!_paused && !_waveActive)
-                    StartWave();
+                if (!e.IsRepeat)
+                    PrepareOrStartWave();
                 return;
             }
 
@@ -1210,6 +1203,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 SetPaused(false);
             }
             _surface.InvalidateVisual();
+            RefreshUpgradeControls();
         }
 
         private int IndexOfNearestThief()
@@ -1292,6 +1286,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 (_progression.Unlocked(index, _wave) ? "" :
                     " (UNLOCK WAVE " + item.UnlockWave + ")");
             _surface.InvalidateVisual();
+            RefreshUpgradeControls();
         }
 
         private void BuySelected(int row)
@@ -1348,6 +1343,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _message = "SPACE TO START, OR W FOR THE PERMANENT WORKSHOP.";
             }
             _surface.InvalidateVisual();
+            RefreshUpgradeControls();
         }
 
         private void ApplyUpgradeEffects(int index, double oldMaxHealth,
@@ -1390,6 +1386,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     cost.ToString("N0", MoneyCulture) + ".";
             }
             _surface.InvalidateVisual();
+            RefreshUpgradeControls();
         }
 
         private void RepairFence()
@@ -1417,6 +1414,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 }
             }
             _surface.InvalidateVisual();
+            RefreshUpgradeControls();
         }
 
         private void ToggleWorkshop()
@@ -1431,6 +1429,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _progression.WorkshopOpen = !_progression.WorkshopOpen;
             _showHelp = false;
             _surface.InvalidateVisual();
+            RefreshUpgradeControls();
         }
 
         private double FenceMaxHealth => _fenceLevel == 0 ? 0 :
