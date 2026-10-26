@@ -355,7 +355,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             };
             _controls.Children.Add(_workshopButton);
 
-            _towerRepairButton = ArcadeButton("REPAIR TOWER", 164, 36, Green);
+            _towerRepairButton = ArcadeButton("REPAIR TOWER", 208, 36, Green);
+            _towerRepairButton.FontSize = 12;
+            ToolTipService.SetShowOnDisabled(_towerRepairButton, true);
             _towerRepairButton.Click += (_, _) =>
             {
                 RepairTower();
@@ -363,7 +365,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             };
             _controls.Children.Add(_towerRepairButton);
 
-            _fenceRepairButton = ArcadeButton("REPAIR FENCE", 160, 36, Cyan);
+            _fenceRepairButton = ArcadeButton("REPAIR FENCE", 207, 36, Cyan);
+            _fenceRepairButton.FontSize = 12;
+            ToolTipService.SetShowOnDisabled(_fenceRepairButton, true);
             _fenceRepairButton.Click += (_, _) =>
             {
                 RepairFence();
@@ -1984,9 +1988,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 143, 231, 14, White, dpi);
             Text(dc, "CLICK A LARGE UPGRADE CARD TO PURCHASE IT.",
                 143, 259, 14, White, dpi);
-            Text(dc, "GUNS, SECURITY AND RF TEAMS OPERATE AUTOMATICALLY.",
+            Text(dc, "TWIN GUNS, SECURITY AND RF TEAMS FIRE AUTOMATICALLY.",
                 143, 290, 14, White, dpi);
-            Text(dc, "T TOWER REPAIR  •  F FENCE REPAIR  •  SPACE WAVE",
+            Text(dc, "REPAIR BUTTONS SHOW COST AND ACTUAL HP RESTORED.",
                 143, 318, 14, White, dpi);
             Text(dc, "WORKSHOP BUTTON: PERMANENT UPGRADES BETWEEN RUNS",
                 143, 352, 15, Purple, dpi, true);
