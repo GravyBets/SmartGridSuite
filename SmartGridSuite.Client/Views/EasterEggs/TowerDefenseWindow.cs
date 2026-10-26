@@ -2441,6 +2441,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 143, 380, 12.8, Green, dpi, true);
             Text(dc, "REOPEN TO CONTINUE OR BANK RESEARCH AND START NEW.",
                 143, 409, 13, Muted, dpi);
+            Text(dc, "BUY AUTO NEXT: $650, 5-SECOND BREAK, PAUSES FOR PERKS.",
+                143, 438, 12.8, Cyan, dpi, true);
             Text(dc, "H CLOSES HELP   •   ESC BACK TO ARCADE",
                 143, 465, 16, Gold, dpi, true);
         }
