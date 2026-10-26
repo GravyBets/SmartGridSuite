@@ -2047,24 +2047,75 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     jammer.Health, jammer.MaxHealth, 39);
             }
 
-            for (int i = 0; i < _thieves.Count; i++)
+            foreach (var enemy in _thieves)
             {
-                var thief = _thieves[i];
-                var p = ThiefPoint(thief);
-                // Copper-colored thief carrying an oversized set of cutters.
-                dc.DrawEllipse(Copper, null, new Point(p.X, p.Y - 7), 5, 5);
-                dc.DrawLine(new Pen(Red, 4),
-                    new Point(p.X, p.Y - 1), new Point(p.X, p.Y + 9));
-                dc.DrawLine(new Pen(Copper, 2.4),
-                    new Point(p.X - 7, p.Y + 2), new Point(p.X + 7, p.Y + 2));
-                dc.DrawLine(new Pen(Gold, 2),
-                    new Point(p.X + 7, p.Y + 2), new Point(p.X + 13, p.Y - 6));
-                dc.DrawLine(new Pen(DarkSteel, 2),
-                    new Point(p.X, p.Y + 9), new Point(p.X - 5, p.Y + 15));
-                dc.DrawLine(new Pen(DarkSteel, 2),
-                    new Point(p.X, p.Y + 9), new Point(p.X + 5, p.Y + 15));
-                DrawHealthBar(dc, p.X, p.Y - 25,
-                    thief.Health, thief.MaxHealth, 27);
+                var p = ThiefPoint(enemy);
+                if (enemy.Kind == 2) // bright-green parakeets
+                {
+                    dc.DrawEllipse(Green, new Pen(White, 0.9), p, 11, 6);
+                    dc.DrawEllipse(Cyan, null,
+                        new Point(p.X - 6, p.Y - 6), 7, 3);
+                    dc.DrawEllipse(Cyan, null,
+                        new Point(p.X + 6, p.Y - 6), 7, 3);
+                    dc.DrawEllipse(Gold, null,
+                        new Point(p.X + 11, p.Y), 4, 2);
+                }
+                else if (enemy.Kind == 3) // fast bee swarm
+                {
+                    for (int bee = 0; bee < 4; bee++)
+                    {
+                        double angle = _clock.Elapsed.TotalSeconds * 14 +
+                            bee * Math.PI / 2;
+                        var at = new Point(
+                            p.X + Math.Cos(angle) * 8,
+                            p.Y + Math.Sin(angle) * 7);
+                        dc.DrawEllipse(Gold, new Pen(Backdrop, 1),
+                            at, 4, 3);
+                    }
+                }
+                else
+                {
+                    double scale = enemy.Kind == 4 ? 2.2 :
+                        enemy.Kind == 1 ? 1.3 : 1;
+                    Brush coat = enemy.Kind == 4 ? Red :
+                        enemy.Kind == 1 ? Cyan : Copper;
+                    dc.DrawEllipse(coat, null,
+                        new Point(p.X, p.Y - 7 * scale),
+                        5 * scale, 5 * scale);
+                    dc.DrawLine(new Pen(enemy.Kind == 4 ? Gold : Red,
+                        4 * scale),
+                        new Point(p.X, p.Y - scale),
+                        new Point(p.X, p.Y + 9 * scale));
+                    dc.DrawLine(new Pen(coat, 2.4 * scale),
+                        new Point(p.X - 7 * scale, p.Y + 2 * scale),
+                        new Point(p.X + 7 * scale, p.Y + 2 * scale));
+                    dc.DrawLine(new Pen(Gold, 2 * scale),
+                        new Point(p.X + 7 * scale, p.Y + 2 * scale),
+                        new Point(p.X + 13 * scale, p.Y - 6 * scale));
+                    dc.DrawLine(new Pen(DarkSteel, 2 * scale),
+                        new Point(p.X, p.Y + 9 * scale),
+                        new Point(p.X - 5 * scale, p.Y + 15 * scale));
+                    dc.DrawLine(new Pen(DarkSteel, 2 * scale),
+                        new Point(p.X, p.Y + 9 * scale),
+                        new Point(p.X + 5 * scale, p.Y + 15 * scale));
+                    if (enemy.Kind == 1)
+                        dc.DrawRectangle(White, null,
+                            new Rect(p.X - 8, p.Y - 14, 16, 4));
+                }
+
+                DrawHealthBar(dc, p.X,
+                    p.Y - (enemy.Kind == 4 ? 46 : 25),
+                    enemy.Health, enemy.MaxHealth,
+                    enemy.Kind == 4 ? 85 : 29);
+            }
+
+            var boss = _thieves.FirstOrDefault(t => t.Kind == 4);
+            if (boss != null)
+            {
+                Text(dc, "WAVE " + _wave + " BOSS: THE SCRAP KING",
+                    FieldX + 210, FieldY + 10, 20, Red, dpi, true);
+                DrawHealthBar(dc, FieldX + FieldWidth / 2,
+                    FieldY + 41, boss.Health, boss.MaxHealth, 350);
             }
 
             // Orbiting blue interceptor orb(s), visually linked to the
