@@ -116,6 +116,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private double _droneCooldown;
         private double _leftGunCooldown;
         private double _rightGunCooldown;
+        private double _leftMuzzleRemaining;
+        private double _rightMuzzleRemaining;
         private Point? _leftGunAim;
         private Point? _rightGunAim;
         private bool _perkPending;
@@ -818,6 +820,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _droneCooldown = 0.8;
             _leftGunCooldown = 0.15;
             _rightGunCooldown = 0.65;
+            _leftMuzzleRemaining = 0;
+            _rightMuzzleRemaining = 0;
             _leftGunAim = null;
             _rightGunAim = null;
             _perkPending = false;
@@ -885,6 +889,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _droneCooldown = Math.Max(0, _droneCooldown - dt);
             _leftGunCooldown = Math.Max(0, _leftGunCooldown - dt);
             _rightGunCooldown = Math.Max(0, _rightGunCooldown - dt);
+            _leftMuzzleRemaining = Math.Max(0, _leftMuzzleRemaining - dt);
+            _rightMuzzleRemaining = Math.Max(0, _rightMuzzleRemaining - dt);
             _flashRemaining = Math.Max(0, _flashRemaining - dt);
             _securityRingTime = Math.Max(0, _securityRingTime - dt);
             _rfRingTime = Math.Max(0, _rfRingTime - dt);
@@ -1155,7 +1161,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 .OrderBy(t => Distance(new Point(t.X, t.Y),
                     new Point(TowerX, TowerY))).FirstOrDefault();
 
-            Point from = new(TowerX + (right ? 21 : -21), TowerY - 23);
+            Point from = TowerDefenseTowerArt.TurretOrigin(
+                new Point(TowerX, TowerY), right);
             Point? target = null;
             Brush ink;
             double damage = right ? RightGunDamage : LeftGunDamage;
@@ -1181,8 +1188,16 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             _defenseFlashes.Add(new DefenseFlash(from, target.Value,
                 now + 0.13, ink));
-            if (right) _rightGunAim = target;
-            else _leftGunAim = target;
+            if (right)
+            {
+                _rightGunAim = target;
+                _rightMuzzleRemaining = 0.16;
+            }
+            else
+            {
+                _leftGunAim = target;
+                _leftMuzzleRemaining = 0.16;
+            }
             double reload = right ? RightGunReload : LeftGunReload;
             if (right) _rightGunCooldown = reload;
             else _leftGunCooldown = reload;
@@ -1972,46 +1987,21 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 }
             }
 
-            // The one structure the entire game is about: a central radio tower
-            // with lattice steel legs, antenna, sector panels and red beacon.
-            var towerBottom = TowerY + 31;
-            var towerTop = TowerY - 56;
-            dc.DrawEllipse(PulseFill, new Pen(Cyan, 0.7),
-                new Point(TowerX, TowerY), 32, 32);
-            var steel = new Pen(TowerSteel, 3);
-            var cross = new Pen(DarkSteel, 1.5);
-            dc.DrawLine(steel, new Point(TowerX, towerTop),
-                new Point(TowerX - 25, towerBottom));
-            dc.DrawLine(steel, new Point(TowerX, towerTop),
-                new Point(TowerX + 25, towerBottom));
-            dc.DrawLine(steel, new Point(TowerX - 25, towerBottom),
-                new Point(TowerX + 25, towerBottom));
-            for (int n = 0; n < 4; n++)
-            {
-                double yy = towerTop + 18 + n * 17;
-                double half = 5 + n * 5.0;
-                dc.DrawLine(cross, new Point(TowerX - half, yy),
-                    new Point(TowerX + half, yy + 12));
-                dc.DrawLine(cross, new Point(TowerX + half, yy),
-                    new Point(TowerX - half, yy + 12));
-            }
-            dc.DrawLine(new Pen(Cyan, 2.4),
-                new Point(TowerX, towerTop - 15), new Point(TowerX, towerTop));
-            dc.DrawRectangle(White, null,
-                new Rect(TowerX - 14, towerTop + 14, 8, 20));
-            dc.DrawRectangle(White, null,
-                new Rect(TowerX + 6, towerTop + 19, 8, 20));
-            dc.DrawEllipse(Red, new Pen(White, 1),
-                new Point(TowerX, towerTop - 16), 4, 4);
-
+            // A cohesive site drawing: tapered four-leg lattice, concrete
+            // foundations, equipment cabinet, microwave dish, sector panels,
+            // lightning rod and blinking obstruction beacon.
+            TowerDefenseTowerArt.DrawSite(dc,
+                new Point(TowerX, TowerY),
+                _clock.Elapsed.TotalSeconds + _savedElapsedOffset,
+                _lightningLevel, _surgeLevel, _filterLevel);
             DrawMountedGun(dc, false);
             DrawMountedGun(dc, true);
 
             // The tower's integrity can be read directly beneath it.
             dc.DrawRectangle(DarkSteel, null,
-                new Rect(TowerX - 42, TowerY + 43, 84, 7));
+                new Rect(TowerX - 42, TowerY + 63, 84, 7));
             dc.DrawRectangle(_health < 28 ? Red : Green, null,
-                new Rect(TowerX - 42, TowerY + 43,
+                new Rect(TowerX - 42, TowerY + 63,
                     84 * Math.Clamp(_health / MaxTowerHealth, 0, 1), 7));
 
             if (_lightningLevel > 0)
@@ -2135,13 +2125,16 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 for (int step = 0; step < 6; step++)
                 {
                     var nx = x + (step % 2 == 0 ? 22 : -19);
-                    var ny = y + (towerTop - FieldY) / 6.0;
+                    var ny = y + (TowerDefenseTowerArt.MastTipY(
+                        new Point(TowerX, TowerY)) - FieldY) / 6.0;
                     dc.DrawLine(bolt, new Point(x, y), new Point(nx, ny));
                     x = nx;
                     y = ny;
                 }
                 dc.DrawLine(bolt, new Point(x, y),
-                    new Point(TowerX, towerTop - 10));
+                    new Point(TowerX,
+                        TowerDefenseTowerArt.MastTipY(
+                            new Point(TowerX, TowerY)) - 5));
             }
         }
 
@@ -2157,24 +2150,12 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void DrawMountedGun(DrawingContext dc, bool right)
         {
-            Point basePoint = new(
-                TowerX + (right ? 21 : -21), TowerY - 23);
-            Point defaultDirection = new(right ? 1 : -1, -0.40);
-            Point? aim = right ? _rightGunAim : _leftGunAim;
-            double dx = (aim?.X ?? basePoint.X + defaultDirection.X) -
-                basePoint.X;
-            double dy = (aim?.Y ?? basePoint.Y + defaultDirection.Y) -
-                basePoint.Y;
-            double length = Math.Max(0.01, Math.Sqrt(dx * dx + dy * dy));
-            double ux = dx / length, uy = dy / length;
-            Brush ink = right ? Purple : Gold;
-            dc.DrawEllipse(DarkSteel, new Pen(White, 1.3),
-                basePoint, 9, 9);
-            dc.DrawLine(new Pen(ink, 5.0), basePoint,
-                new Point(basePoint.X + ux * 20, basePoint.Y + uy * 20));
-            dc.DrawEllipse(ink, null,
-                new Point(basePoint.X + ux * 20, basePoint.Y + uy * 20),
-                3.2, 3.2);
+            Point origin = TowerDefenseTowerArt.TurretOrigin(
+                new Point(TowerX, TowerY), right);
+            TowerDefenseTowerArt.DrawTurret(dc, origin,
+                right ? _rightGunAim : _leftGunAim,
+                right, right ? _rightMuzzleRemaining > 0 :
+                    _leftMuzzleRemaining > 0);
         }
 
         private static string Money(long amount)
