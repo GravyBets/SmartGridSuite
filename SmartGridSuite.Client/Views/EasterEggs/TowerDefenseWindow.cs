@@ -72,6 +72,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private Button _towerRepairButton = null!;
         private Button _fenceRepairButton = null!;
         private Button _nextWaveButton = null!;
+        private Button _autoNextButton = null!;
+        private const int AutoNextPurchasePrice = 650;
+        private const double AutoNextDelaySeconds = 5.0;
+        private bool _autoNextPurchased;
+        private bool _autoNextEnabled;
+        // Negative when no wave is queued; only elapsed while unpaused.
+        private double _autoNextRemaining = -1;
         private Button _endRunButton = null!;
         private Button _continueButton = null!;
         private Button _newRunButton = null!;
@@ -301,6 +308,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _timer.Stop();
             _clock.Stop();
             _gameOver = true;
+            _autoNextRemaining = -1;
             _message = "SHIFT ENDED EARLY. RESEARCH CREDITS BANKED.";
             _progression.BankRun(_wave, _score);
             TowerDefenseSessionStore.Clear();
@@ -327,6 +335,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Started = true,
                 WaveActive = _waveActive,
                 PerkPending = _perkPending,
+                AutoNextPurchased = _autoNextPurchased,
+                AutoNextEnabled = _autoNextEnabled,
+                AutoNextRemaining = _autoNextRemaining,
                 ThievesToSpawn = _thievesToSpawn,
                 JammersToSpawn = _jammersToSpawn,
                 LightningToSpawn = _lightningToSpawn,
@@ -378,6 +389,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _started = snapshot.Started;
             _waveActive = snapshot.WaveActive;
             _perkPending = snapshot.PerkPending;
+            _autoNextPurchased = snapshot.AutoNextPurchased;
+            _autoNextEnabled = snapshot.AutoNextPurchased &&
+                snapshot.AutoNextEnabled;
+            _autoNextRemaining = _autoNextEnabled &&
+                !snapshot.WaveActive && !snapshot.PerkPending
+                ? Math.Clamp(snapshot.AutoNextRemaining, -1,
+                    AutoNextDelaySeconds)
+                : -1;
             _thievesToSpawn = Math.Max(0, snapshot.ThievesToSpawn);
             _jammersToSpawn = Math.Max(0, snapshot.JammersToSpawn);
             _lightningToSpawn = Math.Max(0, snapshot.LightningToSpawn);
@@ -429,6 +448,55 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
             TowerDefenseSessionStore.Clear();
             NewGame();
+        }
+
+        private void ToggleAutoNextWave()
+        {
+            if (!_started || _paused || _gameOver ||
+                _resumeDecisionPending || _perkPending ||
+                _progression.WorkshopOpen || _showHelp)
+                return;
+
+            if (!_autoNextPurchased)
+            {
+                if (_cash < AutoNextPurchasePrice)
+                {
+                    _message = "AUTO NEXT WAVE NEEDS " +
+                        Money(AutoNextPurchasePrice) + ".";
+                    return;
+                }
+
+                _cash -= AutoNextPurchasePrice;
+                _autoNextPurchased = true;
+                _autoNextEnabled = true;
+                _message = "AUTO NEXT UNLOCKED! 5 SECOND BREAK BETWEEN WAVES.";
+            }
+            else
+            {
+                _autoNextEnabled = !_autoNextEnabled;
+                _message = _autoNextEnabled
+                    ? "AUTO NEXT ENABLED. PAUSES FOR MILESTONE REWARDS."
+                    : "AUTO NEXT DISABLED. MANUAL WAVE START.";
+            }
+
+            if (_autoNextEnabled && !_waveActive &&
+                _wave > 0 && !_perkPending)
+                _autoNextRemaining = AutoNextDelaySeconds;
+            else
+                _autoNextRemaining = -1;
+
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+            SaveSuspendedRun();
+        }
+
+        private void QueueAutoNextWave()
+        {
+            _autoNextRemaining = _autoNextPurchased && _autoNextEnabled &&
+                _started && !_gameOver && !_waveActive &&
+                !_perkPending && _wave > 0
+                ? AutoNextDelaySeconds : -1;
+            RefreshUpgradeControls();
         }
 
         private void BuildUpgradeControls()
@@ -545,6 +613,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _newRunButton.Click += (_, _) => StartNewInsteadOfResume();
             _controls.Children.Add(_newRunButton);
 
+            _autoNextButton = ArcadeButton("BUY AUTO NEXT " +
+                Money(AutoNextPurchasePrice), 281, 36, Cyan);
+            _autoNextButton.FontSize = 12;
+            ToolTipService.SetShowOnDisabled(_autoNextButton, true);
+            _autoNextButton.Click += (_, _) => ToggleAutoNextWave();
+            _controls.Children.Add(_autoNextButton);
+
             _nextWaveButton = ArcadeButton("PREPARE", 177, 36, Gold);
             _nextWaveButton.Click += (_, _) =>
             {
@@ -598,6 +673,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             string signature = string.Join("|",
                 workshop, _started, _paused, _gameOver, _showHelp,
                 _perkPending, _resumeDecisionPending, _wave, _cash, _progression.Credits,
+                _autoNextPurchased, _autoNextEnabled,
+                Math.Ceiling(Math.Max(-1, _autoNextRemaining) * 2) / 2,
                 _progression.SelectedCategory, _progression.SelectedRow,
                 _health.ToString("0", MoneyCulture),
                 _fenceHealth.ToString("0", MoneyCulture),
@@ -724,6 +801,30 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Canvas.SetLeft(_nextWaveButton, 1120);
             Canvas.SetTop(_nextWaveButton, 764);
 
+            _autoNextButton.Visibility = showFooter && _started && !_gameOver
+                ? Visibility.Visible : Visibility.Collapsed;
+            _autoNextButton.IsEnabled = gameUsable &&
+                (_autoNextPurchased || _cash >= AutoNextPurchasePrice);
+            _autoNextButton.Content = !_autoNextPurchased
+                ? "BUY AUTO NEXT  " + Money(AutoNextPurchasePrice)
+                : !_autoNextEnabled
+                    ? "AUTO NEXT  OFF • CLICK TO ENABLE"
+                    : _autoNextRemaining >= 0
+                        ? "AUTO NEXT  ON • " +
+                            Math.Ceiling(_autoNextRemaining).ToString("0", MoneyCulture) +
+                            "s"
+                        : "AUTO NEXT  ON • WAITING";
+            _autoNextButton.BorderBrush =
+                _autoNextPurchased && _autoNextEnabled ? Green : Cyan;
+            _autoNextButton.ToolTip = !_autoNextPurchased
+                ? "One-time " + Money(AutoNextPurchasePrice) +
+                    " cash purchase for this run. Automatically launches the next wave after a 5-second break. Milestone choices wait for you."
+                : "Click to turn Auto Next Wave " +
+                    (_autoNextEnabled ? "off" : "on") +
+                    ". Pausing, research rewards and ending a run interrupt the countdown.";
+            Canvas.SetLeft(_autoNextButton, 231);
+            Canvas.SetTop(_autoNextButton, 763);
+
             _endRunButton.Visibility = showFooter && _started && !_gameOver
                 ? Visibility.Visible : Visibility.Collapsed;
             Canvas.SetLeft(_endRunButton, 35);
@@ -800,6 +901,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _resumeOffer = null;
             _snapshotElapsed = 0;
             _savedElapsedOffset = 0;
+            _autoNextPurchased = false;
+            _autoNextEnabled = false;
+            _autoNextRemaining = -1;
             _bossSpawnedThisWave = false;
             _cash = 450 + _progression.Level(16) * 35;
             _score = 0;
@@ -849,6 +953,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
 
             _wave++;
+            _autoNextRemaining = -1;
             _bossSpawnedThisWave = false;
             _thievesToSpawn = Math.Min(75, 4 + _wave * 2 +
                 (int)Math.Pow(_wave, 1.2));
@@ -1439,6 +1544,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private void EndGame()
         {
             _gameOver = true;
+            _autoNextRemaining = -1;
             TowerDefenseSessionStore.Clear();
             _timer.Stop();
             _clock.Stop();
