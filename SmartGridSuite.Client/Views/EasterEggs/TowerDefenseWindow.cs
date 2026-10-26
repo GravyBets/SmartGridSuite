@@ -385,11 +385,15 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
                 if (!_started)
                 {
+                    // Give players a preparation phase before the first wave.
+                    // This is a strategy game: allow building before invaders
+                    // spawn, then press Space again to release wave one.
                     _started = true;
+                    _message = "BUILD DEFENSES ON GRASS, THEN SPACE FOR WAVE 1.";
                     _clock.Restart();
                     _lastTickTime = 0;
                     _timer.Start();
-                    StartWave();
+                    _surface.InvalidateVisual();
                 }
                 else if (!_paused && !_waveRunning)
                 {
