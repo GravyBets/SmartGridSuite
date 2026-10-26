@@ -531,6 +531,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Key.D3 or Key.NumPad3 => 3,
                 Key.D4 or Key.NumPad4 => 4,
                 Key.D5 or Key.NumPad5 => 5,
+                Key.D6 or Key.NumPad6 => 6,
                 _ => 0
             };
 
@@ -539,6 +540,19 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 e.Handled = true;
                 if (!e.IsRepeat)
                     Purchase(option);
+                return;
+            }
+
+            if (e.Key == Key.Q || e.Key == Key.E)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                {
+                    if (e.Key == Key.Q)
+                        CallSecuritySweep();
+                    else
+                        CallRfSweep();
+                }
             }
         }
 
@@ -559,88 +573,75 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _surface.InvalidateVisual();
         }
 
-        private void HandleClick(object sender, MouseButtonEventArgs e)
+        private int IndexOfNearestThief()
         {
-            if (!_started || _paused || _gameOver || _showHelp)
-                return;
-
-            Point p = e.GetPosition(_surface);
-            if (p.X >= FieldX && p.X <= FieldX + FieldWidth &&
-                p.Y >= FieldY && p.Y <= FieldY + FieldHeight)
+            int nearestIndex = 0;
+            for (int i = 1; i < _thieves.Count; i++)
             {
-                e.Handled = true;
-                if (_clickCooldown > 0)
-                    return;
+                if (_thieves[i].Distance < _thieves[nearestIndex].Distance)
+                    nearestIndex = i;
+            }
+            return nearestIndex;
+        }
 
-                var nearestInterference = _jammers
-                    .Where(j => Distance(p, new Point(j.X, j.Y)) <= 19)
-                    .OrderBy(j => Distance(p, new Point(j.X, j.Y)))
-                    .FirstOrDefault();
-
-                if (nearestInterference != null)
+        private void CallSecuritySweep()
+        {
+            if (_securitySweepCooldown > 0)
+            {
+                _message = "SECURITY PATROL READY IN " +
+                    Math.Ceiling(_securitySweepCooldown).ToString(MoneyCulture) + "s.";
+            }
+            else if (_thieves.Count == 0)
+            {
+                _message = "PATROL: NO COPPER THIEVES TO CHASE.";
+            }
+            else
+            {
+                int count = Math.Min(_thieves.Count, 1 + _fenceLevel / 2);
+                for (int i = 0; i < count; i++)
                 {
-                    _jammers.Remove(nearestInterference);
-                    _interferenceRemoved++;
-                    _cash += 45;
-                    _score += 65;
-                    _message = "INTERFERENCE TOWER DISMANTLED! +$45.";
-                    _clickCooldown = 0.22;
-                    _surface.InvalidateVisual();
-                    return;
-                }
-
-                var nearestThief = _thieves
-                    .Where(t => Distance(p, ThiefPoint(t)) <= 17)
-                    .OrderBy(t => Distance(p, ThiefPoint(t)))
-                    .FirstOrDefault();
-
-                if (nearestThief != null)
-                {
-                    _thieves.Remove(nearestThief);
+                    _thieves.RemoveAt(IndexOfNearestThief());
                     _thievesStopped++;
-                    _cash += 25;
-                    _score += 40;
-                    _message = "COPPER THIEF CHASED OFF! +$25.";
-                    _clickCooldown = 0.22;
-                    _surface.InvalidateVisual();
+                    _cash += 22;
+                    _score += 35;
                 }
-                return;
-            }
 
-            // The sidebar buttons are also mouse-clickable.
-            if (p.X >= 620 && p.X <= 876)
+                _securitySweepCooldown = Math.Max(3.0, 8.0 - _fenceLevel * 0.14);
+                _message = "SECURITY SWEEP: " + count + " THIEVES CHASED OFF! +$" +
+                    (count * 22).ToString(MoneyCulture) + ".";
+            }
+            _surface.InvalidateVisual();
+        }
+
+        private void CallRfSweep()
+        {
+            if (_rfSweepCooldown > 0)
             {
-                int option = p.Y switch
-                {
-                    >= 269 and <= 305 => 1,
-                    >= 316 and <= 352 => 2,
-                    >= 363 and <= 399 => 3,
-                    >= 410 and <= 446 => 4,
-                    >= 457 and <= 493 => 5,
-                    _ => 0
-                };
-
-                if (option != 0)
-                {
-                    e.Handled = true;
-                    Purchase(option);
-                }
+                _message = "RF TEAM READY IN " +
+                    Math.Ceiling(_rfSweepCooldown).ToString(MoneyCulture) + "s.";
             }
+            else if (_jammers.Count == 0)
+            {
+                _message = "RF TEAM: NO INTERFERENCE TOWERS TO REMOVE.";
+            }
+            else
+            {
+                int count = Math.Min(_jammers.Count, 1 + _filterLevel / 2);
+                _jammers.RemoveRange(0, count);
+                _interferenceRemoved += count;
+                _cash += count * 40;
+                _score += count * 60;
+                _rfSweepCooldown = Math.Max(4.0, 11.0 - _filterLevel * 0.15);
+                _message = "RF SWEEP: " + count + " INTERFERENCE TOWERS REMOVED! +$" +
+                    (count * 40).ToString(MoneyCulture) + ".";
+            }
+            _surface.InvalidateVisual();
         }
 
-        private static double Distance(Point a, Point b)
-        {
-            double dx = a.X - b.X, dy = a.Y - b.Y;
-            return Math.Sqrt(dx * dx + dy * dy);
-        }
-
-        private static readonly int[][] UpgradePrices =
-        {
-            new[] { 180, 350, 600 }, // lightning arrestor
-            new[] { 160, 280, 460 }, // surge arrestor
-            new[] { 220, 420, 650 }, // security fencing
-            new[] { 200, 390, 640 }  // RF filtering
-        };
+        // Upgrade prices increase every time you invest. There is no three-level
+        // maximum; keep long arithmetic for future waves and saturate before int.
+        private static readonly int[] BaseUpgradePrice = { 180, 160, 220, 200 };
+        private static readonly int[] UpgradeStep = { 165, 155, 175, 180 };
 
         private int LevelFor(int option) => option switch
         {
@@ -654,10 +655,18 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private int? NextPrice(int option)
         {
             if (option == 5)
-                return _fenceLevel > 0 ? 90 : null;
+                return _fenceLevel > 0 ? 90 + _wave * 8 : null;
 
-            int level = LevelFor(option);
-            return level >= MaxUpgradeLevel ? null : UpgradePrices[option - 1][level];
+            if (option == 6)
+                return 150 + _wave * 25;
+
+            if (option < 1 || option > 4)
+                return null;
+
+            long level = LevelFor(option);
+            long cost = BaseUpgradePrice[option - 1] +
+                UpgradeStep[option - 1] * level + 75 * level * level;
+            return (int)Math.Min(int.MaxValue, cost);
         }
 
         private void Purchase(int option)
@@ -665,9 +674,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             int? price = NextPrice(option);
             if (!price.HasValue)
             {
-                _message = option == 5
-                    ? "INSTALL A FENCE BEFORE CALLING FOR REPAIRS."
-                    : "THAT SYSTEM IS ALREADY AT MAX LEVEL.";
+                _message = "INSTALL THE FENCE BEFORE BUYING FENCE REPAIRS.";
                 _surface.InvalidateVisual();
                 return;
             }
@@ -679,10 +686,17 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
             }
 
+            if (option == 6 && _health >= 100)
+            {
+                _message = "TOWER HP IS ALREADY FULL.";
+                _surface.InvalidateVisual();
+                return;
+            }
+
             if (_cash < price.Value)
             {
-                _message = "NEED $" + price.Value.ToString(MoneyCulture) +
-                    ". CURRENT CASH: $" + _cash.ToString(MoneyCulture) + ".";
+                _message = "NEED $" + price.Value.ToString("N0", MoneyCulture) +
+                    ". AVAILABLE $" + _cash.ToString("N0", MoneyCulture) + ".";
                 _surface.InvalidateVisual();
                 return;
             }
@@ -705,17 +719,23 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     break;
                 case 4:
                     _filterLevel++;
-                    _message = "RF INTERFERENCE FILTER UPGRADED TO LVL " + _filterLevel + ".";
+                    _message = "RF FILTERS UPGRADED TO LVL " + _filterLevel + ".";
                     break;
                 case 5:
                     _fenceHealth = FenceMaxHealth;
-                    _message = "FENCE REPAIRED. DISPATCH WANTS A WORK ORDER.";
+                    _message = "SECURITY FENCE REPAIRED!";
+                    break;
+                case 6:
+                    double healed = Math.Min(25, 100 - _health);
+                    _health += healed;
+                    _message = "TOWER REPAIRED! +" +
+                        healed.ToString("0", MoneyCulture) + " HP.";
                     break;
             }
             _surface.InvalidateVisual();
         }
 
-        private double FenceMaxHealth => _fenceLevel == 0 ? 0 : 12 + _fenceLevel * 15;
+        private double FenceMaxHealth => _fenceLevel == 0 ? 0 : 24 + _fenceLevel * 20;
 
         private void Draw(DrawingContext dc, double dpi)
         {
