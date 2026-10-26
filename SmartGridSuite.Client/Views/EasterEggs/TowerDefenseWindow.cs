@@ -695,7 +695,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                         ? -1 : 1;
                     _progression.SelectedCategory =
                         (_progression.SelectedCategory + step + 3) % 3;
-                    _surface.InvalidateVisual();
+                    DescribeSelection();
                 }
                 return;
             }
@@ -707,7 +707,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 {
                     int step = e.Key == Key.Up ? -1 : 1;
                     _progression.SelectedRow = (_progression.SelectedRow + step + 8) % 8;
-                    _surface.InvalidateVisual();
+                    DescribeSelection();
                 }
                 return;
             }
@@ -871,6 +871,17 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _message = "RF SWEEP: " + count + " INTERFERENCE TOWERS REMOVED! +$" +
                     (count * 40).ToString(MoneyCulture) + ".";
             }
+            _surface.InvalidateVisual();
+        }
+
+        private void DescribeSelection()
+        {
+            int index = _progression.SelectedCategory * 8 +
+                _progression.SelectedRow;
+            var item = TowerDefenseProgression.Catalog[index];
+            _message = item.Name.ToUpperInvariant() + ": " + item.Detail +
+                (_progression.Unlocked(index, _wave) ? "" :
+                    " (UNLOCK WAVE " + item.UnlockWave + ")");
             _surface.InvalidateVisual();
         }
 
