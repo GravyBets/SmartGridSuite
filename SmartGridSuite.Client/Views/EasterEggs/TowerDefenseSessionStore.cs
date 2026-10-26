@@ -12,6 +12,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
     /// </summary>
     internal sealed class TowerDefenseSession
     {
+        public TowerDefenseSession() { }
         public int Version { get; set; } = 1;
         public int Wave { get; set; }
         public int Cash { get; set; }
@@ -47,6 +48,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
     internal sealed class TowerDefenseThreatSnapshot
     {
+        public TowerDefenseThreatSnapshot() { }
         public int Kind { get; set; }
         public bool FenceHitDone { get; set; }
         public double Angle { get; set; }
@@ -58,6 +60,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
     internal sealed class TowerDefenseRfSnapshot
     {
+        public TowerDefenseRfSnapshot() { }
         public double X { get; set; }
         public double Y { get; set; }
         public double Age { get; set; }
