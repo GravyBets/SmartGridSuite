@@ -855,12 +855,12 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _spawnJammerIn = 2.4;
             _spawnLightningIn = 4.8;
             _waveActive = true;
+            _message = "WAVE " + _wave + ": TROUBLE IN EVERY DIRECTION!";
             if (_wave % 5 == 0)
             {
                 SpawnBoss();
                 _bossSpawnedThisWave = true;
             }
-            _message = "WAVE " + _wave + ": TROUBLE IN EVERY DIRECTION!";
             _surface.InvalidateVisual();
             RefreshUpgradeControls();
         }
@@ -2244,8 +2244,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 new Rect(PanelX + 17, 216, 208, 7));
             dc.DrawRectangle(hpFill < 0.3 ? Red : Green, null,
                 new Rect(PanelX + 17, 216, 208 * hpFill, 7));
-            Text(dc, "WAVE " + _wave + (_waveActive ? " IN PROGRESS" : " READY"),
-                PanelX + 17, 231, 14, White, dpi, true);
+            Text(dc, "WAVE " + _wave +
+                (_waveActive ? (_wave % 5 == 0 ? " - BOSS" : " IN PROGRESS") : " READY"),
+                PanelX + 17, 231, 14, _waveActive && _wave % 5 == 0 ?
+                    Red : White, dpi, true);
             Text(dc, "RESEARCH +" +
                 _progression.PendingCredits.ToString("N0", MoneyCulture),
                 PanelX + 291, 232, 13, Purple, dpi, true);
