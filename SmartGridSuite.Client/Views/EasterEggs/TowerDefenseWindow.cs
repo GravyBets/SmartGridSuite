@@ -72,6 +72,12 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private Button _towerRepairButton = null!;
         private Button _fenceRepairButton = null!;
         private Button _nextWaveButton = null!;
+        private Button _endRunButton = null!;
+        private Button _continueButton = null!;
+        private Button _newRunButton = null!;
+        private TowerDefenseSession? _resumeOffer;
+        private bool _resumeDecisionPending;
+        private double _snapshotElapsed = 0;
         private readonly Button[] _perkButtons = new Button[3];
         private string _lastUpgradeSignature = "";
         private DateTime _lastControlsRefreshUtc = DateTime.MinValue;
@@ -117,6 +123,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private int _thievesToSpawn;
         private int _jammersToSpawn;
         private int _lightningToSpawn;
+        private bool _bossSpawnedThisWave;
         private bool _started;
         private bool _waveActive;
         private bool _paused;
@@ -176,6 +183,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Loaded += (_, _) =>
             {
                 NewGame();
+                _resumeOffer = TowerDefenseSessionStore.Load();
+                _resumeDecisionPending = _resumeOffer != null;
                 RefreshUpgradeControls();
                 Activate();
                 Keyboard.Focus(this);
@@ -273,6 +282,147 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 VerticalAlignment = VerticalAlignment.Center
             };
+        }
+
+        private void EndRun()
+        {
+            if (!_started || _gameOver || _resumeDecisionPending)
+                return;
+            // Voluntarily end the run: no more waves; bank earned research,
+            // then offer the existing permanent workshop screen.
+            _waveActive = false;
+            _thievesToSpawn = _jammersToSpawn = _lightningToSpawn = 0;
+            _warningRemaining = -1;
+            _thieves.Clear();
+            _jammers.Clear();
+            _timer.Stop();
+            _clock.Stop();
+            _gameOver = true;
+            _message = "SHIFT ENDED EARLY. RESEARCH CREDITS BANKED.";
+            _progression.BankRun(_wave, _score);
+            TowerDefenseSessionStore.Clear();
+            _bestScore = Math.Max(_bestScore, _score);
+            SaveBestScore(_bestScore);
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private void SaveSuspendedRun()
+        {
+            if (!_started || _gameOver || _resumeDecisionPending)
+                return;
+
+            TowerDefenseSessionStore.Save(new TowerDefenseSession
+            {
+                Wave = _wave,
+                Cash = _cash,
+                Score = _score,
+                ThievesStopped = _thievesStopped,
+                InterferenceRemoved = _interferenceRemoved,
+                Health = _health,
+                FenceHealth = _fenceHealth,
+                Started = true,
+                WaveActive = _waveActive,
+                PerkPending = _perkPending,
+                ThievesToSpawn = _thievesToSpawn,
+                JammersToSpawn = _jammersToSpawn,
+                LightningToSpawn = _lightningToSpawn,
+                SpawnThiefIn = _spawnThiefIn,
+                SpawnJammerIn = _spawnJammerIn,
+                SpawnLightningIn = _spawnLightningIn,
+                WarningRemaining = _warningRemaining,
+                SecurityCooldown = _securitySweepCooldown,
+                RfCooldown = _rfSweepCooldown,
+                PatrolCooldown = _patrolCooldown,
+                DroneCooldown = _droneCooldown,
+                LeftGunCooldown = _leftGunCooldown,
+                RightGunCooldown = _rightGunCooldown,
+                ElapsedSeconds = _clock.Elapsed.TotalSeconds,
+                PendingResearch = _progression.PendingCredits,
+                RunLevels = _progression.ExportRunLevels(),
+                Category = _progression.SelectedCategory,
+                Row = _progression.SelectedRow,
+                Enemies = _thieves.Select(t => new TowerDefenseThreatSnapshot
+                {
+                    Kind = t.Kind, Angle = t.Angle, Distance = t.Distance,
+                    Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth
+                }).ToList(),
+                InterferenceTowers = _jammers.Select(t => new TowerDefenseRfSnapshot
+                {
+                    X = t.X, Y = t.Y, Age = t.Age,
+                    Health = t.Health, MaxHealth = t.MaxHealth
+                }).ToList()
+            });
+        }
+
+        private void ContinueSuspendedRun()
+        {
+            var snapshot = _resumeOffer;
+            if (snapshot == null) return;
+            _resumeDecisionPending = false;
+            _resumeOffer = null;
+            _progression.RestoreRun(snapshot.RunLevels, snapshot.PendingResearch);
+            _progression.SelectedCategory = Math.Clamp(snapshot.Category, 0, 2);
+            _progression.SelectedRow = Math.Clamp(snapshot.Row, 0, 7);
+            _wave = snapshot.Wave;
+            _cash = snapshot.Cash;
+            _score = snapshot.Score;
+            _thievesStopped = snapshot.ThievesStopped;
+            _interferenceRemoved = snapshot.InterferenceRemoved;
+            _health = Math.Clamp(snapshot.Health, 0, MaxTowerHealth);
+            _fenceHealth = Math.Clamp(snapshot.FenceHealth, 0, FenceMaxHealth);
+            _started = snapshot.Started;
+            _waveActive = snapshot.WaveActive;
+            _perkPending = snapshot.PerkPending;
+            _thievesToSpawn = Math.Max(0, snapshot.ThievesToSpawn);
+            _jammersToSpawn = Math.Max(0, snapshot.JammersToSpawn);
+            _lightningToSpawn = Math.Max(0, snapshot.LightningToSpawn);
+            _spawnThiefIn = snapshot.SpawnThiefIn;
+            _spawnJammerIn = snapshot.SpawnJammerIn;
+            _spawnLightningIn = snapshot.SpawnLightningIn;
+            _warningRemaining = snapshot.WarningRemaining;
+            _securitySweepCooldown = snapshot.SecurityCooldown;
+            _rfSweepCooldown = snapshot.RfCooldown;
+            _patrolCooldown = snapshot.PatrolCooldown;
+            _droneCooldown = snapshot.DroneCooldown;
+            _leftGunCooldown = snapshot.LeftGunCooldown;
+            _rightGunCooldown = snapshot.RightGunCooldown;
+            _thieves.Clear();
+            _thieves.AddRange(snapshot.Enemies.Select(t => new CopperThief
+            {
+                Kind = Math.Clamp(t.Kind, 0, 4),
+                Angle = t.Angle, Distance = t.Distance,
+                Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth
+            }));
+            _jammers.Clear();
+            _jammers.AddRange(snapshot.InterferenceTowers.Select(t => new InterferenceTower
+            {
+                X = t.X, Y = t.Y, Age = t.Age,
+                Health = t.Health, MaxHealth = t.MaxHealth
+            }));
+            _clock.Restart();
+            _lastTickTime = 0;
+            _paused = true;
+            _clock.Stop();
+            _message = "SESSION RESTORED AT WAVE " + _wave + ". PRESS P TO RESUME.";
+            _timer.Start();
+            _lastUpgradeSignature = "";
+            RefreshUpgradeControls();
+            _surface.InvalidateVisual();
+        }
+
+        private void StartNewInsteadOfResume()
+        {
+            if (_resumeOffer != null)
+            {
+                // Bank earned research from the abandoned run so choosing New
+                // doesn't silently discard hours of permanent progress.
+                _progression.RestoreRun(_resumeOffer.RunLevels,
+                    _resumeOffer.PendingResearch);
+                _progression.BankRun(_resumeOffer.Wave, _resumeOffer.Score);
+            }
+            TowerDefenseSessionStore.Clear();
+            NewGame();
         }
 
         private void BuildUpgradeControls()
@@ -608,6 +758,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _timer.Stop();
             _clock.Reset();
             _progression.NewRun();
+            _resumeDecisionPending = false;
+            _resumeOffer = null;
+            _snapshotElapsed = 0;
+            _bossSpawnedThisWave = false;
             _cash = 450 + _progression.Level(16) * 35;
             _score = 0;
             _wave = 0;
@@ -654,6 +808,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
 
             _wave++;
+            _bossSpawnedThisWave = false;
             _thievesToSpawn = Math.Min(75, 4 + _wave * 2 +
                 (int)Math.Pow(_wave, 1.2));
             _jammersToSpawn = Math.Min(12, 1 + _wave / 2);
@@ -663,6 +818,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _spawnJammerIn = 2.4;
             _spawnLightningIn = 4.8;
             _waveActive = true;
+            if (_wave % 5 == 0)
+            {
+                SpawnBoss();
+                _bossSpawnedThisWave = true;
+            }
             _message = "WAVE " + _wave + ": TROUBLE IN EVERY DIRECTION!";
             _surface.InvalidateVisual();
             RefreshUpgradeControls();
@@ -670,12 +830,18 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void Tick(object? sender, EventArgs e)
         {
-            if (!_started || _paused || _gameOver)
+            if (!_started || _paused || _gameOver || _resumeDecisionPending)
                 return;
 
             double now = _clock.Elapsed.TotalSeconds;
             double dt = Math.Clamp(now - _lastTickTime, 0, 0.1);
             _lastTickTime = now;
+            _snapshotElapsed += dt;
+            if (_snapshotElapsed >= 5)
+            {
+                _snapshotElapsed = 0;
+                SaveSuspendedRun();
+            }
             _securitySweepCooldown = Math.Max(0, _securitySweepCooldown - dt);
             _rfSweepCooldown = Math.Max(0, _rfSweepCooldown - dt);
             _patrolCooldown = Math.Max(0, _patrolCooldown - dt);
@@ -1141,6 +1307,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private void EndGame()
         {
             _gameOver = true;
+            TowerDefenseSessionStore.Clear();
             _timer.Stop();
             _clock.Stop();
             _message = "RADIO SILENCE. DISPATCH IS NOT HAPPY.";
@@ -2075,7 +2242,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         {
             _timer.Stop();
             _clock.Stop();
-            _progression.BankRun(_wave, _score);
+            // Closing the game is a SUSPEND, not a loss. Research is banked
+            // only by End Run or defeat so the wave remains resumable.
+            if (!_gameOver && !_resumeDecisionPending && _started)
+                SaveSuspendedRun();
             _timer.Tick -= Tick;
             _timer.Tick -= RefreshControlsOnTick;
             PreviewKeyDown -= HandleKey;
