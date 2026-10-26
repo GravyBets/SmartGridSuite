@@ -748,6 +748,17 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             DrawField(dc, dpi);
             DrawSidebar(dc, dpi);
 
+            // Cooldown indicators are visible without a trackpad or
+            // repeatedly pressing hotkeys to ask whether the team is ready.
+            string patrol = _securitySweepCooldown <= 0
+                ? "READY"
+                : Math.Ceiling(_securitySweepCooldown).ToString(MoneyCulture) + "s";
+            string rf = _rfSweepCooldown <= 0
+                ? "READY"
+                : Math.Ceiling(_rfSweepCooldown).ToString(MoneyCulture) + "s";
+            Text(dc, "Q SECURITY: " + patrol + "     E RF SWEEP: " + rf,
+                37, 518, 11, Cyan, dpi, true);
+
             dc.DrawRectangle(Panel, new Pen(GridInk, 1), new Rect(25, 539, 859, 42));
             Text(dc, "Q SECURITY SWEEP    E RF SWEEP", 39, 551, 12, White, dpi, true);
             Text(dc, "1-6 BUY/REPAIR   SPACE WAVE   H HELP   P PAUSE",
