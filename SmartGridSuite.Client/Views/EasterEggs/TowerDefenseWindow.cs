@@ -229,6 +229,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _securitySweepCooldown = Math.Max(0, _securitySweepCooldown - dt);
             _rfSweepCooldown = Math.Max(0, _rfSweepCooldown - dt);
             _patrolCooldown = Math.Max(0, _patrolCooldown - dt);
+            _droneCooldown = Math.Max(0, _droneCooldown - dt);
             _flashRemaining = Math.Max(0, _flashRemaining - dt);
 
             if (!_waveActive)
@@ -237,6 +238,15 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
             }
 
+            int patrol = _progression.Level(0);
+            int patrolSpeed = _progression.Level(1);
+            int coverage = _progression.Level(2);
+            int vehicles = _progression.Level(3);
+            int rfTeams = _progression.Level(4);
+            int filters = _progression.Level(5);
+            int drone = _progression.Level(6);
+            int droneRange = _progression.Level(7);
+
             if (_thievesToSpawn > 0)
             {
                 _spawnThiefIn -= dt;
@@ -244,7 +254,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 {
                     SpawnCopperThief();
                     _thievesToSpawn--;
-                    _spawnThiefIn = Math.Max(0.35, 1.5 - _wave * 0.055);
+                    _spawnThiefIn = Math.Max(0.22, 1.5 / (1 + _wave * 0.08));
                 }
             }
 
@@ -255,7 +265,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 {
                     SpawnInterferenceTower();
                     _jammersToSpawn--;
-                    _spawnJammerIn = Math.Max(2.5, 6.8 - _wave * 0.20);
+                    _spawnJammerIn = Math.Max(1.0, 6.8 / (1 + _wave * 0.12));
                 }
             }
 
@@ -272,26 +282,58 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 {
                     _lightningToSpawn--;
                     _warningRemaining = 2.5;
-                    _spawnLightningIn = Math.Max(3.0, 8.3 - _wave * 0.15);
+                    _spawnLightningIn = Math.Max(2.5, 8.3 / (1 + _wave * 0.08));
                     _message = "LIGHTNING INCOMING! ARRESTORS BETTER BE INSTALLED!";
                 }
             }
 
-            // The baseline security patrol works automatically. Buying
-            // fencing protects the compound, while Q calls a faster sweep.
-            // Nothing on the field has to be clicked to complete a wave.
+            // Autonomous countermeasures give keyboard-only players meaningful
+            // choices without requiring a trackpad and pixel-perfect aiming.
             if (_patrolCooldown <= 0)
             {
-                if (_thieves.Count > 0)
+                int count = Math.Min(_thieves.Count,
+                    1 + patrol / 3 + vehicles / 2);
+                double radius = Math.Min(450, 105 + coverage * 17);
+                for (int i = 0; i < count; i++)
                 {
-                    int index = IndexOfNearestThief();
-                    _thieves.RemoveAt(index);
+                    int closest = IndexOfNearestThief();
+                    if (_thieves[closest].Distance > radius)
+                        break;
+                    _thieves.RemoveAt(closest);
                     _thievesStopped++;
-                    _cash += 14;
-                    _score += 24;
+                    _cash = AddCash(_cash, 14 + _progression.Level(17) * 4);
+                    _score = AddCash(_score, 24);
                 }
+                _patrolCooldown = Math.Max(0.2,
+                    3.4 / (1 + patrolSpeed * 0.20 + patrol * 0.07));
+            }
 
-                _patrolCooldown = Math.Max(1.1, 3.4 / (1 + _fenceLevel * 0.11));
+            // The drone intercepts nearby trouble without manual targeting.
+            // RF target priority increases when RF response teams are funded.
+            if (drone > 0 && _droneCooldown <= 0)
+            {
+                double radius = Math.Min(270, 90 + droneRange * 18);
+                var nearbyJammer = _jammers.FirstOrDefault(j =>
+                    Distance(new Point(j.X, j.Y), new Point(TowerX, TowerY)) <= radius);
+                if (nearbyJammer != null && rfTeams > 0)
+                {
+                    _jammers.Remove(nearbyJammer);
+                    _interferenceRemoved++;
+                    _score = AddCash(_score, 30);
+                }
+                else if (_thieves.Count > 0 &&
+                         _thieves.Min(t => t.Distance) <= radius)
+                {
+                    _thieves.RemoveAt(IndexOfNearestThief());
+                    _thievesStopped++;
+                    _score = AddCash(_score, 26);
+                }
+                else if (nearbyJammer != null)
+                {
+                    _jammers.Remove(nearbyJammer);
+                    _interferenceRemoved++;
+                }
+                _droneCooldown = Math.Max(0.25, 3.1 / (1 + drone * 0.20));
             }
 
             for (int i = _thieves.Count - 1; i >= 0; i--)
@@ -302,28 +344,26 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 if (_fenceLevel > 0 && _fenceHealth > 0 &&
                     thief.Distance <= FenceRadius)
                 {
-                    double fenceWear = Math.Max(1, 4.5 + _wave * 0.15 -
-                        _fenceLevel * 0.42);
-                    _fenceHealth = Math.Max(0, _fenceHealth - fenceWear);
+                    double wear = Math.Max(0.3, (4.5 + _wave * 0.18) /
+                        (1 + _fenceLevel * 0.18 +
+                         _progression.Level(13) * 0.23));
+                    _fenceHealth = Math.Max(0, _fenceHealth - wear);
                     _thieves.RemoveAt(i);
                     _thievesStopped++;
-                    _score += 12;
+                    _score = AddCash(_score, 12);
                     if (_fenceHealth <= 0)
-                        _message = "FENCE BREACHED! PRESS 5 TO REPAIR IT.";
+                        _message = "SECURITY FENCE BREACHED! PRESS F TO REPAIR IT.";
                 }
                 else if (thief.Distance <= HubRadius)
                 {
-                    _health -= 6 + _wave * 0.65;
+                    DamageTower(6 + _wave * 0.65);
                     _thieves.RemoveAt(i);
                     _message = "COPPER THIEVES GOT INTO THE TOWER COMPOUND!";
                 }
             }
 
-            // RF sites self-expire, even without player action. Filters reduce
-            // damage AND accelerate their removal, so the game never gets
-            // stuck waiting for a mouse click on a jammer.
-            double jammerLifetime = Math.Max(2.1, 12.0 /
-                (1 + _filterLevel * 0.23));
+            double jammerLifetime = Math.Max(1.1,
+                12.0 / (1 + filters * 0.23 + _progression.Level(4) * 0.10));
             for (int i = _jammers.Count - 1; i >= 0; i--)
             {
                 _jammers[i].Age += dt;
@@ -331,16 +371,23 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 {
                     _jammers.RemoveAt(i);
                     _interferenceRemoved++;
-                    _score += 15;
+                    _score = AddCash(_score, 15);
                 }
             }
 
             if (_jammers.Count > 0)
             {
-                double filterMultiplier = 1.0 / (1 + _filterLevel * 0.58);
-                _health -= _jammers.Count *
-                    (1.05 + 0.10 * _wave) * filterMultiplier * dt;
+                double reduction = 1.0 / (1 + filters * 0.58);
+                DamageTower(_jammers.Count *
+                    (1.05 + 0.10 * _wave) * reduction * dt);
             }
+
+            // Workshop-funded passive maintenance is available every wave.
+            _health = Math.Min(MaxTowerHealth, _health +
+                _progression.Level(9) * 0.055 * dt);
+            if (_fenceLevel > 0)
+                _fenceHealth = Math.Min(FenceMaxHealth, _fenceHealth +
+                    _progression.Level(14) * 0.09 * dt);
 
             if (_health <= 0)
             {
@@ -352,11 +399,28 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (_thievesToSpawn == 0 && _jammersToSpawn == 0 &&
                 _lightningToSpawn == 0 && _warningRemaining <= 0 &&
                 _thieves.Count == 0 && _jammers.Count == 0)
-            {
                 EndWave();
-            }
 
             _surface.InvalidateVisual();
+        }
+
+        private static int AddCash(int value, int delta) =>
+            (int)Math.Min(int.MaxValue, (long)value + Math.Max(0, delta));
+
+        private double MaxTowerHealth =>
+            100 + Math.Min(2500, _progression.Level(8) * 15);
+
+        private void DamageTower(double damage)
+        {
+            double grounded = damage / (1 + _progression.Level(15) * 0.10);
+            _health = Math.Max(0, _health - grounded);
+        }
+
+        private static double Distance(Point a, Point b)
+        {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+            return Math.Sqrt(dx * dx + dy * dy);
         }
 
         private void SpawnCopperThief()
