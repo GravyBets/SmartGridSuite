@@ -23,8 +23,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static readonly Brush Road = Ink("#3A4B53");
         private static readonly Brush RoadEdge = Ink("#647176");
         private static readonly Brush RoadCenter = Ink("#8B8980");
-        private static readonly Brush Yard = Ink("#334B56");
-        private static readonly Brush YardEdge = Ink("#546775");
+        private static readonly Brush Yard = Ink("#294752");
+        private static readonly Brush YardEdge = Ink("#415B68");
         private static readonly Brush Cyan = Ink("#65E5F2");
         private static readonly Brush Purple = Ink("#C69BFA");
         private static readonly Brush Gold = Ink("#F7D275");
@@ -42,10 +42,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static readonly Pen RoadOuter = Stroke(RoadEdge, 34);
         private static readonly Pen RoadInner = Stroke(Road, 29);
         private static readonly Pen RoadDivider = Dashed(RoadCenter, 1.2, 3, 10);
-        private static readonly Pen YardPen = Stroke(YardEdge, 1.2);
-        private static readonly Pen FencePen = Stroke(White, 2.0);
-        private static readonly Pen FenceInnerPen = Stroke(YardEdge, 0.9);
-        private static readonly Pen FenceBrokenPen = Dashed(Red, 2, 4, 3);
+        private static readonly Pen YardPen = Stroke(YardEdge, 1.0);
+        private static readonly Brush FenceBackColor = Ink("#6E939C");
+        private static readonly Brush FenceFrontColor = Ink("#CEE3E6");
+        private static readonly Pen FenceBackPen = Stroke(FenceBackColor, 1.35);
+        private static readonly Pen FenceFrontPen = Stroke(FenceFrontColor, 2.1);
+        private static readonly Pen FenceMeshPen = Stroke(YardEdge, 0.85);
+        private static readonly Pen FenceBrokenPen = Dashed(Red, 1.6, 3, 5);
         private static readonly Pen SecurityPulsePen = Stroke(Cyan, 2.6);
         private static readonly Pen RfPulsePen = Stroke(Purple, 2.7);
         private static readonly Pen LightningPen = Stroke(Gold, 2.5);
@@ -58,9 +61,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static readonly Pen ShieldGlyphPen = Stroke(ShieldFill, 2.4);
         private static readonly Pen RfGlyphPen = Stroke(RfFill, 2.4);
 
-        private static readonly Geometry YardShape = Shape(
-            "M 308,216 L 469,216 L 503,252 L 503,359 " +
-            "L 472,394 L 297,394 L 267,361 L 267,250 Z");
+        // The angled overhead site has a shallow, soft elliptical gravel yard
+        // rather than the oversized octagonal slab in the previous artwork.
+        private static readonly Geometry YardShape = FrozenEllipse(
+            new Point(385, 292), 165, 110);
         private static readonly Geometry AccessRoute = Shape(
             "M -13,528 C 118,527 136,469 209,454 " +
             "C 273,444 293,414 331,372");
@@ -150,89 +154,119 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     field.Width + 4, field.Height + 4));
         }
 
-        internal static void DrawFence(DrawingContext dc,
-            Point center, double radius, bool intact, int level)
-        {
-            // An actual 12-sided physical fence with support posts, rather
-            // than a glowing defensive circle/radar overlay. The perimeter
-            // uses the gameplay FenceRadius without changing hit detection.
-            int sides = 12;
-            Point[] points = new Point[sides];
-            for (int i = 0; i < sides; i++)
-            {
-                double angle = (i + 0.5) * Math.PI * 2 / sides;
-                points[i] = new Point(center.X + Math.Cos(angle) * radius,
-                    center.Y + Math.Sin(angle) * radius);
-            }
+        // All compound effects use the same shallow visual perspective.
+        // Share the fence geometry with the game hit test so enemies do not
+        // get intercepted at an invisible circular boundary.
+        internal const double PerspectiveY = 0.68;
+        private const double CompoundOffsetY = 9;
 
-            for (int i = 0; i < sides; i++)
+        internal static Point FenceCenter(Point tower) =>
+            new(tower.X, tower.Y + CompoundOffsetY);
+
+        internal static bool WithinFence(Point position, Point tower, double radius)
+        {
+            if (radius <= 0) return false;
+            Point center = FenceCenter(tower);
+            double dx = (position.X - center.X) / radius;
+            double dy = (position.Y - center.Y) / (radius * PerspectiveY);
+            return dx * dx + dy * dy <= 1.0;
+        }
+
+        internal static Point OrbitPoint(Point tower, double horizontalRadius,
+            double angle) => new(
+                tower.X + Math.Cos(angle) * horizontalRadius,
+                tower.Y + CompoundOffsetY + Math.Sin(angle) *
+                    horizontalRadius * 0.60);
+
+        internal static void DrawFence(DrawingContext dc,
+            Point tower, double radius, bool intact, int level,
+            bool foreground)
+        {
+            Point center = FenceCenter(tower);
+            // Only draw one depth layer per call. Rear rails pass *behind*
+            // the tower; the front rails pass in front of the concrete base.
+            // This avoids the previous flat, bright octagon overlay.
+            const int halfSegments = 24;
+            for (int i = 0; i <= halfSegments; i++)
             {
-                Point a = points[i], b = points[(i + 1) % sides];
-                dc.DrawLine(intact ? FencePen : FenceBrokenPen, a, b);
+                double angle = (foreground ? 0 : Math.PI) +
+                    i * Math.PI / halfSegments;
+                double nextAngle = angle + Math.PI / halfSegments;
+                if (i == halfSegments) break;
+
+                Point a = new(center.X + Math.Cos(angle) * radius,
+                    center.Y + Math.Sin(angle) * radius * PerspectiveY);
+                Point b = new(center.X + Math.Cos(nextAngle) * radius,
+                    center.Y + Math.Sin(nextAngle) * radius * PerspectiveY);
+
+                Pen edge = intact
+                    ? (foreground ? FenceFrontPen : FenceBackPen)
+                    : FenceBrokenPen;
+                dc.DrawLine(edge, a, b);
+
                 if (intact)
                 {
-                    // Mesh diagonal and lower guide line between posts.
-                    Point innerA = new(center.X + (a.X - center.X) * 0.965,
-                        center.Y + (a.Y - center.Y) * 0.965);
-                    Point innerB = new(center.X + (b.X - center.X) * 0.965,
-                        center.Y + (b.Y - center.Y) * 0.965);
-                    dc.DrawLine(FenceInnerPen, innerA, innerB);
-                    dc.DrawLine(FenceInnerPen, a, innerB);
+                    double railLift = foreground ? 8 : 6;
+                    Point topA = new(a.X, a.Y - railLift);
+                    Point topB = new(b.X, b.Y - railLift);
+                    dc.DrawLine(FenceMeshPen, topA, topB);
+                    // Fine fence mesh only, without luminous square corners.
+                    if (i % 4 == 0)
+                        dc.DrawLine(FenceMeshPen, a, topB);
                 }
 
-                dc.DrawRoundedRectangle(intact ? YardEdge : Red,
-                    FencePostPen,
-                    new Rect(a.X - 3.2, a.Y - 3.2, 6.4, 6.4),
-                    1.4, 1.4);
-            }
-
-            // Upgrade level changes fence durability in the simulation;
-            // restrained physical rivets make that readable, not extra rings.
-            if (intact && level > 1)
-            {
-                for (int i = 0; i < sides; i += 3)
-                    dc.DrawEllipse(Cyan, null, points[i],
-                        1.5 + Math.Min(level, 6) * 0.2, 1.5);
+                if (i % 6 == 0)
+                {
+                    double postHeight = foreground ? 10 : 7;
+                    dc.DrawLine(edge, a,
+                        new Point(a.X, a.Y - postHeight));
+                    dc.DrawEllipse(foreground ? FenceFrontColor : FenceBackColor,
+                        null, new Point(a.X, a.Y - postHeight), 2.1, 1.35);
+                    if (intact && level >= 4 && i % 12 == 0)
+                        dc.DrawEllipse(Cyan, null,
+                            new Point(a.X, a.Y - postHeight - 3), 1.3, 1.3);
+                }
             }
         }
 
         internal static void DrawSweep(DrawingContext dc,
-            Point center, double remaining, double duration, bool rf)
+            Point tower, double remaining, double duration, bool rf)
         {
-            // Short outward-moving strokes, not another oversized circle.
+            // Short wavefront strokes follow the projected ellipse instead of
+            // forming an unintentional round ring around the tower.
             double progress = Math.Clamp(1 - remaining / duration, 0, 1);
-            double radius = 50 + progress * (rf ? 176 : 192);
-            var pen = rf ? RfPulsePen : SecurityPulsePen;
-            int count = rf ? 10 : 12;
-            for (int i = 0; i < count; i++)
+            double radius = 54 + progress * (rf ? 173 : 190);
+            Point center = FenceCenter(tower);
+            Pen pen = rf ? RfPulsePen : SecurityPulsePen;
+            int segments = rf ? 10 : 12;
+            for (int i = 0; i < segments; i++)
             {
-                double angle = i * Math.PI * 2 / count;
+                double angle = i * Math.PI * 2 / segments;
                 double cs = Math.Cos(angle), sn = Math.Sin(angle);
                 dc.DrawLine(pen,
                     new Point(center.X + cs * radius,
-                        center.Y + sn * radius),
-                    new Point(center.X + cs * (radius + 15),
-                        center.Y + sn * (radius + 15)));
+                        center.Y + sn * radius * PerspectiveY),
+                    new Point(center.X + cs * (radius + 12),
+                        center.Y + sn * (radius + 12) * PerspectiveY));
             }
         }
 
         internal static void DrawLightningWarning(DrawingContext dc,
-            Point center, double timeRemaining)
+            Point tower, double timeRemaining)
         {
-            // Corner brackets focus on the mast, avoiding a full warning ring.
-            double radius = 46;
+            // Projected warning brackets, with no surrounding warning circle.
+            Point center = FenceCenter(tower);
+            const double radius = 52;
             for (int i = 0; i < 4; i++)
             {
                 double angle = i * Math.PI / 2 + Math.PI / 4;
-                double cx = center.X + Math.Cos(angle) * radius;
-                double cy = center.Y + Math.Sin(angle) * radius;
-                double ix = center.X - cx, iy = center.Y - cy;
-                double n = Math.Sqrt(ix * ix + iy * iy);
-                dc.DrawLine(LightningPen,
-                    new Point(cx, cy),
-                    new Point(cx + ix / n * 15, cy + iy / n * 15));
-                dc.DrawEllipse(null, LightningWarning,
-                    new Point(cx, cy), 3, 3);
+                double cs = Math.Cos(angle), sn = Math.Sin(angle);
+                Point outer = new(center.X + cs * radius,
+                    center.Y + sn * radius * PerspectiveY);
+                Point inner = new(center.X + cs * (radius - 13),
+                    center.Y + sn * (radius - 13) * PerspectiveY);
+                dc.DrawLine(LightningPen, outer, inner);
+                dc.DrawEllipse(null, LightningWarning, outer, 2.5, 2.5);
             }
         }
 
@@ -293,6 +327,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 new Point(x + dx * 12, y));
             dc.DrawLine(AccentPen, new Point(x, y),
                 new Point(x, y + dy * 12));
+        }
+
+        private static Geometry FrozenEllipse(Point center,
+            double radiusX, double radiusY)
+        {
+            var geometry = new EllipseGeometry(center, radiusX, radiusY);
+            geometry.Freeze();
+            return geometry;
         }
 
         private static Geometry Shape(string path)
