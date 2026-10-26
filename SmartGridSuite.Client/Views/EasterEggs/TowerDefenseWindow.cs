@@ -860,11 +860,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
 
             // Workshop-funded passive maintenance is available every wave.
-            _health = Math.Min(MaxTowerHealth, _health +
-                _progression.Level(9) * 0.055 * dt);
+            _health = Math.Min(MaxTowerHealth,
+                _health + TowerRegenPerSecond * dt);
             if (_fenceLevel > 0)
-                _fenceHealth = Math.Min(FenceMaxHealth, _fenceHealth +
-                    _progression.Level(14) * 0.09 * dt);
+                _fenceHealth = Math.Min(FenceMaxHealth,
+                    _fenceHealth + FenceRegenPerSecond * dt);
 
             if (_health <= 0)
             {
@@ -881,16 +881,27 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _surface.InvalidateVisual();
         }
 
+        private double LeftGunDamage => 14 + _progression.Level(0) * 6.5;
+        private double RightGunDamage => 12 + _progression.Level(0) * 5.5;
+        private double GunRange => Math.Min(500, 225 + _progression.Level(2) * 23);
+        private double LeftGunReload => Math.Max(0.17, 1.02 /
+            (1 + _progression.Level(1) * 0.17));
+        private double RightGunReload => Math.Max(0.17, 1.35 /
+            (1 + _progression.Level(1) * 0.17));
+        private double TowerRegenPerSecond => _progression.Level(9) * 0.055;
+        private double FenceRegenPerSecond => _progression.Level(14) * 0.09;
+        private double LightningDamageReduction => 1.0 -
+            1.0 / ((1 + _lightningLevel * 0.58) *
+                (1 + _surgeLevel * 0.42) *
+                (1 + _progression.Level(15) * 0.10));
+
         private void FireMountedGun(double now, bool right)
         {
             double cooldown = right ? _rightGunCooldown : _leftGunCooldown;
             if (cooldown > 0)
                 return;
 
-            int gunPower = _progression.Level(0);
-            int fireRate = _progression.Level(1);
-            int rangeLevel = _progression.Level(2);
-            double range = Math.Min(500, 225 + rangeLevel * 23);
+            double range = GunRange;
 
             CopperThief? thief = _thieves
                 .Where(t => t.Health > 0 && t.Distance <= range)
@@ -904,8 +915,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Point from = new(TowerX + (right ? 21 : -21), TowerY - 23);
             Point? target = null;
             Brush ink;
-            double damage = (right ? 12 : 14) +
-                gunPower * (right ? 5.5 : 6.5);
+            double damage = right ? RightGunDamage : LeftGunDamage;
 
             if ((right && rf != null) || (thief == null && rf != null))
             {
@@ -930,8 +940,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 now + 0.13, ink));
             if (right) _rightGunAim = target;
             else _leftGunAim = target;
-            double reload = Math.Max(0.17, (right ? 1.35 : 1.02) /
-                (1 + fireRate * 0.17));
+            double reload = right ? RightGunReload : LeftGunReload;
             if (right) _rightGunCooldown = reload;
             else _leftGunCooldown = reload;
         }
@@ -1566,6 +1575,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             DrawField(dc, dpi);
             DrawSidebar(dc, dpi);
+            DrawTowerStats(dc, dpi);
 
             // Cooldown indicators are visible without a trackpad or
             // repeatedly pressing hotkeys to ask whether the team is ready.
@@ -1591,6 +1601,37 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 DrawHelp(dc, dpi);
             if (_progression.WorkshopOpen)
                 DrawWorkshop(dc, dpi);
+        }
+
+        private void DrawTowerStats(DrawingContext dc, double dpi)
+        {
+            const double x = 550;
+            Text(dc, "TOWER  " +
+                Math.Ceiling(_health).ToString("0", MoneyCulture) + "/" +
+                MaxTowerHealth.ToString("0", MoneyCulture) +
+                " HP   REGEN +" +
+                TowerRegenPerSecond.ToString("0.00", MoneyCulture) + " HP/s",
+                x, 24, 14, Green, dpi, true, 740);
+
+            Text(dc, _fenceLevel == 0
+                ? "FENCE  NOT INSTALLED"
+                : "FENCE  " +
+                  Math.Ceiling(_fenceHealth).ToString("0", MoneyCulture) + "/" +
+                  FenceMaxHealth.ToString("0", MoneyCulture) +
+                  " HP   REGEN +" +
+                  FenceRegenPerSecond.ToString("0.00", MoneyCulture) + " HP/s",
+                x, 48, 13.5, Cyan, dpi, true, 740);
+
+            Text(dc, "GUNS " +
+                LeftGunDamage.ToString("0", MoneyCulture) + "/" +
+                RightGunDamage.ToString("0", MoneyCulture) +
+                " DMG  |  RATE " +
+                (1.0 / LeftGunReload).ToString("0.0", MoneyCulture) + "/" +
+                (1.0 / RightGunReload).ToString("0.0", MoneyCulture) +
+                "/s  |  RANGE " + GunRange.ToString("0", MoneyCulture) +
+                "  |  STORM -" +
+                (LightningDamageReduction * 100).ToString("0", MoneyCulture) + "%",
+                x, 72, 12.5, Gold, dpi, true, 740);
         }
 
         private void DrawField(DrawingContext dc, double dpi)
@@ -1846,6 +1887,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 PanelX + 17, 193, 23, _health < 28 ? Red : Green, dpi, true);
             Text(dc, "CASH", PanelX + 281, 174, 13, Muted, dpi, true);
             Text(dc, Money(_cash), PanelX + 281, 193, 22, Gold, dpi, true);
+            double hpFill = Math.Clamp(_health / Math.Max(1, MaxTowerHealth), 0, 1);
+            dc.DrawRectangle(DarkSteel, null,
+                new Rect(PanelX + 17, 216, 208, 7));
+            dc.DrawRectangle(hpFill < 0.3 ? Red : Green, null,
+                new Rect(PanelX + 17, 216, 208 * hpFill, 7));
             Text(dc, "WAVE " + _wave + (_waveActive ? " IN PROGRESS" : " READY"),
                 PanelX + 17, 231, 14, White, dpi, true);
             Text(dc, "RESEARCH +" +
