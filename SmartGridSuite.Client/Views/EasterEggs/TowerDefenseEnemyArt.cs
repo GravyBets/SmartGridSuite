@@ -113,7 +113,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (directional)
                 dc.PushTransform(new ScaleTransform(facingRight ? 1 : -1, 1));
 
-            bool vaulting = vaultProgress >= 0 && kind is 0 or 1 or 4;
+            bool vaulting = vaultProgress >= 0 && (kind is 0 or 1 or 4);
             if (vaulting)
             {
                 double p = Math.Clamp(vaultProgress, 0, 1);
