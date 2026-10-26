@@ -45,6 +45,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static readonly Brush ButtonFace = Paint("#1B3350");
         private static readonly Brush Tree = Paint("#12334B");
         private static readonly Brush Copper = Paint("#DDA36B");
+        private static readonly Pen TileOutline = FreezePen(GridInk, 0.5);
+        private static readonly Pen RadarOutline = FreezePen(GridInk, 0.95);
         private static readonly Brush RedFlash = new SolidColorBrush(Color.FromArgb(105, 255, 92, 113));
         private static readonly Brush PulseFill = new SolidColorBrush(Color.FromArgb(35, 92, 232, 250));
 
@@ -350,9 +352,19 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 (FieldHeight / 2 - inset) / Math.Max(0.0001, sin));
         }
 
-        private static Point ThiefPoint(CopperThief thief) =>
-            new(TowerX + Math.Cos(thief.Angle) * thief.Distance,
-                TowerY + Math.Sin(thief.Angle) * thief.Distance);
+        private Point ThiefPoint(CopperThief thief)
+        {
+            // The scavengers dart from side to side rather than marching in
+            // unnaturally perfect straight lines. Rendering and clicking both
+            // use the same calculated location.
+            double wobble = Math.Sin(
+                _clock.Elapsed.TotalSeconds * 14 + thief.Angle * 6) * 3.5;
+            double dx = Math.Cos(thief.Angle);
+            double dy = Math.Sin(thief.Angle);
+            return new Point(
+                TowerX + dx * thief.Distance - dy * wobble,
+                TowerY + dy * thief.Distance + dx * wobble);
+        }
 
         private double FenceRadius => 58 + _fenceLevel * 7;
 
@@ -700,11 +712,18 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             for (int x = 0; x < 17; x++)
             {
                 double xx = FieldX + x * 32, yy = FieldY + y * 32;
-                dc.DrawRectangle(Ground, new Pen(GridInk, 0.5),
+                dc.DrawRectangle(Ground, TileOutline,
                     new Rect(xx, yy, 32, 32));
                 if ((x * 13 + y * 19) % 7 == 0)
                     dc.DrawEllipse(Tree, null, new Point(xx + 10, yy + 12), 4, 3);
             }
+
+            // Circular radar rings emphasize that threats can approach
+            // from any bearing around this one central radio tower.
+            dc.DrawEllipse(null, RadarOutline,
+                new Point(TowerX, TowerY), 100, 100);
+            dc.DrawEllipse(null, RadarOutline,
+                new Point(TowerX, TowerY), 160, 160);
 
             if (_fenceLevel > 0)
             {
@@ -753,6 +772,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 new Rect(TowerX + 6, towerTop + 19, 8, 20));
             dc.DrawEllipse(Red, new Pen(White, 1),
                 new Point(TowerX, towerTop - 16), 4, 4);
+
+            // The tower's integrity can be read directly beneath it.
+            dc.DrawRectangle(DarkSteel, null,
+                new Rect(TowerX - 42, TowerY + 43, 84, 7));
+            dc.DrawRectangle(_health < 28 ? Red : Green, null,
+                new Rect(TowerX - 42, TowerY + 43,
+                    84 * Math.Clamp(_health / 100.0, 0, 1), 7));
 
             if (_lightningLevel > 0)
                 Text(dc, "L" + _lightningLevel, TowerX + 30, TowerY - 50,
@@ -946,6 +972,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (maxWidth > 0)
                 ft.MaxTextWidth = maxWidth;
             dc.DrawText(ft, new Point(x, y));
+        }
+
+        private static Pen FreezePen(Brush brush, double width)
+        {
+            var pen = new Pen(brush, width);
+            pen.Freeze();
+            return pen;
         }
 
         private static Brush Paint(string hex)
