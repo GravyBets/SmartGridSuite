@@ -2074,42 +2074,16 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void DrawField(DrawingContext dc, double dpi)
         {
-            dc.DrawRectangle(Ground, new Pen(Cyan, 2),
-                new Rect(FieldX - 2, FieldY - 2, FieldWidth + 4, FieldHeight + 4));
-
-            for (int y = 0; y < 19; y++)
-            for (int x = 0; x < 24; x++)
-            {
-                double xx = FieldX + x * 32, yy = FieldY + y * 32;
-                dc.DrawRectangle(Ground, TileOutline,
-                    new Rect(xx, yy, 32, 32));
-                if ((x * 13 + y * 19) % 7 == 0)
-                    dc.DrawEllipse(Tree, null, new Point(xx + 10, yy + 12), 4, 3);
-            }
-
-            // Circular radar rings emphasize that threats can approach
-            // from any bearing around this one central radio tower.
-            dc.DrawEllipse(null, RadarOutline,
-                new Point(TowerX, TowerY), 100, 100);
-            dc.DrawEllipse(null, RadarOutline,
-                new Point(TowerX, TowerY), 160, 160);
+            // Illustrated overhead radio-site yard: muted terrain, corner
+            // markers, shrubs, gravel service access and equipment compound.
+            // All threats remain free to approach from any direction.
+            TowerDefenseEnvironmentArt.DrawBackground(dc,
+                new Rect(FieldX, FieldY, FieldWidth, FieldHeight));
 
             if (_fenceLevel > 0)
-            {
-                dc.DrawEllipse(null,
-                    new Pen(_fenceHealth > 0 ? FenceInk : Red, 3.0),
-                    new Point(TowerX, TowerY), FenceRadius, FenceRadius);
-
-                // Fence posts around the perimeter telegraph the defense upgrade.
-                int postCount = Math.Min(48, 16 + _fenceLevel * 4);
-                for (int post = 0; post < postCount; post++)
-                {
-                    double angle = Math.PI * 2 * post / postCount;
-                    dc.DrawRectangle(_fenceHealth > 0 ? FenceInk : Red, null,
-                        new Rect(TowerX + Math.Cos(angle) * FenceRadius - 2,
-                            TowerY + Math.Sin(angle) * FenceRadius - 2, 4, 4));
-                }
-            }
+                TowerDefenseEnvironmentArt.DrawFence(dc,
+                    new Point(TowerX, TowerY), FenceRadius,
+                    _fenceHealth > 0, _fenceLevel);
 
             // A cohesive site drawing: tapered four-leg lattice, concrete
             // foundations, equipment cabinet, microwave dish, sector panels,
@@ -2128,19 +2102,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 new Rect(TowerX - 42, TowerY + 63,
                     84 * Math.Clamp(_health / MaxTowerHealth, 0, 1), 7));
 
-            if (_lightningLevel > 0)
-                Text(dc, "L" + _lightningLevel, TowerX + 30, TowerY - 50,
-                    13, Gold, dpi, true);
-            if (_surgeLevel > 0)
-                Text(dc, "S" + _surgeLevel, TowerX + 30, TowerY - 30,
-                    13, Green, dpi, true);
-            if (_filterLevel > 0)
-            {
-                for (int ring = 0; ring < Math.Min(4, _filterLevel); ring++)
-                    dc.DrawEllipse(null, new Pen(Purple, 0.9),
-                        new Point(TowerX, TowerY),
-                        84 + ring * 10, 84 + ring * 10);
-            }
 
             // Illegal RF sites are MINIATURE lattice radio towers,
             // visually distinct from the approaching copper thieves.
@@ -2220,24 +2181,22 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 dc.DrawLine(new Pen(flash.Ink, 2.5), flash.From, flash.To);
 
             if (_securityRingTime > 0)
-            {
-                double radius = 55 + (0.55 - _securityRingTime) / 0.55 * 180;
-                dc.DrawEllipse(null, new Pen(Cyan, 2.3),
-                    new Point(TowerX, TowerY), radius, radius);
-            }
+                TowerDefenseEnvironmentArt.DrawSweep(dc,
+                    new Point(TowerX, TowerY),
+                    _securityRingTime, 0.55, false);
+
             if (_rfRingTime > 0)
-            {
-                double radius = 50 + (0.65 - _rfRingTime) / 0.65 * 175;
-                dc.DrawEllipse(null, new Pen(Purple, 2.3),
-                    new Point(TowerX, TowerY), radius, radius);
-            }
+                TowerDefenseEnvironmentArt.DrawSweep(dc,
+                    new Point(TowerX, TowerY),
+                    _rfRingTime, 0.65, true);
 
             if (_warningRemaining > 0)
             {
-                dc.DrawEllipse(null, new Pen(Gold, 3),
-                    new Point(TowerX, TowerY), 42, 42);
-                Text(dc, "LIGHTNING " + _warningRemaining.ToString("0.0", MoneyCulture) + "s",
-                    TowerX - 89, TowerY + 77, 15, Gold, dpi, true);
+                TowerDefenseEnvironmentArt.DrawLightningWarning(dc,
+                    new Point(TowerX, TowerY), _warningRemaining);
+                Text(dc, "LIGHTNING IN " +
+                    _warningRemaining.ToString("0.0", MoneyCulture) + "s",
+                    TowerX - 93, TowerY + 85, 15, Gold, dpi, true);
             }
             if (_flashRemaining > 0)
             {
@@ -2260,6 +2219,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                         TowerDefenseTowerArt.MastTipY(
                             new Point(TowerX, TowerY)) - 5));
             }
+            // Compact on-field status chips replace the floating L1/S1
+            // text. Draw last so they remain readable through effects.
+            TowerDefenseEnvironmentArt.DrawStatusBadges(dc,
+                new Rect(FieldX, FieldY, FieldWidth, FieldHeight),
+                _lightningLevel, _surgeLevel, _filterLevel, dpi);
         }
 
         private static void DrawHealthBar(DrawingContext dc,
