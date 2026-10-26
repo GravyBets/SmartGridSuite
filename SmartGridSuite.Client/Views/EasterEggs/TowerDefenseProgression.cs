@@ -83,6 +83,23 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         }
 
         public int Level(int index) => _run[index];
+
+        // Temporary upgrades and unbanked research are kept in the resumable
+        // session, separate from permanently banked workshop upgrades.
+        public int[] ExportRunLevels() => _run.ToArray();
+
+        public void RestoreRun(int[]? levels, long pendingCredits)
+        {
+            Array.Copy(_permanent, _run, Catalog.Length);
+            if (levels != null)
+            {
+                for (int i = 0; i < Catalog.Length && i < levels.Length; i++)
+                    _run[i] = Math.Clamp(Math.Max(_permanent[i], levels[i]), 0, 1000000);
+            }
+            PendingCredits = Math.Clamp(pendingCredits, 0L, 1_000_000_000L);
+            _banked = false;
+            WorkshopOpen = false;
+        }
         public int PermanentLevel(int index) => _permanent[index];
 
         public bool Unlocked(int index, int currentWave) =>
