@@ -49,6 +49,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private sealed class SavedState
         {
+            // Public parameterless constructor is required by System.Text.Json
+            // even though the containing persistence DTO is private.
+            public SavedState() { }
+
             public int Version { get; set; } = 1;
             public long ResearchCredits { get; set; }
             public int BestWave { get; set; }
@@ -173,8 +177,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Credits = Math.Max(0, saved.ResearchCredits);
                 BestWave = Math.Max(0, saved.BestWave);
                 BestScore = Math.Max(0, saved.BestScore);
-                for (int i = 0; i < Catalog.Length && i < saved.Permanent.Length; i++)
-                    _permanent[i] = Math.Clamp(saved.Permanent[i], 0, 1000000);
+                if (saved.Permanent != null)
+                {
+                    for (int i = 0;
+                        i < Catalog.Length && i < saved.Permanent.Length; i++)
+                    {
+                        _permanent[i] = Math.Clamp(saved.Permanent[i], 0, 1000000);
+                    }
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                 or JsonException or ArgumentException)
