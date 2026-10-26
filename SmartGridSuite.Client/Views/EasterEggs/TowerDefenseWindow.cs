@@ -973,42 +973,44 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     4.5 / (1 + vehicles * 0.13));
             }
 
-            // The drone intercepts nearby trouble without manual targeting.
-            // RF target priority increases when RF response teams are funded.
+            // One or two orbiting interceptor orbs actively attack nearby
+            // threats. Each upgrade improves attack strength/rate, and the
+            // Drone Range investment increases their orbit/target radius.
             if (drone > 0 && _droneCooldown <= 0)
             {
-                double radius = Math.Min(270, 90 + droneRange * 18);
-                var nearbyJammer = _jammers.FirstOrDefault(j =>
-                    Distance(new Point(j.X, j.Y), new Point(TowerX, TowerY)) <= radius);
-                if (nearbyJammer != null && rfTeams > 0)
+                int orbs = drone >= 3 ? 2 : 1;
+                double attackRange = Math.Min(270, 85 + droneRange * 18);
+                double damage = 16 + drone * 11;
+                for (int orb = 0; orb < orbs; orb++)
                 {
-                    _defenseFlashes.Add(new DefenseFlash(
-                        new Point(TowerX, TowerY - 38),
-                        new Point(nearbyJammer.X, nearbyJammer.Y), now + 0.19, Purple));
-                    _jammers.Remove(nearbyJammer);
-                    _interferenceRemoved++;
-                    _score = AddCash(_score, 30);
+                    Point from = OrbPosition(orb, orbs);
+                    var enemyRf = _jammers
+                        .Where(j => j.Health > 0 &&
+                            Distance(from, new Point(j.X, j.Y)) <= attackRange)
+                        .OrderBy(j => Distance(from, new Point(j.X, j.Y)))
+                        .FirstOrDefault();
+                    var enemyThief = _thieves
+                        .Where(t => t.Health > 0 &&
+                            Distance(from, ThiefPoint(t)) <= attackRange)
+                        .OrderBy(t => Distance(from, ThiefPoint(t)))
+                        .FirstOrDefault();
+
+                    if (enemyRf != null && (rfTeams > 0 || enemyThief == null))
+                    {
+                        enemyRf.Health -= damage;
+                        _defenseFlashes.Add(new DefenseFlash(
+                            from, new Point(enemyRf.X, enemyRf.Y),
+                            now + 0.22, Purple));
+                    }
+                    else if (enemyThief != null)
+                    {
+                        enemyThief.Health -= damage;
+                        _defenseFlashes.Add(new DefenseFlash(
+                            from, ThiefPoint(enemyThief), now + 0.22, Gold));
+                    }
                 }
-                else if (_thieves.Count > 0 &&
-                         _thieves.Min(t => t.Distance) <= radius)
-                {
-                    int closest = IndexOfNearestThief();
-                    _defenseFlashes.Add(new DefenseFlash(
-                        new Point(TowerX, TowerY - 38),
-                        ThiefPoint(_thieves[closest]), now + 0.19, Gold));
-                    _thieves.RemoveAt(closest);
-                    _thievesStopped++;
-                    _score = AddCash(_score, 26);
-                }
-                else if (nearbyJammer != null)
-                {
-                    _defenseFlashes.Add(new DefenseFlash(
-                        new Point(TowerX, TowerY - 38),
-                        new Point(nearbyJammer.X, nearbyJammer.Y), now + 0.19, Purple));
-                    _jammers.Remove(nearbyJammer);
-                    _interferenceRemoved++;
-                }
-                _droneCooldown = Math.Max(0.25, 3.1 / (1 + drone * 0.20));
+                ResolveDefeatedThreats();
+                _droneCooldown = Math.Max(0.30, 2.2 / (1 + drone * 0.16));
             }
 
             // Q and E are no longer required. Nearby threats automatically
@@ -1112,6 +1114,16 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             1.0 / ((1 + _lightningLevel * 0.58) *
                 (1 + _surgeLevel * 0.42) *
                 (1 + _progression.Level(15) * 0.10));
+
+        private Point OrbPosition(int index, int count)
+        {
+            double orbit = (_clock.Elapsed.TotalSeconds + _savedElapsedOffset) *
+                (1.45 + _progression.Level(6) * 0.025);
+            double angle = orbit + index * Math.PI * 2 / count;
+            double radius = Math.Min(125, 79 + _progression.Level(7) * 4);
+            return new Point(TowerX + Math.Cos(angle) * radius,
+                TowerY + Math.Sin(angle) * radius);
+        }
 
         private void FireMountedGun(double now, bool right)
         {
@@ -2053,6 +2065,21 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     new Point(p.X, p.Y + 9), new Point(p.X + 5, p.Y + 15));
                 DrawHealthBar(dc, p.X, p.Y - 25,
                     thief.Health, thief.MaxHealth, 27);
+            }
+
+            // Orbiting blue interceptor orb(s), visually linked to the
+            // Drone Interceptor workshop purchase and real attacks.
+            int droneLevel = _progression.Level(6);
+            if (droneLevel > 0)
+            {
+                int orbCount = droneLevel >= 3 ? 2 : 1;
+                for (int orb = 0; orb < orbCount; orb++)
+                {
+                    Point p = OrbPosition(orb, orbCount);
+                    dc.DrawEllipse(null, new Pen(Cyan, 1.5), p, 16, 16);
+                    dc.DrawEllipse(Purple, new Pen(White, 1.5), p, 9, 9);
+                    dc.DrawEllipse(Cyan, null, p, 4, 4);
+                }
             }
 
             foreach (var flash in _defenseFlashes)
