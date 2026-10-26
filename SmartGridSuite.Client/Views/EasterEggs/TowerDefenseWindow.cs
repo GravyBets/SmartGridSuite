@@ -2060,66 +2060,22 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     jammer.Health, jammer.MaxHealth, 39);
             }
 
+            // Dedicated cached-vector sprites. Every enemy has a distinct
+            // silhouette and per-enemy animation phase; gameplay and HP are
+            // still driven by the existing threat simulation.
+            double animationTime = _clock.Elapsed.TotalSeconds +
+                _savedElapsedOffset;
             foreach (var enemy in _thieves)
             {
-                var p = ThiefPoint(enemy);
-                if (enemy.Kind == 2) // bright-green parakeets
-                {
-                    dc.DrawEllipse(Green, new Pen(White, 0.9), p, 11, 6);
-                    dc.DrawEllipse(Cyan, null,
-                        new Point(p.X - 6, p.Y - 6), 7, 3);
-                    dc.DrawEllipse(Cyan, null,
-                        new Point(p.X + 6, p.Y - 6), 7, 3);
-                    dc.DrawEllipse(Gold, null,
-                        new Point(p.X + 11, p.Y), 4, 2);
-                }
-                else if (enemy.Kind == 3) // fast bee swarm
-                {
-                    for (int bee = 0; bee < 4; bee++)
-                    {
-                        double angle = _clock.Elapsed.TotalSeconds * 14 +
-                            bee * Math.PI / 2;
-                        var at = new Point(
-                            p.X + Math.Cos(angle) * 8,
-                            p.Y + Math.Sin(angle) * 7);
-                        dc.DrawEllipse(Gold, new Pen(Backdrop, 1),
-                            at, 4, 3);
-                    }
-                }
-                else
-                {
-                    double scale = enemy.Kind == 4 ? 2.2 :
-                        enemy.Kind == 1 ? 1.3 : 1;
-                    Brush coat = enemy.Kind == 4 ? Red :
-                        enemy.Kind == 1 ? Cyan : Copper;
-                    dc.DrawEllipse(coat, null,
-                        new Point(p.X, p.Y - 7 * scale),
-                        5 * scale, 5 * scale);
-                    dc.DrawLine(new Pen(enemy.Kind == 4 ? Gold : Red,
-                        4 * scale),
-                        new Point(p.X, p.Y - scale),
-                        new Point(p.X, p.Y + 9 * scale));
-                    dc.DrawLine(new Pen(coat, 2.4 * scale),
-                        new Point(p.X - 7 * scale, p.Y + 2 * scale),
-                        new Point(p.X + 7 * scale, p.Y + 2 * scale));
-                    dc.DrawLine(new Pen(Gold, 2 * scale),
-                        new Point(p.X + 7 * scale, p.Y + 2 * scale),
-                        new Point(p.X + 13 * scale, p.Y - 6 * scale));
-                    dc.DrawLine(new Pen(DarkSteel, 2 * scale),
-                        new Point(p.X, p.Y + 9 * scale),
-                        new Point(p.X - 5 * scale, p.Y + 15 * scale));
-                    dc.DrawLine(new Pen(DarkSteel, 2 * scale),
-                        new Point(p.X, p.Y + 9 * scale),
-                        new Point(p.X + 5 * scale, p.Y + 15 * scale));
-                    if (enemy.Kind == 1)
-                        dc.DrawRectangle(White, null,
-                            new Rect(p.X - 8, p.Y - 14, 16, 4));
-                }
-
+                Point p = ThiefPoint(enemy);
+                bool facingRight = p.X < TowerX;
+                TowerDefenseEnemyArt.Draw(dc, enemy.Kind, p,
+                    animationTime, enemy.Angle,
+                    enemy.ClimbSeconds, facingRight);
                 DrawHealthBar(dc, p.X,
-                    p.Y - (enemy.Kind == 4 ? 46 : 25),
+                    p.Y + TowerDefenseEnemyArt.HealthBarOffset(enemy.Kind),
                     enemy.Health, enemy.MaxHealth,
-                    enemy.Kind == 4 ? 85 : 29);
+                    TowerDefenseEnemyArt.HealthBarWidth(enemy.Kind));
             }
 
             var boss = _thieves.FirstOrDefault(t => t.Kind == 4);
