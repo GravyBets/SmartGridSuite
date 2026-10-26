@@ -24,7 +24,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private const double TowerX = FieldX + FieldWidth / 2;
         private const double TowerY = FieldY + FieldHeight / 2;
         private const double HubRadius = 31;
-        private const int MaxUpgradeLevel = 3;
         private static readonly CultureInfo MoneyCulture = CultureInfo.InvariantCulture;
 
         private static TowerDefenseWindow? _active;
@@ -76,7 +75,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private double _spawnLightningIn;
         private double _warningRemaining = -1;
         private double _flashRemaining;
-        private double _clickCooldown;
+        private double _securitySweepCooldown;
+        private double _rfSweepCooldown;
+        private double _patrolCooldown;
         private int _thievesToSpawn;
         private int _jammersToSpawn;
         private int _lightningToSpawn;
@@ -112,7 +113,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             };
             _timer.Tick += Tick;
             PreviewKeyDown += HandleKey;
-            PreviewMouseLeftButtonDown += HandleClick;
 
             _host.Closed += HostClosed;
             _host.IsVisibleChanged += HostVisibilityChanged;
@@ -179,7 +179,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _lastTickTime = 0;
             _warningRemaining = -1;
             _flashRemaining = 0;
-            _clickCooldown = 0;
+            _securitySweepCooldown = 0;
+            _rfSweepCooldown = 0;
+            _patrolCooldown = 1.6;
             _paused = false;
             _started = false;
             _waveActive = false;
@@ -218,7 +220,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             double now = _clock.Elapsed.TotalSeconds;
             double dt = Math.Clamp(now - _lastTickTime, 0, 0.1);
             _lastTickTime = now;
-            _clickCooldown = Math.Max(0, _clickCooldown - dt);
+            _securitySweepCooldown = Math.Max(0, _securitySweepCooldown - dt);
+            _rfSweepCooldown = Math.Max(0, _rfSweepCooldown - dt);
+            _patrolCooldown = Math.Max(0, _patrolCooldown - dt);
             _flashRemaining = Math.Max(0, _flashRemaining - dt);
 
             if (!_waveActive)
@@ -267,36 +271,67 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 }
             }
 
+            // The baseline security patrol works automatically. Buying
+            // fencing protects the compound, while Q calls a faster sweep.
+            // Nothing on the field has to be clicked to complete a wave.
+            if (_patrolCooldown <= 0)
+            {
+                if (_thieves.Count > 0)
+                {
+                    int index = IndexOfNearestThief();
+                    _thieves.RemoveAt(index);
+                    _thievesStopped++;
+                    _cash += 14;
+                    _score += 24;
+                }
+
+                _patrolCooldown = Math.Max(1.1, 3.4 / (1 + _fenceLevel * 0.11));
+            }
+
             for (int i = _thieves.Count - 1; i >= 0; i--)
             {
                 var thief = _thieves[i];
                 thief.Distance = Math.Max(0, thief.Distance - thief.Speed * dt);
 
-                // A functioning fence automatically intercepts thieves.
-                // Each collision damages the fence and sends the thief fleeing.
                 if (_fenceLevel > 0 && _fenceHealth > 0 &&
                     thief.Distance <= FenceRadius)
                 {
-                    _fenceHealth = Math.Max(0, _fenceHealth - Math.Max(1, 4 - _fenceLevel));
+                    double fenceWear = Math.Max(1, 4.5 + _wave * 0.15 -
+                        _fenceLevel * 0.42);
+                    _fenceHealth = Math.Max(0, _fenceHealth - fenceWear);
                     _thieves.RemoveAt(i);
                     _thievesStopped++;
                     _score += 12;
                     if (_fenceHealth <= 0)
-                        _message = "THE FENCE IS DOWN! REPAIR IT WITH 5!";
+                        _message = "FENCE BREACHED! PRESS 5 TO REPAIR IT.";
                 }
                 else if (thief.Distance <= HubRadius)
                 {
-                    _health -= 6 + _wave * 0.6;
+                    _health -= 6 + _wave * 0.65;
                     _thieves.RemoveAt(i);
                     _message = "COPPER THIEVES GOT INTO THE TOWER COMPOUND!";
                 }
             }
 
-            // Interference towers are planted nearby and continuously drain
-            // site integrity until the player clicks to remove them.
+            // RF sites self-expire, even without player action. Filters reduce
+            // damage AND accelerate their removal, so the game never gets
+            // stuck waiting for a mouse click on a jammer.
+            double jammerLifetime = Math.Max(2.1, 12.0 /
+                (1 + _filterLevel * 0.23));
+            for (int i = _jammers.Count - 1; i >= 0; i--)
+            {
+                _jammers[i].Age += dt;
+                if (_jammers[i].Age >= jammerLifetime)
+                {
+                    _jammers.RemoveAt(i);
+                    _interferenceRemoved++;
+                    _score += 15;
+                }
+            }
+
             if (_jammers.Count > 0)
             {
-                double filterMultiplier = 1.0 - 0.27 * _filterLevel;
+                double filterMultiplier = 1.0 / (1 + _filterLevel * 0.58);
                 _health -= _jammers.Count *
                     (1.05 + 0.10 * _wave) * filterMultiplier * dt;
             }
@@ -341,7 +376,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 X = TowerX + Math.Cos(angle) * radius,
                 Y = TowerY + Math.Sin(angle) * radius
             });
-            _message = "ILLEGAL INTERFERENCE TOWER DETECTED! CLICK TO REMOVE!";
+            _message = "INTERFERENCE TOWER DETECTED! E = RF SWEEP.";
         }
 
         private static double BoundaryRadius(double angle, double inset)
@@ -373,9 +408,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _warningRemaining = -1;
             _flashRemaining = 0.43;
 
-            double damage = (10 + _wave * 1.4)
-                * (1 - 0.27 * _lightningLevel)
-                * (1 - 0.22 * _surgeLevel);
+            // Diminishing returns: protection always remains valuable but
+            // lightning never becomes harmless at high upgrade levels.
+            double damage = (10 + _wave * 1.4) /
+                (1 + _lightningLevel * 0.58) /
+                (1 + _surgeLevel * 0.42);
             damage = Math.Max(0.5, damage);
             _health -= damage;
             _message = "LIGHTNING STRIKE! -" +
@@ -391,7 +428,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private void EndWave()
         {
             _waveActive = false;
-            int reward = 90 + _wave * 45;
+            int reward = 120 + _wave * 65;
             _cash += reward;
             _score += 90 * _wave + (int)Math.Ceiling(_health);
             _message = "WAVE " + _wave + " SURVIVED! +$" +
@@ -1037,7 +1074,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _clock.Stop();
             _timer.Tick -= Tick;
             PreviewKeyDown -= HandleKey;
-            PreviewMouseLeftButtonDown -= HandleClick;
             _host.Closed -= HostClosed;
             _host.IsVisibleChanged -= HostVisibilityChanged;
             _host.StateChanged -= HostStateChanged;
