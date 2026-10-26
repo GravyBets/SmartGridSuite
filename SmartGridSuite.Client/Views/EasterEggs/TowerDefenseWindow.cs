@@ -959,14 +959,17 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 37, 518, 11, Cyan, dpi, true);
 
             dc.DrawRectangle(Panel, new Pen(GridInk, 1), new Rect(25, 539, 859, 42));
-            Text(dc, "Q SECURITY SWEEP    E RF SWEEP", 39, 551, 12, White, dpi, true);
-            Text(dc, "1-6 BUY/REPAIR   SPACE WAVE   H HELP   P PAUSE",
-                403, 551, 11, Cyan, dpi, true, 475);
+            Text(dc, "Q SECURITY  E RF  T TOWER REPAIR  F FENCE",
+                37, 551, 11, White, dpi, true);
+            Text(dc, "1-8 BUY  TAB CATEGORY  W WORKSHOP  SPACE WAVE",
+                478, 551, 10.5, Cyan, dpi, true, 400);
 
             if (!_started || _paused || _gameOver)
                 DrawOverlay(dc, dpi);
             if (_showHelp)
                 DrawHelp(dc, dpi);
+            if (_progression.WorkshopOpen)
+                DrawWorkshop(dc, dpi);
         }
 
         private void DrawField(DrawingContext dc, double dpi)
@@ -1045,7 +1048,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 new Rect(TowerX - 42, TowerY + 43, 84, 7));
             dc.DrawRectangle(_health < 28 ? Red : Green, null,
                 new Rect(TowerX - 42, TowerY + 43,
-                    84 * Math.Clamp(_health / 100.0, 0, 1), 7));
+                    84 * Math.Clamp(_health / MaxTowerHealth, 0, 1), 7));
 
             if (_lightningLevel > 0)
                 Text(dc, "L" + _lightningLevel, TowerX + 30, TowerY - 50,
@@ -1120,54 +1123,127 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
         }
 
+        private static string Money(long amount)
+        {
+            if (amount >= 1_000_000_000L)
+                return "$" + (amount / 1_000_000_000.0).ToString("0.0", MoneyCulture) + "B";
+            if (amount >= 1_000_000L)
+                return "$" + (amount / 1_000_000.0).ToString("0.0", MoneyCulture) + "M";
+            if (amount >= 100_000L)
+                return "$" + (amount / 1000.0).ToString("0.0", MoneyCulture) + "K";
+            return "$" + amount.ToString("N0", MoneyCulture);
+        }
+
+        private static string ShortLabel(string name, int maxChars = 16) =>
+            name.Length <= maxChars ? name.ToUpperInvariant() :
+                name.Substring(0, maxChars).ToUpperInvariant();
+
+        private static readonly string[] CategoryNames =
+        {
+            "OPERATIONS", "PROTECTION", "LOGISTICS"
+        };
+
         private void DrawSidebar(DrawingContext dc, double dpi)
         {
             dc.DrawRectangle(Panel, new Pen(GridInk, 1),
                 new Rect(607, FieldY, 277, FieldHeight));
-            Text(dc, "TOWER STATUS", 621, 138, 18, Cyan, dpi, true);
-            Text(dc, "TOWER HP", 621, 173, 12, Muted, dpi);
-            Text(dc, Math.Ceiling(_health).ToString("000", MoneyCulture),
-                621, 190, 27, _health < 28 ? Red : Green, dpi, true);
-            Text(dc, "CASH", 752, 173, 12, Muted, dpi);
-            Text(dc, "$" + _cash.ToString("N0", MoneyCulture),
-                748, 193, 20, Gold, dpi, true);
+            Text(dc, "TOWER STATUS", 621, 138, 17, Cyan, dpi, true);
+            Text(dc, "HP", 621, 173, 12, Muted, dpi);
+            Text(dc, Math.Ceiling(_health).ToString("0", MoneyCulture) +
+                "/" + MaxTowerHealth.ToString("0", MoneyCulture),
+                621, 190, 21, _health < 28 ? Red : Green, dpi, true);
+            Text(dc, "CASH", 760, 173, 12, Muted, dpi);
+            Text(dc, Money(_cash), 754, 193, 20, Gold, dpi, true);
 
             Text(dc, "WAVE " + _wave + (_waveActive ? " LIVE" : " READY"),
-                621, 226, 13, White, dpi, true);
-            Text(dc, _fenceLevel > 0
-                    ? "FENCE " + Math.Ceiling(_fenceHealth).ToString("0", MoneyCulture)
-                    : "NO FENCE",
-                742, 228, 12, _fenceHealth > 0 ? Green : Red, dpi, true);
-            Text(dc, "THIEVES " + (_thieves.Count + _thievesToSpawn) +
-                "   RF " + (_jammers.Count + _jammersToSpawn),
-                621, 245, 12, Purple, dpi, true);
+                621, 224, 13, White, dpi, true);
+            Text(dc, "RESEARCH +" +
+                _progression.PendingCredits.ToString("N0", MoneyCulture),
+                737, 225, 11, Purple, dpi, true);
 
-            // All upgrade/repair actions are accessible from the number row,
-            // including the new tower-health repair on key 6.
-            DrawUpgrade(dc, 1, "LIGHTNING ARRESTOR", 265, Gold, dpi);
-            DrawUpgrade(dc, 2, "SURGE ARRESTOR", 305, Green, dpi);
-            DrawUpgrade(dc, 3, "SECURITY FENCE", 345, Cyan, dpi);
-            DrawUpgrade(dc, 4, "RF FILTERS", 385, Purple, dpi);
-            DrawUpgrade(dc, 5, "REPAIR FENCE", 425, White, dpi);
-            DrawUpgrade(dc, 6, "REPAIR TOWER +25HP", 465, Green, dpi);
+            for (int cat = 0; cat < 3; cat++)
+                Text(dc, cat == _progression.SelectedCategory
+                        ? "[" + CategoryNames[cat] + "]"
+                        : CategoryNames[cat],
+                    cat == 0 ? 618 : cat == 1 ? 707 : 797, 250, 10,
+                    cat == _progression.SelectedCategory ? Gold : Muted,
+                    dpi, true);
+
+            for (int i = 0; i < 8; i++)
+                DrawUpgradeRow(dc, i, 274 + i * 29, dpi);
         }
 
-        private void DrawUpgrade(DrawingContext dc, int option,
-            string name, double y, Brush ink, double dpi)
+        private void DrawUpgradeRow(DrawingContext dc, int row,
+            double y, double dpi)
         {
-            dc.DrawRectangle(ButtonFace, new Pen(ink, 1),
-                new Rect(620, y, 250, 36));
+            int index = _progression.SelectedCategory * 8 + row;
+            var upgrade = TowerDefenseProgression.Catalog[index];
+            bool locked = !_progression.Unlocked(index, _wave);
+            bool selected = _progression.SelectedRow == row;
 
-            string label = option <= 4
-                ? name + " LV" + LevelFor(option)
-                : name;
-            int? next = NextPrice(option);
-            string price = next.HasValue
-                ? "$" + next.Value.ToString("N0", MoneyCulture)
-                : "N/A";
+            dc.DrawRectangle(ButtonFace,
+                new Pen(selected ? Gold : GridInk, selected ? 1.6 : 0.6),
+                new Rect(620, y, 250, 26));
 
-            Text(dc, option + "  " + label, 628, y + 9, 12.3, ink, dpi, true, 182);
-            Text(dc, price, 811, y + 9, 12.3, White, dpi, true, 57);
+            string label = (row + 1) + " " + ShortLabel(upgrade.Name) +
+                " L" + _progression.Level(index);
+            string price = locked
+                ? "W" + upgrade.UnlockWave
+                : Money(_progression.RunPrice(index));
+
+            Text(dc, label, 626, y + 5, 11.2,
+                locked ? Muted : selected ? Gold : White, dpi,
+                selected, 181);
+            Text(dc, price, 806, y + 5, 10.9,
+                locked ? Red : Green, dpi, true, 62);
+        }
+
+        private void DrawWorkshop(DrawingContext dc, double dpi)
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(248, 5, 14, 31)),
+                new Pen(Purple, 2.6), new Rect(105, 116, 720, 411));
+            Text(dc, "RADIO SHOP RESEARCH WORKSHOP", 132, 131, 24,
+                Gold, dpi, true);
+            Text(dc, "PERMANENT CREDITS: " + Money(_progression.Credits) +
+                "     BEST WAVE: " + _progression.BestWave, 133, 168,
+                15, White, dpi, true);
+
+            for (int cat = 0; cat < 3; cat++)
+                Text(dc, cat == _progression.SelectedCategory
+                        ? "[" + CategoryNames[cat] + "]"
+                        : CategoryNames[cat],
+                    cat == 0 ? 132 : cat == 1 ? 348 : 571, 207, 15,
+                    cat == _progression.SelectedCategory ? Gold : Muted,
+                    dpi, true);
+
+            for (int row = 0; row < 8; row++)
+            {
+                int index = _progression.SelectedCategory * 8 + row;
+                var upgrade = TowerDefenseProgression.Catalog[index];
+                double y = 244 + row * 27;
+                bool selected = row == _progression.SelectedRow;
+                bool unlocked = _progression.Unlocked(index, _wave);
+
+                if (selected)
+                    dc.DrawRectangle(ButtonFace, new Pen(Gold, 1.5),
+                        new Rect(131, y - 2, 665, 27));
+
+                Text(dc, (row + 1) + "  " + upgrade.Name,
+                    141, y, 15, unlocked ? selected ? Gold : White : Muted,
+                    dpi, selected, 410);
+                Text(dc, "LV " + _progression.PermanentLevel(index),
+                    572, y, 13, Green, dpi, true, 75);
+                Text(dc, unlocked ? Money(_progression.WorkshopPrice(index)) :
+                    "WAVE " + upgrade.UnlockWave,
+                    680, y, 13, unlocked ? Gold : Red, dpi, true, 112);
+            }
+
+            int picked = _progression.SelectedCategory * 8 +
+                _progression.SelectedRow;
+            Text(dc, TowerDefenseProgression.Catalog[picked].Detail,
+                133, 468, 13, Cyan, dpi, false, 620);
+            Text(dc, "1-8 BUY   TAB CATEGORIES   UP/DOWN SELECT   W CLOSE",
+                133, 498, 13, Muted, dpi, true, 650);
         }
 
         private void DrawOverlay(DrawingContext dc, double dpi)
@@ -1260,7 +1336,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private static string BestFile => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SmartGridSuite", "Arcade", "tower-defense-keyboard-best.txt");
+            "SmartGridSuite", "Arcade", "tower-defense-workshop-score.txt");
 
         private static int ReadBestScore()
         {
