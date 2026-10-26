@@ -384,15 +384,15 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             {
                 int selectedChoice = choice + 1;
                 _perkButtons[choice] = ArcadeButton(
-                    choices[choice], 690, 50,
+                    choices[choice], 913, 51,
                     choice == 0 ? Green : choice == 1 ? Cyan : Purple);
                 _perkButtons[choice].Click += (_, _) =>
                 {
                     SelectPerk(selectedChoice);
                     RefreshUpgradeControls();
                 };
-                Canvas.SetLeft(_perkButtons[choice], 62);
-                Canvas.SetTop(_perkButtons[choice], 328 + 63 * choice);
+                Canvas.SetLeft(_perkButtons[choice], 173);
+                Canvas.SetTop(_perkButtons[choice], 315 + 65 * choice);
                 _controls.Children.Add(_perkButtons[choice]);
             }
         }
@@ -1665,123 +1665,50 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void DrawSidebar(DrawingContext dc, double dpi)
         {
-            dc.DrawRectangle(Panel, new Pen(GridInk, 1),
-                new Rect(607, FieldY, 277, FieldHeight));
-            Text(dc, "TOWER STATUS", 621, 138, 17, Cyan, dpi, true);
-            Text(dc, "HP", 621, 173, 12, Muted, dpi);
+            dc.DrawRectangle(Panel, new Pen(GridInk, 1.6),
+                new Rect(PanelX, FieldY, PanelWidth, FieldHeight));
+            Text(dc, "UPGRADES", PanelX + 17, 140, 22, Cyan, dpi, true);
+            Text(dc, "TOWER HEALTH", PanelX + 17, 174, 13, Muted, dpi, true);
             Text(dc, Math.Ceiling(_health).ToString("0", MoneyCulture) +
                 "/" + MaxTowerHealth.ToString("0", MoneyCulture),
-                621, 190, 21, _health < 28 ? Red : Green, dpi, true);
-            Text(dc, "CASH", 760, 173, 12, Muted, dpi);
-            Text(dc, Money(_cash), 754, 193, 20, Gold, dpi, true);
-
-            Text(dc, "WAVE " + _wave + (_waveActive ? " LIVE" : " READY"),
-                621, 224, 13, White, dpi, true);
+                PanelX + 17, 193, 23, _health < 28 ? Red : Green, dpi, true);
+            Text(dc, "CASH", PanelX + 281, 174, 13, Muted, dpi, true);
+            Text(dc, Money(_cash), PanelX + 281, 193, 22, Gold, dpi, true);
+            Text(dc, "WAVE " + _wave + (_waveActive ? " IN PROGRESS" : " READY"),
+                PanelX + 17, 231, 14, White, dpi, true);
             Text(dc, "RESEARCH +" +
                 _progression.PendingCredits.ToString("N0", MoneyCulture),
-                737, 225, 11, Purple, dpi, true);
-
-            for (int cat = 0; cat < 3; cat++)
-                Text(dc, cat == _progression.SelectedCategory
-                        ? "[" + CategoryNames[cat] + "]"
-                        : CategoryNames[cat],
-                    cat == 0 ? 618 : cat == 1 ? 707 : 797, 250, 10,
-                    cat == _progression.SelectedCategory ? Gold : Muted,
-                    dpi, true);
-
-            for (int i = 0; i < 8; i++)
-                DrawUpgradeRow(dc, i, 274 + i * 29, dpi);
-        }
-
-        private void DrawUpgradeRow(DrawingContext dc, int row,
-            double y, double dpi)
-        {
-            int index = _progression.SelectedCategory * 8 + row;
-            var upgrade = TowerDefenseProgression.Catalog[index];
-            bool locked = !_progression.Unlocked(index, _wave);
-            bool selected = _progression.SelectedRow == row;
-
-            dc.DrawRectangle(ButtonFace,
-                new Pen(selected ? Gold : GridInk, selected ? 1.6 : 0.6),
-                new Rect(620, y, 250, 26));
-
-            string label = (row + 1) + " " + ShortLabel(upgrade.Name) +
-                " L" + _progression.Level(index);
-            string price = locked
-                ? "W" + upgrade.UnlockWave
-                : Money(_progression.RunPrice(index));
-
-            Text(dc, label, 626, y + 5, 11.2,
-                locked ? Muted : selected ? Gold : White, dpi,
-                selected, 181);
-            Text(dc, price, 806, y + 5, 10.9,
-                locked ? Red : Green, dpi, true, 62);
+                PanelX + 291, 232, 13, Purple, dpi, true);
+            // Category selectors and all eight upgrade cards are actual WPF
+            // Buttons above this drawing surface, not tiny painted rectangles.
         }
 
         private void DrawWorkshop(DrawingContext dc, double dpi)
         {
             dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(248, 5, 14, 31)),
-                new Pen(Purple, 2.6), new Rect(105, 116, 720, 411));
-            Text(dc, "RADIO SHOP RESEARCH WORKSHOP", 132, 131, 24,
+                new Pen(Purple, 2.6), new Rect(140, 99, 1093, 647));
+            Text(dc, "RADIO SHOP RESEARCH WORKSHOP", 174, 116, 27,
                 Gold, dpi, true);
             Text(dc, "PERMANENT CREDITS: " + Money(_progression.Credits) +
-                "     BEST WAVE: " + _progression.BestWave, 133, 168,
-                15, White, dpi, true);
+                "        BEST WAVE: " + _progression.BestWave,
+                175, 157, 17, White, dpi, true);
+            Text(dc, "SELECT AN UPGRADE TO KEEP IT IN EVERY FUTURE SHIFT.",
+                175, 184, 15, Cyan, dpi);
 
-            for (int cat = 0; cat < 3; cat++)
-                Text(dc, cat == _progression.SelectedCategory
-                        ? "[" + CategoryNames[cat] + "]"
-                        : CategoryNames[cat],
-                    cat == 0 ? 132 : cat == 1 ? 348 : 571, 207, 15,
-                    cat == _progression.SelectedCategory ? Gold : Muted,
-                    dpi, true);
-
-            for (int row = 0; row < 8; row++)
-            {
-                int index = _progression.SelectedCategory * 8 + row;
-                var upgrade = TowerDefenseProgression.Catalog[index];
-                double y = 244 + row * 27;
-                bool selected = row == _progression.SelectedRow;
-                bool unlocked = _progression.Unlocked(index, _wave);
-
-                if (selected)
-                    dc.DrawRectangle(ButtonFace, new Pen(Gold, 1.5),
-                        new Rect(131, y - 2, 665, 27));
-
-                Text(dc, (row + 1) + "  " + upgrade.Name,
-                    141, y, 15, unlocked ? selected ? Gold : White : Muted,
-                    dpi, selected, 410);
-                Text(dc, "LV " + _progression.PermanentLevel(index),
-                    572, y, 13, Green, dpi, true, 75);
-                Text(dc, unlocked ? Money(_progression.WorkshopPrice(index)) :
-                    "WAVE " + upgrade.UnlockWave,
-                    680, y, 13, unlocked ? Gold : Red, dpi, true, 112);
-            }
-
-            int picked = _progression.SelectedCategory * 8 +
-                _progression.SelectedRow;
-            Text(dc, TowerDefenseProgression.Catalog[picked].Detail,
-                133, 468, 13, Cyan, dpi, false, 620);
-            Text(dc, "1-8 BUY   TAB CATEGORIES   UP/DOWN SELECT   W CLOSE",
-                133, 498, 13, Muted, dpi, true, 650);
+            Text(dc, "CLOSE WORKSHOP TO START OR RETRY YOUR SHIFT",
+                178, 713, 13, Muted, dpi);
         }
 
         private void DrawPerk(DrawingContext dc, double dpi)
         {
-            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(246, 5, 14, 31)),
-                new Pen(Gold, 2.7), new Rect(128, 172, 656, 297));
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(247, 5, 14, 31)),
+                new Pen(Gold, 2.7), new Rect(128, 178, 1010, 435));
             Text(dc, "MILESTONE: WAVE " + _wave + " SURVIVED!",
-                159, 192, 26, Gold, dpi, true);
-            Text(dc, "CHOOSE ONE BONUS FOR THE NEXT STRETCH:",
-                160, 242, 15, White, dpi, true);
-            Text(dc, "1    OVERTIME PAY — LARGE CASH BONUS",
-                160, 287, 17, Green, dpi, true);
-            Text(dc, "2    STORM RECOVERY — TOWER + FENCE HEAL",
-                160, 326, 17, Cyan, dpi, true);
-            Text(dc, "3    R&D GRANT — EXTRA PERMANENT RESEARCH",
-                160, 365, 17, Purple, dpi, true);
-            Text(dc, "PRESS 1 / 2 / 3 TO CHOOSE; SPACE THEN STARTS NEXT WAVE",
-                160, 422, 13, Muted, dpi);
+                174, 199, 29, Gold, dpi, true);
+            Text(dc, "CHOOSE YOUR BONUS BEFORE THE NEXT WAVE:",
+                178, 249, 18, White, dpi, true);
+            Text(dc, "CLICK A BONUS CARD OR PRESS 1 / 2 / 3",
+                178, 560, 16, Muted, dpi);
         }
 
         private void DrawOverlay(DrawingContext dc, double dpi)
@@ -1835,19 +1762,19 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Gold, dpi, true);
             Text(dc, "24 UPGRADES: OPERATIONS / PROTECTION / LOGISTICS",
                 143, 203, 15, Cyan, dpi, true);
-            Text(dc, "TAB OR LEFT/RIGHT: SWITCH CATEGORY (8 EACH)",
+            Text(dc, "CLICK A CATEGORY TAB TO VIEW ITS 8 UPGRADES.",
                 143, 231, 14, White, dpi);
-            Text(dc, "1-8: BUY UPGRADE  •  ARROWS + ENTER: SELECT/BUY",
+            Text(dc, "CLICK A LARGE UPGRADE CARD TO PURCHASE IT.",
                 143, 259, 14, White, dpi);
             Text(dc, "Q SECURITY SWEEP  •  E RF SWEEP  •  T TOWER REPAIR",
                 143, 290, 14, White, dpi);
             Text(dc, "F FENCE REPAIR  •  SPACE NEXT WAVE  •  P PAUSE",
                 143, 318, 14, White, dpi);
-            Text(dc, "W: PERMANENT WORKSHOP BEFORE / AFTER RUNS",
+            Text(dc, "WORKSHOP BUTTON: PERMANENT UPGRADES BETWEEN RUNS",
                 143, 352, 15, Purple, dpi, true);
             Text(dc, "EARN RESEARCH ON WAVES; KEEP IT AFTER DEFEAT.",
                 143, 380, 14, Green, dpi, true);
-            Text(dc, "THREATS ARE AUTOMATIC — NEVER NEED A TRACKPAD.",
+            Text(dc, "KEYBOARD BUYING STILL WORKS: TAB + 1–8.",
                 143, 409, 14, Muted, dpi);
             Text(dc, "H CLOSES HELP   •   ESC BACK TO ARCADE",
                 143, 465, 16, Gold, dpi, true);
