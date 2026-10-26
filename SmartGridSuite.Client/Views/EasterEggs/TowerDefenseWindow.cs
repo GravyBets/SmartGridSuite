@@ -507,16 +507,35 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             _towerRepairButton.Visibility = showFooter && _started && !_gameOver
                 ? Visibility.Visible : Visibility.Collapsed;
+            _towerRepairButton.Content = "TOWER +" +
+                Math.Ceiling(TowerRepairAvailable).ToString("0", MoneyCulture) +
+                "HP  " + Money(TowerRepairCost);
+            _towerRepairButton.ToolTip = "Tower: " +
+                Math.Ceiling(_health).ToString("0", MoneyCulture) +
+                "/" + MaxTowerHealth.ToString("0", MoneyCulture) +
+                " HP. Restores up to " + TowerRepairCapacity.ToString("0", MoneyCulture) +
+                " HP for " + Money(TowerRepairCost) + ".";
             _towerRepairButton.IsEnabled = gameUsable &&
-                _health < MaxTowerHealth;
-            Canvas.SetLeft(_towerRepairButton, 596);
+                TowerRepairAvailable > 0.01 && _cash >= TowerRepairCost;
+            _towerRepairButton.Width = 208;
+            Canvas.SetLeft(_towerRepairButton, 525);
             Canvas.SetTop(_towerRepairButton, 764);
 
             _fenceRepairButton.Visibility = showFooter && _started && !_gameOver
                 ? Visibility.Visible : Visibility.Collapsed;
+            _fenceRepairButton.Content = "FENCE +" +
+                Math.Ceiling(FenceRepairAvailable).ToString("0", MoneyCulture) +
+                "HP  " + Money(FenceRepairCost);
+            _fenceRepairButton.ToolTip = "Fence: " +
+                Math.Ceiling(_fenceHealth).ToString("0", MoneyCulture) +
+                "/" + FenceMaxHealth.ToString("0", MoneyCulture) +
+                " HP. Restores up to " + FenceRepairCapacity.ToString("0", MoneyCulture) +
+                " HP for " + Money(FenceRepairCost) + ".";
             _fenceRepairButton.IsEnabled = gameUsable &&
-                _fenceLevel > 0 && _fenceHealth < FenceMaxHealth;
-            Canvas.SetLeft(_fenceRepairButton, 772);
+                _fenceLevel > 0 && FenceRepairAvailable > 0.01 &&
+                _cash >= FenceRepairCost;
+            _fenceRepairButton.Width = 207;
+            Canvas.SetLeft(_fenceRepairButton, 738);
             Canvas.SetTop(_fenceRepairButton, 764);
 
             _nextWaveButton.Visibility = showFooter && !_gameOver
@@ -1446,31 +1465,46 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     _fenceHealth + FenceMaxHealth - oldFenceHealth);
         }
 
+        // Explicit cost / restored HP metrics drive BOTH repairs and buttons.
+        // Pricing rises by wave and Parts Discount applies to both.
+        private int TowerRepairCost => (int)Math.Clamp(Math.Ceiling(
+            (200 + _wave * 28.0) /
+            (1 + _progression.Level(20) * 0.025)), 1, int.MaxValue);
+
+        private int FenceRepairCost => (int)Math.Clamp(Math.Ceiling(
+            (120 + _wave * 16.0) /
+            (1 + _progression.Level(20) * 0.025)), 1, int.MaxValue);
+
+        private double TowerRepairCapacity =>
+            Math.Min(1000, 100 + 10 * _progression.Level(22));
+
+        private double FenceRepairCapacity =>
+            Math.Min(1000, 100 + 15 * _progression.Level(13));
+
+        private double TowerRepairAvailable =>
+            Math.Max(0, Math.Min(MaxTowerHealth - _health, TowerRepairCapacity));
+
+        private double FenceRepairAvailable =>
+            Math.Max(0, Math.Min(FenceMaxHealth - _fenceHealth, FenceRepairCapacity));
+
         private void RepairTower()
         {
-            if (!_started || _paused || _gameOver || _progression.WorkshopOpen)
+            if (!_started || _paused || _gameOver ||
+                _progression.WorkshopOpen || _showHelp || _perkPending)
                 return;
-            if (_health >= MaxTowerHealth)
-            {
-                _message = "TOWER INTEGRITY ALREADY FULL.";
-                _surface.InvalidateVisual();
-                return;
-            }
-            int cost = 135 + _wave * 30;
-            cost = (int)Math.Max(1,
-                Math.Ceiling(cost / (1 + _progression.Level(20) * 0.025)));
-            if (_cash < cost)
-                _message = "TOWER REPAIR NEEDS $" +
-                    cost.ToString("N0", MoneyCulture) + ".";
+
+            double restored = TowerRepairAvailable;
+            if (restored < 0.01)
+                _message = "TOWER HP ALREADY FULL.";
+            else if (_cash < TowerRepairCost)
+                _message = "REPAIR TOWER: NEED " + Money(TowerRepairCost) +
+                    " FOR UP TO " + TowerRepairCapacity.ToString("0", MoneyCulture) + " HP.";
             else
             {
-                _cash -= cost;
-                double heal = Math.Min(MaxTowerHealth - _health,
-                    25 + 5 * _progression.Level(22));
-                _health += heal;
-                _message = "REPAIR CREW RESTORED " +
-                    heal.ToString("0", MoneyCulture) + " TOWER HP. -$" +
-                    cost.ToString("N0", MoneyCulture) + ".";
+                _cash -= TowerRepairCost;
+                _health = Math.Min(MaxTowerHealth, _health + restored);
+                _message = "TOWER +" + restored.ToString("0", MoneyCulture) +
+                    " HP FOR " + Money(TowerRepairCost) + ".";
             }
             _surface.InvalidateVisual();
             RefreshUpgradeControls();
@@ -1478,27 +1512,24 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void RepairFence()
         {
-            if (!_started || _paused || _gameOver || _progression.WorkshopOpen)
+            if (!_started || _paused || _gameOver ||
+                _progression.WorkshopOpen || _showHelp || _perkPending)
                 return;
+
+            double restored = FenceRepairAvailable;
             if (_fenceLevel == 0)
-                _message = "INSTALL A SECURITY FENCE BEFORE REPAIRING IT.";
-            else if (_fenceHealth >= FenceMaxHealth)
-                _message = "SECURITY FENCE IS ALREADY FULLY REPAIRED.";
+                _message = "BUY A SECURITY FENCE BEFORE REPAIRING IT.";
+            else if (restored < 0.01)
+                _message = "FENCE HP ALREADY FULL.";
+            else if (_cash < FenceRepairCost)
+                _message = "REPAIR FENCE: NEED " + Money(FenceRepairCost) +
+                    " FOR UP TO " + FenceRepairCapacity.ToString("0", MoneyCulture) + " HP.";
             else
             {
-                int price = (int)Math.Max(1,
-                    Math.Ceiling((90 + _wave * 8.0) /
-                        (1 + _progression.Level(20) * 0.025)));
-                if (_cash < price)
-                    _message = "FENCE REPAIR NEEDS $" +
-                        price.ToString("N0", MoneyCulture) + ".";
-                else
-                {
-                    _cash -= price;
-                    _fenceHealth = FenceMaxHealth;
-                    _message = "FENCE RESTORED! -$" +
-                        price.ToString("N0", MoneyCulture) + ".";
-                }
+                _cash -= FenceRepairCost;
+                _fenceHealth = Math.Min(FenceMaxHealth, _fenceHealth + restored);
+                _message = "FENCE +" + restored.ToString("0", MoneyCulture) +
+                    " HP FOR " + Money(FenceRepairCost) + ".";
             }
             _surface.InvalidateVisual();
             RefreshUpgradeControls();
@@ -1544,13 +1575,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             string rf = _rfSweepCooldown <= 0
                 ? "READY"
                 : Math.Ceiling(_rfSweepCooldown).ToString(MoneyCulture) + "s";
-            Text(dc, "Q SECURITY: " + patrol + "     E RF SWEEP: " + rf,
+            Text(dc, "AUTO SECURITY: " + patrol + "    AUTO RF: " + rf,
                 38, 738, 13, Cyan, dpi, true);
 
             dc.DrawRectangle(Panel, new Pen(GridInk, 1),
                 new Rect(24, 759, 1274, 47));
-            Text(dc, "Q SECURITY  E RF  H HELP  P PAUSE",
-                35, 773, 13, White, dpi, true);
+            Text(dc, "AUTO: GUNS / SECURITY / RF    H HELP  P PAUSE",
+                35, 773, 12, White, dpi, true);
 
             if (!_started || _paused || _gameOver)
                 DrawOverlay(dc, dpi);
@@ -1907,9 +1938,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 143, 231, 14, White, dpi);
             Text(dc, "CLICK A LARGE UPGRADE CARD TO PURCHASE IT.",
                 143, 259, 14, White, dpi);
-            Text(dc, "Q SECURITY SWEEP  •  E RF SWEEP  •  T TOWER REPAIR",
+            Text(dc, "GUNS, SECURITY AND RF TEAMS OPERATE AUTOMATICALLY.",
                 143, 290, 14, White, dpi);
-            Text(dc, "F FENCE REPAIR  •  SPACE NEXT WAVE  •  P PAUSE",
+            Text(dc, "T TOWER REPAIR  •  F FENCE REPAIR  •  SPACE WAVE",
                 143, 318, 14, White, dpi);
             Text(dc, "WORKSHOP BUTTON: PERMANENT UPGRADES BETWEEN RUNS",
                 143, 352, 15, Purple, dpi, true);
