@@ -24,6 +24,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         public bool Started { get; set; }
         public bool WaveActive { get; set; }
         public bool PerkPending { get; set; }
+        public bool AutoNextPurchased { get; set; }
+        public bool AutoNextEnabled { get; set; }
+        public double AutoNextRemaining { get; set; } = -1;
         public int ThievesToSpawn { get; set; }
         public int JammersToSpawn { get; set; }
         public int LightningToSpawn { get; set; }
