@@ -1116,6 +1116,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         {
             public double X { get; set; }
             public double Y { get; set; }
+            public double Age { get; set; }
         }
 
         private sealed class GameSurface : FrameworkElement
