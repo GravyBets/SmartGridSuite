@@ -1471,18 +1471,36 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void SpawnInterferenceTower()
         {
-            double angle = _random.NextDouble() * Math.PI * 2;
-            double radius = Math.Min(
-                BoundaryRadius(angle, 30) - 6,
-                102 + _random.NextDouble() * 48);
+            // These are illegal mini repeaters emerging out of the dirt
+            // OUTSIDE the compound, never inexplicably erected under the
+            // tower's security fence. Keep clearance around other repeaters.
+            Point location = default;
+            for (int attempt = 0; attempt < 18; attempt++)
+            {
+                double angle = _random.NextDouble() * Math.PI * 2;
+                double edge = BoundaryRadius(angle, 51) - 7;
+                double desired = Math.Max(146, FenceRadius + 42) +
+                    _random.NextDouble() * 63;
+                double radius = Math.Min(edge, desired);
+                location = new Point(
+                    TowerX + Math.Cos(angle) * radius,
+                    TowerY + Math.Sin(angle) * radius);
+                if (!TowerDefenseEnvironmentArt.WithinFence(location,
+                        new Point(TowerX, TowerY), Math.Max(FenceRadius, 115))
+                    && !_jammers.Any(j => Distance(location,
+                        new Point(j.X, j.Y)) < 57))
+                    break;
+            }
+
+            double health = 42 + _wave * 9;
             _jammers.Add(new InterferenceTower
             {
-                X = TowerX + Math.Cos(angle) * radius,
-                Y = TowerY + Math.Sin(angle) * radius,
-                MaxHealth = 42 + _wave * 9,
-                Health = 42 + _wave * 9
+                X = location.X,
+                Y = location.Y,
+                MaxHealth = health,
+                Health = health
             });
-            _message = "INTERFERENCE TOWER DETECTED! AUTO RF TEAM DISPATCHED.";
+            _message = "ILLEGAL RF REPEATER EMERGING BEYOND THE FENCE!";
         }
 
         private static double BoundaryRadius(double angle, double inset)
@@ -2177,43 +2195,26 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     84 * Math.Clamp(_health / MaxTowerHealth, 0, 1), 7));
 
 
-            // Illegal RF sites are MINIATURE lattice radio towers,
-            // visually distinct from the approaching copper thieves.
+            // Hostile miniature RF repeater rigs erupt from disturbed soil
+            // beyond the compound perimeter. Existing RF attacks and HP
+            // remain unchanged; emergence is visual only.
+            double animationTime = _clock.Elapsed.TotalSeconds +
+                _savedElapsedOffset;
             foreach (var jammer in _jammers)
             {
                 var p = new Point(jammer.X, jammer.Y);
-                dc.DrawEllipse(null, new Pen(Purple, 1.7), p, 27, 27);
-                var frame = new Pen(Purple, 2.2);
-                var braces = new Pen(DarkSteel, 1.3);
-                dc.DrawLine(frame, new Point(p.X, p.Y - 21),
-                    new Point(p.X - 13, p.Y + 16));
-                dc.DrawLine(frame, new Point(p.X, p.Y - 21),
-                    new Point(p.X + 13, p.Y + 16));
-                dc.DrawLine(frame, new Point(p.X - 13, p.Y + 16),
-                    new Point(p.X + 13, p.Y + 16));
-                for (int rung = 0; rung < 3; rung++)
-                {
-                    double yy = p.Y - 11 + rung * 9;
-                    double h = 3 + rung * 3.6;
-                    dc.DrawLine(braces, new Point(p.X - h, yy),
-                        new Point(p.X + h, yy + 8));
-                    dc.DrawLine(braces, new Point(p.X + h, yy),
-                        new Point(p.X - h, yy + 8));
-                }
-                dc.DrawRectangle(White, null,
-                    new Rect(p.X - 10, p.Y - 9, 4, 11));
-                dc.DrawRectangle(White, null,
-                    new Rect(p.X + 5, p.Y - 9, 4, 11));
-                dc.DrawEllipse(Red, null, new Point(p.X, p.Y - 23), 3, 3);
-                DrawHealthBar(dc, p.X, p.Y - 41,
-                    jammer.Health, jammer.MaxHealth, 39);
+                TowerDefenseEnemyArt.DrawInterferenceTower(dc, p,
+                    jammer.Age, animationTime);
+                if (jammer.Age >= 0.3)
+                    DrawHealthBar(dc, p.X,
+                        p.Y - 58 + 22 * (1 - Math.Clamp(
+                            jammer.Age / 1.35, 0, 1)),
+                        jammer.Health, jammer.MaxHealth, 41);
             }
 
             // Dedicated cached-vector sprites. Every enemy has a distinct
             // silhouette and per-enemy animation phase; gameplay and HP are
             // still driven by the existing threat simulation.
-            double animationTime = _clock.Elapsed.TotalSeconds +
-                _savedElapsedOffset;
             foreach (var enemy in _thieves)
             {
                 Point p = ThiefPoint(enemy);
