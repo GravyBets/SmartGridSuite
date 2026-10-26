@@ -34,7 +34,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             new("Security Fence", "Automatically repel nearby thieves", 1, 220, 140, 48, 0),
             new("Fence Durability", "Give installed fencing more integrity", 1, 155, 95, 39, 2),
             new("Fence Auto-Repair", "Regenerate security fence integrity", 1, 210, 125, 55, 5),
-            new("Grounding Grid", "Reduce all tower damage slightly", 1, 260, 175, 78, 8),
+            new("Tower Grounding", "Reduce all tower damage slightly", 1, 260, 175, 78, 8),
 
             // LOGISTICS: fund the radio shop's growing defensive network.
             new("Dispatch Contract", "Earn additional cash after every wave", 2, 95, 66, 26, 0),
@@ -44,7 +44,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             new("Parts Discount", "Lower the cash cost of new upgrades", 2, 240, 145, 70, 4),
             new("Free Work Orders", "Chance of a free upgrade each wave", 2, 290, 175, 85, 7),
             new("Repair Supplies", "Restore 10 extra HP per tower repair", 2, 150, 95, 40, 0),
-            new("Maintenance Dispatch", "Restore tower HP at wave completion", 2, 250, 160, 75, 9)
+            new("Preventative Maintenance", "Restore tower HP at wave completion", 2, 250, 160, 75, 9)
         };
 
         private sealed class SavedState
