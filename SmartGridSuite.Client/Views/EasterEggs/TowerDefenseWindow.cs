@@ -2370,16 +2370,16 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 143, 231, 14, White, dpi);
             Text(dc, "CLICK A LARGE UPGRADE CARD TO PURCHASE IT.",
                 143, 259, 14, White, dpi);
-            Text(dc, "TWIN GUNS, SECURITY AND RF TEAMS FIRE AUTOMATICALLY.",
-                143, 290, 14, White, dpi);
-            Text(dc, "REPAIR BUTTONS SHOW COST AND ACTUAL HP RESTORED.",
-                143, 318, 14, White, dpi);
-            Text(dc, "WORKSHOP BUTTON: PERMANENT UPGRADES BETWEEN RUNS",
-                143, 352, 15, Purple, dpi, true);
-            Text(dc, "EARN RESEARCH ON WAVES; KEEP IT AFTER DEFEAT.",
-                143, 380, 14, Green, dpi, true);
-            Text(dc, "KEYBOARD BUYING STILL WORKS: TAB + 1–8.",
-                143, 409, 14, Muted, dpi);
+            Text(dc, "GUNS, ORBITING DRONES, SECURITY AND RF ARE AUTOMATIC.",
+                143, 290, 13.2, White, dpi);
+            Text(dc, "THIEVES, CLIMBERS, PARAKEETS, BEES + RF MINI TOWERS.",
+                143, 318, 13.2, White, dpi);
+            Text(dc, "EACH 5TH WAVE ADDS A SCRAP KING BOSS.",
+                143, 352, 15, Red, dpi, true);
+            Text(dc, "END RUN BANKS RESEARCH; CLOSING SUSPENDS YOUR WAVE.",
+                143, 380, 12.8, Green, dpi, true);
+            Text(dc, "REOPEN TO CONTINUE OR BANK RESEARCH AND START NEW.",
+                143, 409, 13, Muted, dpi);
             Text(dc, "H CLOSES HELP   •   ESC BACK TO ARCADE",
                 143, 465, 16, Gold, dpi, true);
         }
