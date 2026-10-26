@@ -1458,10 +1458,19 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private static double BoundaryRadius(double angle, double inset)
         {
-            double cos = Math.Abs(Math.Cos(angle));
-            double sin = Math.Abs(Math.Sin(angle));
-            return Math.Min((FieldWidth / 2 - inset) / Math.Max(0.0001, cos),
-                (FieldHeight / 2 - inset) / Math.Max(0.0001, sin));
+            // Spawn along the real field boundary around the raised site.
+            // The previous half-width/half-height math assumed the tower was
+            // centered and could spawn enemies above the top border.
+            double cos = Math.Cos(angle);
+            double sin = Math.Sin(angle);
+            double horizontal = cos >= 0
+                ? FieldX + FieldWidth - inset - TowerX
+                : TowerX - FieldX - inset;
+            double vertical = sin >= 0
+                ? FieldY + FieldHeight - inset - TowerY
+                : TowerY - FieldY - inset;
+            return Math.Min(horizontal / Math.Max(0.0001, Math.Abs(cos)),
+                vertical / Math.Max(0.0001, Math.Abs(sin)));
         }
 
         private Point ThiefPoint(CopperThief thief)
