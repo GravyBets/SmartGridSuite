@@ -1650,6 +1650,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             dc.DrawEllipse(Red, new Pen(White, 1),
                 new Point(TowerX, towerTop - 16), 4, 4);
 
+            DrawMountedGun(dc, false);
+            DrawMountedGun(dc, true);
+
             // The tower's integrity can be read directly beneath it.
             dc.DrawRectangle(DarkSteel, null,
                 new Rect(TowerX - 42, TowerY + 43, 84, 7));
@@ -1671,18 +1674,36 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                         84 + ring * 10, 84 + ring * 10);
             }
 
-            for (int i = 0; i < _jammers.Count; i++)
+            // Illegal RF sites are MINIATURE lattice radio towers,
+            // visually distinct from the approaching copper thieves.
+            foreach (var jammer in _jammers)
             {
-                var jammer = _jammers[i];
                 var p = new Point(jammer.X, jammer.Y);
-                dc.DrawEllipse(null, new Pen(Purple, 2.3), p, 22, 22);
-                dc.DrawRectangle(Panel, new Pen(Purple, 2),
-                    new Rect(p.X - 9, p.Y - 11, 18, 23));
-                dc.DrawLine(new Pen(Purple, 2),
-                    new Point(p.X, p.Y - 10), new Point(p.X, p.Y - 24));
-                dc.DrawEllipse(Purple, null,
-                    new Point(p.X, p.Y - 25), 3.5, 3.5);
-                Text(dc, "RF", p.X - 10, p.Y - 5, 12, White, dpi, true);
+                dc.DrawEllipse(null, new Pen(Purple, 1.7), p, 27, 27);
+                var frame = new Pen(Purple, 2.2);
+                var braces = new Pen(DarkSteel, 1.3);
+                dc.DrawLine(frame, new Point(p.X, p.Y - 21),
+                    new Point(p.X - 13, p.Y + 16));
+                dc.DrawLine(frame, new Point(p.X, p.Y - 21),
+                    new Point(p.X + 13, p.Y + 16));
+                dc.DrawLine(frame, new Point(p.X - 13, p.Y + 16),
+                    new Point(p.X + 13, p.Y + 16));
+                for (int rung = 0; rung < 3; rung++)
+                {
+                    double yy = p.Y - 11 + rung * 9;
+                    double h = 3 + rung * 3.6;
+                    dc.DrawLine(braces, new Point(p.X - h, yy),
+                        new Point(p.X + h, yy + 8));
+                    dc.DrawLine(braces, new Point(p.X + h, yy),
+                        new Point(p.X - h, yy + 8));
+                }
+                dc.DrawRectangle(White, null,
+                    new Rect(p.X - 10, p.Y - 9, 4, 11));
+                dc.DrawRectangle(White, null,
+                    new Rect(p.X + 5, p.Y - 9, 4, 11));
+                dc.DrawEllipse(Red, null, new Point(p.X, p.Y - 23), 3, 3);
+                DrawHealthBar(dc, p.X, p.Y - 41,
+                    jammer.Health, jammer.MaxHealth, 39);
             }
 
             for (int i = 0; i < _thieves.Count; i++)
@@ -1701,6 +1722,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     new Point(p.X, p.Y + 9), new Point(p.X - 5, p.Y + 15));
                 dc.DrawLine(new Pen(DarkSteel, 2),
                     new Point(p.X, p.Y + 9), new Point(p.X + 5, p.Y + 15));
+                DrawHealthBar(dc, p.X, p.Y - 25,
+                    thief.Health, thief.MaxHealth, 27);
             }
 
             foreach (var flash in _defenseFlashes)
@@ -1744,6 +1767,38 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 dc.DrawLine(bolt, new Point(x, y),
                     new Point(TowerX, towerTop - 10));
             }
+        }
+
+        private static void DrawHealthBar(DrawingContext dc,
+            double centerX, double y, double health, double maximum, double width)
+        {
+            double pct = Math.Clamp(health / Math.Max(1, maximum), 0, 1);
+            dc.DrawRectangle(Backdrop, new Pen(White, 0.7),
+                new Rect(centerX - width / 2, y, width, 5));
+            dc.DrawRectangle(pct < 0.3 ? Red : pct < 0.65 ? Gold : Green,
+                null, new Rect(centerX - width / 2, y, width * pct, 5));
+        }
+
+        private void DrawMountedGun(DrawingContext dc, bool right)
+        {
+            Point basePoint = new(
+                TowerX + (right ? 21 : -21), TowerY - 23);
+            Point defaultDirection = new(right ? 1 : -1, -0.40);
+            Point? aim = right ? _rightGunAim : _leftGunAim;
+            double dx = (aim?.X ?? basePoint.X + defaultDirection.X) -
+                basePoint.X;
+            double dy = (aim?.Y ?? basePoint.Y + defaultDirection.Y) -
+                basePoint.Y;
+            double length = Math.Max(0.01, Math.Sqrt(dx * dx + dy * dy));
+            double ux = dx / length, uy = dy / length;
+            Brush ink = right ? Purple : Gold;
+            dc.DrawEllipse(DarkSteel, new Pen(White, 1.3),
+                basePoint, 9, 9);
+            dc.DrawLine(new Pen(ink, 5.0), basePoint,
+                new Point(basePoint.X + ux * 20, basePoint.Y + uy * 20));
+            dc.DrawEllipse(ink, null,
+                new Point(basePoint.X + ux * 20, basePoint.Y + uy * 20),
+                3.2, 3.2);
         }
 
         private static string Money(long amount)
