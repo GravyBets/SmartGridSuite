@@ -347,7 +347,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 {
                     Kind = t.Kind, Angle = t.Angle, Distance = t.Distance,
                     Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth,
-                    FenceHitDone = t.FenceHitDone
+                    FenceHitDone = t.FenceHitDone, ClimbSeconds = t.ClimbSeconds
                 }).ToList(),
                 InterferenceTowers = _jammers.Select(t => new TowerDefenseRfSnapshot
                 {
@@ -395,7 +395,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Kind = Math.Clamp(t.Kind, 0, 4),
                 Angle = t.Angle, Distance = t.Distance,
                 Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth,
-                FenceHitDone = t.FenceHitDone
+                FenceHitDone = t.FenceHitDone, ClimbSeconds = t.ClimbSeconds
             }));
             _jammers.Clear();
             _jammers.AddRange(snapshot.InterferenceTowers.Select(t => new InterferenceTower
@@ -1043,11 +1043,24 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 if (thief.Health <= 0)
                     continue;
 
+                if (thief.Kind == 3 && thief.Distance < 120)
+                    DamageTower((0.65 + _wave * 0.05) * dt);
+
                 if (thief.Distance <= HubRadius)
                 {
+                    if (thief.Kind == 1)
+                    {
+                        // Tower climbers latch onto the structure and chip
+                        // away at integrity until a countermeasure removes them.
+                        thief.Distance = HubRadius;
+                        thief.ClimbSeconds += dt;
+                        DamageTower((2.5 + _wave * 0.22) * dt);
+                        continue;
+                    }
+
                     double impact = thief.Kind switch
                     {
-                        1 => 11, 2 => 5, 3 => 9, 4 => 35, _ => 7
+                        2 => 5, 3 => 9, 4 => 35, _ => 7
                     };
                     DamageTower(impact + _wave * 0.65);
                     _thieves.RemoveAt(i);
@@ -2470,6 +2483,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             public double MaxHealth { get; set; }
             public int Kind { get; set; }
             public bool FenceHitDone { get; set; }
+            public double ClimbSeconds { get; set; }
         }
 
         private sealed record DefenseFlash(
