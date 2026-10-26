@@ -346,7 +346,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Enemies = _thieves.Select(t => new TowerDefenseThreatSnapshot
                 {
                     Kind = t.Kind, Angle = t.Angle, Distance = t.Distance,
-                    Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth
+                    Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth,
+                    FenceHitDone = t.FenceHitDone
                 }).ToList(),
                 InterferenceTowers = _jammers.Select(t => new TowerDefenseRfSnapshot
                 {
@@ -393,7 +394,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             {
                 Kind = Math.Clamp(t.Kind, 0, 4),
                 Angle = t.Angle, Distance = t.Distance,
-                Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth
+                Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth,
+                FenceHitDone = t.FenceHitDone
             }));
             _jammers.Clear();
             _jammers.AddRange(snapshot.InterferenceTowers.Select(t => new InterferenceTower
@@ -953,7 +955,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 int count = Math.Min(_thieves.Count,
                     1 + vehicles / 2);
                 double radius = Math.Min(450, 105 + coverage * 17);
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < count && _thieves.Count > 0; i++)
                 {
                     int closest = IndexOfNearestThief();
                     if (_thieves[closest].Distance > radius)
@@ -1166,11 +1168,12 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             for (int i = _thieves.Count - 1; i >= 0; i--)
             {
                 if (_thieves[i].Health > 0) continue;
+                int kind = _thieves[i].Kind;
                 _thieves.RemoveAt(i);
                 _thievesStopped++;
-                int bounty = _thieves[i].Kind == 4 ? 600 : 25;
+                int bounty = kind == 4 ? 600 : kind == 1 ? 40 : 25;
                 _cash = AddCash(_cash, bounty + _progression.Level(17) * 4);
-                _score = AddCash(_score, _thieves[i].Kind == 4 ? 1000 : 40);
+                _score = AddCash(_score, kind == 4 ? 1000 : 40);
             }
             for (int i = _jammers.Count - 1; i >= 0; i--)
             {
