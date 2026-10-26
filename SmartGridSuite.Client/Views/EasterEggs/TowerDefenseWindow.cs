@@ -667,6 +667,23 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
             }
 
+            // Milestone rewards temporarily take precedence over the normal
+            // 1-8 purchase hotkeys. Space cannot skip a reward decision.
+            if (_perkPending && !_progression.WorkshopOpen)
+            {
+                int choice = e.Key switch
+                {
+                    Key.D1 or Key.NumPad1 => 1,
+                    Key.D2 or Key.NumPad2 => 2,
+                    Key.D3 or Key.NumPad3 => 3,
+                    _ => 0
+                };
+                e.Handled = true;
+                if (!e.IsRepeat && choice != 0)
+                    SelectPerk(choice);
+                return;
+            }
+
             // 24 upgrades: 3 tab pages x 8 rows. Entirely usable on laptop
             // keyboards, including purchases within the permanent workshop.
             if (e.Key is Key.Tab or Key.Left or Key.Right)
@@ -820,6 +837,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     _score = AddCash(_score, 35);
                 }
 
+                _securityRingTime = 0.55;
                 _securitySweepCooldown = Math.Max(1.0,
                     8.0 / (1 + _progression.Level(18) * 0.18));
                 _message = "SECURITY SWEEP: " + count + " THIEVES CHASED OFF! +$" +
@@ -847,6 +865,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _interferenceRemoved += count;
                 _cash = AddCash(_cash, count * 40);
                 _score = AddCash(_score, count * 60);
+                _rfRingTime = 0.65;
                 _rfSweepCooldown = Math.Max(1.5,
                     11.0 / (1 + _progression.Level(18) * 0.16));
                 _message = "RF SWEEP: " + count + " INTERFERENCE TOWERS REMOVED! +$" +
@@ -1028,6 +1047,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             if (!_started || _paused || _gameOver)
                 DrawOverlay(dc, dpi);
+            if (_perkPending)
+                DrawPerk(dc, dpi);
             if (_showHelp)
                 DrawHelp(dc, dpi);
             if (_progression.WorkshopOpen)
@@ -1156,6 +1177,22 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     new Point(p.X, p.Y + 9), new Point(p.X - 5, p.Y + 15));
                 dc.DrawLine(new Pen(DarkSteel, 2),
                     new Point(p.X, p.Y + 9), new Point(p.X + 5, p.Y + 15));
+            }
+
+            foreach (var flash in _defenseFlashes)
+                dc.DrawLine(new Pen(flash.Ink, 2.5), flash.From, flash.To);
+
+            if (_securityRingTime > 0)
+            {
+                double radius = 55 + (0.55 - _securityRingTime) / 0.55 * 180;
+                dc.DrawEllipse(null, new Pen(Cyan, 2.3),
+                    new Point(TowerX, TowerY), radius, radius);
+            }
+            if (_rfRingTime > 0)
+            {
+                double radius = 50 + (0.65 - _rfRingTime) / 0.65 * 175;
+                dc.DrawEllipse(null, new Pen(Purple, 2.3),
+                    new Point(TowerX, TowerY), radius, radius);
             }
 
             if (_warningRemaining > 0)
@@ -1306,6 +1343,24 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 133, 468, 13, Cyan, dpi, false, 620);
             Text(dc, "1-8 BUY   TAB CATEGORIES   UP/DOWN SELECT   W CLOSE",
                 133, 498, 13, Muted, dpi, true, 650);
+        }
+
+        private void DrawPerk(DrawingContext dc, double dpi)
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(246, 5, 14, 31)),
+                new Pen(Gold, 2.7), new Rect(128, 172, 656, 297));
+            Text(dc, "MILESTONE: WAVE " + _wave + " SURVIVED!",
+                159, 192, 26, Gold, dpi, true);
+            Text(dc, "CHOOSE ONE BONUS FOR THE NEXT STRETCH:",
+                160, 242, 15, White, dpi, true);
+            Text(dc, "1    OVERTIME PAY — LARGE CASH BONUS",
+                160, 287, 17, Green, dpi, true);
+            Text(dc, "2    STORM RECOVERY — TOWER + FENCE HEAL",
+                160, 326, 17, Cyan, dpi, true);
+            Text(dc, "3    R&D GRANT — EXTRA PERMANENT RESEARCH",
+                160, 365, 17, Purple, dpi, true);
+            Text(dc, "PRESS 1 / 2 / 3 TO CHOOSE; SPACE THEN STARTS NEXT WAVE",
+                160, 422, 13, Muted, dpi);
         }
 
         private void DrawOverlay(DrawingContext dc, double dpi)
