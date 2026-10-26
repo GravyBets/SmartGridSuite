@@ -23,8 +23,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             new("Response Vehicles", "Automatic security sweep handles more thieves", 0, 190, 110, 50, 3),
             new("RF Response Team", "Automatic RF sweeps deal more jammer damage", 0, 155, 95, 35, 2),
             new("Counter-RF Filters", "Shorten the lifetime of RF interference", 0, 140, 90, 38, 0),
-            new("Drone Interceptor", "Automatic countermeasure beam", 0, 260, 180, 75, 5),
-            new("Drone Range", "Expand the interceptor's effective radius", 0, 200, 140, 55, 5),
+            new("Drone Interceptor", "1-2 orbiting orbs shoot approaching threats", 0, 260, 180, 75, 5),
+            new("Drone Range", "Expand drone orbit and attack distance", 0, 200, 140, 55, 5),
 
             // PROTECTION: survive lightning, trespass, and sustained interference.
             new("Tower Reinforcement", "Increase maximum tower integrity", 1, 125, 78, 30, 0),
