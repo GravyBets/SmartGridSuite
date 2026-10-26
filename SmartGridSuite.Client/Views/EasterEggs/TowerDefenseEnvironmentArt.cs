@@ -35,6 +35,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static readonly Brush BoltFill = Ink("#F1B94C");
         private static readonly Brush ShieldFill = Ink("#67D2EE");
         private static readonly Brush RfFill = Ink("#AD91EA");
+        private static readonly Brush OrbShell = Ink("#415E7D");
+        private static readonly Brush OrbMetal = Ink("#A6C6D9");
+        private static readonly Brush OrbCore = Ink("#77ECFF");
+        private static readonly Brush OrbPulse = Ink("#54B2F6FF");
+        private static readonly Brush OrbShadow = Ink("#38000E18");
 
         private static readonly Pen BorderPen = Stroke(FieldEdge, 1.5);
         private static readonly Pen AccentPen = Stroke(Cyan, 1.6);
@@ -60,9 +65,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static readonly Pen BoltGlyphPen = Stroke(BoltFill, 2.4);
         private static readonly Pen ShieldGlyphPen = Stroke(ShieldFill, 2.4);
         private static readonly Pen RfGlyphPen = Stroke(RfFill, 2.4);
+        private static readonly Pen OrbEdgePen = Stroke(OrbMetal, 1.45);
+        private static readonly Pen OrbFinPen = Stroke(OrbShell, 2.8);
+        private static readonly Pen OrbAccentPen = Stroke(OrbCore, 1.65);
 
         // The angled overhead site has a shallow, soft elliptical gravel yard
         // rather than the oversized octagonal slab in the previous artwork.
+        private static readonly Geometry OrbHex = Shape(
+            "M -9,0 L -5,-7 L 5,-7 L 9,0 L 5,7 L -5,7 Z");
         private static readonly Geometry YardShape = FrozenEllipse(
             new Point(385, 292), 165, 110);
         private static readonly Geometry AccessRoute = Shape(
@@ -268,6 +278,46 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 dc.DrawLine(LightningPen, outer, inner);
                 dc.DrawEllipse(null, LightningWarning, outer, 2.5, 2.5);
             }
+        }
+
+        internal static void DrawDroneOrb(DrawingContext dc,
+            Point orbitPosition, double orbitAngle, bool front, double seconds)
+        {
+            // Small articulated flying interceptor, not the previous large
+            // neon bullseye. Front/back size and tone sell an angled orbit.
+            double scale = front ? 1.12 : 0.82;
+            double hover = Math.Sin(seconds * 6 + orbitAngle) * 1.5;
+            dc.PushTransform(new TranslateTransform(
+                orbitPosition.X, orbitPosition.Y));
+
+            // Flattened ground shadow sits below the actual hovering unit.
+            dc.DrawEllipse(OrbShadow, null, new Point(2.0, 10), 10, 3.4);
+            dc.PushTransform(new TranslateTransform(0, -6 + hover));
+            dc.PushTransform(new ScaleTransform(scale, scale));
+
+            // A restrained orbit-direction motion streak.
+            double dx = -Math.Sin(orbitAngle);
+            double dy = Math.Cos(orbitAngle) * 0.6;
+            dc.DrawLine(OrbAccentPen,
+                new Point(-dx * 10, -dy * 10),
+                new Point(-dx * 16, -dy * 16));
+
+            // Armored six-sided hovering drone, two short stabilizer fins,
+            // turquoise engine/optical core, compact blue power nodes.
+            dc.DrawLine(OrbFinPen, new Point(-8, 2), new Point(-15, 5));
+            dc.DrawLine(OrbFinPen, new Point(8, 2), new Point(15, 5));
+            dc.DrawEllipse(OrbMetal, null, new Point(-15, 5), 2.5, 2);
+            dc.DrawEllipse(OrbMetal, null, new Point(15, 5), 2.5, 2);
+            dc.DrawGeometry(OrbShell, OrbEdgePen, OrbHex);
+            dc.DrawRectangle(OrbMetal, null, new Rect(-5, -5, 10, 2));
+            dc.DrawEllipse(OrbPulse, null, new Point(0, 1), 5.6, 5);
+            dc.DrawEllipse(front ? OrbCore : OrbMetal, OrbAccentPen,
+                new Point(0, 1), 3.2, 3.2);
+            dc.DrawEllipse(OrbCore, null, new Point(2, -1), 1, 1);
+
+            dc.Pop();
+            dc.Pop();
+            dc.Pop();
         }
 
         internal static void DrawStatusBadges(DrawingContext dc,
