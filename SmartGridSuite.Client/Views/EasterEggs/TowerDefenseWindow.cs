@@ -739,100 +739,142 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _surface.InvalidateVisual();
         }
 
-        // Upgrade prices increase every time you invest. There is no three-level
-        // maximum; keep long arithmetic for future waves and saturate before int.
-        private static readonly int[] BaseUpgradePrice = { 180, 160, 220, 200 };
-        private static readonly int[] UpgradeStep = { 165, 155, 175, 180 };
-
-        private int LevelFor(int option) => option switch
+        private void BuySelected(int row)
         {
-            1 => _lightningLevel,
-            2 => _surgeLevel,
-            3 => _fenceLevel,
-            4 => _filterLevel,
-            _ => 0
-        };
+            int index = _progression.SelectedCategory * 8 + row;
+            if (index < 0 || index >= TowerDefenseProgression.Catalog.Length)
+                return;
+            _progression.SelectedRow = row;
 
-        private int? NextPrice(int option)
-        {
-            if (option == 5)
-                return _fenceLevel > 0 ? 90 + _wave * 8 : null;
+            var upgrade = TowerDefenseProgression.Catalog[index];
+            if (!_progression.Unlocked(index, _wave))
+            {
+                _message = upgrade.Name.ToUpperInvariant() +
+                    " UNLOCKS AFTER WAVE " + upgrade.UnlockWave + ".";
+                _surface.InvalidateVisual();
+                return;
+            }
 
-            if (option == 6)
-                return 150 + _wave * 25;
+            double previousMax = MaxTowerHealth;
+            double previousFence = FenceMaxHealth;
 
-            if (option < 1 || option > 4)
-                return null;
-
-            long level = LevelFor(option);
-            long cost = BaseUpgradePrice[option - 1] +
-                UpgradeStep[option - 1] * level + 75 * level * level;
-            return (int)Math.Min(int.MaxValue, cost);
+            if (_progression.WorkshopOpen)
+            {
+                if (!_progression.BuyWorkshop(index))
+                {
+                    _message = "RESEARCH WORKSHOP: NEED " +
+                        _progression.WorkshopPrice(index).ToString("N0", MoneyCulture) +
+                        " CREDITS.";
+                }
+                else
+                {
+                    ApplyUpgradeEffects(index, previousMax, previousFence);
+                    _message = "PERMANENT RESEARCH: " +
+                        upgrade.Name.ToUpperInvariant() + " LV" +
+                        _progression.PermanentLevel(index) + ".";
+                }
+            }
+            else if (_started && !_gameOver && !_paused)
+            {
+                int price = _progression.RunPrice(index);
+                if (_progression.BuyRun(index, ref _cash, _wave))
+                {
+                    ApplyUpgradeEffects(index, previousMax, previousFence);
+                    _message = upgrade.Name.ToUpperInvariant() + " LV" +
+                        _progression.Level(index) + "  -$" +
+                        price.ToString("N0", MoneyCulture) + ".";
+                }
+                else
+                    _message = "NEED $" + price.ToString("N0", MoneyCulture) +
+                        " FOR " + upgrade.Name.ToUpperInvariant() + ".";
+            }
+            else
+            {
+                _message = "SPACE TO START, OR W FOR THE PERMANENT WORKSHOP.";
+            }
+            _surface.InvalidateVisual();
         }
 
-        private void Purchase(int option)
+        private void ApplyUpgradeEffects(int index, double oldMaxHealth,
+            double oldFenceHealth)
         {
-            int? price = NextPrice(option);
-            if (!price.HasValue)
+            if (index == 8) // structural tower reinforcement
+                _health = Math.Min(MaxTowerHealth,
+                    _health + (MaxTowerHealth - oldMaxHealth));
+            else if (index == 12 && oldFenceHealth == 0) // install fence
+                _fenceHealth = FenceMaxHealth;
+            else if (index == 12 || index == 13)
+                _fenceHealth = Math.Min(FenceMaxHealth,
+                    _fenceHealth + FenceMaxHealth - oldFenceHealth);
+        }
+
+        private void RepairTower()
+        {
+            if (!_started || _paused || _gameOver || _progression.WorkshopOpen)
+                return;
+            if (_health >= MaxTowerHealth)
             {
-                _message = "INSTALL THE FENCE BEFORE BUYING FENCE REPAIRS.";
+                _message = "TOWER INTEGRITY ALREADY FULL.";
                 _surface.InvalidateVisual();
                 return;
             }
-
-            if (option == 5 && _fenceHealth >= FenceMaxHealth)
+            int cost = 135 + _wave * 30;
+            cost = (int)Math.Max(1,
+                Math.Ceiling(cost / (1 + _progression.Level(20) * 0.025)));
+            if (_cash < cost)
+                _message = "TOWER REPAIR NEEDS $" +
+                    cost.ToString("N0", MoneyCulture) + ".";
+            else
             {
-                _message = "YOUR FENCE IS ALREADY FULLY REPAIRED.";
-                _surface.InvalidateVisual();
-                return;
+                _cash -= cost;
+                double heal = Math.Min(MaxTowerHealth - _health,
+                    25 + 5 * _progression.Level(22));
+                _health += heal;
+                _message = "REPAIR CREW RESTORED " +
+                    heal.ToString("0", MoneyCulture) + " TOWER HP. -$" +
+                    cost.ToString("N0", MoneyCulture) + ".";
             }
+            _surface.InvalidateVisual();
+        }
 
-            if (option == 6 && _health >= 100)
-            {
-                _message = "TOWER HP IS ALREADY FULL.";
-                _surface.InvalidateVisual();
+        private void RepairFence()
+        {
+            if (!_started || _paused || _gameOver || _progression.WorkshopOpen)
                 return;
-            }
-
-            if (_cash < price.Value)
+            if (_fenceLevel == 0)
+                _message = "INSTALL A SECURITY FENCE BEFORE REPAIRING IT.";
+            else if (_fenceHealth >= FenceMaxHealth)
+                _message = "SECURITY FENCE IS ALREADY FULLY REPAIRED.";
+            else
             {
-                _message = "NEED $" + price.Value.ToString("N0", MoneyCulture) +
-                    ". AVAILABLE $" + _cash.ToString("N0", MoneyCulture) + ".";
-                _surface.InvalidateVisual();
-                return;
-            }
-
-            _cash -= price.Value;
-            switch (option)
-            {
-                case 1:
-                    _lightningLevel++;
-                    _message = "LIGHTNING ARRESTOR UPGRADED TO LVL " + _lightningLevel + ".";
-                    break;
-                case 2:
-                    _surgeLevel++;
-                    _message = "SURGE ARRESTOR UPGRADED TO LVL " + _surgeLevel + ".";
-                    break;
-                case 3:
-                    _fenceLevel++;
+                int price = (int)Math.Max(1,
+                    Math.Ceiling((90 + _wave * 8.0) /
+                        (1 + _progression.Level(20) * 0.025)));
+                if (_cash < price)
+                    _message = "FENCE REPAIR NEEDS $" +
+                        price.ToString("N0", MoneyCulture) + ".";
+                else
+                {
+                    _cash -= price;
                     _fenceHealth = FenceMaxHealth;
-                    _message = "SECURITY FENCE UPGRADED TO LVL " + _fenceLevel + ".";
-                    break;
-                case 4:
-                    _filterLevel++;
-                    _message = "RF FILTERS UPGRADED TO LVL " + _filterLevel + ".";
-                    break;
-                case 5:
-                    _fenceHealth = FenceMaxHealth;
-                    _message = "SECURITY FENCE REPAIRED!";
-                    break;
-                case 6:
-                    double healed = Math.Min(25, 100 - _health);
-                    _health += healed;
-                    _message = "TOWER REPAIRED! +" +
-                        healed.ToString("0", MoneyCulture) + " HP.";
-                    break;
+                    _message = "FENCE RESTORED! -$" +
+                        price.ToString("N0", MoneyCulture) + ".";
+                }
             }
+            _surface.InvalidateVisual();
+        }
+
+        private void ToggleWorkshop()
+        {
+            if (_waveActive || (_wave > 0 && !_gameOver))
+            {
+                _message = "PERMANENT WORKSHOP AVAILABLE BEFORE OR AFTER RUNS.";
+                _surface.InvalidateVisual();
+                return;
+            }
+
+            _progression.WorkshopOpen = !_progression.WorkshopOpen;
+            _showHelp = false;
             _surface.InvalidateVisual();
         }
 
