@@ -56,6 +56,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private readonly Random _random = new();
         private readonly List<CopperThief> _thieves = new();
         private readonly List<InterferenceTower> _jammers = new();
+        private readonly TowerDefenseProgression _progression = new();
 
         private int _cash;
         private int _score;
@@ -63,10 +64,12 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private int _wave;
         private int _thievesStopped;
         private int _interferenceRemoved;
-        private int _lightningLevel;
-        private int _surgeLevel;
-        private int _fenceLevel;
-        private int _filterLevel;
+        // Compatibility aliases for the original center-tower mechanics.
+        // The 24 upgrade paths now live in TowerDefenseProgression.
+        private int _lightningLevel => _progression.Level(10);
+        private int _surgeLevel => _progression.Level(11);
+        private int _fenceLevel => _progression.Level(12);
+        private int _filterLevel => _progression.Level(5);
         private double _health;
         private double _fenceHealth;
         private double _lastTickTime;
@@ -78,6 +81,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private double _securitySweepCooldown;
         private double _rfSweepCooldown;
         private double _patrolCooldown;
+        private double _droneCooldown;
+        private bool _freeUpgradeAnnounced;
         private int _thievesToSpawn;
         private int _jammersToSpawn;
         private int _lightningToSpawn;
@@ -162,17 +167,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         {
             _timer.Stop();
             _clock.Reset();
-            _cash = 450;
+            _progression.NewRun();
+            _cash = 450 + _progression.Level(16) * 35;
             _score = 0;
             _wave = 0;
             _thievesStopped = 0;
             _interferenceRemoved = 0;
-            _health = 100;
-            _fenceHealth = 0;
-            _lightningLevel = 0;
-            _surgeLevel = 0;
-            _fenceLevel = 0;
-            _filterLevel = 0;
+            _health = MaxTowerHealth;
+            _fenceHealth = FenceMaxHealth;
             _thievesToSpawn = 0;
             _jammersToSpawn = 0;
             _lightningToSpawn = 0;
@@ -182,6 +184,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _securitySweepCooldown = 0;
             _rfSweepCooldown = 0;
             _patrolCooldown = 1.6;
+            _droneCooldown = 0.8;
+            _freeUpgradeAnnounced = false;
             _paused = false;
             _started = false;
             _waveActive = false;
@@ -191,7 +195,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _message = "PRESS SPACE TO DEFEND YOUR TOWER.";
             _thieves.Clear();
             _jammers.Clear();
-            _bestScore = ReadBestScore();
+            _bestScore = Math.Max(ReadBestScore(), _progression.BestScore);
             _surface.InvalidateVisual();
         }
 
@@ -201,9 +205,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
 
             _wave++;
-            _thievesToSpawn = Math.Min(36, 3 + _wave * 2);
-            _jammersToSpawn = Math.Min(5, 1 + (_wave - 1) / 3);
-            _lightningToSpawn = _wave <= 1 ? 0 : Math.Min(4, 1 + (_wave - 2) / 4);
+            _thievesToSpawn = Math.Min(75, 4 + _wave * 2 +
+                (int)Math.Pow(_wave, 1.2));
+            _jammersToSpawn = Math.Min(12, 1 + _wave / 2);
+            _lightningToSpawn = _wave <= 1 ? 0 :
+                Math.Min(8, 1 + (_wave - 2) / 3);
             _spawnThiefIn = 0.8;
             _spawnJammerIn = 2.4;
             _spawnLightningIn = 4.8;
