@@ -40,6 +40,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static readonly Brush RedHighlight = Ink("#E96958");
         private static readonly Brush BossDark = Ink("#491F33");
         private static readonly Brush BossAura = Ink("#2AFA7857");
+        private static readonly Brush DisturbedDirt = Ink("#715544");
+        private static readonly Brush DirtEdge = Ink("#362C32");
+        private static readonly Brush DirtRidge = Ink("#A87953");
+        private static readonly Brush Weed = Ink("#5B8B59");
+        private static readonly Brush InterferenceFrame = Ink("#987C9C");
+        private static readonly Brush InterferenceArmor = Ink("#584664");
+        private static readonly Brush InterferenceBeacon = Ink("#F56ACD");
+        private static readonly Brush InterferenceGlow = Ink("#5BE971D8");
 
         private static readonly Pen OutlinePen = Stroke(Outline, 1.5);
         private static readonly Pen ThinOutline = Stroke(Outline, 1.0);
@@ -51,6 +59,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static readonly Pen CopperPen = Stroke(Copper, 2.6);
         private static readonly Pen RedPen = Stroke(Harness, 2.7);
         private static readonly Pen DarkPen = Stroke(Outline, 3.3);
+        private static readonly Pen JammerFramePen = Stroke(InterferenceFrame, 2.6);
+        private static readonly Pen JammerBracePen = Stroke(InterferenceArmor, 1.8);
+        private static readonly Pen DirtPen = Stroke(DirtEdge, 1.3);
+        private static readonly Pen JammerWavePen = Stroke(InterferenceBeacon, 1.4);
+        private static readonly Pen WeedPen = Stroke(Weed, 2);
 
         private static readonly Geometry HoodieBody = Shape(
             "M -8,-11 Q -12,-8 -11,2 L -8,9 L 8,9 L 10,1 Q 12,-8 7,-11 Z");
@@ -87,15 +100,35 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         /// </param>
         internal static void Draw(DrawingContext dc, int kind,
             Point location, double time, double seed, double climbSeconds,
-            bool facingRight)
+            bool facingRight, double vaultProgress = -1)
         {
             // Individual phase offsets keep neighboring enemies from marching
-            // in lockstep. All animations freeze naturally when the timer pauses.
+            // in lockstep. All animations freeze naturally when paused.
             double phase = time * (kind == 3 ? 12 : kind == 2 ? 8.3 : 10) +
                 seed * 2.7;
             dc.PushTransform(new TranslateTransform(location.X, location.Y));
-            if (kind is 0 or 1 or 4)
+            // Parakeets have a beak on the right in local coordinates, so
+            // reverse the entire bird when it flies in from screen-right.
+            bool directional = kind is 0 or 1 or 2 or 4;
+            if (directional)
                 dc.PushTransform(new ScaleTransform(facingRight ? 1 : -1, 1));
+
+            bool vaulting = vaultProgress >= 0 && kind is 0 or 1 or 4;
+            if (vaulting)
+            {
+                double p = Math.Clamp(vaultProgress, 0, 1);
+                double lift = Math.Sin(p * Math.PI) *
+                    (kind == 4 ? 23 : 17);
+                // Shadow stays on the ground while the character vaults.
+                dc.DrawEllipse(Shadow, null, new Point(0, 17),
+                    kind == 4 ? 22 : 11, 2.7);
+                dc.DrawLine(CopperPen, new Point(-11, 13),
+                    new Point(-16, 11 - Math.Sin(p * Math.PI) * 3));
+                dc.PushTransform(new TranslateTransform(
+                    Math.Sin(p * Math.PI) * 3, -lift));
+                dc.PushTransform(new RotateTransform(
+                    (kind == 4 ? -9 : -17) * Math.Sin(p * Math.PI)));
+            }
 
             switch (kind)
             {
@@ -116,8 +149,90 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     break;
             }
 
-            if (kind is 0 or 1 or 4)
+            if (vaulting)
+            {
                 dc.Pop();
+                dc.Pop();
+            }
+            if (directional)
+                dc.Pop();
+            dc.Pop();
+        }
+
+        internal static void DrawInterferenceTower(DrawingContext dc,
+            Point position, double age, double seconds)
+        {
+            double rise = Math.Clamp(age / 1.35, 0, 1);
+            double wobble = Math.Sin(seconds * 9 + position.X) * 0.7;
+            dc.PushTransform(new TranslateTransform(position.X, position.Y));
+
+            // Soil is disturbed as a hostile miniature repeater pushes up
+            // outside the compound. Dust and grass frame its foundation.
+            dc.DrawEllipse(Shadow, null, new Point(1, 11), 31, 9);
+            dc.DrawEllipse(DisturbedDirt, DirtPen,
+                new Point(0, 5), 29, 10);
+            dc.DrawEllipse(DirtEdge, null, new Point(0, 4), 19, 5);
+            dc.DrawEllipse(DirtRidge, null,
+                new Point(-19, 4), 7, 3.6);
+            dc.DrawEllipse(DirtRidge, null,
+                new Point(17, 5), 9, 3.8);
+            Line(dc, WeedPen, -23, 1, -27, -6);
+            Line(dc, WeedPen, -23, 1, -19, -7);
+            Line(dc, WeedPen, 25, 2, 29, -5);
+            Line(dc, WeedPen, 25, 2, 22, -6);
+
+            // The rising portion is clipped behind the ground lip.
+            dc.PushClip(new RectangleGeometry(new Rect(-34, -63, 68, 68)));
+            dc.PushTransform(new TranslateTransform(wobble, 29 * (1 - rise)));
+            dc.DrawRoundedRectangle(InterferenceArmor, OutlinePen,
+                new Rect(-14, -6, 28, 11), 2, 2);
+            dc.DrawRectangle(SteelDark, null, new Rect(-11, -3, 22, 4));
+
+            // Purposeful hostile tripod, cross-braces and RF panel hardware.
+            Line(dc, JammerFramePen, 0, -47, -16, 2);
+            Line(dc, JammerFramePen, 0, -47, 16, 2);
+            Line(dc, JammerFramePen, -16, 2, 16, 2);
+            for (int rung = 0; rung < 4; rung++)
+            {
+                double y = -36 + rung * 10;
+                double half = 3 + rung * 3.1;
+                Line(dc, JammerBracePen, -half, y, half + 3.5, y + 9);
+                Line(dc, JammerBracePen, half, y, -half - 3.5, y + 9);
+                Line(dc, JammerFramePen, -half, y, half, y);
+            }
+
+            // Two visibly directional sector antennas with RF emitters.
+            dc.DrawRoundedRectangle(Steel, OutlinePen,
+                new Rect(-17, -38, 6, 18), 2, 2);
+            dc.DrawRoundedRectangle(Steel, OutlinePen,
+                new Rect(11, -35, 6, 18), 2, 2);
+            dc.DrawRectangle(InterferenceBeacon, null,
+                new Rect(-16, -35, 2, 11));
+            dc.DrawRectangle(InterferenceBeacon, null,
+                new Rect(14, -32, 2, 11));
+            Line(dc, JammerFramePen, 0, -47, 0, -54);
+            dc.DrawEllipse(InterferenceGlow, null,
+                new Point(0, -54), 7, 7);
+            dc.DrawEllipse(InterferenceBeacon, ThinOutline,
+                new Point(0, -54), 3.7, 3.7);
+
+            // A short, intermittent pair of emissions, no large circles.
+            double blink = 0.4 + 0.6 *
+                Math.Abs(Math.Sin(seconds * 3 + position.X * 0.02));
+            if (rise > 0.55 && blink > 0.6)
+            {
+                Line(dc, JammerWavePen, -23, -33, -28, -35);
+                Line(dc, JammerWavePen, 23, -33, 28, -35);
+            }
+
+            dc.Pop();
+            dc.Pop();
+
+            // Foreground ridge masks the lower lattice during emergence.
+            dc.DrawEllipse(DisturbedDirt, null,
+                new Point(0, 7.3), 20, 4.5);
+            dc.DrawEllipse(DirtRidge, null,
+                new Point(-10, 6), 8, 2.3);
             dc.Pop();
         }
 
