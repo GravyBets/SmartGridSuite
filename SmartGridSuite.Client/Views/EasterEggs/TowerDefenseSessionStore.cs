@@ -38,6 +38,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         public double RfCooldown { get; set; }
         public double PatrolCooldown { get; set; }
         public double DroneCooldown { get; set; }
+        public int DroneHits { get; set; }
+        public int DroneDamageDone { get; set; }
         public double LeftGunCooldown { get; set; }
         public double RightGunCooldown { get; set; }
         public double ElapsedSeconds { get; set; }
