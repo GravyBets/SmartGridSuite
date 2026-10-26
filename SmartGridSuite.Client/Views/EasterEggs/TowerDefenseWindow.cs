@@ -360,7 +360,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 {
                     Kind = t.Kind, Angle = t.Angle, Distance = t.Distance,
                     Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth,
-                    FenceHitDone = t.FenceHitDone, ClimbSeconds = t.ClimbSeconds
+                    FenceHitDone = t.FenceHitDone, ClimbSeconds = t.ClimbSeconds,
+                    FenceVaultDuration = t.FenceVaultDuration,
+                    FenceVaultRemaining = t.FenceVaultRemaining
                 }).ToList(),
                 InterferenceTowers = _jammers.Select(t => new TowerDefenseRfSnapshot
                 {
@@ -416,7 +418,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Kind = Math.Clamp(t.Kind, 0, 4),
                 Angle = t.Angle, Distance = t.Distance,
                 Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth,
-                FenceHitDone = t.FenceHitDone, ClimbSeconds = t.ClimbSeconds
+                FenceHitDone = t.FenceHitDone, ClimbSeconds = t.ClimbSeconds,
+                FenceVaultDuration = t.FenceVaultDuration,
+                FenceVaultRemaining = t.FenceVaultRemaining
             }));
             _jammers.Clear();
             _jammers.AddRange(snapshot.InterferenceTowers.Select(t => new InterferenceTower
@@ -1105,7 +1109,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             // Drone Range investment increases their orbit/target radius.
             if (drone > 0 && _droneCooldown <= 0)
             {
-                int orbs = drone >= 3 ? 2 : 1;
+                int orbs = drone >= 5 ? 2 : 1;
                 double attackRange = Math.Min(270, 85 + droneRange * 18);
                 double damage = 16 + drone * 11;
                 for (int orb = 0; orb < orbs; orb++)
@@ -1151,23 +1155,48 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             for (int i = _thieves.Count - 1; i >= 0; i--)
             {
                 var thief = _thieves[i];
-                thief.Distance = Math.Max(0, thief.Distance - thief.Speed * dt);
+                bool airborne = thief.Kind is 2 or 3;
 
-                if (_fenceLevel > 0 && _fenceHealth > 0 &&
+                // Birds and bees always fly over the compound. Ground
+                // intruders get stopped at the exact visible oval fence.
+                if (!airborne && thief.FenceVaultRemaining > 0)
+                {
+                    thief.FenceVaultRemaining = Math.Max(0,
+                        thief.FenceVaultRemaining - dt);
+                    // Halt until the jump/vault finishes.
+                    continue;
+                }
+
+                double previousDistance = thief.Distance;
+                thief.Distance = Math.Max(0,
+                    thief.Distance - thief.Speed * dt);
+
+                if (!airborne && _fenceLevel > 0 && _fenceHealth > 0 &&
                     !thief.FenceHitDone &&
                     TowerDefenseEnvironmentArt.WithinFence(
-                        ThiefPoint(thief),
-                        new Point(TowerX, TowerY), FenceRadius))
+                        ThiefPoint(thief), new Point(TowerX, TowerY),
+                        FenceRadius))
                 {
-                    double wear = Math.Max(0.3, (4.5 + _wave * 0.18) /
-                        (1 + _fenceLevel * 0.18 +
-                         _progression.Level(13) * 0.23));
-                    _fenceHealth = Math.Max(0, _fenceHealth -
-                        wear * (thief.Kind == 4 ? 8 : 1));
+                    thief.Distance = previousDistance;
                     thief.FenceHitDone = true;
-                    thief.Health -= thief.Kind == 4 ? 45 : 28;
+                    thief.FenceVaultDuration = Math.Min(5.8,
+                        0.85 + _fenceLevel * 0.34 +
+                        (thief.Kind == 4 ? 1.0 :
+                         thief.Kind == 1 ? 0.45 : 0));
+                    thief.FenceVaultRemaining = thief.FenceVaultDuration;
+
+                    double wear = Math.Max(0.7,
+                        (8 + _wave * 0.45) /
+                        (1 + _fenceLevel * 0.13 +
+                         _progression.Level(13) * 0.22));
+                    _fenceHealth = Math.Max(0, _fenceHealth -
+                        wear * (thief.Kind == 4 ? 6 : 1.0));
+                    thief.Health -= thief.Kind == 4 ? 30 : 18 +
+                        _fenceLevel * 4;
+
                     if (_fenceHealth <= 0)
                         _message = "SECURITY FENCE BREACHED! REPAIR IT!";
+                    continue;
                 }
 
                 if (thief.Health <= 0)
@@ -1276,7 +1305,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         {
             int level = _progression.Level(6);
             if (level <= 0) return;
-            int count = level >= 3 ? 2 : 1;
+            int count = level >= 5 ? 2 : 1;
             double seconds = _clock.Elapsed.TotalSeconds + _savedElapsedOffset;
             for (int i = 0; i < count; i++)
             {
@@ -2189,11 +2218,21 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             {
                 Point p = ThiefPoint(enemy);
                 bool facingRight = p.X < TowerX;
+                double vaultProgress = enemy.FenceVaultDuration > 0 &&
+                    enemy.FenceVaultRemaining > 0
+                    ? Math.Clamp(1 - enemy.FenceVaultRemaining /
+                        enemy.FenceVaultDuration, 0, 1)
+                    : -1;
                 TowerDefenseEnemyArt.Draw(dc, enemy.Kind, p,
                     animationTime, enemy.Angle,
-                    enemy.ClimbSeconds, facingRight);
+                    enemy.ClimbSeconds, facingRight, vaultProgress);
+                double jumpHeight = vaultProgress >= 0
+                    ? Math.Sin(vaultProgress * Math.PI) *
+                        (enemy.Kind == 4 ? 23 : 17)
+                    : 0;
                 DrawHealthBar(dc, p.X,
-                    p.Y + TowerDefenseEnemyArt.HealthBarOffset(enemy.Kind),
+                    p.Y + TowerDefenseEnemyArt.HealthBarOffset(enemy.Kind) -
+                        jumpHeight,
                     enemy.Health, enemy.MaxHealth,
                     TowerDefenseEnemyArt.HealthBarWidth(enemy.Kind));
             }
@@ -2544,6 +2583,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             public double MaxHealth { get; set; }
             public int Kind { get; set; }
             public bool FenceHitDone { get; set; }
+            public double FenceVaultDuration { get; set; }
+            public double FenceVaultRemaining { get; set; }
             public double ClimbSeconds { get; set; }
         }
 
