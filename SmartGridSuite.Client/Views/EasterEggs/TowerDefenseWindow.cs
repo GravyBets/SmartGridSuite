@@ -56,6 +56,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private readonly Random _random = new();
         private readonly List<CopperThief> _thieves = new();
         private readonly List<InterferenceTower> _jammers = new();
+        private readonly List<DefenseFlash> _defenseFlashes = new();
         private readonly TowerDefenseProgression _progression = new();
 
         private int _cash;
@@ -82,7 +83,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private double _rfSweepCooldown;
         private double _patrolCooldown;
         private double _droneCooldown;
-        private bool _freeUpgradeAnnounced;
+        private bool _perkPending;
+        private double _securityRingTime;
+        private double _rfRingTime;
         private int _thievesToSpawn;
         private int _jammersToSpawn;
         private int _lightningToSpawn;
@@ -185,7 +188,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _rfSweepCooldown = 0;
             _patrolCooldown = 1.6;
             _droneCooldown = 0.8;
-            _freeUpgradeAnnounced = false;
+            _perkPending = false;
+            _securityRingTime = 0;
+            _rfRingTime = 0;
+            _defenseFlashes.Clear();
             _paused = false;
             _started = false;
             _waveActive = false;
@@ -201,7 +207,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void StartWave()
         {
-            if (!_started || _paused || _gameOver || _waveActive)
+            if (!_started || _paused || _gameOver || _waveActive ||
+                _perkPending)
                 return;
 
             _wave++;
@@ -231,6 +238,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _patrolCooldown = Math.Max(0, _patrolCooldown - dt);
             _droneCooldown = Math.Max(0, _droneCooldown - dt);
             _flashRemaining = Math.Max(0, _flashRemaining - dt);
+            _securityRingTime = Math.Max(0, _securityRingTime - dt);
+            _rfRingTime = Math.Max(0, _rfRingTime - dt);
+            _defenseFlashes.RemoveAll(flash => flash.EndTime <= now);
 
             if (!_waveActive)
             {
@@ -299,6 +309,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     int closest = IndexOfNearestThief();
                     if (_thieves[closest].Distance > radius)
                         break;
+                    _defenseFlashes.Add(new DefenseFlash(
+                        new Point(TowerX, TowerY - 38),
+                        ThiefPoint(_thieves[closest]), now + 0.16, Cyan));
                     _thieves.RemoveAt(closest);
                     _thievesStopped++;
                     _cash = AddCash(_cash, 14 + _progression.Level(17) * 4);
@@ -317,6 +330,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     Distance(new Point(j.X, j.Y), new Point(TowerX, TowerY)) <= radius);
                 if (nearbyJammer != null && rfTeams > 0)
                 {
+                    _defenseFlashes.Add(new DefenseFlash(
+                        new Point(TowerX, TowerY - 38),
+                        new Point(nearbyJammer.X, nearbyJammer.Y), now + 0.19, Purple));
                     _jammers.Remove(nearbyJammer);
                     _interferenceRemoved++;
                     _score = AddCash(_score, 30);
@@ -324,12 +340,19 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 else if (_thieves.Count > 0 &&
                          _thieves.Min(t => t.Distance) <= radius)
                 {
-                    _thieves.RemoveAt(IndexOfNearestThief());
+                    int closest = IndexOfNearestThief();
+                    _defenseFlashes.Add(new DefenseFlash(
+                        new Point(TowerX, TowerY - 38),
+                        ThiefPoint(_thieves[closest]), now + 0.19, Gold));
+                    _thieves.RemoveAt(closest);
                     _thievesStopped++;
                     _score = AddCash(_score, 26);
                 }
                 else if (nearbyJammer != null)
                 {
+                    _defenseFlashes.Add(new DefenseFlash(
+                        new Point(TowerX, TowerY - 38),
+                        new Point(nearbyJammer.X, nearbyJammer.Y), now + 0.19, Purple));
                     _jammers.Remove(nearbyJammer);
                     _interferenceRemoved++;
                 }
@@ -529,6 +552,45 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                         TowerDefenseProgression.Catalog[index].Name.ToUpperInvariant() + "!";
                 }
             }
+
+            if (_wave % 5 == 0)
+            {
+                _perkPending = true;
+                _message = "MILESTONE BONUS! CHOOSE 1 CASH / 2 REPAIR / 3 RESEARCH.";
+            }
+        }
+
+        private void SelectPerk(int option)
+        {
+            if (!_perkPending || option < 1 || option > 3)
+                return;
+
+            _perkPending = false;
+            switch (option)
+            {
+                case 1:
+                    int cash = 380 + _wave * 120;
+                    _cash = AddCash(_cash, cash);
+                    _message = "OVERTIME PAY: +$" +
+                        cash.ToString("N0", MoneyCulture) + ". SPACE FOR NEXT WAVE.";
+                    break;
+                case 2:
+                    double repaired = Math.Min(MaxTowerHealth - _health,
+                        MaxTowerHealth * 0.40);
+                    _health += repaired;
+                    if (_fenceLevel > 0)
+                        _fenceHealth = FenceMaxHealth;
+                    _message = "STORM RECOVERY: RESTORED " +
+                        repaired.ToString("0", MoneyCulture) + " HP + FENCE.";
+                    break;
+                case 3:
+                    int research = 25 + _wave * 8;
+                    _progression.AddResearchCredits(research);
+                    _message = "R&D GRANT: +" +
+                        research.ToString(MoneyCulture) + " RESEARCH CREDITS.";
+                    break;
+            }
+            _surface.InvalidateVisual();
         }
 
         private void EndGame()
@@ -1407,6 +1469,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             public double Distance { get; set; }
             public double Speed { get; set; }
         }
+
+        private sealed record DefenseFlash(
+            Point From, Point To, double EndTime, Brush Ink);
 
         private sealed class InterferenceTower
         {
