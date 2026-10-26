@@ -286,7 +286,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 int bonus = 90 + 20 * _wave;
                 _cash += bonus;
                 _score += 100 * _wave;
-                _message = $"WAVE {_wave} CLEARED! +\${bonus} CASH. SPACE FOR NEXT WAVE.";
+                _message = $"WAVE {_wave} CLEARED! +${bonus} CASH. SPACE FOR NEXT WAVE.";
             }
 
             _surface.InvalidateVisual();
@@ -495,14 +495,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             };
             if (_cash < price)
             {
-                _message = $"NOT ENOUGH CASH! NEED \${price}.";
+                _message = $"NOT ENOUGH CASH! NEED ${price}.";
                 _surface.InvalidateVisual();
                 return;
             }
 
             _cash -= price;
             _towers.Add(new DefenseTower(x, y, kind));
-            _message = $"{kind.ToString().ToUpperInvariant()} TOWER DEPLOYED. -\${price}.";
+            _message = $"{kind.ToString().ToUpperInvariant()} TOWER DEPLOYED. -${price}.";
             _surface.InvalidateVisual();
         }
 
@@ -521,13 +521,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             {
                 int price = tower.NextUpgradeCost;
                 if (_cash < price)
-                    _message = $"UPGRADE NEEDS \${price}.";
+                    _message = $"UPGRADE NEEDS ${price}.";
                 else
                 {
                     _cash -= price;
                     tower.Level++;
                     tower.TotalSpent += price;
-                    _message = $"DEFENSE UPGRADED TO LEVEL {tower.Level}. -\${price}.";
+                    _message = $"DEFENSE UPGRADED TO LEVEL {tower.Level}. -${price}.";
                 }
             }
             _surface.InvalidateVisual();
@@ -543,7 +543,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 int refund = (int)(tower.TotalSpent * 0.60);
                 _cash += refund;
                 _towers.Remove(tower);
-                _message = $"DEFENSE SOLD FOR \${refund}.";
+                _message = $"DEFENSE SOLD FOR ${refund}.";
             }
             _surface.InvalidateVisual();
         }
@@ -699,11 +699,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             var tower = SelectedTower();
             string upgrade = tower == null ? "U  UPGRADE (SELECT)"
                 : tower.Level >= 3 ? "U  MAX LEVEL"
-                : $"U  UPGRADE  \${tower.NextUpgradeCost}";
+                : $"U  UPGRADE  ${tower.NextUpgradeCost}";
             DrawButton(dc, upgrade, 423, Mint, dpi);
 
             string sell = tower == null ? "X  SELL (SELECT)"
-                : $"X  SELL FOR \${(int)(tower.TotalSpent * 0.60)}";
+                : $"X  SELL FOR ${(int)(tower.TotalSpent * 0.60)}";
             DrawButton(dc, sell, 466, Red, dpi);
         }
 
