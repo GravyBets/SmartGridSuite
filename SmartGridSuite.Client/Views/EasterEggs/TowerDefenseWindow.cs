@@ -693,8 +693,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
             }
 
-            int patrol = _progression.Level(0);
-            int patrolSpeed = _progression.Level(1);
             int coverage = _progression.Level(2);
             int vehicles = _progression.Level(3);
             int rfTeams = _progression.Level(4);
