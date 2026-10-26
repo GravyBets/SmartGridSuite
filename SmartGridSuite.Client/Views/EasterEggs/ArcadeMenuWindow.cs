@@ -76,8 +76,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             var defense = GameCard(
                 "02   GRID UNDER ATTACK",
                 "TOWER DEFENSE",
-                "Build Pulse, Sniper, and Jammer towers. Stop interference before it hits the hub.",
-                "MOUSE • 1 / 2 / 3 • U • X",
+                "Protect a central radio tower from copper thieves, illegal interference towers, and lightning strikes.",
+                "MOUSE • 1–5 UPGRADES • H HELP",
                 Gold,
                 "PLAY TOWER DEFENSE",
                 LaunchTowerDefense);
