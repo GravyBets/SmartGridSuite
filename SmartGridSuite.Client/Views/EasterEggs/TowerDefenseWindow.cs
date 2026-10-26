@@ -1248,7 +1248,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void DrawOverlay(DrawingContext dc, double dpi)
         {
-            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(241, 5, 13, 29)),
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(242, 5, 13, 29)),
                 new Pen(Cyan, 2.5), new Rect(103, 164, 709, 307));
             Text(dc, _gameOver ? "TOWER DESTROYED" :
                 _paused ? "RADIO SILENCE — PAUSED" : "GRID UNDER ATTACK",
@@ -1256,54 +1256,63 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             if (!_started)
             {
-                Text(dc, "ONE RADIO TOWER. TROUBLE FROM EVERY DIRECTION.",
-                    151, 246, 16, White, dpi, true);
-                Text(dc, "COPPER THIEVES • ILLEGAL INTERFERENCE • LIGHTNING",
-                    151, 280, 15, Red, dpi);
-                Text(dc, "1-4 UPGRADES   5 FENCE REPAIR   6 TOWER REPAIR",
-                    151, 315, 15, Gold, dpi);
-                Text(dc, "PRESS SPACE TO PREPARE", 151, 379, 24, Green, dpi, true);
-                Text(dc, "SPACE AGAIN TO RELEASE WAVE 1", 151, 428, 15, Muted, dpi);
+                Text(dc, "ONE RADIO TOWER. UNLIMITED WAYS TO IMPROVE IT.",
+                    151, 245, 17, White, dpi, true);
+                Text(dc, "24 UPGRADES • 3 SYSTEMS • PERSISTENT RESEARCH",
+                    151, 280, 17, Purple, dpi, true);
+                Text(dc, "INVEST IN YOUR SHOP BETWEEN EVERY SHIFT.",
+                    151, 315, 15, Gold, dpi, true);
+                Text(dc, "PRESS SPACE TO PREPARE", 151, 370, 24, Green, dpi, true);
+                Text(dc, "W RESEARCH WORKSHOP   H HELP   SPACE THEN WAVE 1",
+                    151, 422, 14, Muted, dpi);
             }
             else if (_gameOver)
             {
                 Text(dc, "WAVE " + _wave + "  •  SCORE " +
                     _score.ToString("N0", MoneyCulture),
-                    151, 279, 20, White, dpi, true);
-                Text(dc, "PERSONAL BEST " + _bestScore.ToString("N0", MoneyCulture),
-                    151, 321, 19, Gold, dpi, true);
-                Text(dc, "R TO RETRY      ESC BACK TO ARCADE", 151, 395, 17, Green, dpi);
+                    151, 275, 20, White, dpi, true);
+                Text(dc, "RESEARCH BANK: " + Money(_progression.Credits) +
+                    "   BEST WAVE: " + _progression.BestWave,
+                    151, 314, 17, Gold, dpi, true);
+                Text(dc, "W FOR PERMANENT UPGRADES  •  R FOR NEXT SHIFT",
+                    151, 366, 16, Green, dpi, true);
+                Text(dc, "ESC BACK TO ARCADE", 151, 410, 14, Muted, dpi);
             }
             else
             {
                 Text(dc, "WAVE " + _wave + "    TOWER HP " +
-                    Math.Ceiling(_health).ToString(MoneyCulture),
-                    151, 287, 20, Gold, dpi, true);
-                Text(dc, "P TO RESUME    ESC BACK TO ARCADE", 151, 395, 17, White, dpi);
+                    Math.Ceiling(_health).ToString(MoneyCulture) +
+                    "/" + MaxTowerHealth.ToString("0", MoneyCulture),
+                    151, 285, 20, Gold, dpi, true);
+                Text(dc, "P TO RESUME    ESC BACK TO ARCADE",
+                    151, 395, 17, White, dpi);
             }
         }
 
         private void DrawHelp(DrawingContext dc, double dpi)
         {
-            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(248, 6, 18, 38)),
-                new Pen(Gold, 2.4), new Rect(112, 149, 698, 353));
-            Text(dc, "RADIO TOWER DEFENSE — FIELD MANUAL", 143, 169, 22, Gold, dpi, true);
-            Text(dc, "KEYBOARD ONLY — NO TRACKPAD REQUIRED", 143, 213, 16, Cyan, dpi, true);
-            Text(dc, "SECURITY PATROLS CHASE THIEVES AUTOMATICALLY.",
-                143, 242, 14, White, dpi);
-            Text(dc, "RF TOWERS EXPIRE; FILTERS LIMIT INTERFERENCE.",
-                143, 266, 14, White, dpi);
-            Text(dc, "Q = SECURITY SWEEP; E = RF SWEEP (COOLDOWNS).",
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(249, 6, 18, 38)),
+                new Pen(Gold, 2.4), new Rect(112, 143, 698, 369));
+            Text(dc, "GRID UNDER ATTACK — FIELD MANUAL", 143, 160, 22,
+                Gold, dpi, true);
+            Text(dc, "24 UPGRADES: OPERATIONS / PROTECTION / LOGISTICS",
+                143, 203, 15, Cyan, dpi, true);
+            Text(dc, "TAB OR LEFT/RIGHT: SWITCH CATEGORY (8 EACH)",
+                143, 231, 14, White, dpi);
+            Text(dc, "1-8: BUY UPGRADE  •  ARROWS + ENTER: SELECT/BUY",
+                143, 259, 14, White, dpi);
+            Text(dc, "Q SECURITY SWEEP  •  E RF SWEEP  •  T TOWER REPAIR",
                 143, 290, 14, White, dpi);
-            Text(dc, "1 LIGHTNING     2 SURGE     3 FENCE     4 RF FILTERS",
-                143, 326, 14, Green, dpi, true);
-            Text(dc, "5 FENCE REPAIR     6 TOWER REPAIR (+25 HP)",
-                143, 352, 14, Green, dpi, true);
-            Text(dc, "UPGRADES HAVE NO 3-LEVEL CAP; PRICES KEEP RISING.",
-                143, 388, 14, Gold, dpi);
-            Text(dc, "SPACE NEXT WAVE    P PAUSE    ESC BACK TO ARCADE",
-                143, 424, 14, White, dpi);
-            Text(dc, "PRESS H TO RETURN", 143, 466, 16, Gold, dpi, true);
+            Text(dc, "F FENCE REPAIR  •  SPACE NEXT WAVE  •  P PAUSE",
+                143, 318, 14, White, dpi);
+            Text(dc, "W: PERMANENT WORKSHOP BEFORE / AFTER RUNS",
+                143, 352, 15, Purple, dpi, true);
+            Text(dc, "EARN RESEARCH ON WAVES; KEEP IT AFTER DEFEAT.",
+                143, 380, 14, Green, dpi, true);
+            Text(dc, "THREATS ARE AUTOMATIC — NEVER NEED A TRACKPAD.",
+                143, 409, 14, Muted, dpi);
+            Text(dc, "H CLOSES HELP   •   ESC BACK TO ARCADE",
+                143, 465, 16, Gold, dpi, true);
         }
 
         private static void Text(DrawingContext dc, string value,
