@@ -525,6 +525,20 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             };
             _controls.Children.Add(_fenceRepairButton);
 
+            _endRunButton = ArcadeButton("END RUN • BANK", 180, 36, Red);
+            _endRunButton.FontSize = 12;
+            _endRunButton.ToolTip = "Stop incoming waves now and bank this run's research credits.";
+            _endRunButton.Click += (_, _) => EndRun();
+            _controls.Children.Add(_endRunButton);
+
+            _continueButton = ArcadeButton("CONTINUE SAVED RUN", 450, 59, Green);
+            _continueButton.Click += (_, _) => ContinueSuspendedRun();
+            _controls.Children.Add(_continueButton);
+
+            _newRunButton = ArcadeButton("BANK RESEARCH & NEW RUN", 450, 59, Gold);
+            _newRunButton.Click += (_, _) => StartNewInsteadOfResume();
+            _controls.Children.Add(_newRunButton);
+
             _nextWaveButton = ArcadeButton("PREPARE", 177, 36, Gold);
             _nextWaveButton.Click += (_, _) =>
             {
@@ -571,12 +585,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             bool workshop = _progression.WorkshopOpen;
             bool gameUsable = _started && !_gameOver && !_paused &&
-                !_showHelp && !_perkPending;
-            bool rowsVisible = workshop || gameUsable;
+                !_showHelp && !_perkPending && !_resumeDecisionPending;
+            bool rowsVisible = !_resumeDecisionPending &&
+                (workshop || gameUsable);
 
             string signature = string.Join("|",
                 workshop, _started, _paused, _gameOver, _showHelp,
-                _perkPending, _wave, _cash, _progression.Credits,
+                _perkPending, _resumeDecisionPending, _wave, _cash, _progression.Credits,
                 _progression.SelectedCategory, _progression.SelectedRow,
                 _health.ToString("0", MoneyCulture),
                 _fenceHealth.ToString("0", MoneyCulture),
@@ -649,8 +664,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     (affordable ? "" : " • Not enough funds");
             }
 
-            bool showFooter = !workshop && !_showHelp && !_perkPending;
-            _workshopButton.Visibility = !_showHelp && !_perkPending &&
+            bool showFooter = !workshop && !_showHelp && !_perkPending &&
+                !_resumeDecisionPending;
+            _workshopButton.Visibility = !_resumeDecisionPending &&
+                !_showHelp && !_perkPending &&
                 (workshop || !_waveActive && (!_started || _gameOver))
                     ? Visibility.Visible : Visibility.Collapsed;
             _workshopButton.Content = workshop
@@ -701,8 +718,23 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Canvas.SetLeft(_nextWaveButton, 1120);
             Canvas.SetTop(_nextWaveButton, 764);
 
+            _endRunButton.Visibility = showFooter && _started && !_gameOver
+                ? Visibility.Visible : Visibility.Collapsed;
+            Canvas.SetLeft(_endRunButton, 35);
+            Canvas.SetTop(_endRunButton, 763);
+
+            _continueButton.Visibility = _resumeDecisionPending
+                ? Visibility.Visible : Visibility.Collapsed;
+            Canvas.SetLeft(_continueButton, 196);
+            Canvas.SetTop(_continueButton, 343);
+            _newRunButton.Visibility = _resumeDecisionPending
+                ? Visibility.Visible : Visibility.Collapsed;
+            Canvas.SetLeft(_newRunButton, 674);
+            Canvas.SetTop(_newRunButton, 343);
+
             for (int choice = 0; choice < 3; choice++)
                 _perkButtons[choice].Visibility = _perkPending &&
+                    !_resumeDecisionPending &&
                     !_showHelp && !workshop
                     ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -710,7 +742,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private void PrepareOrStartWave()
         {
             if (_progression.WorkshopOpen || _perkPending ||
-                _paused || _gameOver)
+                _paused || _gameOver || _resumeDecisionPending)
                 return;
             if (!_started)
             {
@@ -1338,6 +1370,17 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void HandleKey(object sender, KeyEventArgs e)
         {
+            if (_resumeDecisionPending)
+            {
+                e.Handled = true;
+                // Leave the choice onscreen until user selects with a button.
+                // Esc still closes the window while preserving the snapshot.
+                if (e.Key == Key.Escape) Close();
+                else if (e.Key == Key.C) ContinueSuspendedRun();
+                else if (e.Key == Key.N) StartNewInsteadOfResume();
+                return;
+            }
+
             if (e.Key == Key.Escape)
             {
                 e.Handled = true;
@@ -1766,6 +1809,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 DrawOverlay(dc, dpi);
             if (_perkPending)
                 DrawPerk(dc, dpi);
+            if (_resumeDecisionPending)
+                DrawResumePrompt(dc, dpi);
             if (_showHelp)
                 DrawHelp(dc, dpi);
             if (_progression.WorkshopOpen)
@@ -2096,6 +2141,25 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 178, 249, 18, White, dpi, true);
             Text(dc, "CLICK A BONUS CARD OR PRESS 1 / 2 / 3",
                 178, 560, 16, Muted, dpi);
+        }
+
+        private void DrawResumePrompt(DrawingContext dc, double dpi)
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(249, 5, 13, 29)),
+                new Pen(Cyan, 3), new Rect(104, 155, 1122, 380));
+            Text(dc, "SAVED RADIO-SHOP SHIFT FOUND", 165, 190, 32, Cyan, dpi, true);
+            if (_resumeOffer != null)
+            {
+                Text(dc, "WAVE " + _resumeOffer.Wave +
+                    "     CASH " + Money(_resumeOffer.Cash) +
+                    "     RESEARCH +" +
+                    _resumeOffer.PendingResearch.ToString("N0", MoneyCulture),
+                    166, 251, 21, Gold, dpi, true);
+            }
+            Text(dc, "CONTINUE THE EXACT WAVE, OR BANK RESEARCH AND START FRESH?",
+                166, 292, 16, White, dpi, true);
+            Text(dc, "C = CONTINUE     N = NEW RUN     ESC = CLOSE",
+                166, 450, 16, Muted, dpi, true);
         }
 
         private void DrawOverlay(DrawingContext dc, double dpi)
