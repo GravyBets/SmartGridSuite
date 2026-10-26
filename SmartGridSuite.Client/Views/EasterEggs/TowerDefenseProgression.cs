@@ -17,11 +17,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         internal static readonly Upgrade[] Catalog =
         {
             // OPERATIONS: automated threat removal and tower countermeasures.
-            new("Security Patrol", "More thieves intercepted per patrol", 0, 85, 55, 24, 0),
-            new("Patrol Frequency", "Faster automatic security response", 0, 100, 65, 24, 0),
-            new("Patrol Coverage", "Detect threats farther from the tower", 0, 110, 70, 26, 0),
-            new("Response Vehicles", "Additional thieves removed per dispatch", 0, 190, 110, 50, 3),
-            new("RF Response Team", "Remove more illegal RF towers per sweep", 0, 155, 95, 35, 2),
+            new("Mounted Gun Power", "Increase damage from both tower-mounted guns", 0, 85, 55, 24, 0),
+            new("Gun Fire Rate", "Tower-mounted guns reload and fire faster", 0, 100, 65, 24, 0),
+            new("Gun Range", "Let mounted guns hit enemies farther away", 0, 110, 70, 26, 0),
+            new("Response Vehicles", "Automatic security sweep handles more thieves", 0, 190, 110, 50, 3),
+            new("RF Response Team", "Automatic RF sweeps deal more jammer damage", 0, 155, 95, 35, 2),
             new("Counter-RF Filters", "Shorten the lifetime of RF interference", 0, 140, 90, 38, 0),
             new("Drone Interceptor", "Automatic countermeasure beam", 0, 260, 180, 75, 5),
             new("Drone Range", "Expand the interceptor's effective radius", 0, 200, 140, 55, 5),
@@ -39,11 +39,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             // LOGISTICS: fund the radio shop's growing defensive network.
             new("Dispatch Contract", "Earn additional cash after every wave", 2, 95, 66, 26, 0),
             new("Scrap Recovery", "Earn more for stopping copper thieves", 2, 110, 70, 28, 0),
-            new("Crew Training", "Shorten Q/E sweep cooldowns", 2, 140, 100, 41, 2),
+            new("Crew Training", "Automatic security and RF teams respond faster", 2, 140, 100, 41, 2),
             new("Research Funding", "Earn more permanent research credits", 2, 200, 125, 65, 4),
             new("Parts Discount", "Lower the cash cost of new upgrades", 2, 240, 145, 70, 4),
             new("Free Work Orders", "Chance of a free upgrade each wave", 2, 290, 175, 85, 7),
-            new("Repair Supplies", "Restore more HP per paid tower repair", 2, 150, 95, 40, 0),
+            new("Repair Supplies", "Restore 10 extra HP per tower repair", 2, 150, 95, 40, 0),
             new("Maintenance Dispatch", "Restore tower HP at wave completion", 2, 250, 160, 75, 9)
         };
 
