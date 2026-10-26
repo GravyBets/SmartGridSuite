@@ -333,6 +333,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 grid.Children.Add(_upgradeLevels[row]);
                 grid.Children.Add(_upgradePrices[row]);
                 button.Content = grid;
+                ToolTipService.SetShowOnDisabled(button, true);
                 button.Click += (_, _) =>
                 {
                     BuySelected(selectedRow);
@@ -497,8 +498,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _workshopButton.Content = workshop
                 ? "CLOSE WORKSHOP" : "RESEARCH WORKSHOP";
             Canvas.SetLeft(_workshopButton, workshop ? 1052 : 949);
-            Canvas.SetTop(_workshopButton, workshop ? 711 : 764);
-            _workshopButton.Width = workshop ? 168 : 180;
+            Canvas.SetTop(_workshopButton, workshop ? 709 : 764);
+            _workshopButton.Width = workshop ? 168 : 160;
 
             _towerRepairButton.Visibility = showFooter && _started && !_gameOver
                 ? Visibility.Visible : Visibility.Collapsed;
