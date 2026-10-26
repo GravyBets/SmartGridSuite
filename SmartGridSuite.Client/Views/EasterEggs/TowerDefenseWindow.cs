@@ -28,7 +28,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static readonly CultureInfo MoneyCulture = CultureInfo.InvariantCulture;
 
         private static TowerDefenseWindow? _active;
-        private static readonly Brush Background = Paint("#081224");
+        private static readonly Brush Backdrop = Paint("#081224");
         private static readonly Brush Panel = Paint("#11233D");
         private static readonly Brush Ground = Paint("#0C243B");
         private static readonly Brush GridInk = Paint("#234159");
@@ -100,7 +100,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             ResizeMode = ResizeMode.NoResize;
             ShowInTaskbar = false;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            Background = Background;
+            Background = Backdrop;
             FontFamily = new FontFamily("Consolas");
             Focusable = true;
 
@@ -682,7 +682,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void Draw(DrawingContext dc, double dpi)
         {
-            dc.DrawRectangle(Background, null, new Rect(0, 0, 940, 650));
+            dc.DrawRectangle(Backdrop, null, new Rect(0, 0, 940, 650));
             dc.DrawRectangle(Panel, new Pen(GridInk, 2), new Rect(12, 12, 894, 580));
             Text(dc, "GRID UNDER ATTACK", 27, 23, 29, Cyan, dpi, true);
             Text(dc, "360 DEGREE RADIO TOWER DEFENSE", 28, 64, 13, Muted, dpi);
