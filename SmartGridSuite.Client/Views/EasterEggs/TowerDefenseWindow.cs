@@ -663,6 +663,44 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             RefreshUpgradeControls();
         }
 
+        // All visible bottom actions share a single row with consistent
+        // gutters; the previous hand-coded X values caused overlapping
+        // buttons and accidentally covered the footer's help text.
+        private void LayoutFooterButtons()
+        {
+            if (_progression.WorkshopOpen)
+                return;
+
+            var slots = new (Button Control, double Width)[]
+            {
+                (_endRunButton, 172),
+                (_autoNextButton, 248),
+                (_towerRepairButton, 196),
+                (_fenceRepairButton, 196),
+                (_workshopButton, 160),
+                (_nextWaveButton, 177)
+            };
+            var visible = slots
+                .Where(slot => slot.Control.Visibility == Visibility.Visible)
+                .ToArray();
+            if (visible.Length == 0) return;
+
+            const double left = 34;
+            const double right = 1286;
+            const double gap = 12;
+            double groupWidth = visible.Sum(slot => slot.Width) +
+                gap * (visible.Length - 1);
+            double x = left + Math.Max(0, (right - left - groupWidth) / 2);
+
+            foreach (var slot in visible)
+            {
+                slot.Control.Width = slot.Width;
+                Canvas.SetLeft(slot.Control, x);
+                Canvas.SetTop(slot.Control, 765);
+                x += slot.Width + gap;
+            }
+        }
+
         private void RefreshUpgradeControls()
         {
             if (_upgradeButtons[0] == null)
@@ -848,6 +886,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     !_resumeDecisionPending &&
                     !_showHelp && !workshop
                     ? Visibility.Visible : Visibility.Collapsed;
+
+            LayoutFooterButtons();
         }
 
         private void PrepareOrStartWave()
@@ -2107,9 +2147,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             dc.DrawRectangle(Panel, new Pen(GridInk, 1),
                 new Rect(24, 759, 1274, 47));
-            Text(dc, "AUTO GUNS / SECURITY / RF    H HELP  P PAUSE",
-                35, 773, 12, White, dpi, true);
-
             if (!_started || _paused || _gameOver)
                 DrawOverlay(dc, dpi);
             if (_perkPending)
