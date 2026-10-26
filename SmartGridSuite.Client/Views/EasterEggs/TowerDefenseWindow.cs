@@ -37,13 +37,15 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static readonly Brush Lilac = Paint("#CD9DFF");
         private static readonly Brush White = Paint("#F1F6FE");
         private static readonly Brush Muted = Paint("#9FB2CD");
+        private static readonly Brush DotBrush = Paint("#1A3652");
+        private static readonly Brush TowerInterior = Paint("#08182E");
+        private static readonly Brush ActionBackground = Paint("#182D4B");
 
         private static TowerDefenseWindow? _active;
         private readonly Window _host;
         private readonly GameSurface _surface;
         private readonly DispatcherTimer _timer;
         private readonly Stopwatch _clock = new();
-        private readonly Random _random = new();
         private readonly List<(int X, int Y)> _route = new();
         private readonly HashSet<(int X, int Y)> _road = new();
         private readonly List<DefenseTower> _towers = new();
@@ -609,7 +611,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     new Pen(GridLine, 0.65), point);
                 if (!road)
                 {
-                    dc.DrawEllipse(Paint("#1A3652"), null,
+                    dc.DrawEllipse(DotBrush, null,
                         Center(x, y), 2.1, 2.1);
                 }
             }
@@ -626,7 +628,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 var p = Center(tower.X, tower.Y);
                 Brush fill = tower.Kind == TowerKind.Pulse ? Cyan :
                     tower.Kind == TowerKind.Sniper ? Gold : Lilac;
-                dc.DrawEllipse(Paint("#08182E"), new Pen(fill, 2.1), p, 12, 12);
+                dc.DrawEllipse(TowerInterior, new Pen(fill, 2.1), p, 12, 12);
                 var glyph = tower.Kind == TowerKind.Pulse ? "P" :
                     tower.Kind == TowerKind.Sniper ? "S" : "J";
                 Text(dc, glyph, p.X - 6, p.Y - 10, 17, fill, dpi, true);
@@ -704,7 +706,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static void DrawButton(
             DrawingContext dc, string label, double y, Brush ink, double dpi)
         {
-            dc.DrawRectangle(Paint("#182D4B"), new Pen(ink, 1),
+            dc.DrawRectangle(ActionBackground, new Pen(ink, 1),
                 new Rect(620, y, 253, y >= 423 ? 36 : 40));
             Text(dc, label, 632, y + 9, 15, ink, dpi, true);
         }
