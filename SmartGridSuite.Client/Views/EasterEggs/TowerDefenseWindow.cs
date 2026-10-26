@@ -401,7 +401,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 TowerY + dy * thief.Distance + dx * wobble);
         }
 
-        private double FenceRadius => 58 + _fenceLevel * 7;
+        private double FenceRadius => Math.Min(145, 58 + _fenceLevel * 7);
 
         private void LightningStrike()
         {
@@ -749,10 +749,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             DrawSidebar(dc, dpi);
 
             dc.DrawRectangle(Panel, new Pen(GridInk, 1), new Rect(25, 539, 859, 42));
-            Text(dc, "CLICK THIEVES + INTERFERENCE TOWERS TO STOP THEM",
-                39, 551, 12, White, dpi, true);
-            Text(dc, "1-5 BUY  |  SPACE NEXT WAVE  |  H HELP  |  P PAUSE",
-                462, 551, 11, Cyan, dpi, true, 400);
+            Text(dc, "Q SECURITY SWEEP    E RF SWEEP", 39, 551, 12, White, dpi, true);
+            Text(dc, "1-6 BUY/REPAIR   SPACE WAVE   H HELP   P PAUSE",
+                403, 551, 11, Cyan, dpi, true, 475);
 
             if (!_started || _paused || _gameOver)
                 DrawOverlay(dc, dpi);
@@ -789,9 +788,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     new Point(TowerX, TowerY), FenceRadius, FenceRadius);
 
                 // Fence posts around the perimeter telegraph the defense upgrade.
-                for (int post = 0; post < 16 + _fenceLevel * 4; post++)
+                int postCount = Math.Min(48, 16 + _fenceLevel * 4);
+                for (int post = 0; post < postCount; post++)
                 {
-                    double angle = Math.PI * 2 * post / (16 + _fenceLevel * 4);
+                    double angle = Math.PI * 2 * post / postCount;
                     dc.DrawRectangle(_fenceHealth > 0 ? FenceInk : Red, null,
                         new Rect(TowerX + Math.Cos(angle) * FenceRadius - 2,
                             TowerY + Math.Sin(angle) * FenceRadius - 2, 4, 4));
@@ -845,7 +845,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     13, Green, dpi, true);
             if (_filterLevel > 0)
             {
-                for (int ring = 0; ring < _filterLevel; ring++)
+                for (int ring = 0; ring < Math.Min(4, _filterLevel); ring++)
                     dc.DrawEllipse(null, new Pen(Purple, 0.9),
                         new Point(TowerX, TowerY),
                         84 + ring * 10, 84 + ring * 10);
@@ -923,21 +923,23 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 748, 193, 20, Gold, dpi, true);
 
             Text(dc, "WAVE " + _wave + (_waveActive ? " LIVE" : " READY"),
-                621, 228, 14, White, dpi, true);
+                621, 226, 13, White, dpi, true);
+            Text(dc, _fenceLevel > 0
+                    ? "FENCE " + Math.Ceiling(_fenceHealth).ToString("0", MoneyCulture)
+                    : "NO FENCE",
+                742, 228, 12, _fenceHealth > 0 ? Green : Red, dpi, true);
             Text(dc, "THIEVES " + (_thieves.Count + _thievesToSpawn) +
                 "   RF " + (_jammers.Count + _jammersToSpawn),
-                621, 246, 12, Purple, dpi, true);
+                621, 245, 12, Purple, dpi, true);
 
-            DrawUpgrade(dc, 1, "LIGHTNING ARRESTOR", 269, Gold, dpi);
-            DrawUpgrade(dc, 2, "SURGE ARRESTOR", 316, Green, dpi);
-            DrawUpgrade(dc, 3, "SECURITY FENCE", 363, Cyan, dpi);
-            DrawUpgrade(dc, 4, "RF FILTERS", 410, Purple, dpi);
-            DrawUpgrade(dc, 5, "REPAIR FENCE", 457, White, dpi);
-
-            if (_fenceLevel > 0)
-                Text(dc, "FENCE " + Math.Ceiling(_fenceHealth).ToString("0", MoneyCulture) +
-                    "/" + FenceMaxHealth.ToString("0", MoneyCulture),
-                    624, 496, 12, _fenceHealth > 0 ? Green : Red, dpi, true);
+            // All upgrade/repair actions are accessible from the number row,
+            // including the new tower-health repair on key 6.
+            DrawUpgrade(dc, 1, "LIGHTNING ARRESTOR", 265, Gold, dpi);
+            DrawUpgrade(dc, 2, "SURGE ARRESTOR", 305, Green, dpi);
+            DrawUpgrade(dc, 3, "SECURITY FENCE", 345, Cyan, dpi);
+            DrawUpgrade(dc, 4, "RF FILTERS", 385, Purple, dpi);
+            DrawUpgrade(dc, 5, "REPAIR FENCE", 425, White, dpi);
+            DrawUpgrade(dc, 6, "REPAIR TOWER +25HP", 465, Green, dpi);
         }
 
         private void DrawUpgrade(DrawingContext dc, int option,
@@ -945,17 +947,17 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         {
             dc.DrawRectangle(ButtonFace, new Pen(ink, 1),
                 new Rect(620, y, 250, 36));
-            string label = option == 5
-                ? name
-                : name + " " + LevelFor(option) + "/" + MaxUpgradeLevel;
-            string price = NextPrice(option).HasValue
-                ? "$" + NextPrice(option)!.Value.ToString("N0", MoneyCulture)
-                : "MAX";
-            if (option == 5 && !NextPrice(option).HasValue)
-                price = "N/A";
 
-            Text(dc, option + "  " + label, 628, y + 9, 12.5, ink, dpi, true, 191);
-            Text(dc, price, 816, y + 9, 12.5, White, dpi, true, 54);
+            string label = option <= 4
+                ? name + " LV" + LevelFor(option)
+                : name;
+            int? next = NextPrice(option);
+            string price = next.HasValue
+                ? "$" + next.Value.ToString("N0", MoneyCulture)
+                : "N/A";
+
+            Text(dc, option + "  " + label, 628, y + 9, 12.3, ink, dpi, true, 182);
+            Text(dc, price, 811, y + 9, 12.3, White, dpi, true, 57);
         }
 
         private void DrawOverlay(DrawingContext dc, double dpi)
@@ -972,7 +974,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     151, 246, 16, White, dpi, true);
                 Text(dc, "COPPER THIEVES • ILLEGAL INTERFERENCE • LIGHTNING",
                     151, 280, 15, Red, dpi);
-                Text(dc, "BUY ARRESTORS, FENCES AND RF FILTERS TO SURVIVE.",
+                Text(dc, "1-4 UPGRADES   5 FENCE REPAIR   6 TOWER REPAIR",
                     151, 315, 15, Gold, dpi);
                 Text(dc, "PRESS SPACE TO PREPARE", 151, 379, 24, Green, dpi, true);
                 Text(dc, "SPACE AGAIN TO RELEASE WAVE 1", 151, 428, 15, Muted, dpi);
@@ -1000,21 +1002,22 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(248, 6, 18, 38)),
                 new Pen(Gold, 2.4), new Rect(112, 149, 698, 353));
             Text(dc, "RADIO TOWER DEFENSE — FIELD MANUAL", 143, 169, 22, Gold, dpi, true);
-            Text(dc, "THE THREATS", 143, 217, 15, Cyan, dpi, true);
-            Text(dc, "CLICK COPPER THIEVES TO CHASE THEM OFF (+$25).",
+            Text(dc, "KEYBOARD ONLY — NO TRACKPAD REQUIRED", 143, 213, 16, Cyan, dpi, true);
+            Text(dc, "SECURITY PATROLS CHASE THIEVES AUTOMATICALLY.",
                 143, 242, 14, White, dpi);
-            Text(dc, "CLICK INTERFERENCE TOWERS TO REMOVE THEM (+$45).",
-                143, 267, 14, White, dpi);
-            Text(dc, "LIGHTNING STRIKES AFTER A VISIBLE WARNING.",
-                143, 292, 14, White, dpi);
-            Text(dc, "THE UPGRADES", 143, 323, 15, Cyan, dpi, true);
-            Text(dc, "1 LIGHTNING • 2 SURGE • 3 FENCE • 4 RF FILTER • 5 FENCE REPAIR",
-                143, 347, 13, White, dpi);
-            Text(dc, "UPGRADES CAN BE PURCHASED DURING OR BETWEEN WAVES.",
-                143, 374, 13, Muted, dpi);
-            Text(dc, "SPACE = START / NEXT WAVE   P = PAUSE   ESC = LEAVE",
-                143, 426, 13, White, dpi);
-            Text(dc, "PRESS H TO RETURN", 143, 469, 16, Gold, dpi, true);
+            Text(dc, "RF TOWERS EXPIRE; FILTERS LIMIT INTERFERENCE.",
+                143, 266, 14, White, dpi);
+            Text(dc, "Q = SECURITY SWEEP; E = RF SWEEP (COOLDOWNS).",
+                143, 290, 14, White, dpi);
+            Text(dc, "1 LIGHTNING     2 SURGE     3 FENCE     4 RF FILTERS",
+                143, 326, 14, Green, dpi, true);
+            Text(dc, "5 FENCE REPAIR     6 TOWER REPAIR (+25 HP)",
+                143, 352, 14, Green, dpi, true);
+            Text(dc, "UPGRADES HAVE NO 3-LEVEL CAP; PRICES KEEP RISING.",
+                143, 388, 14, Gold, dpi);
+            Text(dc, "SPACE NEXT WAVE    P PAUSE    ESC BACK TO ARCADE",
+                143, 424, 14, White, dpi);
+            Text(dc, "PRESS H TO RETURN", 143, 466, 16, Gold, dpi, true);
         }
 
         private static void Text(DrawingContext dc, string value,
@@ -1047,7 +1050,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private static string BestFile => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SmartGridSuite", "Arcade", "tower-defense-360-best.txt");
+            "SmartGridSuite", "Arcade", "tower-defense-keyboard-best.txt");
 
         private static int ReadBestScore()
         {
