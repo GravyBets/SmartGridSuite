@@ -1277,15 +1277,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (!_started || _paused || _gameOver)
                 return;
 
-            if (e.Key is Key.Q or Key.E or Key.T or Key.F)
+            if (e.Key is Key.T or Key.F)
             {
                 e.Handled = true;
                 if (e.IsRepeat) return;
-                if (e.Key == Key.Q)
-                    CallSecuritySweep();
-                else if (e.Key == Key.E)
-                    CallRfSweep();
-                else if (e.Key == Key.T)
+                if (e.Key == Key.T)
                     RepairTower();
                 else
                     RepairFence();
@@ -1323,62 +1319,49 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void CallSecuritySweep()
         {
-            if (_securitySweepCooldown > 0)
-            {
-                _message = "SECURITY PATROL READY IN " +
-                    Math.Ceiling(_securitySweepCooldown).ToString(MoneyCulture) + "s.";
-            }
-            else if (_thieves.Count == 0)
-            {
-                _message = "PATROL: NO COPPER THIEVES TO CHASE.";
-            }
-            else
-            {
-                int count = Math.Min(_thieves.Count,
-                    1 + _progression.Level(3) / 2 + _progression.Level(0) / 4);
-                for (int i = 0; i < count; i++)
-                {
-                    _thieves.RemoveAt(IndexOfNearestThief());
-                    _thievesStopped++;
-                    _cash = AddCash(_cash, 22 + _progression.Level(17) * 4);
-                    _score = AddCash(_score, 35);
-                }
+            if (_securitySweepCooldown > 0 || _thieves.Count == 0)
+                return;
 
-                _securityRingTime = 0.55;
-                _securitySweepCooldown = Math.Max(1.0,
-                    8.0 / (1 + _progression.Level(18) * 0.18));
-                _message = "SECURITY SWEEP: " + count + " THIEVES CHASED OFF! +$" +
-                    (count * 22).ToString(MoneyCulture) + ".";
+            // Independent automated response. No Q press or pointer needed.
+            // Damage-based sweeps allow health bars and mounted guns to matter.
+            int count = Math.Min(_thieves.Count,
+                1 + _progression.Level(3) / 2);
+            double damage = 19 + _progression.Level(3) * 11;
+            int dispatched = 0;
+            foreach (var thief in _thieves
+                .Where(t => t.Distance <= 165)
+                .OrderBy(t => t.Distance).Take(count))
+            {
+                thief.Health -= damage;
+                dispatched++;
             }
-            _surface.InvalidateVisual();
+
+            if (dispatched == 0)
+                return;
+
+            _securityRingTime = 0.55;
+            _securitySweepCooldown = Math.Max(1.0,
+                8.0 / (1 + _progression.Level(18) * 0.18));
+            ResolveDefeatedThreats();
         }
 
         private void CallRfSweep()
         {
-            if (_rfSweepCooldown > 0)
-            {
-                _message = "RF TEAM READY IN " +
-                    Math.Ceiling(_rfSweepCooldown).ToString(MoneyCulture) + "s.";
-            }
-            else if (_jammers.Count == 0)
-            {
-                _message = "RF TEAM: NO INTERFERENCE TOWERS TO REMOVE.";
-            }
-            else
-            {
-                int count = Math.Min(_jammers.Count,
-                    1 + _progression.Level(4) / 2);
-                _jammers.RemoveRange(0, count);
-                _interferenceRemoved += count;
-                _cash = AddCash(_cash, count * 40);
-                _score = AddCash(_score, count * 60);
-                _rfRingTime = 0.65;
-                _rfSweepCooldown = Math.Max(1.5,
-                    11.0 / (1 + _progression.Level(18) * 0.16));
-                _message = "RF SWEEP: " + count + " INTERFERENCE TOWERS REMOVED! +$" +
-                    (count * 40).ToString(MoneyCulture) + ".";
-            }
-            _surface.InvalidateVisual();
+            if (_rfSweepCooldown > 0 || _jammers.Count == 0)
+                return;
+
+            // Automated interference suppression damages small RF towers.
+            // The guns and drones finish survivors.
+            int count = Math.Min(_jammers.Count,
+                1 + _progression.Level(4) / 2);
+            double damage = 26 + _progression.Level(4) * 14;
+            foreach (var tower in _jammers.Take(count))
+                tower.Health -= damage;
+
+            _rfRingTime = 0.65;
+            _rfSweepCooldown = Math.Max(1.5,
+                11.0 / (1 + _progression.Level(18) * 0.16));
+            ResolveDefeatedThreats();
         }
 
         private void DescribeSelection()
