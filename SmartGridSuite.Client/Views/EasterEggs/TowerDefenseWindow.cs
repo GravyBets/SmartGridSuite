@@ -1046,6 +1046,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 {
                     _progression.WorkshopOpen = false;
                     _surface.InvalidateVisual();
+                    RefreshUpgradeControls();
                 }
                 else
                     Close();
