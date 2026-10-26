@@ -78,6 +78,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private TowerDefenseSession? _resumeOffer;
         private bool _resumeDecisionPending;
         private double _snapshotElapsed = 0;
+        private double _savedElapsedOffset;
         private readonly Button[] _perkButtons = new Button[3];
         private string _lastUpgradeSignature = "";
         private DateTime _lastControlsRefreshUtc = DateTime.MinValue;
@@ -337,7 +338,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 DroneCooldown = _droneCooldown,
                 LeftGunCooldown = _leftGunCooldown,
                 RightGunCooldown = _rightGunCooldown,
-                ElapsedSeconds = _clock.Elapsed.TotalSeconds,
+                ElapsedSeconds = _clock.Elapsed.TotalSeconds + _savedElapsedOffset,
                 PendingResearch = _progression.PendingCredits,
                 RunLevels = _progression.ExportRunLevels(),
                 Category = _progression.SelectedCategory,
@@ -400,6 +401,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 X = t.X, Y = t.Y, Age = t.Age,
                 Health = t.Health, MaxHealth = t.MaxHealth
             }));
+            _savedElapsedOffset = Math.Max(0, snapshot.ElapsedSeconds);
             _clock.Restart();
             _lastTickTime = 0;
             _paused = true;
@@ -793,6 +795,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _resumeDecisionPending = false;
             _resumeOffer = null;
             _snapshotElapsed = 0;
+            _savedElapsedOffset = 0;
             _bossSpawnedThisWave = false;
             _cash = 450 + _progression.Level(16) * 35;
             _score = 0;
@@ -958,9 +961,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     _defenseFlashes.Add(new DefenseFlash(
                         new Point(TowerX, TowerY - 38),
                         ThiefPoint(_thieves[closest]), now + 0.16, Cyan));
-                    _thieves.RemoveAt(closest);
-                    _thievesStopped++;
-                    _cash = AddCash(_cash, 14 + _progression.Level(17) * 4);
+                    _thieves[closest].Health -= 22 +
+                        _progression.Level(3) * 9;
+                    ResolveDefeatedThreats();
+                    _cash = AddCash(_cash, 4 + _progression.Level(17) * 2);
                     _score = AddCash(_score, 24);
                 }
                 _patrolCooldown = Math.Max(0.8,
@@ -1019,23 +1023,33 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 thief.Distance = Math.Max(0, thief.Distance - thief.Speed * dt);
 
                 if (_fenceLevel > 0 && _fenceHealth > 0 &&
-                    thief.Distance <= FenceRadius)
+                    thief.Distance <= FenceRadius && !thief.FenceHitDone)
                 {
                     double wear = Math.Max(0.3, (4.5 + _wave * 0.18) /
                         (1 + _fenceLevel * 0.18 +
                          _progression.Level(13) * 0.23));
-                    _fenceHealth = Math.Max(0, _fenceHealth - wear);
-                    _thieves.RemoveAt(i);
-                    _thievesStopped++;
-                    _score = AddCash(_score, 12);
+                    _fenceHealth = Math.Max(0, _fenceHealth -
+                        wear * (thief.Kind == 4 ? 8 : 1));
+                    thief.FenceHitDone = true;
+                    thief.Health -= thief.Kind == 4 ? 45 : 28;
                     if (_fenceHealth <= 0)
-                        _message = "SECURITY FENCE BREACHED! PRESS F TO REPAIR IT.";
+                        _message = "SECURITY FENCE BREACHED! REPAIR IT!";
                 }
-                else if (thief.Distance <= HubRadius)
+
+                if (thief.Health <= 0)
+                    continue;
+
+                if (thief.Distance <= HubRadius)
                 {
-                    DamageTower(6 + _wave * 0.65);
+                    double impact = thief.Kind switch
+                    {
+                        1 => 11, 2 => 5, 3 => 9, 4 => 35, _ => 7
+                    };
+                    DamageTower(impact + _wave * 0.65);
                     _thieves.RemoveAt(i);
-                    _message = "COPPER THIEVES GOT INTO THE TOWER COMPOUND!";
+                    _message = thief.Kind == 4
+                        ? "THE SCRAP KING REACHED THE TOWER!"
+                        : "SITE BREACH! YOUR RADIO TOWER TOOK DAMAGE!";
                 }
             }
 
@@ -1072,6 +1086,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 EndGame();
                 return;
             }
+
+            ResolveDefeatedThreats();
 
             if (_thievesToSpawn == 0 && _jammersToSpawn == 0 &&
                 _lightningToSpawn == 0 && _warningRemaining <= 0 &&
@@ -1152,8 +1168,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 if (_thieves[i].Health > 0) continue;
                 _thieves.RemoveAt(i);
                 _thievesStopped++;
-                _cash = AddCash(_cash, 25 + _progression.Level(17) * 4);
-                _score = AddCash(_score, 40);
+                int bounty = _thieves[i].Kind == 4 ? 600 : 25;
+                _cash = AddCash(_cash, bounty + _progression.Level(17) * 4);
+                _score = AddCash(_score, _thieves[i].Kind == 4 ? 1000 : 40);
             }
             for (int i = _jammers.Count - 1; i >= 0; i--)
             {
@@ -1188,14 +1205,52 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         {
             double angle = _random.NextDouble() * Math.PI * 2;
             double radius = BoundaryRadius(angle, 18);
+            int roll = _random.Next(100);
+            // 0: ordinary copper thief; 1: armored tower climber;
+            // 2: parakeet; 3: bee swarm; 4: five-wave Scrap King boss.
+            int kind = roll < 38 ? 0 :
+                roll < 58 && _wave >= 2 ? 1 :
+                roll < 80 && _wave >= 2 ? 2 :
+                roll < 100 && _wave >= 3 ? 3 : 0;
+            double speedScale = kind switch
+            {
+                1 => 0.66,
+                2 => 1.68,
+                3 => 2.03,
+                _ => 0.85 + _random.NextDouble() * 0.65
+            };
+            double health = kind switch
+            {
+                1 => 75 + _wave * 12,
+                2 => 16 + _wave * 3,
+                3 => 13 + _wave * 3,
+                _ => 22 + _wave * 5
+            };
             _thieves.Add(new CopperThief
             {
+                Kind = kind,
                 Angle = angle,
                 Distance = radius,
-                Speed = 22 + _wave * 2.2 + _random.NextDouble() * 9,
-                MaxHealth = 22 + _wave * 5,
-                Health = 22 + _wave * 5
+                Speed = (24 + _wave * 2.45) * speedScale,
+                MaxHealth = health,
+                Health = health
             });
+        }
+
+        private void SpawnBoss()
+        {
+            double angle = _random.NextDouble() * Math.PI * 2;
+            double health = 250 + _wave * 76;
+            _thieves.Add(new CopperThief
+            {
+                Kind = 4,
+                Angle = angle,
+                Distance = BoundaryRadius(angle, 35),
+                Speed = 15 + _wave * 0.65,
+                Health = health,
+                MaxHealth = health
+            });
+            _message = "BOSS WAVE! THE SCRAP KING IS HEADED FOR THE TOWER!";
         }
 
         private void SpawnInterferenceTower()
@@ -1211,7 +1266,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 MaxHealth = 42 + _wave * 9,
                 Health = 42 + _wave * 9
             });
-            _message = "INTERFERENCE TOWER DETECTED! E = RF SWEEP.";
+            _message = "INTERFERENCE TOWER DETECTED! AUTO RF TEAM DISPATCHED.";
         }
 
         private static double BoundaryRadius(double angle, double inset)
@@ -1228,7 +1283,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             // unnaturally perfect straight lines. Rendering and clicking both
             // use the same calculated location.
             double wobble = Math.Sin(
-                _clock.Elapsed.TotalSeconds * 14 + thief.Angle * 6) * 3.5;
+                (_clock.Elapsed.TotalSeconds + _savedElapsedOffset) *
+                    (thief.Kind == 3 ? 27 : thief.Kind == 2 ? 20 : 14)
+                 + thief.Angle * 6) * (thief.Kind is 2 or 3 ? 8.0 : 3.5);
             double dx = Math.Cos(thief.Angle);
             double dy = Math.Sin(thief.Angle);
             return new Point(
@@ -2328,6 +2385,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             public double Speed { get; set; }
             public double Health { get; set; }
             public double MaxHealth { get; set; }
+            public int Kind { get; set; }
+            public bool FenceHitDone { get; set; }
         }
 
         private sealed record DefenseFlash(
