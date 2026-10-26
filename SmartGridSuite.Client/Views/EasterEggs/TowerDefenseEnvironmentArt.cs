@@ -50,6 +50,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private static readonly Pen RfPulsePen = Stroke(Purple, 2.7);
         private static readonly Pen LightningPen = Stroke(Gold, 2.5);
         private static readonly Pen LightningWarning = Stroke(Red, 1.5);
+        private static readonly Pen FencePostPen = Stroke(White, 0.6);
+        private static readonly Pen GoldBadgePen = Stroke(Gold, 1.2);
+        private static readonly Pen CyanBadgePen = Stroke(Cyan, 1.2);
+        private static readonly Pen PurpleBadgePen = Stroke(Purple, 1.2);
+        private static readonly Pen BoltGlyphPen = Stroke(BoltFill, 2.4);
+        private static readonly Pen ShieldGlyphPen = Stroke(ShieldFill, 2.4);
+        private static readonly Pen RfGlyphPen = Stroke(RfFill, 2.4);
 
         private static readonly Geometry YardShape = Shape(
             "M 308,216 L 469,216 L 503,252 L 503,359 " +
@@ -174,7 +181,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 }
 
                 dc.DrawRoundedRectangle(intact ? YardEdge : Red,
-                    Stroke(White, 0.6),
+                    FencePostPen,
                     new Rect(a.X - 3.2, a.Y - 3.2, 6.4, 6.4),
                     1.4, 1.4);
             }
@@ -256,11 +263,15 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             double x, double y, string name, int level, Brush accent,
             Brush iconBrush, Geometry glyph, double dpi)
         {
-            dc.DrawRoundedRectangle(Badge, Stroke(accent, 1.2),
+            Pen chipPen = name == "LIGHTNING"
+                ? GoldBadgePen : name == "SURGE" ? CyanBadgePen : PurpleBadgePen;
+            Pen glyphPen = name == "LIGHTNING"
+                ? BoltGlyphPen : name == "SURGE" ? ShieldGlyphPen : RfGlyphPen;
+            dc.DrawRoundedRectangle(Badge, chipPen,
                 new Rect(x, y, 160, 29), 5, 5);
             dc.PushTransform(new TranslateTransform(x + 9, y + 4));
             dc.PushTransform(new ScaleTransform(0.68, 0.68));
-            dc.DrawGeometry(null, Stroke(iconBrush, 2.4), glyph);
+            dc.DrawGeometry(null, glyphPen, glyph);
             if (name != "RF FILTER")
                 dc.DrawGeometry(iconBrush, null, glyph);
             dc.Pop();
