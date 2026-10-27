@@ -95,9 +95,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private readonly List<CopperThief> _thieves = new();
         private readonly List<InterferenceTower> _jammers = new();
         private readonly List<DefenseFlash> _defenseFlashes = new();
-        private int _droneHits;
-        private int _droneDamageDone;
-        private static readonly Pen DroneBeamGlowPen = FreezePen(PulseFill, 7);
+        private static readonly Pen DroneBeamGlowPen = FreezePen(PulseFill, 5);
         private static readonly Pen DroneBeamCorePen = FreezePen(White, 2.4);
         private static readonly Pen DroneImpactPen = FreezePen(Cyan, 1.9);
         private readonly TowerDefenseProgression _progression = new();
@@ -354,8 +352,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 RfCooldown = _rfSweepCooldown,
                 PatrolCooldown = _patrolCooldown,
                 DroneCooldown = _droneCooldown,
-                DroneHits = _droneHits,
-                DroneDamageDone = _droneDamageDone,
                 LeftGunCooldown = _leftGunCooldown,
                 RightGunCooldown = _rightGunCooldown,
                 ElapsedSeconds = _clock.Elapsed.TotalSeconds + _savedElapsedOffset,
@@ -417,8 +413,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _rfSweepCooldown = snapshot.RfCooldown;
             _patrolCooldown = snapshot.PatrolCooldown;
             _droneCooldown = snapshot.DroneCooldown;
-            _droneHits = Math.Max(0, snapshot.DroneHits);
-            _droneDamageDone = Math.Max(0, snapshot.DroneDamageDone);
             _leftGunCooldown = snapshot.LeftGunCooldown;
             _rightGunCooldown = snapshot.RightGunCooldown;
             _thieves.Clear();
@@ -963,8 +957,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _wave = 0;
             _thievesStopped = 0;
             _interferenceRemoved = 0;
-            _droneHits = 0;
-            _droneDamageDone = 0;
             _health = MaxTowerHealth;
             _fenceHealth = FenceMaxHealth;
             _thievesToSpawn = 0;
@@ -1179,25 +1171,17 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
                     if (enemyRf != null && (rfTeams > 0 || enemyThief == null))
                     {
-                        double dealt = Math.Min(enemyRf.Health, damage);
                         enemyRf.Health -= damage;
-                        _droneHits = AddCash(_droneHits, 1);
-                        _droneDamageDone = AddCash(_droneDamageDone,
-                            (int)Math.Ceiling(dealt));
                         _defenseFlashes.Add(new DefenseFlash(
                             from, new Point(enemyRf.X, enemyRf.Y),
-                            now + 0.42, Purple, true));
+                            now + 0.17, Purple, true, orb, orbs));
                     }
                     else if (enemyThief != null)
                     {
-                        double dealt = Math.Min(enemyThief.Health, damage);
                         enemyThief.Health -= damage;
-                        _droneHits = AddCash(_droneHits, 1);
-                        _droneDamageDone = AddCash(_droneDamageDone,
-                            (int)Math.Ceiling(dealt));
                         _defenseFlashes.Add(new DefenseFlash(
                             from, ThiefPoint(enemyThief),
-                            now + 0.42, Cyan, true));
+                            now + 0.17, Cyan, true, orb, orbs));
                     }
                 }
                 ResolveDefeatedThreats();
@@ -2162,9 +2146,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             string rf = _rfSweepCooldown <= 0
                 ? "READY"
                 : Math.Ceiling(_rfSweepCooldown).ToString(MoneyCulture) + "s";
-            Text(dc, "AUTO SECURITY: " + patrol + "    AUTO RF: " + rf,
-                38, 738, 13, Cyan, dpi, true);
-
             dc.DrawRectangle(Panel, new Pen(GridInk, 1),
                 new Rect(24, 759, 1274, 47));
             if (!_started || _paused || _gameOver)
@@ -2208,6 +2189,17 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 "  |  STORM -" +
                 (LightningDamageReduction * 100).ToString("0", MoneyCulture) + "%",
                 x, 72, 12.5, Gold, dpi, true, 740);
+
+            // Keep security/RF readiness with the other tower performance
+            // specs, not down against the footer buttons.
+            string security = _securitySweepCooldown <= 0
+                ? "READY" : Math.Ceiling(_securitySweepCooldown)
+                    .ToString(MoneyCulture) + "s";
+            string rf = _rfSweepCooldown <= 0
+                ? "READY" : Math.Ceiling(_rfSweepCooldown)
+                    .ToString(MoneyCulture) + "s";
+            Text(dc, "AUTO SECURITY: " + security + "   AUTO RF: " + rf,
+                x, 96, 13, Cyan, dpi, true, 740);
         }
 
         private void DrawField(DrawingContext dc, double dpi)
@@ -2310,20 +2302,22 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             foreach (var flash in _defenseFlashes)
             {
+                // Shot origin now follows its specific orbiting drone rather
+                // than hanging in mid-air at the point where it fired.
+                Point from = flash.IsDrone && flash.DroneCount > 0
+                    ? OrbPosition(flash.DroneIndex, flash.DroneCount)
+                    : flash.From;
                 if (flash.IsDrone)
                 {
-                    // A long-lived bright shot, impact spark and colored
-                    // afterglow make the orbiting drone's attacks obvious.
-                    dc.DrawLine(DroneBeamGlowPen, flash.From, flash.To);
-                    dc.DrawLine(new Pen(flash.Ink, 3.4),
-                        flash.From, flash.To);
-                    dc.DrawLine(DroneBeamCorePen, flash.From, flash.To);
+                    dc.DrawLine(DroneBeamGlowPen, from, flash.To);
+                    dc.DrawLine(new Pen(flash.Ink, 2.8), from, flash.To);
+                    dc.DrawLine(DroneBeamCorePen, from, flash.To);
                     dc.DrawEllipse(flash.Ink, DroneImpactPen,
-                        flash.To, 5.0, 5.0);
+                        flash.To, 3.5, 3.5);
                 }
                 else
                     dc.DrawLine(new Pen(flash.Ink, 2.5),
-                        flash.From, flash.To);
+                        from, flash.To);
             }
 
             if (_securityRingTime > 0)
@@ -2371,18 +2365,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 new Rect(FieldX, FieldY, FieldWidth, FieldHeight),
                 _lightningLevel, _surgeLevel, _filterLevel, dpi);
 
-            if (_progression.Level(6) > 0)
-            {
-                int activeDrones = _progression.Level(6) >= 5 ? 2 : 1;
-                double barY = FieldY + FieldHeight - 39;
-                dc.DrawRoundedRectangle(Panel, DroneImpactPen,
-                    new Rect(FieldX + 13, barY, 357, 30), 6, 6);
-                Text(dc, "DRONES " + activeDrones +
-                    "   HITS " + _droneHits.ToString("N0", MoneyCulture) +
-                    "   DAMAGE " +
-                    _droneDamageDone.ToString("N0", MoneyCulture),
-                    FieldX + 24, barY + 7, 12.2, Cyan, dpi, true, 335);
-            }
+
         }
 
         private static void DrawHealthBar(DrawingContext dc,
@@ -2676,7 +2659,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private sealed record DefenseFlash(
             Point From, Point To, double EndTime, Brush Ink,
-            bool IsDrone = false);
+            bool IsDrone = false, int DroneIndex = 0, int DroneCount = 0);
 
         private sealed class InterferenceTower
         {
