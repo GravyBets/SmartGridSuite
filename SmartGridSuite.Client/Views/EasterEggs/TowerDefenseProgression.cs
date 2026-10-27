@@ -60,7 +60,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             public int[] Permanent { get; set; } = new int[Catalog.Length];
             public int SpeedTier { get; set; }
             public int SkipTier { get; set; }
-            public bool UseWaveSkip { get; set; } = true;
+            public bool UseWaveSkip { get; set; } = true; // legacy compatibility
+            public int SelectedSkipTier { get; set; } = -1;
             public int[] SpecialWeaponLevels { get; set; } = new int[4];
         }
 
@@ -69,7 +70,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private bool _banked = true;
         private int _speedTier;
         private int _skipTier;
-        private bool _useWaveSkip = true;
+        private int _selectedSkipTier;
         private readonly int[] _specialWeaponLevels = new int[4];
 
         public static readonly string[] SpecialWeaponNames =
@@ -89,8 +90,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         public double GameSpeedMultiplier => 1.0 + _speedTier * 0.25;
         public int SkipTier => _skipTier;
         public int PurchasedSkipWaves => _skipTier * 5;
-        public bool UseWaveSkip => _useWaveSkip;
-        public int StartingWave => _useWaveSkip ? PurchasedSkipWaves : 0;
+        public bool UseWaveSkip => _selectedSkipTier > 0;
+        public int StartingWave => _selectedSkipTier * 5;
+        public int SelectedSkipTier => _selectedSkipTier;
         public int SpecialWeaponLevel(int index) => _specialWeaponLevels[index];
         public int[] ExportSpecialLevels() => _specialWeaponLevels.ToArray();
 
@@ -140,7 +142,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (Credits < price) return false;
             Credits -= price;
             if (index == 0) _speedTier++;
-            else if (index == 1) _skipTier++;
+            else if (index == 1)
+            {
+                _skipTier++;
+                // Newly bought milestone is selected, but earlier purchases
+                // remain available for shorter starts.
+                _selectedSkipTier = _skipTier;
+            }
             else _specialWeaponLevels[index - 2]++;
             Save();
             return true;
@@ -148,7 +156,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         public void ToggleWaveSkip()
         {
-            _useWaveSkip = !_useWaveSkip;
+            // Cycle 0, 5, 10, 15... up to the purchased maximum.
+            _selectedSkipTier = _skipTier == 0
+                ? 0 : (_selectedSkipTier + 1) % (_skipTier + 1);
             Save();
         }
 
@@ -285,7 +295,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 BestScore = Math.Max(0, saved.BestScore);
                 _speedTier = Math.Clamp(saved.SpeedTier, 0, 4);
                 _skipTier = Math.Clamp(saved.SkipTier, 0, 20);
-                _useWaveSkip = saved.UseWaveSkip;
+                _selectedSkipTier = saved.SelectedSkipTier >= 0
+                    ? Math.Clamp(saved.SelectedSkipTier, 0, _skipTier)
+                    : saved.UseWaveSkip ? _skipTier : 0;
                 if (saved.SpecialWeaponLevels != null)
                 {
                     for (int i = 0; i < 4 && i < saved.SpecialWeaponLevels.Length; i++)
@@ -321,7 +333,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     Permanent = _permanent.ToArray(),
                     SpeedTier = _speedTier,
                     SkipTier = _skipTier,
-                    UseWaveSkip = _useWaveSkip,
+                    UseWaveSkip = UseWaveSkip,
+                    SelectedSkipTier = _selectedSkipTier,
                     SpecialWeaponLevels = _specialWeaponLevels.ToArray()
                 };
                 var temp = FilePath + ".tmp";
