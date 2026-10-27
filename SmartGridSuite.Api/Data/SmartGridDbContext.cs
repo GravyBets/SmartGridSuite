@@ -14,6 +14,8 @@ namespace SmartGridSuite.Api.Data
 
         // Fake-game high scores only; no production ticket/assignment data.
         public DbSet<ArcadeHighScoreEntity> ArcadeHighScores => Set<ArcadeHighScoreEntity>();
+        public DbSet<TowerDefenseHighScoreEntity> TowerDefenseHighScores =>
+            Set<TowerDefenseHighScoreEntity>();
 
         public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
         {
@@ -163,6 +165,20 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.BestScore).HasColumnName("best_score");
                 e.Property(x => x.BestWave).HasColumnName("best_wave");
                 e.Property(x => x.BestRepairs).HasColumnName("best_repairs");
+                e.Property(x => x.AchievedAtUtc).HasColumnName("achieved_at_utc");
+                e.HasOne(x => x.Technician)
+                    .WithMany()
+                    .HasForeignKey(x => x.TechnicianId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<TowerDefenseHighScoreEntity>(e =>
+            {
+                e.ToTable("arcade_tower_defense_high_scores");
+                e.HasKey(x => x.TechnicianId);
+                e.Property(x => x.TechnicianId).HasColumnName("technician_id");
+                e.Property(x => x.BestWave).HasColumnName("best_wave");
+                e.Property(x => x.BestScore).HasColumnName("best_score");
                 e.Property(x => x.AchievedAtUtc).HasColumnName("achieved_at_utc");
                 e.HasOne(x => x.Technician)
                     .WithMany()
