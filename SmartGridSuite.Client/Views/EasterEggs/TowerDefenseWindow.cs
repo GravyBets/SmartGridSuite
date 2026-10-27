@@ -1772,6 +1772,131 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             else _leftGunCooldown = reload;
         }
 
+        private sealed class SpecialTarget
+        {
+            public CopperThief? Intruder { get; init; }
+            public InterferenceTower? Rf { get; init; }
+            public Point Position { get; init; }
+            public double Hp => Intruder?.Health ?? Rf?.Health ?? 0;
+            public void Damage(double damage)
+            {
+                if (Intruder != null) Intruder.Health -= damage;
+                else if (Rf != null) Rf.Health -= damage;
+            }
+        }
+
+        private List<SpecialTarget> GetSpecialTargets()
+        {
+            var targets = new List<SpecialTarget>(_thieves.Count + _jammers.Count);
+            targets.AddRange(_thieves
+                .Where(t => t.Health > 0)
+                .Select(t => new SpecialTarget
+                {
+                    Intruder = t, Position = ThiefPoint(t)
+                }));
+            targets.AddRange(_jammers
+                .Where(j => j.Health > 0)
+                .Select(j => new SpecialTarget
+                {
+                    Rf = j, Position = new Point(j.X, j.Y)
+                }));
+            return targets;
+        }
+
+        private void FireSpecialWeapons(double now)
+        {
+            if (!_progression.ExportSpecialLevels().Any(level => level > 0))
+                return;
+
+            var targets = GetSpecialTargets();
+            if (targets.Count == 0) return;
+
+            var center = new Point(TowerX, TowerY - 35);
+
+            // 1. LASER SENTRY: precise high-HP target selection and a short,
+            // high-contrast continuous-looking line. Permanent research only.
+            int laser = _progression.SpecialWeaponLevel(0);
+            if (laser > 0 && _specialCooldowns[0] <= 0)
+            {
+                var target = targets
+                    .Where(t => Distance(center, t.Position) <= 380)
+                    .OrderByDescending(t => t.Hp).FirstOrDefault();
+                if (target != null)
+                {
+                    target.Damage(32 + laser * 18);
+                    _defenseFlashes.Add(new DefenseFlash(
+                        center, target.Position, now + 0.25, Gold,
+                        SpecialType: 0));
+                    _specialCooldowns[0] = Math.Max(0.45, 3.0 - laser * 0.10);
+                }
+            }
+
+            // 2. TESLA COIL: chain arcs to multiple enemies. The number of
+            // chained targets rises gradually as the permanent tier improves.
+            int tesla = _progression.SpecialWeaponLevel(1);
+            if (tesla > 0 && _specialCooldowns[1] <= 0)
+            {
+                int count = Math.Min(targets.Count, 2 + tesla / 3);
+                var previous = center;
+                int chained = 0;
+                foreach (var target in targets
+                    .Where(t => Distance(center, t.Position) <= 275)
+                    .OrderBy(t => Distance(center, t.Position))
+                    .Take(count))
+                {
+                    target.Damage(18 + tesla * 11);
+                    _defenseFlashes.Add(new DefenseFlash(
+                        previous, target.Position, now + 0.35, Cyan,
+                        SpecialType: 1));
+                    previous = target.Position;
+                    chained++;
+                }
+                if (chained > 0)
+                    _specialCooldowns[1] = Math.Max(1.2, 7 - tesla * 0.18);
+            }
+
+            // 3. EMP CANNON: a projected area pulse that especially punishes
+            // illegal RF repeaters, but can also shock approaching intruders.
+            int emp = _progression.SpecialWeaponLevel(2);
+            if (emp > 0 && _specialCooldowns[2] <= 0)
+            {
+                bool struck = false;
+                double radius = Math.Min(410, 230 + emp * 9);
+                foreach (var target in targets)
+                {
+                    if (Distance(center, target.Position) > radius) continue;
+                    target.Damage((21 + emp * 12) *
+                        (target.Rf != null ? 2.0 : 1.0));
+                    struck = true;
+                }
+                if (struck)
+                {
+                    _empPulseRemaining = 0.65;
+                    _specialCooldowns[2] = Math.Max(2, 11 - emp * 0.23);
+                }
+            }
+
+            // 4. AIRSTRIKE: fast overhead missile traces strike a limited
+            // number of the highest-HP threats each volley.
+            int airstrike = _progression.SpecialWeaponLevel(3);
+            if (airstrike > 0 && _specialCooldowns[3] <= 0)
+            {
+                int count = Math.Min(targets.Count, 2 + airstrike / 4);
+                foreach (var target in targets
+                    .OrderByDescending(t => t.Hp).Take(count))
+                {
+                    target.Damage(62 + airstrike * 25);
+                    Point launch = new(target.Position.X + 42,
+                        FieldY + 4);
+                    _defenseFlashes.Add(new DefenseFlash(
+                        launch, target.Position, now + 0.42, Red,
+                        SpecialType: 3));
+                }
+                if (count > 0)
+                    _specialCooldowns[3] = Math.Max(4, 19 - airstrike * 0.47);
+            }
+        }
+
         private void ResolveDefeatedThreats()
         {
             for (int i = _thieves.Count - 1; i >= 0; i--)
@@ -2735,6 +2860,15 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     dc.DrawEllipse(flash.Ink, DroneImpactPen,
                         flash.To, 3.5, 3.5);
                 }
+                else if (flash.SpecialType >= 0)
+                {
+                    dc.DrawLine(new Pen(flash.Ink,
+                        flash.SpecialType == 3 ? 5.5 : 4.0), from, flash.To);
+                    dc.DrawLine(DroneBeamCorePen, from, flash.To);
+                    dc.DrawEllipse(flash.Ink, DroneImpactPen, flash.To,
+                        flash.SpecialType == 3 ? 9 : 5,
+                        flash.SpecialType == 3 ? 9 : 5);
+                }
                 else
                     dc.DrawLine(new Pen(flash.Ink, 2.5),
                         from, flash.To);
@@ -2749,6 +2883,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 TowerDefenseEnvironmentArt.DrawSweep(dc,
                     new Point(TowerX, TowerY),
                     _rfRingTime, 0.65, true);
+            if (_empPulseRemaining > 0)
+                TowerDefenseEnvironmentArt.DrawSweep(dc,
+                    new Point(TowerX, TowerY),
+                    _empPulseRemaining, 0.65, true);
 
             if (_warningRemaining > 0)
             {
@@ -3087,7 +3225,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private sealed record DefenseFlash(
             Point From, Point To, double EndTime, Brush Ink,
-            bool IsDrone = false, int DroneIndex = 0, int DroneCount = 0);
+            bool IsDrone = false, int DroneIndex = 0, int DroneCount = 0,
+            int SpecialType = -1);
 
         private sealed class InterferenceTower
         {
