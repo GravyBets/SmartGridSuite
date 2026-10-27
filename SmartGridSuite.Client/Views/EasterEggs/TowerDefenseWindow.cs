@@ -34,6 +34,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private const double PanelWidth = 484;
         private const double FirstUpgradeY = 303;
         private const double UpgradePitch = 54.5;
+        private const double WorkshopActionY = 748;
         private const double TowerX = FieldX + FieldWidth / 2;
         private const double TowerY = FieldY + FieldHeight / 2 - 22;
         private const double HubRadius = 31;
@@ -1044,7 +1045,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _workshopButton.Content = workshop
                 ? "CLOSE WORKSHOP" : "RESEARCH WORKSHOP";
             Canvas.SetLeft(_workshopButton, workshop ? 1052 : 949);
-            Canvas.SetTop(_workshopButton, workshop ? 709 : 764);
+            Canvas.SetTop(_workshopButton, workshop ? WorkshopActionY : 764);
             _workshopButton.Width = workshop ? 168 : 160;
 
             _towerRepairButton.Visibility = showFooter && _started && !_gameOver
@@ -1147,7 +1148,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _advancedWorkshopButton.Content = _advancedWorkshopVisible
                 ? "STANDARD RESEARCH" : "SPECIAL RESEARCH";
             Canvas.SetLeft(_advancedWorkshopButton, 801);
-            Canvas.SetTop(_advancedWorkshopButton, 709);
+            Canvas.SetTop(_advancedWorkshopButton, WorkshopActionY);
 
             _skipToggleButton.Visibility = workshop && _advancedWorkshopVisible
                 ? Visibility.Visible : Visibility.Collapsed;
@@ -3056,7 +3057,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private void DrawWorkshop(DrawingContext dc, double dpi)
         {
             dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(248, 5, 14, 31)),
-                new Pen(Purple, 2.6), new Rect(140, 99, 1093, 647));
+                new Pen(Purple, 2.6), new Rect(140, 99, 1093, 701));
             Text(dc, "RADIO SHOP RESEARCH WORKSHOP", 174, 116, 27,
                 Gold, dpi, true);
             Text(dc, "PERMANENT CREDITS: " + Money(_progression.Credits) +
@@ -3070,7 +3071,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Text(dc, _advancedWorkshopVisible
                     ? "S TOGGLE SKIP • 1-6 BUY SPECIAL RESEARCH"
                     : "SPECIAL RESEARCH: SPEED / WAVE SKIP / FOUR EXCLUSIVE WEAPONS",
-                178, 692, 12.5, Muted, dpi);
+                178, 718, 12.5, Muted, dpi);
         }
 
         private void DrawPerk(DrawingContext dc, double dpi)

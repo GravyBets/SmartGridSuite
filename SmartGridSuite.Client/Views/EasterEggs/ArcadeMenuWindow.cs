@@ -29,22 +29,25 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _host = host;
             Owner = host;
             Title = "SmartGridSuite Arcade";
-            Width = 790;
-            Height = 580;
-            MinWidth = Width;
-            MinHeight = Height;
-            ResizeMode = ResizeMode.NoResize;
+            // Keep the launcher comfortable at laptop resolutions, while
+            // allowing resizing if Windows text scaling makes controls taller.
+            Width = Math.Min(840, Math.Max(760, SystemParameters.WorkArea.Width - 48));
+            Height = Math.Min(620, Math.Max(550, SystemParameters.WorkArea.Height - 48));
+            MinWidth = 760;
+            MinHeight = 550;
+            ResizeMode = ResizeMode.CanResize;
+            UseLayoutRounding = true;
             ShowInTaskbar = false;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             Background = Back;
             FontFamily = new FontFamily("Consolas");
 
-            var layout = new Grid { Margin = new Thickness(26, 22, 26, 20) };
+            var layout = new Grid { Margin = new Thickness(26, 22, 26, 22) };
             layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 23) };
+            var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 17) };
             heading.Children.Add(Label("SMARTGRID SUITE PRESENTS", 12, Cyan));
             heading.Children.Add(Label("RADIO SHOP ARCADE", 31, Gold, true));
             heading.Children.Add(Label("Two ways to avoid AMS/IG Tickets", 13, Muted));
@@ -52,6 +55,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             layout.Children.Add(heading);
 
             var gameGrid = new Grid();
+            Grid.SetIsSharedSizeScope(gameGrid, true);
             gameGrid.ColumnDefinitions.Add(new ColumnDefinition
             {
                 Width = new GridLength(1, GridUnitType.Star)
@@ -88,7 +92,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Grid.SetRow(gameGrid, 1);
             layout.Children.Add(gameGrid);
 
-            var footer = new StackPanel { Margin = new Thickness(0, 19, 0, 0) };
+            var footer = new StackPanel { Margin = new Thickness(0, 17, 0, 0) };
             footer.Children.Add(Label(
                 "ESC TO CLOSE    •    FICTIONAL RADIOS AND TOWERS ONLY    •    NO WORK ORDERS WERE HARMED",
                 11, Muted));
@@ -129,7 +133,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         }
 
         private static TextBlock Label(
-            string text, double size, Brush color, bool bold = false) =>
+            string text, double size, Brush color, bool bold = false,
+            double bottomMargin = 9) =>
             new()
             {
                 Text = text,
@@ -137,27 +142,60 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 FontSize = size,
                 FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
                 Foreground = color,
-                Margin = new Thickness(0, 0, 0, 9)
+                Margin = new Thickness(0, 0, 0, bottomMargin)
             };
 
         private static Border GameCard(
             string id, string title, string description, string controls,
             Brush highlight, string buttonText, RoutedEventHandler launch)
         {
-            var content = new StackPanel
+            // Shared row heights line up the two cards, and the star spacer
+            // leaves room for the controls and both Play buttons at the same
+            // baseline even when one game has a longer description.
+            var content = new Grid
             {
-                Margin = new Thickness(20, 23, 20, 23)
+                Margin = new Thickness(20, 22, 20, 21)
             };
-            content.Children.Add(Label(id, 13, highlight, true));
-            content.Children.Add(Label(title, 21, White, true));
-            content.Children.Add(Label(description, 15, Muted));
-            content.Children.Add(new Border
+            content.RowDefinitions.Add(new RowDefinition
             {
-                Height = 17,
-                Background = Brushes.Transparent
+                Height = GridLength.Auto, SharedSizeGroup = "GameId"
             });
-            content.Children.Add(Label("CONTROLS", 11, highlight, true));
-            content.Children.Add(Label(controls, 12, White));
+            content.RowDefinitions.Add(new RowDefinition
+            {
+                Height = GridLength.Auto, SharedSizeGroup = "GameTitle"
+            });
+            content.RowDefinitions.Add(new RowDefinition
+            {
+                Height = GridLength.Auto, SharedSizeGroup = "GameDescription"
+            });
+            content.RowDefinitions.Add(new RowDefinition
+            {
+                Height = new GridLength(1, GridUnitType.Star)
+            });
+            content.RowDefinitions.Add(new RowDefinition
+            {
+                Height = GridLength.Auto, SharedSizeGroup = "GameControlsHeading"
+            });
+            content.RowDefinitions.Add(new RowDefinition
+            {
+                Height = GridLength.Auto, SharedSizeGroup = "GameControls"
+            });
+            content.RowDefinitions.Add(new RowDefinition
+            {
+                Height = GridLength.Auto, SharedSizeGroup = "GamePlay"
+            });
+
+            void AddRow(UIElement element, int row)
+            {
+                Grid.SetRow(element, row);
+                content.Children.Add(element);
+            }
+
+            AddRow(Label(id, 13, highlight, true, 7), 0);
+            AddRow(Label(title, 21, White, true, 7), 1);
+            AddRow(Label(description, 15, Muted, bottomMargin: 9), 2);
+            AddRow(Label("CONTROLS", 11, highlight, true, 7), 4);
+            AddRow(Label(controls, 12, White, bottomMargin: 0), 5);
 
             var play = new Button
             {
@@ -167,13 +205,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 FontWeight = FontWeights.Bold,
                 FontSize = 14,
                 Height = 47,
-                Margin = new Thickness(0, 23, 0, 0),
+                Margin = new Thickness(0, 18, 0, 0),
                 Background = highlight,
                 Foreground = Back,
                 BorderThickness = new Thickness(0)
             };
             play.Click += launch;
-            content.Children.Add(play);
+            AddRow(play, 6);
 
             return new Border
             {
