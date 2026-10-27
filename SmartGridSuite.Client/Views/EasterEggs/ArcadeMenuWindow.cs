@@ -77,7 +77,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 "02   GRID UNDER ATTACK",
                 "TOWER DEFENSE",
                 "Defend the tower through escalating waves. Upgrade defenses and permanently unlock speed, wave skips and special weapons.",
-                "SPACE waves • P pause • H help • L scores\nW workshop • TAB / 1–8 upgrades\nSpecial: 1–6 buy • S skip • ESC exit",
+                "SPACE prepare/waves • P pause • H help\nL shop scores • W research • ESC back\nTAB categories • 1–8 standard buys\nSpecial: 1–6 buys • S choose wave skip",
                 Gold,
                 "PLAY TOWER DEFENSE",
                 LaunchTowerDefense);
