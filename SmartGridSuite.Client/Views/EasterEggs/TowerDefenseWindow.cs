@@ -117,6 +117,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private readonly List<CopperThief> _thieves = new();
         private readonly List<InterferenceTower> _jammers = new();
         private readonly List<DefenseFlash> _defenseFlashes = new();
+        private readonly double[] _specialCooldowns = new double[4];
+        private double _empPulseRemaining;
         private static readonly Pen DroneBeamGlowPen = FreezePen(PulseFill, 5);
         private static readonly Pen DroneBeamCorePen = FreezePen(White, 2.4);
         private static readonly Pen DroneImpactPen = FreezePen(Cyan, 1.9);
@@ -379,6 +381,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 DroneCooldown = _droneCooldown,
                 LeftGunCooldown = _leftGunCooldown,
                 RightGunCooldown = _rightGunCooldown,
+                SpecialCooldowns = _specialCooldowns.ToArray(),
                 ElapsedSeconds = _clock.Elapsed.TotalSeconds + _savedElapsedOffset,
                 PendingResearch = _progression.PendingCredits,
                 RunLevels = _progression.ExportRunLevels(),
@@ -440,6 +443,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _droneCooldown = snapshot.DroneCooldown;
             _leftGunCooldown = snapshot.LeftGunCooldown;
             _rightGunCooldown = snapshot.RightGunCooldown;
+            for (int i = 0; i < _specialCooldowns.Length; i++)
+                _specialCooldowns[i] = snapshot.SpecialCooldowns != null &&
+                    i < snapshot.SpecialCooldowns.Length
+                    ? Math.Clamp(snapshot.SpecialCooldowns[i], 0, 60) : 0;
+            _empPulseRemaining = 0;
             _thieves.Clear();
             _thieves.AddRange(snapshot.Enemies.Select(t => new CopperThief
             {
@@ -1075,7 +1083,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _nextWaveButton.IsEnabled = !workshop && !_paused &&
                 !_waveActive && !_perkPending && !_showHelp;
             _nextWaveButton.Content = !_started ? "PREPARE" :
-                _wave == 0 ? "START WAVE 1" : "NEXT WAVE";
+                !_waveActive && _wave == _progression.StartingWave &&
+                    _score == 0 ? "START WAVE " + (_wave + 1) : "NEXT WAVE";
             Canvas.SetLeft(_nextWaveButton, 1120);
             Canvas.SetTop(_nextWaveButton, 764);
 
@@ -1272,9 +1281,12 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _autoNextEnabled = false;
             _autoNextRemaining = -1;
             _bossSpawnedThisWave = false;
-            _cash = 450 + _progression.Level(16) * 35;
+            // Purchased starting-wave skips cost permanent research, but do
+            // not generate free earnings from waves never actually played.
+            _cash = AddCash(450 + _progression.Level(16) * 35,
+                _progression.StartingWave * 90);
             _score = 0;
-            _wave = 0;
+            _wave = _progression.StartingWave;
             _thievesStopped = 0;
             _interferenceRemoved = 0;
             _health = MaxTowerHealth;
@@ -1299,13 +1311,17 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _securityRingTime = 0;
             _rfRingTime = 0;
             _defenseFlashes.Clear();
+            Array.Clear(_specialCooldowns, 0, _specialCooldowns.Length);
+            _empPulseRemaining = 0;
             _paused = false;
             _started = false;
             _waveActive = false;
             _gameOver = false;
             _showHelp = false;
             _helpAutoPaused = false;
-            _message = "PRESS SPACE TO DEFEND YOUR TOWER.";
+            _message = _wave > 0
+                ? "RESEARCH WAVE SKIP READY: START AT WAVE " + (_wave + 1) + "."
+                : "PRESS SPACE TO DEFEND YOUR TOWER.";
             _thieves.Clear();
             _jammers.Clear();
             _bestScore = Math.Max(ReadBestScore(), _progression.BestScore);
@@ -1349,9 +1365,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
 
             double now = _clock.Elapsed.TotalSeconds;
-            double dt = Math.Clamp(now - _lastTickTime, 0, 0.1);
+            double frameDt = Math.Clamp(now - _lastTickTime, 0, 0.1);
+            double dt = frameDt * _progression.GameSpeedMultiplier;
             _lastTickTime = now;
-            _snapshotElapsed += dt;
+            // Save frequency uses actual time, regardless of speed research.
+            _snapshotElapsed += frameDt;
             if (_snapshotElapsed >= 5)
             {
                 _snapshotElapsed = 0;
@@ -1368,6 +1386,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _flashRemaining = Math.Max(0, _flashRemaining - dt);
             _securityRingTime = Math.Max(0, _securityRingTime - dt);
             _rfRingTime = Math.Max(0, _rfRingTime - dt);
+            _empPulseRemaining = Math.Max(0, _empPulseRemaining - dt);
+            for (int i = 0; i < _specialCooldowns.Length; i++)
+                _specialCooldowns[i] = Math.Max(0, _specialCooldowns[i] - dt);
             _defenseFlashes.RemoveAll(flash => flash.EndTime <= now);
 
             // Auto Next is an optional purchased convenience, not an idle
@@ -1444,6 +1465,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             // Mounted guns deal real damage before automated cleanup teams.
             FireMountedGun(now, false);
             FireMountedGun(now, true);
+            FireSpecialWeapons(now);
             ResolveDefeatedThreats();
 
             if (_patrolCooldown <= 0)
@@ -1631,10 +1653,17 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             ResolveDefeatedThreats();
 
+            // Lightning is a background hazard, not an enemy. A completed
+            // encounter must not spend extra seconds waiting for scheduled
+            // storms after the last hostile is defeated.
             if (_thievesToSpawn == 0 && _jammersToSpawn == 0 &&
-                _lightningToSpawn == 0 && _warningRemaining <= 0 &&
                 _thieves.Count == 0 && _jammers.Count == 0)
+            {
+                _lightningToSpawn = 0;
+                _warningRemaining = -1;
+                _spawnLightningIn = 0;
                 EndWave();
+            }
 
             _surface.InvalidateVisual();
         }
@@ -1656,7 +1685,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private double OrbAngle(int index, int count)
         {
             double seconds = _clock.Elapsed.TotalSeconds + _savedElapsedOffset;
-            return seconds * (1.45 + _progression.Level(6) * 0.025) +
+            return seconds * _progression.GameSpeedMultiplier *
+                (1.45 + _progression.Level(6) * 0.025) +
                 index * Math.PI * 2 / count;
         }
 
@@ -2474,7 +2504,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             dc.DrawRectangle(Panel, new Pen(GridInk, 2),
                 new Rect(12, 12, 1296, 735));
             Text(dc, "GRID UNDER ATTACK", 27, 23, 29, Cyan, dpi, true);
-            Text(dc, "360 DEGREE RADIO TOWER DEFENSE", 28, 64, 13, Muted, dpi);
+            Text(dc, "360 DEGREE RADIO TOWER DEFENSE    " +
+                "SPEED " + _progression.GameSpeedMultiplier.ToString("0.00", MoneyCulture) +
+                "x", 28, 64, 13, Muted, dpi);
             // Reserve the right side of this row for the auto-response
             // readiness stats instead of letting long events overwrite them.
             Text(dc, _message, 28, 96, 13.5, Gold, dpi, true, 505, true);
@@ -2611,7 +2643,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             // lightning rod and blinking obstruction beacon.
             TowerDefenseTowerArt.DrawSite(dc,
                 new Point(TowerX, TowerY),
-                _clock.Elapsed.TotalSeconds + _savedElapsedOffset,
+                (_clock.Elapsed.TotalSeconds + _savedElapsedOffset) *
+                    _progression.GameSpeedMultiplier,
                 _lightningLevel, _surgeLevel, _filterLevel);
             DrawMountedGun(dc, false);
             DrawMountedGun(dc, true);
@@ -2634,8 +2667,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             // Hostile miniature RF repeater rigs erupt from disturbed soil
             // beyond the compound perimeter. Existing RF attacks and HP
             // remain unchanged; emergence is visual only.
-            double animationTime = _clock.Elapsed.TotalSeconds +
-                _savedElapsedOffset;
+            double animationTime = (_clock.Elapsed.TotalSeconds +
+                _savedElapsedOffset) * _progression.GameSpeedMultiplier;
             foreach (var jammer in _jammers)
             {
                 var p = new Point(jammer.X, jammer.Y);
