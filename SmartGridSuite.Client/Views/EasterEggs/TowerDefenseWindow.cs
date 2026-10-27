@@ -71,6 +71,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private readonly TextBlock[] _upgradeLevels = new TextBlock[8];
         private readonly TextBlock[] _upgradePrices = new TextBlock[8];
         private readonly Button[] _categoryButtons = new Button[3];
+        private bool _advancedWorkshopVisible;
+        private Button _advancedWorkshopButton = null!;
+        private Button _skipToggleButton = null!;
+        private readonly Button[] _advancedButtons = new Button[6];
+        private readonly TextBlock[] _advancedNames = new TextBlock[6];
+        private readonly TextBlock[] _advancedDetails = new TextBlock[6];
+        private readonly TextBlock[] _advancedPrices = new TextBlock[6];
         private Button _workshopButton = null!;
         private Button _towerRepairButton = null!;
         private Button _fenceRepairButton = null!;
@@ -734,6 +741,56 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _controls.Children.Add(button);
             }
 
+            _advancedWorkshopButton = ArcadeButton("SPECIAL RESEARCH", 226, 37, Purple);
+            _advancedWorkshopButton.Click += (_, _) =>
+            {
+                if (!_progression.WorkshopOpen) return;
+                _advancedWorkshopVisible = !_advancedWorkshopVisible;
+                _lastUpgradeSignature = "";
+                RefreshUpgradeControls();
+                _surface.InvalidateVisual();
+            };
+            _controls.Children.Add(_advancedWorkshopButton);
+
+            _skipToggleButton = ArcadeButton("SKIP WAVES: ON", 260, 36, Gold);
+            _skipToggleButton.Click += (_, _) =>
+            {
+                if (!_progression.WorkshopOpen || !_advancedWorkshopVisible) return;
+                _progression.ToggleWaveSkip();
+                _lastUpgradeSignature = "";
+                RefreshUpgradeControls();
+                _surface.InvalidateVisual();
+            };
+            _controls.Children.Add(_skipToggleButton);
+
+            for (int i = 0; i < 6; i++)
+            {
+                int selected = i;
+                var button = ArcadeButton("", 460, 113, ButtonFace);
+                var textGrid = new Grid();
+                textGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(33) });
+                textGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(42) });
+                textGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(26) });
+
+                _advancedNames[i] = CardText(16.5, White, true);
+                _advancedDetails[i] = CardText(12.4, Muted);
+                _advancedDetails[i].TextWrapping = TextWrapping.Wrap;
+                _advancedDetails[i].TextTrimming = TextTrimming.None;
+                _advancedPrices[i] = CardText(14.4, Cyan, true);
+                Grid.SetRow(_advancedNames[i], 0);
+                Grid.SetRow(_advancedDetails[i], 1);
+                Grid.SetRow(_advancedPrices[i], 2);
+                textGrid.Children.Add(_advancedNames[i]);
+                textGrid.Children.Add(_advancedDetails[i]);
+                textGrid.Children.Add(_advancedPrices[i]);
+                button.Content = textGrid;
+                button.Padding = new Thickness(12, 3, 12, 3);
+                ToolTipService.SetShowOnDisabled(button, true);
+                button.Click += (_, _) => BuyAdvancedUpgrade(selected);
+                _advancedButtons[i] = button;
+                _controls.Children.Add(button);
+            }
+
             _workshopButton = ArcadeButton("RESEARCH WORKSHOP", 180, 36, Purple);
             _workshopButton.Click += (_, _) =>
             {
@@ -884,7 +941,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 !_leaderboardVisible &&
                 !_showHelp && !_perkPending && !_resumeDecisionPending;
             bool rowsVisible = !_resumeDecisionPending &&
-                !_leaderboardVisible && (workshop || gameUsable);
+                !_leaderboardVisible &&
+                (workshop ? !_advancedWorkshopVisible : gameUsable);
 
             string signature = string.Join("|",
                 workshop, _started, _paused, _gameOver, _showHelp,
@@ -892,6 +950,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _autoNextPurchased, _autoNextEnabled,
                 Math.Ceiling(Math.Max(-1, _autoNextRemaining) * 2) / 2,
                 _progression.SelectedCategory, _progression.SelectedRow,
+                _advancedWorkshopVisible,
+                _progression.SpeedTier, _progression.SkipTier,
+                _progression.UseWaveSkip,
+                string.Join(",", _progression.ExportSpecialLevels()),
                 _health.ToString("0", MoneyCulture),
                 _fenceHealth.ToString("0", MoneyCulture),
                 string.Join(",", Enumerable.Range(0, 8).Select(row =>
@@ -1069,7 +1131,86 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _leaderboardCloseButton.Visibility = _leaderboardVisible
                 ? Visibility.Visible : Visibility.Collapsed;
 
+            _advancedWorkshopButton.Visibility = workshop
+                ? Visibility.Visible : Visibility.Collapsed;
+            _advancedWorkshopButton.Content = _advancedWorkshopVisible
+                ? "STANDARD RESEARCH" : "SPECIAL RESEARCH";
+            Canvas.SetLeft(_advancedWorkshopButton, 850);
+            Canvas.SetTop(_advancedWorkshopButton, 214);
+
+            _skipToggleButton.Visibility = workshop && _advancedWorkshopVisible
+                ? Visibility.Visible : Visibility.Collapsed;
+            _skipToggleButton.Content = _progression.UseWaveSkip
+                ? "START AT WAVE " + (_progression.StartingWave + 1) + " • ON"
+                : "WAVE SKIP OFF • START AT 1";
+            Canvas.SetLeft(_skipToggleButton, 172);
+            Canvas.SetTop(_skipToggleButton, 652);
+
+            for (int i = 0; i < _advancedButtons.Length; i++)
+            {
+                var btn = _advancedButtons[i];
+                btn.Visibility = workshop && _advancedWorkshopVisible
+                    ? Visibility.Visible : Visibility.Collapsed;
+                int row = i / 2, col = i % 2;
+                Canvas.SetLeft(btn, 182 + col * 477);
+                Canvas.SetTop(btn, 277 + row * 120);
+
+                int level = _progression.AdvancedLevel(i);
+                bool maxed = level >= _progression.AdvancedMaximum(i);
+                long price = _progression.AdvancedPrice(i);
+                bool affordable = _progression.Credits >= price;
+                btn.IsEnabled = !maxed && affordable;
+                btn.BorderBrush = maxed ? Green : affordable ? Cyan : GridInk;
+                _advancedNames[i].Text = i switch
+                {
+                    0 => "GAME SPEED  •  " +
+                        _progression.GameSpeedMultiplier.ToString("0.00", MoneyCulture) + "x",
+                    1 => "WAVE SKIP  •  FIRST " + _progression.PurchasedSkipWaves,
+                    _ => TowerDefenseProgression.SpecialWeaponNames[i - 2]
+                };
+                _advancedDetails[i].Text = i switch
+                {
+                    0 => "Speed up entire game: 1.25x / 1.50x / 1.75x / 2.00x",
+                    1 => "Permanent +5 starting waves per tier; no skipped rewards",
+                    _ => TowerDefenseProgression.SpecialWeaponDetails[i - 2]
+                };
+                _advancedPrices[i].Text = "LV " + level +
+                    (maxed ? "   MAXED" : "   " + Money(price) + " RESEARCH");
+                _advancedPrices[i].Foreground =
+                    maxed ? Green : affordable ? Cyan : Gold;
+                btn.ToolTip = _advancedDetails[i].Text +
+                    Environment.NewLine +
+                    (maxed ? "Maximum level reached" :
+                        "Permanent upgrade: " + Money(price) + " credits");
+            }
+
             LayoutFooterButtons();
+        }
+
+        private void BuyAdvancedUpgrade(int index)
+        {
+            if (!_progression.WorkshopOpen || !_advancedWorkshopVisible ||
+                index is < 0 or > 5)
+                return;
+            if (!_progression.BuyAdvanced(index))
+            {
+                _message = "SPECIAL RESEARCH: NOT ENOUGH CREDITS OR MAXED.";
+            }
+            else
+            {
+                _message = index switch
+                {
+                    0 => "PERMANENT GAME SPEED: " +
+                        _progression.GameSpeedMultiplier.ToString("0.00", MoneyCulture) + "x",
+                    1 => "PERMANENT WAVE SKIP: FIRST " +
+                        _progression.PurchasedSkipWaves + " WAVES.",
+                    _ => TowerDefenseProgression.SpecialWeaponNames[index - 2] +
+                        " LEVEL " + _progression.SpecialWeaponLevel(index - 2)
+                };
+            }
+            _lastUpgradeSignature = "";
+            RefreshUpgradeControls();
+            _surface.InvalidateVisual();
         }
 
         private void PrepareOrStartWave()
@@ -1934,6 +2075,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 if (_progression.WorkshopOpen)
                 {
                     _progression.WorkshopOpen = false;
+                    _advancedWorkshopVisible = false;
+                    _lastUpgradeSignature = "";
                     _surface.InvalidateVisual();
                     RefreshUpgradeControls();
                 }
@@ -2313,6 +2456,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
 
             _progression.WorkshopOpen = !_progression.WorkshopOpen;
+            _advancedWorkshopVisible = false;
+            _lastUpgradeSignature = "";
             _showHelp = false;
             _surface.InvalidateVisual();
             RefreshUpgradeControls();
@@ -2686,7 +2831,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Text(dc, "PERMANENT CREDITS: " + Money(_progression.Credits) +
                 "        BEST WAVE: " + _progression.BestWave,
                 175, 157, 17, White, dpi, true);
-            Text(dc, "SELECT AN UPGRADE TO KEEP IT IN EVERY FUTURE SHIFT.",
+            Text(dc, _advancedWorkshopVisible
+                    ? "PERMANENT SPEED, WAVE SKIPS, AND EXCLUSIVE SPECIAL WEAPONS."
+                    : "SELECT A RESEARCH UPGRADE OR OPEN SPECIAL RESEARCH.",
                 175, 184, 15, Cyan, dpi);
 
             Text(dc, "CLOSE WORKSHOP TO START OR RETRY YOUR SHIFT",
