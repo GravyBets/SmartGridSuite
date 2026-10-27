@@ -1806,7 +1806,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void FireSpecialWeapons(double now)
         {
-            if (!_progression.ExportSpecialLevels().Any(level => level > 0))
+            if (!Enumerable.Range(0, 4).Any(i =>
+                    _progression.SpecialWeaponLevel(i) > 0 &&
+                    _specialCooldowns[i] <= 0))
                 return;
 
             var targets = GetSpecialTargets();
@@ -1820,7 +1822,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (laser > 0 && _specialCooldowns[0] <= 0)
             {
                 var target = targets
-                    .Where(t => Distance(center, t.Position) <= 380)
+                    .Where(t => t.Hp > 0 &&
+                        Distance(center, t.Position) <= 380)
                     .OrderByDescending(t => t.Hp).FirstOrDefault();
                 if (target != null)
                 {
@@ -1841,7 +1844,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 var previous = center;
                 int chained = 0;
                 foreach (var target in targets
-                    .Where(t => Distance(center, t.Position) <= 275)
+                    .Where(t => t.Hp > 0 &&
+                        Distance(center, t.Position) <= 275)
                     .OrderBy(t => Distance(center, t.Position))
                     .Take(count))
                 {
@@ -1865,7 +1869,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 double radius = Math.Min(410, 230 + emp * 9);
                 foreach (var target in targets)
                 {
-                    if (Distance(center, target.Position) > radius) continue;
+                    if (target.Hp <= 0 ||
+                        Distance(center, target.Position) > radius) continue;
                     target.Damage((21 + emp * 12) *
                         (target.Rf != null ? 2.0 : 1.0));
                     struck = true;
@@ -1882,8 +1887,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             int airstrike = _progression.SpecialWeaponLevel(3);
             if (airstrike > 0 && _specialCooldowns[3] <= 0)
             {
-                int count = Math.Min(targets.Count, 2 + airstrike / 4);
-                foreach (var target in targets
+                int count = Math.Min(targets.Count(t => t.Hp > 0),
+                    2 + airstrike / 4);
+                foreach (var target in targets.Where(t => t.Hp > 0)
                     .OrderByDescending(t => t.Hp).Take(count))
                 {
                     target.Damage(62 + airstrike * 25);
@@ -3037,7 +3043,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Text(dc, _advancedWorkshopVisible
                     ? "S TOGGLE SKIP • 1-6 BUY SPECIAL RESEARCH"
                     : "SPECIAL RESEARCH: SPEED / WAVE SKIP / FOUR EXCLUSIVE WEAPONS",
-                178, 687, 12.5, Muted, dpi);
+                178, 692, 12.5, Muted, dpi);
         }
 
         private void DrawPerk(DrawingContext dc, double dpi)
