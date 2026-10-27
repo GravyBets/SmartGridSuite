@@ -778,6 +778,20 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _autoNextButton.Click += (_, _) => ToggleAutoNextWave();
             _controls.Children.Add(_autoNextButton);
 
+            _leaderboardButton = ArcadeButton("SHOP SCORES", 168, 35, Gold);
+            _leaderboardButton.FontSize = 13;
+            _leaderboardButton.Click += (_, _) => ToggleLeaderboard();
+            Canvas.SetLeft(_leaderboardButton, PanelX + 297);
+            Canvas.SetTop(_leaderboardButton, 137);
+            _controls.Children.Add(_leaderboardButton);
+
+            _leaderboardCloseButton = ArcadeButton(
+                "CLOSE SCORES", 174, 40, Cyan);
+            _leaderboardCloseButton.Click += (_, _) => ToggleLeaderboard();
+            Canvas.SetLeft(_leaderboardCloseButton, 968);
+            Canvas.SetTop(_leaderboardCloseButton, 159);
+            _controls.Children.Add(_leaderboardCloseButton);
+
             _nextWaveButton = ArcadeButton("PREPARE", 177, 36, Gold);
             _nextWaveButton.Click += (_, _) =>
             {
@@ -862,13 +876,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             bool workshop = _progression.WorkshopOpen;
             bool gameUsable = _started && !_gameOver && !_paused &&
+                !_leaderboardVisible &&
                 !_showHelp && !_perkPending && !_resumeDecisionPending;
             bool rowsVisible = !_resumeDecisionPending &&
-                (workshop || gameUsable);
+                !_leaderboardVisible && (workshop || gameUsable);
 
             string signature = string.Join("|",
                 workshop, _started, _paused, _gameOver, _showHelp,
-                _perkPending, _resumeDecisionPending, _wave, _cash, _progression.Credits,
+                _perkPending, _resumeDecisionPending, _leaderboardVisible, _wave, _cash, _progression.Credits,
                 _autoNextPurchased, _autoNextEnabled,
                 Math.Ceiling(Math.Max(-1, _autoNextRemaining) * 2) / 2,
                 _progression.SelectedCategory, _progression.SelectedRow,
@@ -944,9 +959,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
 
             bool showFooter = !workshop && !_showHelp && !_perkPending &&
-                !_resumeDecisionPending;
+                !_resumeDecisionPending && !_leaderboardVisible;
             _workshopButton.Visibility = !_resumeDecisionPending &&
-                !_showHelp && !_perkPending &&
+                !_showHelp && !_perkPending && !_leaderboardVisible &&
                 (workshop || !_waveActive && (!_started || _gameOver))
                     ? Visibility.Visible : Visibility.Collapsed;
             _workshopButton.Content = workshop
@@ -1026,20 +1041,28 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Canvas.SetLeft(_endRunButton, 35);
             Canvas.SetTop(_endRunButton, 763);
 
-            _continueButton.Visibility = _resumeDecisionPending
-                ? Visibility.Visible : Visibility.Collapsed;
+            _continueButton.Visibility = _resumeDecisionPending &&
+                !_leaderboardVisible ? Visibility.Visible : Visibility.Collapsed;
             Canvas.SetLeft(_continueButton, 196);
             Canvas.SetTop(_continueButton, 343);
-            _newRunButton.Visibility = _resumeDecisionPending
-                ? Visibility.Visible : Visibility.Collapsed;
+            _newRunButton.Visibility = _resumeDecisionPending &&
+                !_leaderboardVisible ? Visibility.Visible : Visibility.Collapsed;
             Canvas.SetLeft(_newRunButton, 674);
             Canvas.SetTop(_newRunButton, 343);
 
             for (int choice = 0; choice < 3; choice++)
                 _perkButtons[choice].Visibility = _perkPending &&
+                    !_leaderboardVisible &&
                     !_resumeDecisionPending &&
                     !_showHelp && !workshop
                     ? Visibility.Visible : Visibility.Collapsed;
+
+            _leaderboardButton.Visibility = !_leaderboardVisible &&
+                !workshop && !_showHelp && !_perkPending &&
+                !_resumeDecisionPending
+                    ? Visibility.Visible : Visibility.Collapsed;
+            _leaderboardCloseButton.Visibility = _leaderboardVisible
+                ? Visibility.Visible : Visibility.Collapsed;
 
             LayoutFooterButtons();
         }
@@ -1873,6 +1896,22 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void HandleKey(object sender, KeyEventArgs e)
         {
+            if (_leaderboardVisible)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat && (e.Key is Key.L or Key.Escape))
+                    ToggleLeaderboard();
+                return;
+            }
+
+            if (e.Key == Key.L && !_progression.WorkshopOpen &&
+                !_resumeDecisionPending)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat) ToggleLeaderboard();
+                return;
+            }
+
             if (_resumeDecisionPending)
             {
                 e.Handled = true;
