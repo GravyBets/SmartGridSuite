@@ -2327,7 +2327,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 new Rect(12, 12, 1296, 735));
             Text(dc, "GRID UNDER ATTACK", 27, 23, 29, Cyan, dpi, true);
             Text(dc, "360 DEGREE RADIO TOWER DEFENSE", 28, 64, 13, Muted, dpi);
-            Text(dc, _message, 28, 96, 15, Gold, dpi, true, 1250);
+            // Reserve the right side of this row for the auto-response
+            // readiness stats instead of letting long events overwrite them.
+            Text(dc, _message, 28, 96, 13.5, Gold, dpi, true, 505, true);
 
             DrawField(dc, dpi);
             DrawSidebar(dc, dpi);
@@ -2800,7 +2802,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private static void Text(DrawingContext dc, string value,
             double x, double y, double size, Brush color, double dpi,
-            bool bold = false, double maxWidth = 0)
+            bool bold = false, double maxWidth = 0,
+            bool singleLine = false)
         {
             var ft = new FormattedText(
                 value, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
@@ -2809,6 +2812,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 size, color, dpi);
             if (maxWidth > 0)
                 ft.MaxTextWidth = maxWidth;
+            if (singleLine)
+            {
+                ft.MaxLineCount = 1;
+                ft.Trimming = TextTrimming.CharacterEllipsis;
+            }
             dc.DrawText(ft, new Point(x, y));
         }
 
