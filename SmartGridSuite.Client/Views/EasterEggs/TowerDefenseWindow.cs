@@ -2351,6 +2351,56 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 DrawHelp(dc, dpi);
             if (_progression.WorkshopOpen)
                 DrawWorkshop(dc, dpi);
+            if (_leaderboardVisible)
+                DrawLeaderboard(dc, dpi);
+        }
+
+        private void DrawLeaderboard(DrawingContext dc, double dpi)
+        {
+            const double x = 149;
+            const double y = 128;
+            dc.DrawRoundedRectangle(
+                new SolidColorBrush(Color.FromArgb(251, 5, 16, 34)),
+                new Pen(Cyan, 2.5),
+                new Rect(x, y, 1027, 606), 10, 10);
+            Text(dc, "GRID UNDER ATTACK — SHOP LEADERBOARD",
+                188, 158, 27, Gold, dpi, true, 775);
+            Text(dc, "TOP 10 • HIGHEST WAVE FIRST • SCORE BREAKS TIES",
+                192, 203, 14, Cyan, dpi, true);
+
+            dc.DrawRectangle(Panel, null, new Rect(183, 241, 957, 34));
+            Text(dc, "#", 202, 249, 16, Cyan, dpi, true);
+            Text(dc, "TECHNICIAN", 265, 249, 16, Cyan, dpi, true);
+            Text(dc, "WAVE", 816, 249, 16, Cyan, dpi, true);
+            Text(dc, "SCORE", 979, 249, 16, Cyan, dpi, true);
+
+            int index = 0;
+            foreach (var entry in _leaderboard.Take(10))
+            {
+                double rowY = 281 + index * 32;
+                if (index % 2 == 0)
+                    dc.DrawRectangle(ButtonFace, null,
+                        new Rect(183, rowY, 957, 30));
+                Brush ink = index == 0 ? Gold : White;
+                Text(dc, entry.Rank.ToString(MoneyCulture),
+                    203, rowY + 6, 14, ink, dpi, true);
+                Text(dc, entry.TechnicianName,
+                    266, rowY + 6, 14, ink, dpi, true, 470);
+                Text(dc, entry.Wave.ToString("N0", MoneyCulture),
+                    816, rowY + 6, 14, Green, dpi, true);
+                Text(dc, entry.Score.ToString("N0", MoneyCulture),
+                    980, rowY + 6, 14, Gold, dpi, true);
+                index++;
+            }
+
+            Text(dc, _leaderboardStatus,
+                195, 621, 14, Muted, dpi, false, 930);
+            Text(dc, "PLAYER: " + _playerName,
+                195, 653, 13, Cyan, dpi, true, 900);
+            Text(dc, _scoreUploadStatus,
+                195, 680, 13.2, Gold, dpi, false, 900);
+            Text(dc, "Scores upload after End Run or defeat. L / ESC closes.",
+                195, 707, 12.8, Muted, dpi, false, 900);
         }
 
         private void DrawTowerStats(DrawingContext dc, double dpi)
@@ -2742,7 +2792,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 143, 409, 13, Muted, dpi);
             Text(dc, "BUY AUTO NEXT: $650, 5-SECOND BREAK, PAUSES FOR PERKS.",
                 143, 438, 12.8, Cyan, dpi, true);
-            Text(dc, "H CLOSES HELP   •   ESC BACK TO ARCADE",
+            Text(dc, "H CLOSES HELP • L OPENS SHOP SCORES",
                 143, 465, 16, Gold, dpi, true);
         }
 
