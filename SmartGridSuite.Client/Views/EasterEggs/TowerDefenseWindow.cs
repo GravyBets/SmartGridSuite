@@ -2236,7 +2236,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 !_resumeDecisionPending)
             {
                 e.Handled = true;
-                if (!e.IsRepeat) ToggleLeaderboard();
+                if (!e.IsRepeat)
+                {
+                    // The field manual advertises L; allow it to transition
+                    // straight into scores instead of swallowing the key.
+                    if (_showHelp) ToggleHelp();
+                    ToggleLeaderboard();
+                }
                 return;
             }
 
