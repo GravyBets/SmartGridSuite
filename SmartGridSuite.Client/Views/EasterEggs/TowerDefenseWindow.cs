@@ -961,7 +961,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _progression.SelectedCategory, _progression.SelectedRow,
                 _advancedWorkshopVisible,
                 _progression.SpeedTier, _progression.SkipTier,
-                _progression.UseWaveSkip,
+                _progression.SelectedSkipTier,
                 string.Join(",", _progression.ExportSpecialLevels()),
                 _health.ToString("0", MoneyCulture),
                 _fenceHealth.ToString("0", MoneyCulture),
@@ -1150,9 +1150,13 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             _skipToggleButton.Visibility = workshop && _advancedWorkshopVisible
                 ? Visibility.Visible : Visibility.Collapsed;
-            _skipToggleButton.Content = _progression.UseWaveSkip
-                ? "START AT WAVE " + (_progression.StartingWave + 1) + " • ON"
-                : "WAVE SKIP OFF • START AT 1";
+            _skipToggleButton.Content = "START AT WAVE " +
+                (_progression.StartingWave + 1) + " • CHANGE";
+            _skipToggleButton.IsEnabled = _progression.SkipTier > 0;
+            _skipToggleButton.ToolTip = "Cycle any purchased starting wave: " +
+                "1, 6, 11, 16... up to wave " +
+                (_progression.PurchasedSkipWaves + 1) + ". " +
+                "Skipped waves award no cash, score or research.";
             Canvas.SetLeft(_skipToggleButton, 172);
             Canvas.SetTop(_skipToggleButton, 652);
 
@@ -1181,7 +1185,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _advancedDetails[i].Text = i switch
                 {
                     0 => "Speed up entire game: 1.25x / 1.50x / 1.75x / 2.00x",
-                    1 => "Permanent +5 starting waves per tier; no skipped rewards",
+                    1 => "Buy +5 max skip each tier, then choose any bought start",
                     _ => TowerDefenseProgression.SpecialWeaponDetails[i - 2]
                 };
                 _advancedPrices[i].Text = "LV " + level +
@@ -1212,8 +1216,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 {
                     0 => "PERMANENT GAME SPEED: " +
                         _progression.GameSpeedMultiplier.ToString("0.00", MoneyCulture) + "x",
-                    1 => "PERMANENT WAVE SKIP: FIRST " +
-                        _progression.PurchasedSkipWaves + " WAVES.",
+                    1 => "WAVE SKIP UNLOCKED THROUGH WAVE " +
+                        _progression.PurchasedSkipWaves +
+                        ". USE CHANGE START TO SELECT.",
                     _ => TowerDefenseProgression.SpecialWeaponNames[index - 2] +
                         " LEVEL " + _progression.SpecialWeaponLevel(index - 2)
                 };
@@ -3135,8 +3140,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 143, 231, 14, White, dpi);
             Text(dc, "CLICK A LARGE UPGRADE CARD TO PURCHASE IT.",
                 143, 259, 14, White, dpi);
-            Text(dc, "GUNS, ORBITING DRONES, SECURITY AND RF ARE AUTOMATIC.",
-                143, 290, 13.2, White, dpi);
+            Text(dc, "GUNS, DRONES, SECURITY, RF & SPECIAL WEAPONS ARE AUTOMATIC.",
+                143, 290, 12.8, White, dpi);
             Text(dc, "THIEVES, CLIMBERS, PARAKEETS, BEES + RF MINI TOWERS.",
                 143, 318, 13.2, White, dpi);
             Text(dc, "BOSSES EVERY 5 WAVES • PERMANENT SPEED & SPECIAL WEAPONS.",
