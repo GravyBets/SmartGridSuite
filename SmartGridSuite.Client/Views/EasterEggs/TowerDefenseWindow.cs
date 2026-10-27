@@ -4,6 +4,9 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
+using SmartGridSuite.Client.Services;
+using SmartGridSuite.Contracts.Arcade;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -82,6 +85,18 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private Button _endRunButton = null!;
         private Button _continueButton = null!;
         private Button _newRunButton = null!;
+        private Button _leaderboardButton = null!;
+        private Button _leaderboardCloseButton = null!;
+        private bool _leaderboardVisible;
+        private bool _leaderboardAutoPaused;
+        private List<TowerDefenseLeaderboardEntryDto> _leaderboard = new();
+        private string _leaderboardStatus = "Loading shop leaderboard...";
+        private string _scoreUploadStatus = "Finished shifts submit to the shop board.";
+        private string _playerName = "Guest (local only)";
+        private string? _employeeId;
+        private Task? _playerLoadTask;
+        private bool _scoreSubmissionStarted;
+        private readonly ApiClient _arcadeApi = ClientAppSettings.CreateApiClient();
         private TowerDefenseSession? _resumeOffer;
         private bool _resumeDecisionPending;
         private double _snapshotElapsed = 0;
@@ -196,6 +211,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Loaded += (_, _) =>
             {
                 NewGame();
+                _playerLoadTask = LoadPlayerAsync();
+                _ = RefreshLeaderboardAsync();
                 _resumeOffer = TowerDefenseSessionStore.Load();
                 _resumeDecisionPending = _resumeOffer != null;
                 RefreshUpgradeControls();
@@ -315,6 +332,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _message = "SHIFT ENDED EARLY. RESEARCH CREDITS BANKED.";
             _progression.BankRun(_wave, _score);
             TowerDefenseSessionStore.Clear();
+            _ = SubmitScoreAsync();
             _bestScore = Math.Max(_bestScore, _score);
             SaveBestScore(_bestScore);
             _surface.InvalidateVisual();
@@ -504,6 +522,139 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 !_perkPending && _wave > 0
                 ? AutoNextDelaySeconds : -1;
             RefreshUpgradeControls();
+        }
+
+        private async Task LoadPlayerAsync()
+        {
+            try
+            {
+                var current = await CurrentUserService.LoadCurrentTechnicianAsync();
+                if (!IsLoaded) return;
+                if (current != null && current.IsActive)
+                {
+                    _employeeId = current.EmployeeId;
+                    _playerName = current.Name;
+                }
+                else
+                {
+                    _employeeId = null;
+                    _playerName = "Guest (local only)";
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Tower Defense technician lookup failed: " + ex);
+                if (!IsLoaded) return;
+                _employeeId = null;
+                _playerName = "Guest (local only)";
+            }
+            if (IsLoaded) _surface.InvalidateVisual();
+        }
+
+        private static string LeaderboardError(Exception error) => error switch
+        {
+            ApiClient.ApiException { StatusCode: 404 } =>
+                "Leaderboard API/table missing. Deploy the API and SQL migration.",
+            ApiClient.ApiException { StatusCode: 500 } =>
+                "Leaderboard database error. Check the new SQL migration.",
+            ApiClient.ApiConnectionException =>
+                "Shop API unreachable. Check network or VPN.",
+            ApiClient.ApiException exception =>
+                "Leaderboard request failed: HTTP " + exception.StatusCode,
+            _ => "Leaderboard unavailable. Check client logs."
+        };
+
+        private async Task RefreshLeaderboardAsync()
+        {
+            _leaderboardStatus = "Loading shop leaderboard...";
+            _surface.InvalidateVisual();
+            try
+            {
+                var results = await _arcadeApi
+                    .GetAsync<List<TowerDefenseLeaderboardEntryDto>>(
+                        "api/arcade/tower-defense/leaderboard");
+                if (!IsLoaded) return;
+                _leaderboard = results ?? new();
+                _leaderboardStatus = _leaderboard.Count == 0
+                    ? "No scores yet. Finish a shift to join the leaderboard."
+                    : "Best completed shift per active technician.";
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Tower Defense leaderboard load failed: " + ex);
+                if (!IsLoaded) return;
+                _leaderboardStatus = LeaderboardError(ex);
+            }
+            if (IsLoaded) _surface.InvalidateVisual();
+        }
+
+        private async Task SubmitScoreAsync()
+        {
+            if (_scoreSubmissionStarted || _wave <= 0) return;
+            _scoreSubmissionStarted = true;
+
+            // Identity loading is independent of leaderboard retrieval. Wait
+            // for the initial roster lookup, so a fast End Run doesn't lose
+            // its score just because the shop VPN responded slowly.
+            try
+            {
+                if (_playerLoadTask != null)
+                    await _playerLoadTask;
+
+                if (string.IsNullOrWhiteSpace(_employeeId))
+                {
+                    _scoreUploadStatus =
+                        "Guest run: local score only (active roster required).";
+                    return;
+                }
+
+                _scoreUploadStatus = "Uploading finished shift...";
+                if (IsLoaded) _surface.InvalidateVisual();
+                await _arcadeApi.PostAsync<TowerDefenseScoreRequest,
+                    TowerDefenseLeaderboardEntryDto>(
+                    "api/arcade/tower-defense/scores",
+                    new TowerDefenseScoreRequest
+                    {
+                        EmployeeId = _employeeId,
+                        Wave = _wave,
+                        Score = _score
+                    });
+                _scoreUploadStatus = "Shift uploaded to shop leaderboard!";
+                if (IsLoaded) await RefreshLeaderboardAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Tower Defense score upload failed: " + ex);
+                _scoreUploadStatus = LeaderboardError(ex);
+            }
+            finally
+            {
+                if (IsLoaded) _surface.InvalidateVisual();
+            }
+        }
+
+        private void ToggleLeaderboard()
+        {
+            if (_resumeDecisionPending || _progression.WorkshopOpen ||
+                _perkPending || _showHelp)
+                return;
+
+            _leaderboardVisible = !_leaderboardVisible;
+            if (_leaderboardVisible)
+            {
+                _leaderboardAutoPaused = _started && !_paused && !_gameOver;
+                if (_leaderboardAutoPaused)
+                    SetPaused(true);
+                _ = RefreshLeaderboardAsync();
+            }
+            else
+            {
+                if (_leaderboardAutoPaused && !_gameOver)
+                    SetPaused(false);
+                _leaderboardAutoPaused = false;
+            }
+            RefreshUpgradeControls();
+            _surface.InvalidateVisual();
         }
 
         private void BuildUpgradeControls()
@@ -989,6 +1140,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _thieves.Clear();
             _jammers.Clear();
             _bestScore = Math.Max(ReadBestScore(), _progression.BestScore);
+            _scoreSubmissionStarted = false;
+            _scoreUploadStatus = "Finished shifts submit to the shop board.";
             _surface.InvalidateVisual();
             RefreshUpgradeControls();
         }
@@ -1693,6 +1846,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _clock.Stop();
             _message = "RADIO SILENCE. DISPATCH IS NOT HAPPY.";
             _progression.BankRun(_wave, _score);
+            _ = SubmitScoreAsync();
             if (_score > _bestScore)
             {
                 _bestScore = _score;
