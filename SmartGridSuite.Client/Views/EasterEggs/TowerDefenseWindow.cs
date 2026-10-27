@@ -766,6 +766,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             {
                 if (!_progression.WorkshopOpen || !_advancedWorkshopVisible) return;
                 _progression.ToggleWaveSkip();
+                SyncPreRunSkip();
                 _lastUpgradeSignature = "";
                 RefreshUpgradeControls();
                 _surface.InvalidateVisual();
@@ -1212,6 +1213,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             }
             else
             {
+                if (index == 1)
+                    SyncPreRunSkip();
                 _message = index switch
                 {
                     0 => "PERMANENT GAME SPEED: " +
@@ -1226,6 +1229,18 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _lastUpgradeSignature = "";
             RefreshUpgradeControls();
             _surface.InvalidateVisual();
+        }
+
+        private void SyncPreRunSkip()
+        {
+            // A new purchase in the pre-run workshop should immediately
+            // change the upcoming starting wave, not require closing and
+            // relaunching the entire arcade game.
+            if (_started || _gameOver) return;
+            _wave = _progression.StartingWave;
+            _cash = AddCash(450 + _progression.Level(16) * 35,
+                _wave * 90);
+            _score = 0;
         }
 
         private void PrepareOrStartWave()
@@ -2302,6 +2317,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 else if (!e.IsRepeat && e.Key == Key.S)
                 {
                     _progression.ToggleWaveSkip();
+                    SyncPreRunSkip();
                     _lastUpgradeSignature = "";
                     RefreshUpgradeControls();
                 }
@@ -2641,7 +2657,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private void ToggleWorkshop()
         {
-            if (_waveActive || (_wave > 0 && !_gameOver))
+            if (_waveActive || (_started && _wave > 0 && !_gameOver))
             {
                 _message = "PERMANENT WORKSHOP AVAILABLE BEFORE OR AFTER RUNS.";
                 _surface.InvalidateVisual();
