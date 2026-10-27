@@ -610,7 +610,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
         private async Task SubmitScoreAsync(int finishedWave, int finishedScore)
         {
-            if (_scoreSubmissionStarted || finishedWave <= 0) return;
+            if (_scoreSubmissionStarted || finishedWave <= 0 ||
+                finishedScore <= 0) return;
             _scoreSubmissionStarted = true;
 
             // Identity loading is independent of leaderboard retrieval. Wait
@@ -1144,8 +1145,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 ? Visibility.Visible : Visibility.Collapsed;
             _advancedWorkshopButton.Content = _advancedWorkshopVisible
                 ? "STANDARD RESEARCH" : "SPECIAL RESEARCH";
-            Canvas.SetLeft(_advancedWorkshopButton, 850);
-            Canvas.SetTop(_advancedWorkshopButton, 214);
+            Canvas.SetLeft(_advancedWorkshopButton, 801);
+            Canvas.SetTop(_advancedWorkshopButton, 709);
 
             _skipToggleButton.Visibility = workshop && _advancedWorkshopVisible
                 ? Visibility.Visible : Visibility.Collapsed;
@@ -2270,6 +2271,32 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 return;
             }
 
+            // The Special Research page is permanent-only; number keys must
+            // not accidentally purchase ordinary upgrades behind this page.
+            if (_progression.WorkshopOpen && _advancedWorkshopVisible)
+            {
+                int specialIndex = e.Key switch
+                {
+                    Key.D1 or Key.NumPad1 => 0,
+                    Key.D2 or Key.NumPad2 => 1,
+                    Key.D3 or Key.NumPad3 => 2,
+                    Key.D4 or Key.NumPad4 => 3,
+                    Key.D5 or Key.NumPad5 => 4,
+                    Key.D6 or Key.NumPad6 => 5,
+                    _ => -1
+                };
+                e.Handled = true;
+                if (!e.IsRepeat && specialIndex >= 0)
+                    BuyAdvancedUpgrade(specialIndex);
+                else if (!e.IsRepeat && e.Key == Key.S)
+                {
+                    _progression.ToggleWaveSkip();
+                    _lastUpgradeSignature = "";
+                    RefreshUpgradeControls();
+                }
+                return;
+            }
+
             // Milestone rewards temporarily take precedence over the normal
             // 1-8 purchase hotkeys. Space cannot skip a reward decision.
             if (_perkPending && !_progression.WorkshopOpen)
@@ -3007,8 +3034,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     : "SELECT A RESEARCH UPGRADE OR OPEN SPECIAL RESEARCH.",
                 175, 184, 15, Cyan, dpi);
 
-            Text(dc, "CLOSE WORKSHOP TO START OR RETRY YOUR SHIFT",
-                178, 713, 13, Muted, dpi);
+            Text(dc, _advancedWorkshopVisible
+                    ? "S TOGGLE SKIP • 1-6 BUY SPECIAL RESEARCH"
+                    : "SPECIAL RESEARCH: SPEED / WAVE SKIP / FOUR EXCLUSIVE WEAPONS",
+                178, 687, 12.5, Muted, dpi);
         }
 
         private void DrawPerk(DrawingContext dc, double dpi)
@@ -3059,8 +3088,10 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Text(dc, "INVEST IN YOUR SHOP BETWEEN EVERY SHIFT.",
                     151, 315, 15, Gold, dpi, true);
                 Text(dc, "PRESS SPACE TO PREPARE", 151, 370, 24, Green, dpi, true);
-                Text(dc, "W RESEARCH WORKSHOP   H HELP   SPACE THEN WAVE 1",
-                    151, 422, 14, Muted, dpi);
+                Text(dc, "W WORKSHOP  •  H HELP  •  L SHOP LEADERBOARD",
+                    151, 416, 14, Muted, dpi);
+                Text(dc, "SPECIAL RESEARCH: SPEED / SKIPS / 4 WEAPONS",
+                    151, 445, 12.5, Purple, dpi);
             }
             else if (_gameOver)
             {
@@ -3072,7 +3103,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     151, 314, 17, Gold, dpi, true);
                 Text(dc, "W FOR PERMANENT UPGRADES  •  R FOR NEXT SHIFT",
                     151, 366, 16, Green, dpi, true);
-                Text(dc, "ESC BACK TO ARCADE", 151, 410, 14, Muted, dpi);
+                Text(dc, "L SHOP LEADERBOARD  •  ESC BACK TO ARCADE",
+                    151, 410, 14, Muted, dpi);
             }
             else
             {
@@ -3080,8 +3112,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     Math.Ceiling(_health).ToString(MoneyCulture) +
                     "/" + MaxTowerHealth.ToString("0", MoneyCulture),
                     151, 285, 20, Gold, dpi, true);
-                Text(dc, "P TO RESUME    ESC BACK TO ARCADE",
-                    151, 395, 17, White, dpi);
+                Text(dc, "P RESUME  •  L SHOP LEADERBOARD  •  ESC EXIT",
+                    151, 395, 15, White, dpi);
             }
         }
 
@@ -3101,12 +3133,12 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 143, 290, 13.2, White, dpi);
             Text(dc, "THIEVES, CLIMBERS, PARAKEETS, BEES + RF MINI TOWERS.",
                 143, 318, 13.2, White, dpi);
-            Text(dc, "EACH 5TH WAVE ADDS A SCRAP KING BOSS.",
-                143, 352, 15, Red, dpi, true);
+            Text(dc, "BOSSES EVERY 5 WAVES • PERMANENT SPEED & SPECIAL WEAPONS.",
+                143, 352, 13.3, Red, dpi, true);
             Text(dc, "END RUN BANKS RESEARCH; CLOSING SUSPENDS YOUR WAVE.",
                 143, 380, 12.8, Green, dpi, true);
-            Text(dc, "REOPEN TO CONTINUE OR BANK RESEARCH AND START NEW.",
-                143, 409, 13, Muted, dpi);
+            Text(dc, "SPECIAL RESEARCH BUYS SPEED, +5 WAVE SKIPS, 4 WEAPONS.",
+                143, 409, 12.6, Muted, dpi);
             Text(dc, "BUY AUTO NEXT: $650, 5-SECOND BREAK, PAUSES FOR PERKS.",
                 143, 438, 12.8, Cyan, dpi, true);
             Text(dc, "H CLOSES HELP • L OPENS SHOP SCORES",
