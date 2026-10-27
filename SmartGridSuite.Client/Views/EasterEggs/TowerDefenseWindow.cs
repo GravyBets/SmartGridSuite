@@ -588,9 +588,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (IsLoaded) _surface.InvalidateVisual();
         }
 
-        private async Task SubmitScoreAsync()
+        private Task SubmitScoreAsync() => SubmitScoreAsync(_wave, _score);
+
+        private async Task SubmitScoreAsync(int finishedWave, int finishedScore)
         {
-            if (_scoreSubmissionStarted || _wave <= 0) return;
+            if (_scoreSubmissionStarted || finishedWave <= 0) return;
             _scoreSubmissionStarted = true;
 
             // Identity loading is independent of leaderboard retrieval. Wait
@@ -616,8 +618,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     new TowerDefenseScoreRequest
                     {
                         EmployeeId = _employeeId,
-                        Wave = _wave,
-                        Score = _score
+                        Wave = finishedWave,
+                        Score = finishedScore
                     });
                 _scoreUploadStatus = "Shift uploaded to shop leaderboard!";
                 if (IsLoaded) await RefreshLeaderboardAsync();
