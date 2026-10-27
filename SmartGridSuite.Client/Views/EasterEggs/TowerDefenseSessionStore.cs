@@ -42,6 +42,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         public int DroneDamageDone { get; set; }
         public double LeftGunCooldown { get; set; }
         public double RightGunCooldown { get; set; }
+        public double[] SpecialCooldowns { get; set; } = Array.Empty<double>();
         public double ElapsedSeconds { get; set; }
         public long PendingResearch { get; set; }
         public int[] RunLevels { get; set; } = Array.Empty<int>();
