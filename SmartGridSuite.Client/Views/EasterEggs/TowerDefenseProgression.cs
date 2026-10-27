@@ -58,11 +58,100 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             public int BestWave { get; set; }
             public int BestScore { get; set; }
             public int[] Permanent { get; set; } = new int[Catalog.Length];
+            public int SpeedTier { get; set; }
+            public int SkipTier { get; set; }
+            public bool UseWaveSkip { get; set; } = true;
+            public int[] SpecialWeaponLevels { get; set; } = new int[4];
         }
 
         private readonly int[] _permanent = new int[Catalog.Length];
         private readonly int[] _run = new int[Catalog.Length];
         private bool _banked = true;
+        private int _speedTier;
+        private int _skipTier;
+        private bool _useWaveSkip = true;
+        private readonly int[] _specialWeaponLevels = new int[4];
+
+        public static readonly string[] SpecialWeaponNames =
+        {
+            "LASER SENTRY", "TESLA COIL", "EMP CANNON", "AIRSTRIKE"
+        };
+
+        public static readonly string[] SpecialWeaponDetails =
+        {
+            "A precision beam tracks the toughest target; stronger every tier",
+            "Chain lightning arcs to several threats around the compound",
+            "Area shockwave damages hostile RF rigs and nearby intruders",
+            "Automated missiles strike multiple threats from overhead"
+        };
+
+        public int SpeedTier => _speedTier;
+        public double GameSpeedMultiplier => 1.0 + _speedTier * 0.25;
+        public int SkipTier => _skipTier;
+        public int PurchasedSkipWaves => _skipTier * 5;
+        public bool UseWaveSkip => _useWaveSkip;
+        public int StartingWave => _useWaveSkip ? PurchasedSkipWaves : 0;
+        public int SpecialWeaponLevel(int index) => _specialWeaponLevels[index];
+        public int[] ExportSpecialLevels() => _specialWeaponLevels.ToArray();
+
+        // These are ONLY purchasable with banked research in the permanent
+        // workshop. They never consume run cash and cannot roll from Free WOs.
+        public long AdvancedPrice(int index)
+        {
+            if (index < 0 || index > 5) throw new ArgumentOutOfRangeException(nameof(index));
+            double level = index switch
+            {
+                0 => _speedTier,
+                1 => _skipTier,
+                _ => _specialWeaponLevels[index - 2]
+            };
+            double basePrice = index switch
+            {
+                0 => 420,
+                1 => 700,
+                2 => 550,
+                3 => 850,
+                4 => 1200,
+                _ => 1500
+            };
+            return Math.Max(1, (long)Math.Ceiling(Math.Min(1e15,
+                basePrice * (1 + 0.95 * level + 0.36 * level * level))));
+        }
+
+        public int AdvancedLevel(int index) => index switch
+        {
+            0 => _speedTier,
+            1 => _skipTier,
+            >= 2 and <= 5 => _specialWeaponLevels[index - 2],
+            _ => throw new ArgumentOutOfRangeException(nameof(index))
+        };
+
+        public int AdvancedMaximum(int index) => index switch
+        {
+            0 => 4, 1 => 20, >= 2 and <= 5 => 20,
+            _ => throw new ArgumentOutOfRangeException(nameof(index))
+        };
+
+        public bool BuyAdvanced(int index)
+        {
+            if (AdvancedLevel(index) >= AdvancedMaximum(index))
+                return false;
+            long price = AdvancedPrice(index);
+            if (Credits < price) return false;
+            Credits -= price;
+            if (index == 0) _speedTier++;
+            else if (index == 1) _skipTier++;
+            else _specialWeaponLevels[index - 2]++;
+            Save();
+            return true;
+        }
+
+        public void ToggleWaveSkip()
+        {
+            _useWaveSkip = !_useWaveSkip;
+            Save();
+        }
+
 
         public long Credits { get; private set; }
         public long PendingCredits { get; private set; }
@@ -194,6 +283,14 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 Credits = Math.Max(0, saved.ResearchCredits);
                 BestWave = Math.Max(0, saved.BestWave);
                 BestScore = Math.Max(0, saved.BestScore);
+                _speedTier = Math.Clamp(saved.SpeedTier, 0, 4);
+                _skipTier = Math.Clamp(saved.SkipTier, 0, 20);
+                _useWaveSkip = saved.UseWaveSkip;
+                if (saved.SpecialWeaponLevels != null)
+                {
+                    for (int i = 0; i < 4 && i < saved.SpecialWeaponLevels.Length; i++)
+                        _specialWeaponLevels[i] = Math.Clamp(saved.SpecialWeaponLevels[i], 0, 20);
+                }
                 if (saved.Permanent != null)
                 {
                     for (int i = 0;
@@ -221,7 +318,11 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                     ResearchCredits = Credits,
                     BestWave = BestWave,
                     BestScore = BestScore,
-                    Permanent = _permanent.ToArray()
+                    Permanent = _permanent.ToArray(),
+                    SpeedTier = _speedTier,
+                    SkipTier = _skipTier,
+                    UseWaveSkip = _useWaveSkip,
+                    SpecialWeaponLevels = _specialWeaponLevels.ToArray()
                 };
                 var temp = FilePath + ".tmp";
                 File.WriteAllText(temp, JsonSerializer.Serialize(snapshot));
