@@ -470,6 +470,9 @@ namespace SmartGridSuite.Client.Views.EasterEggs
                 _progression.RestoreRun(_resumeOffer.RunLevels,
                     _resumeOffer.PendingResearch);
                 _progression.BankRun(_resumeOffer.Wave, _resumeOffer.Score);
+                // Choosing a fresh game explicitly ends the suspended shift.
+                // Submit its captured score, never the reset new-run score.
+                _ = SubmitScoreAsync(_resumeOffer.Wave, _resumeOffer.Score);
             }
             TowerDefenseSessionStore.Clear();
             NewGame();
@@ -2335,14 +2338,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             DrawSidebar(dc, dpi);
             DrawTowerStats(dc, dpi);
 
-            // Cooldown indicators are visible without a trackpad or
-            // repeatedly pressing hotkeys to ask whether the team is ready.
-            string patrol = _securitySweepCooldown <= 0
-                ? "READY"
-                : Math.Ceiling(_securitySweepCooldown).ToString(MoneyCulture) + "s";
-            string rf = _rfSweepCooldown <= 0
-                ? "READY"
-                : Math.Ceiling(_rfSweepCooldown).ToString(MoneyCulture) + "s";
             dc.DrawRectangle(Panel, new Pen(GridInk, 1),
                 new Rect(24, 759, 1274, 47));
             if (!_started || _paused || _gameOver)
