@@ -161,7 +161,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
         private int _thievesToSpawn;
         private int _jammersToSpawn;
         private int _lightningToSpawn;
-        private bool _bossSpawnedThisWave;
         private bool _started;
         private bool _waveActive;
         private bool _paused;
@@ -1302,7 +1301,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             _autoNextPurchased = false;
             _autoNextEnabled = false;
             _autoNextRemaining = -1;
-            _bossSpawnedThisWave = false;
             // Purchased starting-wave skips cost permanent research, but do
             // not generate free earnings from waves never actually played.
             _cash = AddCash(450 + _progression.Level(16) * 35,
@@ -1361,7 +1359,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
 
             _wave++;
             _autoNextRemaining = -1;
-            _bossSpawnedThisWave = false;
             _thievesToSpawn = Math.Min(75, 4 + _wave * 2 +
                 (int)Math.Pow(_wave, 1.2));
             _jammersToSpawn = Math.Min(12, 1 + _wave / 2);
@@ -1375,7 +1372,6 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             if (_wave % 5 == 0)
             {
                 SpawnBoss();
-                _bossSpawnedThisWave = true;
             }
             _surface.InvalidateVisual();
             RefreshUpgradeControls();
