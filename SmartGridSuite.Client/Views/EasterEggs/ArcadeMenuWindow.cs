@@ -30,7 +30,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             Owner = host;
             Title = "SmartGridSuite Arcade";
             Width = 790;
-            Height = 545;
+            Height = 580;
             MinWidth = Width;
             MinHeight = Height;
             ResizeMode = ResizeMode.NoResize;
@@ -47,7 +47,7 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 23) };
             heading.Children.Add(Label("SMARTGRID SUITE PRESENTS", 12, Cyan));
             heading.Children.Add(Label("RADIO SHOP ARCADE", 31, Gold, true));
-            heading.Children.Add(Label("TWO WAYS TO AVOID THE DISPATCH QUEUE.", 13, Muted));
+            heading.Children.Add(Label("Two ways to avoid AMS/IG Tickets", 13, Muted));
             Grid.SetRow(heading, 0);
             layout.Children.Add(heading);
 
@@ -76,8 +76,8 @@ namespace SmartGridSuite.Client.Views.EasterEggs
             var defense = GameCard(
                 "02   GRID UNDER ATTACK",
                 "TOWER DEFENSE",
-                "Build 24 radio-shop upgrades, fight escalating waves, and research permanent improvements between runs.",
-                "KEYBOARD • TAB • 1–8 • W WORKSHOP",
+                "Defend the tower through escalating waves. Upgrade defenses and permanently unlock speed, wave skips and special weapons.",
+                "SPACE waves • P pause • H help • L scores\nW workshop • TAB / 1–8 upgrades\nSpecial: 1–6 buy • S skip • ESC exit",
                 Gold,
                 "PLAY TOWER DEFENSE",
                 LaunchTowerDefense);
