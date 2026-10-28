@@ -16,6 +16,98 @@ public sealed class ArcadeController : ControllerBase
         _db = db;
     }
 
+    // Grid Under Attack ranks by wave reached; score breaks ties.
+    // This leaderboard is intentionally distinct from Bucket Truck cash.
+    [HttpGet("tower-defense/leaderboard")]
+    public async Task<ActionResult<List<TowerDefenseLeaderboardEntryDto>>>
+        GetTowerDefenseLeaderboard(CancellationToken ct)
+    {
+        var scores = await _db.TowerDefenseHighScores.AsNoTracking()
+            .Where(s => s.Technician.IsActive)
+            .OrderByDescending(s => s.BestWave)
+            .ThenByDescending(s => s.BestScore)
+            .ThenBy(s => s.AchievedAtUtc)
+            .ThenBy(s => s.TechnicianId)
+            .Take(10)
+            .Select(s => new
+            {
+                s.Technician.FirstName,
+                s.Technician.LastName,
+                s.BestWave,
+                s.BestScore,
+                s.AchievedAtUtc
+            })
+            .ToListAsync(ct);
+
+        return Ok(scores.Select((s, i) => new TowerDefenseLeaderboardEntryDto
+        {
+            Rank = i + 1,
+            TechnicianName = $"{s.FirstName} {s.LastName}".Trim(),
+            Wave = s.BestWave,
+            Score = s.BestScore,
+            AchievedAtUtc = s.AchievedAtUtc
+        }).ToList());
+    }
+
+    [HttpPost("tower-defense/scores")]
+    public async Task<ActionResult<TowerDefenseLeaderboardEntryDto>>
+        SubmitTowerDefenseScore([FromBody] TowerDefenseScoreRequest? request,
+            CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest("A tower-defense score is required.");
+
+        var employeeId = (request.EmployeeId ?? "").Trim();
+        if (employeeId.Length is < 1 or > 32 ||
+            request.Wave is < 1 or > 100_000 ||
+            request.Score < 0)
+            return BadRequest("Invalid Grid Under Attack score.");
+
+        // Resolve a real active technician; user-typed names are never used
+        // for leaderboard submissions.
+        var technician = await _db.Technicians.AsNoTracking()
+            .Where(t => t.IsActive && t.EmployeeId == employeeId)
+            .Select(t => new { t.Id, t.FirstName, t.LastName })
+            .SingleOrDefaultAsync(ct);
+
+        if (technician is null)
+            return NotFound("Active technician not found in shop roster.");
+
+        var achieved = DateTime.UtcNow;
+        // Atomic best-of update: a later low-scoring upload can never
+        // replace a higher wave, and score settles same-wave ties.
+        // Update best_wave LAST to preserve the comparisons above.
+        await _db.Database.ExecuteSqlInterpolatedAsync(
+            $@"INSERT INTO arcade_tower_defense_high_scores
+                (technician_id, best_wave, best_score, achieved_at_utc)
+               VALUES ({technician.Id}, {request.Wave},
+                       {request.Score}, {achieved})
+               ON DUPLICATE KEY UPDATE
+                achieved_at_utc = IF(
+                    VALUES(best_wave) > best_wave OR
+                    (VALUES(best_wave) = best_wave AND
+                     VALUES(best_score) > best_score),
+                    VALUES(achieved_at_utc), achieved_at_utc),
+                best_score = IF(
+                    VALUES(best_wave) > best_wave OR
+                    (VALUES(best_wave) = best_wave AND
+                     VALUES(best_score) > best_score),
+                    VALUES(best_score), best_score),
+                best_wave = GREATEST(best_wave, VALUES(best_wave))",
+            ct);
+
+        var best = await _db.TowerDefenseHighScores.AsNoTracking()
+            .SingleAsync(s => s.TechnicianId == technician.Id, ct);
+
+        return Ok(new TowerDefenseLeaderboardEntryDto
+        {
+            TechnicianName = $"{technician.FirstName} {technician.LastName}".Trim(),
+            Wave = best.BestWave,
+            Score = best.BestScore,
+            AchievedAtUtc = best.AchievedAtUtc
+        });
+    }
+
     [HttpGet("leaderboard")]
     public async Task<ActionResult<List<ArcadeLeaderboardEntryDto>>> GetLeaderboard(
         CancellationToken ct)

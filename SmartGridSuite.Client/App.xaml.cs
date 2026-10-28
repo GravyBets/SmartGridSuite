@@ -81,7 +81,7 @@ namespace SmartGridSuite.Client
             e.Handled = true;
 
             if (sender is Window host)
-                RadioShopArcadeWindow.Toggle(host);
+                ArcadeMenuWindow.Toggle(host);
         }
 
         protected override void OnExit(ExitEventArgs e)

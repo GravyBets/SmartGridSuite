@@ -1,5 +1,19 @@
 [
   {
+    "version": "3.6.2.4",
+    "date": "October 28, 2026",
+    "title": "Bug Fixes from 3.6.2.3",
+    "changes": [
+      "Fixed an issue where existing tickets were not displayed for certain tower sites.",
+      "Improved ticket matching to recognize equivalent site identifiers containing hyphens or underscores.",
+      "Fixed an issue where previously assigned techs remained in a ticket\u0027s Assigned To list after their Daily Assignment was removed.",
+      "Preserved technicians manually assigned through Dispatch -\u003e Tickets.",
+      "Updated Ctrl+Shift+F12 controls.",
+      "Improved consistency between between Daily Assignments and ticket assignment information."
+    ]
+  },
+
+  {
     "version": "3.6.2.3",
     "date": "October 20, 2026",
     "title": "Dispatch Ticket Filtering, Check for Updates",

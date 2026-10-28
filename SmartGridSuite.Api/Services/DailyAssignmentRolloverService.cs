@@ -385,23 +385,6 @@ namespace SmartGridSuite.Api.Services
                         x => x.Key,
                         x => x.OrderBy(c => c.Id).First());
 
-                var rosterNamesByTruckId = rosterRows
-                    .Where(x =>
-                        activeTechniciansById.ContainsKey(
-                            x.TechnicianId))
-                    .GroupBy(x => x.TruckId)
-                    .ToDictionary(
-                        x => x.Key,
-                        x => x
-                            .Select(row =>
-                                FormatTechnicianName(
-                                    activeTechniciansById[
-                                        row.TechnicianId]))
-                            .Distinct(
-                                StringComparer.OrdinalIgnoreCase)
-                            .OrderBy(name => name)
-                            .ToList());
-
                 var candidates = latestPriorRows
                     .Select(source => new RolloverCandidate
                     {
@@ -697,13 +680,8 @@ namespace SmartGridSuite.Api.Services
                                 assignment.TicketId,
                                 out var ticket))
                         {
-                            ticket.AssignedTech =
-                                BuildAssignedToText(
-                                    target,
-                                    activeTechniciansById,
-                                    activeTrucksById,
-                                    rosterNamesByTruckId);
-
+                            // Current display assignees are reconciled from all
+                            // published routes after rollover is persisted.
                             ticket.AssignedCrewId =
                                 target.CrewId;
 
@@ -759,6 +737,9 @@ namespace SmartGridSuite.Api.Services
                 _db.DailyTicketAssignmentPublished.AddRange(
                     newPublishedRows);
 
+                await _db.SaveChangesAsync(ct);
+                await TicketAssigneeReconciler.ReconcileAsync(
+                    _db, carriedTicketIds, workDate, ct);
                 await _db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
@@ -1088,95 +1069,6 @@ namespace SmartGridSuite.Api.Services
                 PublishedAt = publishedAt,
                 PublishedBy = SystemActor
             };
-        }
-
-        private static string BuildAssignedToText(
-            RolloverTarget target,
-            IReadOnlyDictionary<uint, TechnicianEntity> techniciansById,
-            IReadOnlyDictionary<uint, TruckEntity> trucksById,
-            IReadOnlyDictionary<uint, List<string>> rosterNamesByTruckId)
-        {
-            if (target.TruckId.HasValue)
-            {
-                if (rosterNamesByTruckId.TryGetValue(
-                        target.TruckId.Value,
-                        out var names) &&
-                    names.Count > 0)
-                {
-                    return FormatCrewDisplayText(names);
-                }
-
-                if (target.TechnicianId.HasValue &&
-                    techniciansById.TryGetValue(
-                        target.TechnicianId.Value,
-                        out var lead))
-                {
-                    return FormatTechnicianName(lead);
-                }
-
-                if (trucksById.TryGetValue(
-                        target.TruckId.Value,
-                        out var truck))
-                {
-                    return $"Truck " +
-                           $"{truck.TruckNumber.Trim()}";
-                }
-            }
-
-            if (target.TechnicianId.HasValue &&
-                techniciansById.TryGetValue(
-                    target.TechnicianId.Value,
-                    out var technician))
-            {
-                return FormatTechnicianName(
-                    technician);
-            }
-
-            return "(Unassigned)";
-        }
-
-        private static string FormatTechnicianName(TechnicianEntity technician)
-        {
-            var name =
-                $"{technician.FirstName} " +
-                $"{technician.LastName}";
-
-            name = name.Trim();
-
-            return string.IsNullOrWhiteSpace(name)
-                ? technician.EmployeeId.Trim()
-                : name;
-        }
-
-        private static string FormatCrewDisplayText(IReadOnlyList<string> names)
-        {
-            var cleanNames = names
-                .Where(x =>
-                    !string.IsNullOrWhiteSpace(x))
-                .Select(x => x.Trim())
-                .Distinct(
-                    StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (cleanNames.Count == 0)
-                return "Unknown";
-
-            if (cleanNames.Count == 1)
-                return cleanNames[0];
-
-            if (cleanNames.Count == 2)
-            {
-                return
-                    $"{cleanNames[0]} & " +
-                    $"{cleanNames[1]}";
-            }
-
-            return string.Join(
-                       ", ",
-                       cleanNames.Take(
-                           cleanNames.Count - 1)) +
-                   " & " +
-                   cleanNames.Last();
         }
 
         private static string NormalizeTargetType(string? targetType)

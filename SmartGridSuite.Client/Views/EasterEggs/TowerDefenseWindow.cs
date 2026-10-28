@@ -1,0 +1,3323 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using SmartGridSuite.Client.Services;
+using SmartGridSuite.Contracts.Arcade;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Data;
+using System.Windows.Media;
+using System.Windows.Threading;
+
+namespace SmartGridSuite.Client.Views.EasterEggs
+{
+    /// <summary>
+    /// Entirely fictional, standalone arcade simulation. No real towers,
+    /// communications, radio commands, tickets, or operational APIs are used.
+    /// </summary>
+    public sealed class TowerDefenseWindow : Window
+    {
+        // Virtual design is scaled by Viewbox to fit available laptop space.
+        // Hit testing uses unscaled design coordinates inside the Viewbox.
+        private const double DesignWidth = 1320;
+        private const double DesignHeight = 820;
+        private const double FieldX = 24;
+        private const double FieldY = 129;
+        private const double FieldWidth = 768;
+        private const double FieldHeight = 608;
+        private const double PanelX = 814;
+        private const double PanelWidth = 484;
+        private const double FirstUpgradeY = 303;
+        private const double UpgradePitch = 54.5;
+        private const double WorkshopActionY = 748;
+        private const double TowerX = FieldX + FieldWidth / 2;
+        private const double TowerY = FieldY + FieldHeight / 2 - 22;
+        private const double HubRadius = 31;
+        private static readonly CultureInfo MoneyCulture = CultureInfo.InvariantCulture;
+
+        private static TowerDefenseWindow? _active;
+        private static readonly Brush Backdrop = Paint("#081224");
+        private static readonly Brush Panel = Paint("#11233D");
+        private static readonly Brush Ground = Paint("#0C243B");
+        private static readonly Brush GridInk = Paint("#234159");
+        private static readonly Brush Cyan = Paint("#5CE8FA");
+        private static readonly Brush Green = Paint("#66F3B8");
+        private static readonly Brush Red = Paint("#FF6889");
+        private static readonly Brush Gold = Paint("#F9DA79");
+        private static readonly Brush Purple = Paint("#CD9BFF");
+        private static readonly Brush White = Paint("#F2F7FF");
+        private static readonly Brush Muted = Paint("#A0B5D3");
+        private static readonly Brush FenceInk = Paint("#9DCBC5");
+        private static readonly Brush TowerSteel = Paint("#B5C5D8");
+        private static readonly Brush DarkSteel = Paint("#526E86");
+        private static readonly Brush ButtonFace = Paint("#1B3350");
+        private static readonly Brush Tree = Paint("#12334B");
+        private static readonly Brush Copper = Paint("#DDA36B");
+        private static readonly Pen TileOutline = FreezePen(GridInk, 0.5);
+        private static readonly Pen RadarOutline = FreezePen(GridInk, 0.95);
+        private static readonly Brush RedFlash = new SolidColorBrush(Color.FromArgb(105, 255, 92, 113));
+        private static readonly Brush PulseFill = new SolidColorBrush(Color.FromArgb(35, 92, 232, 250));
+
+        private readonly Window _host;
+        private readonly GameSurface _surface;
+        private readonly Canvas _controls = new();
+        private readonly Button[] _upgradeButtons = new Button[8];
+        private readonly TextBlock[] _upgradeNames = new TextBlock[8];
+        private readonly TextBlock[] _upgradeDetails = new TextBlock[8];
+        private readonly TextBlock[] _upgradeLevels = new TextBlock[8];
+        private readonly TextBlock[] _upgradePrices = new TextBlock[8];
+        private readonly Button[] _categoryButtons = new Button[3];
+        private bool _advancedWorkshopVisible;
+        private Button _advancedWorkshopButton = null!;
+        private Button _skipToggleButton = null!;
+        private readonly Button[] _advancedButtons = new Button[6];
+        private readonly TextBlock[] _advancedNames = new TextBlock[6];
+        private readonly TextBlock[] _advancedDetails = new TextBlock[6];
+        private readonly TextBlock[] _advancedPrices = new TextBlock[6];
+        private Button _workshopButton = null!;
+        private Button _towerRepairButton = null!;
+        private Button _fenceRepairButton = null!;
+        private Button _nextWaveButton = null!;
+        private Button _autoNextButton = null!;
+        private const int AutoNextPurchasePrice = 650;
+        private const double AutoNextDelaySeconds = 5.0;
+        private bool _autoNextPurchased;
+        private bool _autoNextEnabled;
+        // Negative when no wave is queued; only elapsed while unpaused.
+        private double _autoNextRemaining = -1;
+        private Button _endRunButton = null!;
+        private Button _continueButton = null!;
+        private Button _newRunButton = null!;
+        private Button _leaderboardButton = null!;
+        private Button _leaderboardCloseButton = null!;
+        private bool _leaderboardVisible;
+        private bool _leaderboardAutoPaused;
+        private List<TowerDefenseLeaderboardEntryDto> _leaderboard = new();
+        private string _leaderboardStatus = "Loading shop leaderboard...";
+        private string _scoreUploadStatus = "Finished shifts submit to the shop board.";
+        private string _playerName = "Guest (local only)";
+        private string? _employeeId;
+        private Task? _playerLoadTask;
+        private bool _scoreSubmissionStarted;
+        private readonly ApiClient _arcadeApi = ClientAppSettings.CreateApiClient();
+        private TowerDefenseSession? _resumeOffer;
+        private bool _resumeDecisionPending;
+        private double _snapshotElapsed = 0;
+        private double _savedElapsedOffset;
+        private readonly Button[] _perkButtons = new Button[3];
+        private string _lastUpgradeSignature = "";
+        private DateTime _lastControlsRefreshUtc = DateTime.MinValue;
+        private readonly DispatcherTimer _timer;
+        private readonly Stopwatch _clock = new();
+        private readonly Random _random = new();
+        private readonly List<CopperThief> _thieves = new();
+        private readonly List<InterferenceTower> _jammers = new();
+        private readonly List<DefenseFlash> _defenseFlashes = new();
+        private readonly double[] _specialCooldowns = new double[4];
+        private double _empPulseRemaining;
+        private static readonly Pen DroneBeamGlowPen = FreezePen(PulseFill, 5);
+        private static readonly Pen DroneBeamCorePen = FreezePen(White, 2.4);
+        private static readonly Pen DroneImpactPen = FreezePen(Cyan, 1.9);
+        private readonly TowerDefenseProgression _progression = new();
+
+        private int _cash;
+        private int _score;
+        private int _bestScore;
+        private int _wave;
+        private int _thievesStopped;
+        private int _interferenceRemoved;
+        // Compatibility aliases for the original center-tower mechanics.
+        // The 24 upgrade paths now live in TowerDefenseProgression.
+        private int _lightningLevel => _progression.Level(10);
+        private int _surgeLevel => _progression.Level(11);
+        private int _fenceLevel => _progression.Level(12);
+        private int _filterLevel => _progression.Level(5);
+        private double _health;
+        private double _fenceHealth;
+        private double _lastTickTime;
+        private double _spawnThiefIn;
+        private double _spawnJammerIn;
+        private double _spawnLightningIn;
+        private double _warningRemaining = -1;
+        private double _flashRemaining;
+        private double _securitySweepCooldown;
+        private double _rfSweepCooldown;
+        private double _patrolCooldown;
+        private double _droneCooldown;
+        private double _leftGunCooldown;
+        private double _rightGunCooldown;
+        private double _leftMuzzleRemaining;
+        private double _rightMuzzleRemaining;
+        private Point? _leftGunAim;
+        private Point? _rightGunAim;
+        private bool _perkPending;
+        private double _securityRingTime;
+        private double _rfRingTime;
+        private int _thievesToSpawn;
+        private int _jammersToSpawn;
+        private int _lightningToSpawn;
+        private bool _started;
+        private bool _waveActive;
+        private bool _paused;
+        private bool _gameOver;
+        private bool _showHelp;
+        private bool _helpAutoPaused;
+        private string _message = "PRESS SPACE TO DEFEND YOUR TOWER.";
+
+        private TowerDefenseWindow(Window host)
+        {
+            _host = host;
+            Owner = host;
+            Title = "Grid Under Attack — 360° Tower Defense";
+            Width = Math.Min(1360, Math.Max(760, SystemParameters.WorkArea.Width - 24));
+            Height = Math.Min(890, Math.Max(535, SystemParameters.WorkArea.Height - 18));
+            MinWidth = 760;
+            MinHeight = 535;
+            ResizeMode = ResizeMode.CanResize;
+            ShowInTaskbar = false;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            Background = Backdrop;
+            FontFamily = new FontFamily("Consolas");
+            Focusable = true;
+
+            _surface = new GameSurface(this);
+            var design = new Grid
+            {
+                Width = DesignWidth,
+                Height = DesignHeight
+            };
+            design.Children.Add(_surface);
+            _controls.Width = DesignWidth;
+            _controls.Height = DesignHeight;
+            design.Children.Add(_controls);
+            BuildUpgradeControls();
+
+            // Larger by default, with graceful downscaling for small screens.
+            // This keeps the radio tower, panel, and buttons inside the window.
+            Content = new Viewbox
+            {
+                Stretch = Stretch.Uniform,
+                Child = design
+            };
+
+            _timer = new DispatcherTimer(DispatcherPriority.Background)
+            {
+                Interval = TimeSpan.FromMilliseconds(45)
+            };
+            _timer.Tick += Tick;
+            _timer.Tick += RefreshControlsOnTick;
+            PreviewKeyDown += HandleKey;
+
+            _host.Closed += HostClosed;
+            _host.IsVisibleChanged += HostVisibilityChanged;
+            _host.StateChanged += HostStateChanged;
+            Closed += WindowClosed;
+            Loaded += (_, _) =>
+            {
+                NewGame();
+                _playerLoadTask = LoadPlayerAsync();
+                _ = RefreshLeaderboardAsync();
+                _resumeOffer = TowerDefenseSessionStore.Load();
+                _resumeDecisionPending = _resumeOffer != null;
+                RefreshUpgradeControls();
+                Activate();
+                Keyboard.Focus(this);
+            };
+            Deactivated += (_, _) =>
+            {
+                if (_started && !_paused && !_gameOver)
+                    SetPaused(true);
+            };
+        }
+
+        private static ControlTemplate MakeButtonTemplate()
+        {
+            var template = new ControlTemplate(typeof(Button));
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.Name = "chrome";
+            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(7));
+            border.SetValue(Border.BorderThicknessProperty, new Thickness(1.2));
+            border.SetValue(Border.PaddingProperty, new Thickness(10, 4, 10, 4));
+            var source = new RelativeSource(RelativeSourceMode.TemplatedParent);
+            border.SetBinding(Border.BackgroundProperty,
+                new Binding("Background") { RelativeSource = source });
+            border.SetBinding(Border.BorderBrushProperty,
+                new Binding("BorderBrush") { RelativeSource = source });
+
+            var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenter.SetValue(FrameworkElement.HorizontalAlignmentProperty,
+                HorizontalAlignment.Stretch);
+            presenter.SetValue(FrameworkElement.VerticalAlignmentProperty,
+                VerticalAlignment.Center);
+            presenter.SetBinding(ContentPresenter.ContentProperty,
+                new Binding("Content") { RelativeSource = source });
+            border.AppendChild(presenter);
+            template.VisualTree = border;
+
+            var hover = new Trigger
+            {
+                Property = Button.IsMouseOverProperty,
+                Value = true
+            };
+            hover.Setters.Add(new Setter(Border.BackgroundProperty,
+                Paint("#315574"), "chrome"));
+            hover.Setters.Add(new Setter(Border.BorderBrushProperty,
+                Gold, "chrome"));
+            template.Triggers.Add(hover);
+
+            var pressed = new Trigger
+            {
+                Property = Button.IsPressedProperty,
+                Value = true
+            };
+            pressed.Setters.Add(new Setter(Border.BackgroundProperty,
+                Paint("#426483"), "chrome"));
+            template.Triggers.Add(pressed);
+
+            var disabled = new Trigger
+            {
+                Property = Button.IsEnabledProperty,
+                Value = false
+            };
+            disabled.Setters.Add(new Setter(UIElement.OpacityProperty, 0.54));
+            template.Triggers.Add(disabled);
+            return template;
+        }
+
+        private static Button ArcadeButton(string title, double width,
+            double height, Brush accent)
+        {
+            return new Button
+            {
+                Content = title,
+                Width = width,
+                Height = height,
+                Background = ButtonFace,
+                BorderBrush = accent,
+                Foreground = White,
+                FontSize = 14,
+                FontWeight = FontWeights.SemiBold,
+                FontFamily = new FontFamily("Consolas"),
+                Cursor = Cursors.Hand,
+                Focusable = false,
+                Template = MakeButtonTemplate()
+            };
+        }
+
+        private static TextBlock CardText(
+            double size, Brush color, bool bold = false)
+        {
+            return new TextBlock
+            {
+                FontSize = size,
+                Foreground = color,
+                FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
+                FontFamily = new FontFamily("Consolas"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private void EndRun()
+        {
+            if (!_started || _gameOver || _resumeDecisionPending)
+                return;
+            // Voluntarily end the run: no more waves; bank earned research,
+            // then offer the existing permanent workshop screen.
+            _waveActive = false;
+            _thievesToSpawn = _jammersToSpawn = _lightningToSpawn = 0;
+            _warningRemaining = -1;
+            _thieves.Clear();
+            _jammers.Clear();
+            _timer.Stop();
+            _clock.Stop();
+            _gameOver = true;
+            _autoNextRemaining = -1;
+            _message = "SHIFT ENDED EARLY. RESEARCH CREDITS BANKED.";
+            _progression.BankRun(_wave, _score);
+            TowerDefenseSessionStore.Clear();
+            _ = SubmitScoreAsync();
+            _bestScore = Math.Max(_bestScore, _score);
+            SaveBestScore(_bestScore);
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private void SaveSuspendedRun()
+        {
+            if (!_started || _gameOver || _resumeDecisionPending)
+                return;
+
+            TowerDefenseSessionStore.Save(new TowerDefenseSession
+            {
+                Wave = _wave,
+                Cash = _cash,
+                Score = _score,
+                ThievesStopped = _thievesStopped,
+                InterferenceRemoved = _interferenceRemoved,
+                Health = _health,
+                FenceHealth = _fenceHealth,
+                Started = true,
+                WaveActive = _waveActive,
+                PerkPending = _perkPending,
+                AutoNextPurchased = _autoNextPurchased,
+                AutoNextEnabled = _autoNextEnabled,
+                AutoNextRemaining = _autoNextRemaining,
+                ThievesToSpawn = _thievesToSpawn,
+                JammersToSpawn = _jammersToSpawn,
+                LightningToSpawn = _lightningToSpawn,
+                SpawnThiefIn = _spawnThiefIn,
+                SpawnJammerIn = _spawnJammerIn,
+                SpawnLightningIn = _spawnLightningIn,
+                WarningRemaining = _warningRemaining,
+                SecurityCooldown = _securitySweepCooldown,
+                RfCooldown = _rfSweepCooldown,
+                PatrolCooldown = _patrolCooldown,
+                DroneCooldown = _droneCooldown,
+                LeftGunCooldown = _leftGunCooldown,
+                RightGunCooldown = _rightGunCooldown,
+                SpecialCooldowns = _specialCooldowns.ToArray(),
+                ElapsedSeconds = _clock.Elapsed.TotalSeconds + _savedElapsedOffset,
+                PendingResearch = _progression.PendingCredits,
+                RunLevels = _progression.ExportRunLevels(),
+                Category = _progression.SelectedCategory,
+                Row = _progression.SelectedRow,
+                Enemies = _thieves.Select(t => new TowerDefenseThreatSnapshot
+                {
+                    Kind = t.Kind, Angle = t.Angle, Distance = t.Distance,
+                    Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth,
+                    FenceHitDone = t.FenceHitDone, ClimbSeconds = t.ClimbSeconds,
+                    FenceVaultDuration = t.FenceVaultDuration,
+                    FenceVaultRemaining = t.FenceVaultRemaining
+                }).ToList(),
+                InterferenceTowers = _jammers.Select(t => new TowerDefenseRfSnapshot
+                {
+                    X = t.X, Y = t.Y, Age = t.Age,
+                    Health = t.Health, MaxHealth = t.MaxHealth
+                }).ToList()
+            });
+        }
+
+        private void ContinueSuspendedRun()
+        {
+            var snapshot = _resumeOffer;
+            if (snapshot == null) return;
+            _resumeDecisionPending = false;
+            _resumeOffer = null;
+            _progression.RestoreRun(snapshot.RunLevels, snapshot.PendingResearch);
+            _progression.SelectedCategory = Math.Clamp(snapshot.Category, 0, 2);
+            _progression.SelectedRow = Math.Clamp(snapshot.Row, 0, 7);
+            _wave = snapshot.Wave;
+            _cash = snapshot.Cash;
+            _score = snapshot.Score;
+            _thievesStopped = snapshot.ThievesStopped;
+            _interferenceRemoved = snapshot.InterferenceRemoved;
+            _health = Math.Clamp(snapshot.Health, 0, MaxTowerHealth);
+            _fenceHealth = Math.Clamp(snapshot.FenceHealth, 0, FenceMaxHealth);
+            _started = snapshot.Started;
+            _waveActive = snapshot.WaveActive;
+            _perkPending = snapshot.PerkPending;
+            _autoNextPurchased = snapshot.AutoNextPurchased;
+            _autoNextEnabled = snapshot.AutoNextPurchased &&
+                snapshot.AutoNextEnabled;
+            _autoNextRemaining = _autoNextEnabled &&
+                !snapshot.WaveActive && !snapshot.PerkPending
+                ? Math.Clamp(snapshot.AutoNextRemaining, -1,
+                    AutoNextDelaySeconds)
+                : -1;
+            _thievesToSpawn = Math.Max(0, snapshot.ThievesToSpawn);
+            _jammersToSpawn = Math.Max(0, snapshot.JammersToSpawn);
+            _lightningToSpawn = Math.Max(0, snapshot.LightningToSpawn);
+            _spawnThiefIn = snapshot.SpawnThiefIn;
+            _spawnJammerIn = snapshot.SpawnJammerIn;
+            _spawnLightningIn = snapshot.SpawnLightningIn;
+            _warningRemaining = snapshot.WarningRemaining;
+            _securitySweepCooldown = snapshot.SecurityCooldown;
+            _rfSweepCooldown = snapshot.RfCooldown;
+            _patrolCooldown = snapshot.PatrolCooldown;
+            _droneCooldown = snapshot.DroneCooldown;
+            _leftGunCooldown = snapshot.LeftGunCooldown;
+            _rightGunCooldown = snapshot.RightGunCooldown;
+            for (int i = 0; i < _specialCooldowns.Length; i++)
+                _specialCooldowns[i] = snapshot.SpecialCooldowns != null &&
+                    i < snapshot.SpecialCooldowns.Length
+                    ? Math.Clamp(snapshot.SpecialCooldowns[i], 0, 60) : 0;
+            _empPulseRemaining = 0;
+            _thieves.Clear();
+            _thieves.AddRange(snapshot.Enemies.Select(t => new CopperThief
+            {
+                Kind = Math.Clamp(t.Kind, 0, 4),
+                Angle = t.Angle, Distance = t.Distance,
+                Speed = t.Speed, Health = t.Health, MaxHealth = t.MaxHealth,
+                FenceHitDone = t.FenceHitDone, ClimbSeconds = t.ClimbSeconds,
+                FenceVaultDuration = t.FenceVaultDuration,
+                FenceVaultRemaining = t.FenceVaultRemaining
+            }));
+            _jammers.Clear();
+            _jammers.AddRange(snapshot.InterferenceTowers.Select(t => new InterferenceTower
+            {
+                X = t.X, Y = t.Y, Age = t.Age,
+                Health = t.Health, MaxHealth = t.MaxHealth
+            }));
+            _savedElapsedOffset = Math.Max(0, snapshot.ElapsedSeconds);
+            _clock.Restart();
+            _lastTickTime = 0;
+            _paused = true;
+            _clock.Stop();
+            _message = "SESSION RESTORED AT WAVE " + _wave + ". PRESS P TO RESUME.";
+            _timer.Start();
+            _lastUpgradeSignature = "";
+            RefreshUpgradeControls();
+            _surface.InvalidateVisual();
+        }
+
+        private void StartNewInsteadOfResume()
+        {
+            if (_resumeOffer != null)
+            {
+                // Bank earned research from the abandoned run so choosing New
+                // doesn't silently discard hours of permanent progress.
+                _progression.RestoreRun(_resumeOffer.RunLevels,
+                    _resumeOffer.PendingResearch);
+                _progression.BankRun(_resumeOffer.Wave, _resumeOffer.Score);
+                // Choosing a fresh game explicitly ends the suspended shift.
+                // Submit its captured score, never the reset new-run score.
+                _ = SubmitScoreAsync(_resumeOffer.Wave, _resumeOffer.Score);
+            }
+            TowerDefenseSessionStore.Clear();
+            NewGame();
+        }
+
+        private void ToggleAutoNextWave()
+        {
+            if (!_started || _paused || _gameOver ||
+                _resumeDecisionPending || _perkPending ||
+                _progression.WorkshopOpen || _showHelp)
+                return;
+
+            if (!_autoNextPurchased)
+            {
+                if (_cash < AutoNextPurchasePrice)
+                {
+                    _message = "AUTO NEXT WAVE NEEDS " +
+                        Money(AutoNextPurchasePrice) + ".";
+                    return;
+                }
+
+                _cash -= AutoNextPurchasePrice;
+                _autoNextPurchased = true;
+                _autoNextEnabled = true;
+                _message = "AUTO NEXT UNLOCKED! 5 SECOND BREAK BETWEEN WAVES.";
+            }
+            else
+            {
+                _autoNextEnabled = !_autoNextEnabled;
+                _message = _autoNextEnabled
+                    ? "AUTO NEXT ENABLED. PAUSES FOR MILESTONE REWARDS."
+                    : "AUTO NEXT DISABLED. MANUAL WAVE START.";
+            }
+
+            if (_autoNextEnabled && !_waveActive &&
+                _wave > 0 && !_perkPending)
+                _autoNextRemaining = AutoNextDelaySeconds;
+            else
+                _autoNextRemaining = -1;
+
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+            SaveSuspendedRun();
+        }
+
+        private void QueueAutoNextWave()
+        {
+            _autoNextRemaining = _autoNextPurchased && _autoNextEnabled &&
+                _started && !_gameOver && !_waveActive &&
+                !_perkPending && _wave > 0
+                ? AutoNextDelaySeconds : -1;
+            RefreshUpgradeControls();
+        }
+
+        private async Task LoadPlayerAsync()
+        {
+            try
+            {
+                var current = await CurrentUserService.LoadCurrentTechnicianAsync();
+                if (!IsLoaded) return;
+                if (current != null && current.IsActive)
+                {
+                    _employeeId = current.EmployeeId;
+                    _playerName = current.Name;
+                }
+                else
+                {
+                    _employeeId = null;
+                    _playerName = "Guest (local only)";
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Tower Defense technician lookup failed: " + ex);
+                if (!IsLoaded) return;
+                _employeeId = null;
+                _playerName = "Guest (local only)";
+            }
+            if (IsLoaded) _surface.InvalidateVisual();
+        }
+
+        private static string LeaderboardError(Exception error) => error switch
+        {
+            ApiClient.ApiException { StatusCode: 404 } =>
+                "Leaderboard API/table missing. Deploy the API and SQL migration.",
+            ApiClient.ApiException { StatusCode: 500 } =>
+                "Leaderboard database error. Check the new SQL migration.",
+            ApiClient.ApiConnectionException =>
+                "Shop API unreachable. Check network or VPN.",
+            ApiClient.ApiException exception =>
+                "Leaderboard request failed: HTTP " + exception.StatusCode,
+            _ => "Leaderboard unavailable. Check client logs."
+        };
+
+        private async Task RefreshLeaderboardAsync()
+        {
+            _leaderboardStatus = "Loading shop leaderboard...";
+            _surface.InvalidateVisual();
+            try
+            {
+                var results = await _arcadeApi
+                    .GetAsync<List<TowerDefenseLeaderboardEntryDto>>(
+                        "api/arcade/tower-defense/leaderboard");
+                if (!IsLoaded) return;
+                _leaderboard = results ?? new();
+                _leaderboardStatus = _leaderboard.Count == 0
+                    ? "No scores yet. Finish a shift to join the leaderboard."
+                    : "Best completed shift per active technician.";
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Tower Defense leaderboard load failed: " + ex);
+                if (!IsLoaded) return;
+                _leaderboardStatus = LeaderboardError(ex);
+            }
+            if (IsLoaded) _surface.InvalidateVisual();
+        }
+
+        private Task SubmitScoreAsync() => SubmitScoreAsync(_wave, _score);
+
+        private async Task SubmitScoreAsync(int finishedWave, int finishedScore)
+        {
+            if (_scoreSubmissionStarted || finishedWave <= 0 ||
+                finishedScore <= 0) return;
+            _scoreSubmissionStarted = true;
+
+            // Identity loading is independent of leaderboard retrieval. Wait
+            // for the initial roster lookup, so a fast End Run doesn't lose
+            // its score just because the shop VPN responded slowly.
+            try
+            {
+                if (_playerLoadTask != null)
+                    await _playerLoadTask;
+
+                if (string.IsNullOrWhiteSpace(_employeeId))
+                {
+                    _scoreUploadStatus =
+                        "Guest run: local score only (active roster required).";
+                    return;
+                }
+
+                _scoreUploadStatus = "Uploading finished shift...";
+                if (IsLoaded) _surface.InvalidateVisual();
+                await _arcadeApi.PostAsync<TowerDefenseScoreRequest,
+                    TowerDefenseLeaderboardEntryDto>(
+                    "api/arcade/tower-defense/scores",
+                    new TowerDefenseScoreRequest
+                    {
+                        EmployeeId = _employeeId,
+                        Wave = finishedWave,
+                        Score = finishedScore
+                    });
+                _scoreUploadStatus = "Shift uploaded to shop leaderboard!";
+                if (IsLoaded) await RefreshLeaderboardAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Tower Defense score upload failed: " + ex);
+                _scoreUploadStatus = LeaderboardError(ex);
+            }
+            finally
+            {
+                if (IsLoaded) _surface.InvalidateVisual();
+            }
+        }
+
+        private void ToggleLeaderboard()
+        {
+            if (_resumeDecisionPending || _progression.WorkshopOpen ||
+                _perkPending || _showHelp)
+                return;
+
+            _leaderboardVisible = !_leaderboardVisible;
+            if (_leaderboardVisible)
+            {
+                _leaderboardAutoPaused = _started && !_paused && !_gameOver;
+                if (_leaderboardAutoPaused)
+                    SetPaused(true);
+                _ = RefreshLeaderboardAsync();
+            }
+            else
+            {
+                if (_leaderboardAutoPaused && !_gameOver)
+                    SetPaused(false);
+                _leaderboardAutoPaused = false;
+            }
+            RefreshUpgradeControls();
+            _surface.InvalidateVisual();
+        }
+
+        private void BuildUpgradeControls()
+        {
+            for (int category = 0; category < 3; category++)
+            {
+                int selectedCategory = category;
+                var button = ArcadeButton(
+                    CategoryNames[category], 148, 37, Cyan);
+                button.Click += (_, _) =>
+                {
+                    _progression.SelectedCategory = selectedCategory;
+                    DescribeSelection();
+                    RefreshUpgradeControls();
+                };
+                _categoryButtons[category] = button;
+                _controls.Children.Add(button);
+            }
+
+            for (int row = 0; row < 8; row++)
+            {
+                int selectedRow = row;
+                var button = ArcadeButton("", PanelWidth - 22,
+                    50, GridInk);
+                button.BorderBrush = GridInk;
+                var grid = new Grid();
+                grid.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength(1, GridUnitType.Star)
+                });
+                grid.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength(122)
+                });
+                grid.RowDefinitions.Add(new RowDefinition
+                {
+                    Height = new GridLength(1, GridUnitType.Star)
+                });
+                grid.RowDefinitions.Add(new RowDefinition
+                {
+                    Height = new GridLength(1, GridUnitType.Star)
+                });
+
+                _upgradeNames[row] = CardText(15.6, White, true);
+                _upgradeDetails[row] = CardText(12, Muted);
+                _upgradeLevels[row] = CardText(11.7, Cyan, true);
+                _upgradePrices[row] = CardText(15, Green, true);
+                _upgradeLevels[row].TextAlignment = TextAlignment.Right;
+                _upgradePrices[row].TextAlignment = TextAlignment.Right;
+
+                Grid.SetRow(_upgradeNames[row], 0);
+                Grid.SetColumn(_upgradeNames[row], 0);
+                Grid.SetRow(_upgradeDetails[row], 1);
+                Grid.SetColumn(_upgradeDetails[row], 0);
+                Grid.SetRow(_upgradeLevels[row], 1);
+                Grid.SetColumn(_upgradeLevels[row], 1);
+                Grid.SetRow(_upgradePrices[row], 0);
+                Grid.SetColumn(_upgradePrices[row], 1);
+
+                grid.Children.Add(_upgradeNames[row]);
+                grid.Children.Add(_upgradeDetails[row]);
+                grid.Children.Add(_upgradeLevels[row]);
+                grid.Children.Add(_upgradePrices[row]);
+                button.Content = grid;
+                ToolTipService.SetShowOnDisabled(button, true);
+                button.Click += (_, _) =>
+                {
+                    BuySelected(selectedRow);
+                    RefreshUpgradeControls();
+                };
+                _upgradeButtons[row] = button;
+                _controls.Children.Add(button);
+            }
+
+            _advancedWorkshopButton = ArcadeButton("SPECIAL RESEARCH", 226, 37, Purple);
+            _advancedWorkshopButton.Click += (_, _) =>
+            {
+                if (!_progression.WorkshopOpen) return;
+                _advancedWorkshopVisible = !_advancedWorkshopVisible;
+                _lastUpgradeSignature = "";
+                RefreshUpgradeControls();
+                _surface.InvalidateVisual();
+            };
+            _controls.Children.Add(_advancedWorkshopButton);
+
+            _skipToggleButton = ArcadeButton("SKIP WAVES: ON", 260, 36, Gold);
+            _skipToggleButton.Click += (_, _) =>
+            {
+                if (!_progression.WorkshopOpen || !_advancedWorkshopVisible) return;
+                _progression.ToggleWaveSkip();
+                SyncPreRunSkip();
+                _lastUpgradeSignature = "";
+                RefreshUpgradeControls();
+                _surface.InvalidateVisual();
+            };
+            _controls.Children.Add(_skipToggleButton);
+
+            for (int i = 0; i < 6; i++)
+            {
+                int selected = i;
+                var button = ArcadeButton("", 460, 113, ButtonFace);
+                var textGrid = new Grid();
+                textGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(33) });
+                textGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(42) });
+                textGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(26) });
+
+                _advancedNames[i] = CardText(16.5, White, true);
+                _advancedDetails[i] = CardText(12.4, Muted);
+                _advancedDetails[i].TextWrapping = TextWrapping.Wrap;
+                _advancedDetails[i].TextTrimming = TextTrimming.None;
+                _advancedPrices[i] = CardText(14.4, Cyan, true);
+                Grid.SetRow(_advancedNames[i], 0);
+                Grid.SetRow(_advancedDetails[i], 1);
+                Grid.SetRow(_advancedPrices[i], 2);
+                textGrid.Children.Add(_advancedNames[i]);
+                textGrid.Children.Add(_advancedDetails[i]);
+                textGrid.Children.Add(_advancedPrices[i]);
+                button.Content = textGrid;
+                button.Padding = new Thickness(12, 3, 12, 3);
+                ToolTipService.SetShowOnDisabled(button, true);
+                button.Click += (_, _) => BuyAdvancedUpgrade(selected);
+                _advancedButtons[i] = button;
+                _controls.Children.Add(button);
+            }
+
+            _workshopButton = ArcadeButton("RESEARCH WORKSHOP", 180, 36, Purple);
+            _workshopButton.Click += (_, _) =>
+            {
+                ToggleWorkshop();
+                RefreshUpgradeControls();
+            };
+            _controls.Children.Add(_workshopButton);
+
+            _towerRepairButton = ArcadeButton("REPAIR TOWER", 208, 36, Green);
+            _towerRepairButton.FontSize = 12;
+            ToolTipService.SetShowOnDisabled(_towerRepairButton, true);
+            _towerRepairButton.Click += (_, _) =>
+            {
+                RepairTower();
+                RefreshUpgradeControls();
+            };
+            _controls.Children.Add(_towerRepairButton);
+
+            _fenceRepairButton = ArcadeButton("REPAIR FENCE", 207, 36, Cyan);
+            _fenceRepairButton.FontSize = 12;
+            ToolTipService.SetShowOnDisabled(_fenceRepairButton, true);
+            _fenceRepairButton.Click += (_, _) =>
+            {
+                RepairFence();
+                RefreshUpgradeControls();
+            };
+            _controls.Children.Add(_fenceRepairButton);
+
+            _endRunButton = ArcadeButton("END RUN • BANK", 180, 36, Red);
+            _endRunButton.FontSize = 12;
+            _endRunButton.ToolTip = "Stop incoming waves now and bank this run's research credits.";
+            _endRunButton.Click += (_, _) => EndRun();
+            _controls.Children.Add(_endRunButton);
+
+            _continueButton = ArcadeButton("CONTINUE SAVED RUN", 450, 59, Green);
+            _continueButton.Click += (_, _) => ContinueSuspendedRun();
+            _controls.Children.Add(_continueButton);
+
+            _newRunButton = ArcadeButton("BANK RESEARCH & NEW RUN", 450, 59, Gold);
+            _newRunButton.Click += (_, _) => StartNewInsteadOfResume();
+            _controls.Children.Add(_newRunButton);
+
+            _autoNextButton = ArcadeButton("BUY AUTO NEXT " +
+                Money(AutoNextPurchasePrice), 281, 36, Cyan);
+            _autoNextButton.FontSize = 12;
+            ToolTipService.SetShowOnDisabled(_autoNextButton, true);
+            _autoNextButton.Click += (_, _) => ToggleAutoNextWave();
+            _controls.Children.Add(_autoNextButton);
+
+            _leaderboardButton = ArcadeButton("SHOP SCORES", 168, 35, Gold);
+            _leaderboardButton.FontSize = 13;
+            _leaderboardButton.Click += (_, _) => ToggleLeaderboard();
+            Canvas.SetLeft(_leaderboardButton, PanelX + 297);
+            Canvas.SetTop(_leaderboardButton, 137);
+            _controls.Children.Add(_leaderboardButton);
+
+            _leaderboardCloseButton = ArcadeButton(
+                "CLOSE SCORES", 174, 40, Cyan);
+            _leaderboardCloseButton.Click += (_, _) => ToggleLeaderboard();
+            Canvas.SetLeft(_leaderboardCloseButton, 968);
+            Canvas.SetTop(_leaderboardCloseButton, 159);
+            _controls.Children.Add(_leaderboardCloseButton);
+
+            _nextWaveButton = ArcadeButton("PREPARE", 177, 36, Gold);
+            _nextWaveButton.Click += (_, _) =>
+            {
+                PrepareOrStartWave();
+                RefreshUpgradeControls();
+            };
+            _controls.Children.Add(_nextWaveButton);
+
+            string[] choices =
+            {
+                "OVERTIME PAY • CASH",
+                "STORM RECOVERY • HEAL",
+                "R&D GRANT • RESEARCH"
+            };
+            for (int choice = 0; choice < 3; choice++)
+            {
+                int selectedChoice = choice + 1;
+                _perkButtons[choice] = ArcadeButton(
+                    choices[choice], 913, 51,
+                    choice == 0 ? Green : choice == 1 ? Cyan : Purple);
+                _perkButtons[choice].Click += (_, _) =>
+                {
+                    SelectPerk(selectedChoice);
+                    RefreshUpgradeControls();
+                };
+                Canvas.SetLeft(_perkButtons[choice], 173);
+                Canvas.SetTop(_perkButtons[choice], 315 + 65 * choice);
+                _controls.Children.Add(_perkButtons[choice]);
+            }
+        }
+
+        private void RefreshControlsOnTick(object? sender, EventArgs e)
+        {
+            if ((DateTime.UtcNow - _lastControlsRefreshUtc).TotalMilliseconds < 170)
+                return;
+            _lastControlsRefreshUtc = DateTime.UtcNow;
+            RefreshUpgradeControls();
+        }
+
+        // All visible bottom actions share a single row with consistent
+        // gutters; the previous hand-coded X values caused overlapping
+        // buttons and accidentally covered the footer's help text.
+        private void LayoutFooterButtons()
+        {
+            if (_progression.WorkshopOpen)
+                return;
+
+            var slots = new (Button Control, double Width)[]
+            {
+                (_endRunButton, 172),
+                (_autoNextButton, 248),
+                (_towerRepairButton, 196),
+                (_fenceRepairButton, 196),
+                (_workshopButton, 160),
+                (_nextWaveButton, 177)
+            };
+            var visible = slots
+                .Where(slot => slot.Control.Visibility == Visibility.Visible)
+                .ToArray();
+            if (visible.Length == 0) return;
+
+            const double left = 34;
+            const double right = 1286;
+            const double gap = 12;
+            double groupWidth = visible.Sum(slot => slot.Width) +
+                gap * (visible.Length - 1);
+            double x = left + Math.Max(0, (right - left - groupWidth) / 2);
+
+            foreach (var slot in visible)
+            {
+                slot.Control.Width = slot.Width;
+                Canvas.SetLeft(slot.Control, x);
+                Canvas.SetTop(slot.Control, 765);
+                x += slot.Width + gap;
+            }
+        }
+
+        private void RefreshUpgradeControls()
+        {
+            if (_upgradeButtons[0] == null)
+                return;
+
+            bool workshop = _progression.WorkshopOpen;
+            bool gameUsable = _started && !_gameOver && !_paused &&
+                !_leaderboardVisible &&
+                !_showHelp && !_perkPending && !_resumeDecisionPending;
+            bool rowsVisible = !_resumeDecisionPending &&
+                !_leaderboardVisible &&
+                (workshop ? !_advancedWorkshopVisible : gameUsable);
+
+            string signature = string.Join("|",
+                workshop, _started, _paused, _gameOver, _showHelp,
+                _perkPending, _resumeDecisionPending, _leaderboardVisible, _wave, _cash, _progression.Credits,
+                _autoNextPurchased, _autoNextEnabled,
+                Math.Ceiling(Math.Max(-1, _autoNextRemaining) * 2) / 2,
+                _progression.SelectedCategory, _progression.SelectedRow,
+                _advancedWorkshopVisible,
+                _progression.SpeedTier, _progression.SkipTier,
+                _progression.SelectedSkipTier,
+                string.Join(",", _progression.ExportSpecialLevels()),
+                _health.ToString("0", MoneyCulture),
+                _fenceHealth.ToString("0", MoneyCulture),
+                string.Join(",", Enumerable.Range(0, 8).Select(row =>
+                {
+                    int index = _progression.SelectedCategory * 8 + row;
+                    return _progression.Level(index) + ":" +
+                        _progression.PermanentLevel(index);
+                })));
+
+            if (signature == _lastUpgradeSignature)
+                return;
+            _lastUpgradeSignature = signature;
+
+            for (int category = 0; category < 3; category++)
+            {
+                var button = _categoryButtons[category];
+                button.Visibility = rowsVisible
+                    ? Visibility.Visible : Visibility.Collapsed;
+                button.Background = _progression.SelectedCategory == category
+                    ? Paint("#294D69") : ButtonFace;
+                button.BorderBrush = _progression.SelectedCategory == category
+                    ? Gold : GridInk;
+                Canvas.SetLeft(button, workshop ? 183 + category * 315
+                    : PanelX + 10 + category * 155);
+                Canvas.SetTop(button, workshop ? 217 : 258);
+                button.Width = workshop ? 302 : 148;
+            }
+
+            for (int row = 0; row < 8; row++)
+            {
+                int index = _progression.SelectedCategory * 8 + row;
+                var upgrade = TowerDefenseProgression.Catalog[index];
+                bool unlocked = _progression.Unlocked(index, _wave);
+                long price = workshop
+                    ? _progression.WorkshopPrice(index)
+                    : _progression.RunPrice(index);
+                bool affordable = workshop
+                    ? _progression.Credits >= price
+                    : _cash >= price;
+
+                var button = _upgradeButtons[row];
+                button.Visibility = rowsVisible
+                    ? Visibility.Visible : Visibility.Collapsed;
+                button.IsEnabled = unlocked && affordable && rowsVisible;
+                button.BorderBrush = row == _progression.SelectedRow
+                    ? Gold : GridInk;
+                button.Background = row == _progression.SelectedRow
+                    ? Paint("#223A56") : ButtonFace;
+                button.Width = workshop ? 947 : PanelWidth - 22;
+                button.Height = workshop ? 51 : 50;
+                Canvas.SetLeft(button, workshop ? 182 : PanelX + 11);
+                Canvas.SetTop(button, workshop ? 266 + row * 55
+                    : FirstUpgradeY + row * UpgradePitch);
+
+                _upgradeNames[row].Text = upgrade.Name;
+                _upgradeDetails[row].Text = upgrade.Detail;
+                _upgradeLevels[row].Text = "LV " +
+                    (workshop ? _progression.PermanentLevel(index)
+                              : _progression.Level(index));
+                _upgradePrices[row].Text = !unlocked
+                    ? "WAVE " + upgrade.UnlockWave : Money(price);
+                _upgradePrices[row].Foreground = !unlocked
+                    ? Red : affordable ? Green : Gold;
+                button.ToolTip = upgrade.Detail + Environment.NewLine +
+                    (workshop ? "Permanent research" : "Current run") +
+                    " • " + (!unlocked
+                        ? "Unlock at wave " + upgrade.UnlockWave
+                        : "Price: " + Money(price)) +
+                    (affordable ? "" : " • Not enough funds");
+            }
+
+            bool showFooter = !workshop && !_showHelp && !_perkPending &&
+                !_resumeDecisionPending && !_leaderboardVisible;
+            _workshopButton.Visibility = !_resumeDecisionPending &&
+                !_showHelp && !_perkPending && !_leaderboardVisible &&
+                (workshop || !_waveActive && (!_started || _gameOver))
+                    ? Visibility.Visible : Visibility.Collapsed;
+            _workshopButton.Content = workshop
+                ? "CLOSE WORKSHOP" : "RESEARCH WORKSHOP";
+            Canvas.SetLeft(_workshopButton, workshop ? 1052 : 949);
+            Canvas.SetTop(_workshopButton, workshop ? WorkshopActionY : 764);
+            _workshopButton.Width = workshop ? 168 : 160;
+
+            _towerRepairButton.Visibility = showFooter && _started && !_gameOver
+                ? Visibility.Visible : Visibility.Collapsed;
+            _towerRepairButton.Content = "TOWER +" +
+                Math.Ceiling(TowerRepairAvailable).ToString("0", MoneyCulture) +
+                "HP  " + Money(TowerRepairCost);
+            _towerRepairButton.ToolTip = "Tower: " +
+                Math.Ceiling(_health).ToString("0", MoneyCulture) +
+                "/" + MaxTowerHealth.ToString("0", MoneyCulture) +
+                " HP. Restores up to " + TowerRepairCapacity.ToString("0", MoneyCulture) +
+                " HP for " + Money(TowerRepairCost) + ".";
+            _towerRepairButton.IsEnabled = gameUsable &&
+                TowerRepairAvailable > 0.01 && _cash >= TowerRepairCost;
+            _towerRepairButton.Width = 208;
+            Canvas.SetLeft(_towerRepairButton, 525);
+            Canvas.SetTop(_towerRepairButton, 764);
+
+            _fenceRepairButton.Visibility = showFooter && _started && !_gameOver
+                ? Visibility.Visible : Visibility.Collapsed;
+            _fenceRepairButton.Content = "FENCE +" +
+                Math.Ceiling(FenceRepairAvailable).ToString("0", MoneyCulture) +
+                "HP  " + Money(FenceRepairCost);
+            _fenceRepairButton.ToolTip = "Fence: " +
+                Math.Ceiling(_fenceHealth).ToString("0", MoneyCulture) +
+                "/" + FenceMaxHealth.ToString("0", MoneyCulture) +
+                " HP. Restores up to " + FenceRepairCapacity.ToString("0", MoneyCulture) +
+                " HP for " + Money(FenceRepairCost) + ".";
+            _fenceRepairButton.IsEnabled = gameUsable &&
+                _fenceLevel > 0 && FenceRepairAvailable > 0.01 &&
+                _cash >= FenceRepairCost;
+            _fenceRepairButton.Width = 207;
+            Canvas.SetLeft(_fenceRepairButton, 738);
+            Canvas.SetTop(_fenceRepairButton, 764);
+
+            _nextWaveButton.Visibility = showFooter && !_gameOver
+                ? Visibility.Visible : Visibility.Collapsed;
+            _nextWaveButton.IsEnabled = !workshop && !_paused &&
+                !_waveActive && !_perkPending && !_showHelp;
+            _nextWaveButton.Content = !_started ? "PREPARE" :
+                !_waveActive && _wave == _progression.StartingWave &&
+                    _score == 0 ? "START WAVE " + (_wave + 1) : "NEXT WAVE";
+            Canvas.SetLeft(_nextWaveButton, 1120);
+            Canvas.SetTop(_nextWaveButton, 764);
+
+            _autoNextButton.Visibility = showFooter && _started && !_gameOver
+                ? Visibility.Visible : Visibility.Collapsed;
+            _autoNextButton.IsEnabled = gameUsable &&
+                (_autoNextPurchased || _cash >= AutoNextPurchasePrice);
+            _autoNextButton.Content = !_autoNextPurchased
+                ? "BUY AUTO NEXT  " + Money(AutoNextPurchasePrice)
+                : !_autoNextEnabled
+                    ? "AUTO NEXT  OFF • CLICK TO ENABLE"
+                    : _autoNextRemaining >= 0
+                        ? "AUTO NEXT  ON • " +
+                            Math.Ceiling(_autoNextRemaining).ToString("0", MoneyCulture) +
+                            "s"
+                        : "AUTO NEXT  ON • WAITING";
+            _autoNextButton.BorderBrush =
+                _autoNextPurchased && _autoNextEnabled ? Green : Cyan;
+            _autoNextButton.ToolTip = !_autoNextPurchased
+                ? "One-time " + Money(AutoNextPurchasePrice) +
+                    " cash purchase for this run. Automatically launches the next wave after a 5-second break. Milestone choices wait for you."
+                : "Click to turn Auto Next Wave " +
+                    (_autoNextEnabled ? "off" : "on") +
+                    ". Pausing, research rewards and ending a run interrupt the countdown.";
+            Canvas.SetLeft(_autoNextButton, 231);
+            Canvas.SetTop(_autoNextButton, 763);
+
+            _endRunButton.Visibility = showFooter && _started && !_gameOver
+                ? Visibility.Visible : Visibility.Collapsed;
+            Canvas.SetLeft(_endRunButton, 35);
+            Canvas.SetTop(_endRunButton, 763);
+
+            _continueButton.Visibility = _resumeDecisionPending &&
+                !_leaderboardVisible ? Visibility.Visible : Visibility.Collapsed;
+            Canvas.SetLeft(_continueButton, 196);
+            Canvas.SetTop(_continueButton, 343);
+            _newRunButton.Visibility = _resumeDecisionPending &&
+                !_leaderboardVisible ? Visibility.Visible : Visibility.Collapsed;
+            Canvas.SetLeft(_newRunButton, 674);
+            Canvas.SetTop(_newRunButton, 343);
+
+            for (int choice = 0; choice < 3; choice++)
+                _perkButtons[choice].Visibility = _perkPending &&
+                    !_leaderboardVisible &&
+                    !_resumeDecisionPending &&
+                    !_showHelp && !workshop
+                    ? Visibility.Visible : Visibility.Collapsed;
+
+            _leaderboardButton.Visibility = !_leaderboardVisible &&
+                !workshop && !_showHelp && !_perkPending &&
+                !_resumeDecisionPending
+                    ? Visibility.Visible : Visibility.Collapsed;
+            _leaderboardCloseButton.Visibility = _leaderboardVisible
+                ? Visibility.Visible : Visibility.Collapsed;
+
+            _advancedWorkshopButton.Visibility = workshop
+                ? Visibility.Visible : Visibility.Collapsed;
+            _advancedWorkshopButton.Content = _advancedWorkshopVisible
+                ? "STANDARD RESEARCH" : "SPECIAL RESEARCH";
+            Canvas.SetLeft(_advancedWorkshopButton, 801);
+            Canvas.SetTop(_advancedWorkshopButton, WorkshopActionY);
+
+            _skipToggleButton.Visibility = workshop && _advancedWorkshopVisible
+                ? Visibility.Visible : Visibility.Collapsed;
+            _skipToggleButton.Content = "START AT WAVE " +
+                (_progression.StartingWave + 1) + " • CHANGE";
+            _skipToggleButton.IsEnabled = _progression.SkipTier > 0;
+            _skipToggleButton.ToolTip = "Cycle any purchased starting wave: " +
+                "1, 6, 11, 16... up to wave " +
+                (_progression.PurchasedSkipWaves + 1) + ". " +
+                "Skipped waves award no cash, score or research.";
+            Canvas.SetLeft(_skipToggleButton, 172);
+            Canvas.SetTop(_skipToggleButton, 652);
+
+            for (int i = 0; i < _advancedButtons.Length; i++)
+            {
+                var btn = _advancedButtons[i];
+                btn.Visibility = workshop && _advancedWorkshopVisible
+                    ? Visibility.Visible : Visibility.Collapsed;
+                int row = i / 2, col = i % 2;
+                Canvas.SetLeft(btn, 182 + col * 477);
+                Canvas.SetTop(btn, 277 + row * 120);
+
+                int level = _progression.AdvancedLevel(i);
+                bool maxed = level >= _progression.AdvancedMaximum(i);
+                long price = _progression.AdvancedPrice(i);
+                bool affordable = _progression.Credits >= price;
+                btn.IsEnabled = !maxed && affordable;
+                btn.BorderBrush = maxed ? Green : affordable ? Cyan : GridInk;
+                _advancedNames[i].Text = i switch
+                {
+                    0 => "GAME SPEED  •  " +
+                        _progression.GameSpeedMultiplier.ToString("0.00", MoneyCulture) + "x",
+                    1 => "WAVE SKIP  •  FIRST " + _progression.PurchasedSkipWaves,
+                    _ => TowerDefenseProgression.SpecialWeaponNames[i - 2]
+                };
+                _advancedDetails[i].Text = i switch
+                {
+                    0 => "Speed up entire game: 1.25x / 1.50x / 1.75x / 2.00x",
+                    1 => "Buy +5 max skip each tier, then choose any bought start",
+                    _ => TowerDefenseProgression.SpecialWeaponDetails[i - 2]
+                };
+                _advancedPrices[i].Text = "LV " + level +
+                    (maxed ? "   MAXED" : "   " + Money(price) + " RESEARCH");
+                _advancedPrices[i].Foreground =
+                    maxed ? Green : affordable ? Cyan : Gold;
+                btn.ToolTip = _advancedDetails[i].Text +
+                    Environment.NewLine +
+                    (maxed ? "Maximum level reached" :
+                        "Permanent upgrade: " + Money(price) + " credits");
+            }
+
+            LayoutFooterButtons();
+        }
+
+        private void BuyAdvancedUpgrade(int index)
+        {
+            if (!_progression.WorkshopOpen || !_advancedWorkshopVisible ||
+                index is < 0 or > 5)
+                return;
+            if (!_progression.BuyAdvanced(index))
+            {
+                _message = "SPECIAL RESEARCH: NOT ENOUGH CREDITS OR MAXED.";
+            }
+            else
+            {
+                if (index == 1)
+                    SyncPreRunSkip();
+                _message = index switch
+                {
+                    0 => "PERMANENT GAME SPEED: " +
+                        _progression.GameSpeedMultiplier.ToString("0.00", MoneyCulture) + "x",
+                    1 => "WAVE SKIP UNLOCKED THROUGH WAVE " +
+                        _progression.PurchasedSkipWaves +
+                        ". USE CHANGE START TO SELECT.",
+                    _ => TowerDefenseProgression.SpecialWeaponNames[index - 2] +
+                        " LEVEL " + _progression.SpecialWeaponLevel(index - 2)
+                };
+            }
+            _lastUpgradeSignature = "";
+            RefreshUpgradeControls();
+            _surface.InvalidateVisual();
+        }
+
+        private void SyncPreRunSkip()
+        {
+            // A new purchase in the pre-run workshop should immediately
+            // change the upcoming starting wave, not require closing and
+            // relaunching the entire arcade game.
+            if (_started || _gameOver) return;
+            _wave = _progression.StartingWave;
+            _cash = AddCash(450 + _progression.Level(16) * 35,
+                _wave * 90);
+            _score = 0;
+        }
+
+        private void PrepareOrStartWave()
+        {
+            if (_progression.WorkshopOpen || _perkPending ||
+                _paused || _gameOver || _resumeDecisionPending)
+                return;
+            if (!_started)
+            {
+                _started = true;
+                _clock.Restart();
+                _lastTickTime = 0;
+                _timer.Start();
+                _message = "BUILD YOUR RADIO DEFENSES, THEN SPACE FOR WAVE 1.";
+                _surface.InvalidateVisual();
+            }
+            else if (!_waveActive)
+                StartWave();
+            RefreshUpgradeControls();
+        }
+
+        public static bool IsRunning => _active != null;
+
+        public static void Toggle(Window host)
+        {
+            if (_active != null)
+            {
+                _active.Close();
+                return;
+            }
+
+            if (!host.IsVisible || host.WindowState == WindowState.Minimized)
+                return;
+
+            try
+            {
+                var window = new TowerDefenseWindow(host);
+                _active = window;
+                window.Show();
+                window.Activate();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Tower Defense failed to open: " + ex);
+                _active = null;
+            }
+        }
+
+        private void NewGame()
+        {
+            _timer.Stop();
+            _clock.Reset();
+            _progression.NewRun();
+            _resumeDecisionPending = false;
+            _resumeOffer = null;
+            _snapshotElapsed = 0;
+            _savedElapsedOffset = 0;
+            _autoNextPurchased = false;
+            _autoNextEnabled = false;
+            _autoNextRemaining = -1;
+            // Purchased starting-wave skips cost permanent research, but do
+            // not generate free earnings from waves never actually played.
+            _cash = AddCash(450 + _progression.Level(16) * 35,
+                _progression.StartingWave * 90);
+            _score = 0;
+            _wave = _progression.StartingWave;
+            _thievesStopped = 0;
+            _interferenceRemoved = 0;
+            _health = MaxTowerHealth;
+            _fenceHealth = FenceMaxHealth;
+            _thievesToSpawn = 0;
+            _jammersToSpawn = 0;
+            _lightningToSpawn = 0;
+            _lastTickTime = 0;
+            _warningRemaining = -1;
+            _flashRemaining = 0;
+            _securitySweepCooldown = 0;
+            _rfSweepCooldown = 0;
+            _patrolCooldown = 1.6;
+            _droneCooldown = 0.8;
+            _leftGunCooldown = 0.15;
+            _rightGunCooldown = 0.65;
+            _leftMuzzleRemaining = 0;
+            _rightMuzzleRemaining = 0;
+            _leftGunAim = null;
+            _rightGunAim = null;
+            _perkPending = false;
+            _securityRingTime = 0;
+            _rfRingTime = 0;
+            _defenseFlashes.Clear();
+            Array.Clear(_specialCooldowns, 0, _specialCooldowns.Length);
+            _empPulseRemaining = 0;
+            _paused = false;
+            _started = false;
+            _waveActive = false;
+            _gameOver = false;
+            _showHelp = false;
+            _helpAutoPaused = false;
+            _message = _wave > 0
+                ? "RESEARCH WAVE SKIP READY: START AT WAVE " + (_wave + 1) + "."
+                : "PRESS SPACE TO DEFEND YOUR TOWER.";
+            _thieves.Clear();
+            _jammers.Clear();
+            _bestScore = Math.Max(ReadBestScore(), _progression.BestScore);
+            _scoreSubmissionStarted = false;
+            _scoreUploadStatus = "Finished shifts submit to the shop board.";
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private void StartWave()
+        {
+            if (!_started || _paused || _gameOver || _waveActive ||
+                _perkPending)
+                return;
+
+            _wave++;
+            _autoNextRemaining = -1;
+            _thievesToSpawn = Math.Min(75, 4 + _wave * 2 +
+                (int)Math.Pow(_wave, 1.2));
+            _jammersToSpawn = Math.Min(12, 1 + _wave / 2);
+            _lightningToSpawn = _wave <= 1 ? 0 :
+                Math.Min(8, 1 + (_wave - 2) / 3);
+            _spawnThiefIn = 0.8;
+            _spawnJammerIn = 2.4;
+            _spawnLightningIn = 4.8;
+            _waveActive = true;
+            _message = "WAVE " + _wave + ": TROUBLE IN EVERY DIRECTION!";
+            if (_wave % 5 == 0)
+            {
+                SpawnBoss();
+            }
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private void Tick(object? sender, EventArgs e)
+        {
+            if (!_started || _paused || _gameOver || _resumeDecisionPending)
+                return;
+
+            double now = _clock.Elapsed.TotalSeconds;
+            double frameDt = Math.Clamp(now - _lastTickTime, 0, 0.1);
+            double dt = frameDt * _progression.GameSpeedMultiplier;
+            _lastTickTime = now;
+            // Save frequency uses actual time, regardless of speed research.
+            _snapshotElapsed += frameDt;
+            if (_snapshotElapsed >= 5)
+            {
+                _snapshotElapsed = 0;
+                SaveSuspendedRun();
+            }
+            _securitySweepCooldown = Math.Max(0, _securitySweepCooldown - dt);
+            _rfSweepCooldown = Math.Max(0, _rfSweepCooldown - dt);
+            _patrolCooldown = Math.Max(0, _patrolCooldown - dt);
+            _droneCooldown = Math.Max(0, _droneCooldown - dt);
+            _leftGunCooldown = Math.Max(0, _leftGunCooldown - dt);
+            _rightGunCooldown = Math.Max(0, _rightGunCooldown - dt);
+            _leftMuzzleRemaining = Math.Max(0, _leftMuzzleRemaining - dt);
+            _rightMuzzleRemaining = Math.Max(0, _rightMuzzleRemaining - dt);
+            _flashRemaining = Math.Max(0, _flashRemaining - dt);
+            _securityRingTime = Math.Max(0, _securityRingTime - dt);
+            _rfRingTime = Math.Max(0, _rfRingTime - dt);
+            _empPulseRemaining = Math.Max(0, _empPulseRemaining - dt);
+            for (int i = 0; i < _specialCooldowns.Length; i++)
+                _specialCooldowns[i] = Math.Max(0, _specialCooldowns[i] - dt);
+            _defenseFlashes.RemoveAll(flash => flash.EndTime <= now);
+
+            // Auto Next is an optional purchased convenience, not an idle
+            // prerequisite. Never skip milestone decisions or run while
+            // paused (the early return above already handles pausing).
+            if (_autoNextRemaining >= 0 && !_waveActive &&
+                _autoNextPurchased && _autoNextEnabled &&
+                !_perkPending && !_showHelp && !_progression.WorkshopOpen)
+            {
+                _autoNextRemaining -= dt;
+                if (_autoNextRemaining <= 0)
+                {
+                    _autoNextRemaining = -1;
+                    StartWave();
+                    return;
+                }
+            }
+
+            if (!_waveActive)
+            {
+                _surface.InvalidateVisual();
+                return;
+            }
+
+            int coverage = _progression.Level(2);
+            int vehicles = _progression.Level(3);
+            int rfTeams = _progression.Level(4);
+            int filters = _progression.Level(5);
+            int drone = _progression.Level(6);
+            int droneRange = _progression.Level(7);
+
+            if (_thievesToSpawn > 0)
+            {
+                _spawnThiefIn -= dt;
+                if (_spawnThiefIn <= 0)
+                {
+                    SpawnCopperThief();
+                    _thievesToSpawn--;
+                    _spawnThiefIn = Math.Max(0.22, 1.5 / (1 + _wave * 0.08));
+                }
+            }
+
+            if (_jammersToSpawn > 0)
+            {
+                _spawnJammerIn -= dt;
+                if (_spawnJammerIn <= 0)
+                {
+                    SpawnInterferenceTower();
+                    _jammersToSpawn--;
+                    _spawnJammerIn = Math.Max(1.0, 6.8 / (1 + _wave * 0.12));
+                }
+            }
+
+            if (_warningRemaining > 0)
+            {
+                _warningRemaining -= dt;
+                if (_warningRemaining <= 0)
+                    LightningStrike();
+            }
+            else if (_lightningToSpawn > 0)
+            {
+                _spawnLightningIn -= dt;
+                if (_spawnLightningIn <= 0)
+                {
+                    _lightningToSpawn--;
+                    _warningRemaining = 2.5;
+                    _spawnLightningIn = Math.Max(2.5, 8.3 / (1 + _wave * 0.08));
+                    _message = "LIGHTNING INCOMING! ARRESTORS BETTER BE INSTALLED!";
+                }
+            }
+
+            // Autonomous countermeasures give keyboard-only players meaningful
+            // choices without requiring a trackpad and pixel-perfect aiming.
+            // Mounted guns deal real damage before automated cleanup teams.
+            FireMountedGun(now, false);
+            FireMountedGun(now, true);
+            FireSpecialWeapons(now);
+            ResolveDefeatedThreats();
+
+            if (_patrolCooldown <= 0)
+            {
+                int count = Math.Min(_thieves.Count,
+                    1 + vehicles / 2);
+                double radius = Math.Min(450, 105 + coverage * 17);
+                for (int i = 0; i < count && _thieves.Count > 0; i++)
+                {
+                    int closest = IndexOfNearestThief();
+                    if (_thieves[closest].Distance > radius)
+                        break;
+                    _defenseFlashes.Add(new DefenseFlash(
+                        new Point(TowerX, TowerY - 38),
+                        ThiefPoint(_thieves[closest]), now + 0.16, Cyan));
+                    _thieves[closest].Health -= 22 +
+                        _progression.Level(3) * 9;
+                    ResolveDefeatedThreats();
+                    _cash = AddCash(_cash, 4 + _progression.Level(17) * 2);
+                    _score = AddCash(_score, 24);
+                }
+                _patrolCooldown = Math.Max(0.8,
+                    4.5 / (1 + vehicles * 0.13));
+            }
+
+            // One or two orbiting interceptor orbs actively attack nearby
+            // threats. Each upgrade improves attack strength/rate, and the
+            // Drone Range investment increases their orbit/target radius.
+            if (drone > 0 && _droneCooldown <= 0)
+            {
+                int orbs = drone >= 5 ? 2 : 1;
+                double attackRange = Math.Min(270, 85 + droneRange * 18);
+                double damage = 16 + drone * 11;
+                for (int orb = 0; orb < orbs; orb++)
+                {
+                    Point from = OrbPosition(orb, orbs);
+                    var enemyRf = _jammers
+                        .Where(j => j.Health > 0 &&
+                            Distance(from, new Point(j.X, j.Y)) <= attackRange)
+                        .OrderBy(j => Distance(from, new Point(j.X, j.Y)))
+                        .FirstOrDefault();
+                    var enemyThief = _thieves
+                        .Where(t => t.Health > 0 &&
+                            Distance(from, ThiefPoint(t)) <= attackRange)
+                        .OrderBy(t => Distance(from, ThiefPoint(t)))
+                        .FirstOrDefault();
+
+                    if (enemyRf != null && (rfTeams > 0 || enemyThief == null))
+                    {
+                        enemyRf.Health -= damage;
+                        _defenseFlashes.Add(new DefenseFlash(
+                            from, new Point(enemyRf.X, enemyRf.Y),
+                            now + 0.17, Purple, true, orb, orbs));
+                    }
+                    else if (enemyThief != null)
+                    {
+                        enemyThief.Health -= damage;
+                        _defenseFlashes.Add(new DefenseFlash(
+                            from, ThiefPoint(enemyThief),
+                            now + 0.17, Cyan, true, orb, orbs));
+                    }
+                }
+                ResolveDefeatedThreats();
+                _droneCooldown = Math.Max(0.30, 2.2 / (1 + drone * 0.16));
+            }
+
+            // Q and E are no longer required. Nearby threats automatically
+            // trigger each response service as soon as its cooldown ends.
+            if (_securitySweepCooldown <= 0 &&
+                _thieves.Any(t => t.Distance <= 165))
+                CallSecuritySweep();
+            if (_rfSweepCooldown <= 0 && _jammers.Count > 0)
+                CallRfSweep();
+
+            for (int i = _thieves.Count - 1; i >= 0; i--)
+            {
+                var thief = _thieves[i];
+                bool airborne = thief.Kind is 2 or 3;
+
+                // Birds and bees always fly over the compound. Ground
+                // intruders get stopped at the exact visible oval fence.
+                if (!airborne && thief.FenceVaultRemaining > 0)
+                {
+                    thief.FenceVaultRemaining = Math.Max(0,
+                        thief.FenceVaultRemaining - dt);
+                    // Halt until the jump/vault finishes.
+                    continue;
+                }
+
+                double previousDistance = thief.Distance;
+                thief.Distance = Math.Max(0,
+                    thief.Distance - thief.Speed * dt);
+
+                if (!airborne && _fenceLevel > 0 && _fenceHealth > 0 &&
+                    !thief.FenceHitDone &&
+                    TowerDefenseEnvironmentArt.WithinFence(
+                        ThiefPoint(thief), new Point(TowerX, TowerY),
+                        FenceRadius))
+                {
+                    thief.Distance = previousDistance;
+                    thief.FenceHitDone = true;
+                    thief.FenceVaultDuration = Math.Min(5.8,
+                        0.85 + _fenceLevel * 0.34 +
+                        (thief.Kind == 4 ? 1.0 :
+                         thief.Kind == 1 ? 0.45 : 0));
+                    thief.FenceVaultRemaining = thief.FenceVaultDuration;
+
+                    double wear = Math.Max(0.7,
+                        (8 + _wave * 0.45) /
+                        (1 + _fenceLevel * 0.13 +
+                         _progression.Level(13) * 0.22));
+                    _fenceHealth = Math.Max(0, _fenceHealth -
+                        wear * (thief.Kind == 4 ? 6 : 1.0));
+                    thief.Health -= thief.Kind == 4 ? 30 : 18 +
+                        _fenceLevel * 4;
+
+                    if (_fenceHealth <= 0)
+                        _message = "SECURITY FENCE BREACHED! REPAIR IT!";
+                    continue;
+                }
+
+                if (thief.Health <= 0)
+                    continue;
+
+                if (thief.Kind == 3 && thief.Distance < 120)
+                    DamageTower((0.65 + _wave * 0.05) * dt);
+
+                if (thief.Distance <= HubRadius)
+                {
+                    if (thief.Kind == 1)
+                    {
+                        // Tower climbers latch onto the structure and chip
+                        // away at integrity until a countermeasure removes them.
+                        thief.Distance = HubRadius;
+                        thief.ClimbSeconds += dt;
+                        DamageTower((2.5 + _wave * 0.22) * dt);
+                        continue;
+                    }
+
+                    double impact = thief.Kind switch
+                    {
+                        2 => 5, 3 => 9, 4 => 35, _ => 7
+                    };
+                    DamageTower(impact + _wave * 0.65);
+                    _thieves.RemoveAt(i);
+                    _message = thief.Kind == 4
+                        ? "THE SCRAP KING REACHED THE TOWER!"
+                        : "SITE BREACH! YOUR RADIO TOWER TOOK DAMAGE!";
+                }
+            }
+
+            double jammerLifetime = Math.Max(1.1,
+                12.0 / (1 + filters * 0.23 + _progression.Level(4) * 0.10));
+            for (int i = _jammers.Count - 1; i >= 0; i--)
+            {
+                _jammers[i].Age += dt;
+                if (_jammers[i].Age >= jammerLifetime)
+                {
+                    _jammers.RemoveAt(i);
+                    _interferenceRemoved++;
+                    _score = AddCash(_score, 15);
+                }
+            }
+
+            if (_jammers.Count > 0)
+            {
+                double reduction = 1.0 / (1 + filters * 0.58);
+                DamageTower(_jammers.Count *
+                    (1.05 + 0.10 * _wave) * reduction * dt);
+            }
+
+            // Workshop-funded passive maintenance is available every wave.
+            _health = Math.Min(MaxTowerHealth,
+                _health + TowerRegenPerSecond * dt);
+            if (_fenceLevel > 0)
+                _fenceHealth = Math.Min(FenceMaxHealth,
+                    _fenceHealth + FenceRegenPerSecond * dt);
+
+            if (_health <= 0)
+            {
+                _health = 0;
+                EndGame();
+                return;
+            }
+
+            ResolveDefeatedThreats();
+
+            // Lightning is a background hazard, not an enemy. A completed
+            // encounter must not spend extra seconds waiting for scheduled
+            // storms after the last hostile is defeated.
+            if (_thievesToSpawn == 0 && _jammersToSpawn == 0 &&
+                _thieves.Count == 0 && _jammers.Count == 0)
+            {
+                _lightningToSpawn = 0;
+                _warningRemaining = -1;
+                _spawnLightningIn = 0;
+                EndWave();
+            }
+
+            _surface.InvalidateVisual();
+        }
+
+        private double LeftGunDamage => 14 + _progression.Level(0) * 6.5;
+        private double RightGunDamage => 12 + _progression.Level(0) * 5.5;
+        private double GunRange => Math.Min(500, 225 + _progression.Level(2) * 23);
+        private double LeftGunReload => Math.Max(0.17, 1.02 /
+            (1 + _progression.Level(1) * 0.17));
+        private double RightGunReload => Math.Max(0.17, 1.35 /
+            (1 + _progression.Level(1) * 0.17));
+        private double TowerRegenPerSecond => _progression.Level(9) * 0.055;
+        private double FenceRegenPerSecond => _progression.Level(14) * 0.09;
+        private double LightningDamageReduction => 1.0 -
+            1.0 / ((1 + _lightningLevel * 0.58) *
+                (1 + _surgeLevel * 0.42) *
+                (1 + _progression.Level(15) * 0.10));
+
+        private double OrbAngle(int index, int count)
+        {
+            double seconds = _clock.Elapsed.TotalSeconds + _savedElapsedOffset;
+            return seconds * _progression.GameSpeedMultiplier *
+                (1.45 + _progression.Level(6) * 0.025) +
+                index * Math.PI * 2 / count;
+        }
+
+        private Point OrbPosition(int index, int count)
+        {
+            double radius = Math.Min(142, 91 + _progression.Level(7) * 4);
+            return TowerDefenseEnvironmentArt.OrbitPoint(
+                new Point(TowerX, TowerY), radius, OrbAngle(index, count));
+        }
+
+        private void DrawOrbitingDrones(DrawingContext dc, bool foreground)
+        {
+            int level = _progression.Level(6);
+            if (level <= 0) return;
+            int count = level >= 5 ? 2 : 1;
+            double seconds = _clock.Elapsed.TotalSeconds + _savedElapsedOffset;
+            for (int i = 0; i < count; i++)
+            {
+                double angle = OrbAngle(i, count);
+                bool isFront = Math.Sin(angle) >= 0;
+                if (isFront != foreground) continue;
+                TowerDefenseEnvironmentArt.DrawDroneOrb(dc,
+                    OrbPosition(i, count), angle, isFront, seconds);
+            }
+        }
+
+        private void FireMountedGun(double now, bool right)
+        {
+            double cooldown = right ? _rightGunCooldown : _leftGunCooldown;
+            if (cooldown > 0)
+                return;
+
+            double range = GunRange;
+
+            CopperThief? thief = _thieves
+                .Where(t => t.Health > 0 && t.Distance <= range)
+                .OrderBy(t => t.Distance).FirstOrDefault();
+            InterferenceTower? rf = _jammers
+                .Where(t => t.Health > 0 &&
+                    Distance(new Point(t.X, t.Y), new Point(TowerX, TowerY)) <= range)
+                .OrderBy(t => Distance(new Point(t.X, t.Y),
+                    new Point(TowerX, TowerY))).FirstOrDefault();
+
+            Point from = TowerDefenseTowerArt.TurretOrigin(
+                new Point(TowerX, TowerY), right);
+            Point? target = null;
+            Brush ink;
+            double damage = right ? RightGunDamage : LeftGunDamage;
+
+            if ((right && rf != null) || (thief == null && rf != null))
+            {
+                rf!.Health -= damage;
+                target = new Point(rf.X, rf.Y);
+                ink = Purple;
+            }
+            else if (thief != null)
+            {
+                thief.Health -= damage;
+                target = ThiefPoint(thief);
+                ink = Gold;
+            }
+            else
+            {
+                if (right) _rightGunCooldown = 0.12;
+                else _leftGunCooldown = 0.12;
+                return;
+            }
+
+            _defenseFlashes.Add(new DefenseFlash(from, target.Value,
+                now + 0.13, ink));
+            if (right)
+            {
+                _rightGunAim = target;
+                _rightMuzzleRemaining = 0.16;
+            }
+            else
+            {
+                _leftGunAim = target;
+                _leftMuzzleRemaining = 0.16;
+            }
+            double reload = right ? RightGunReload : LeftGunReload;
+            if (right) _rightGunCooldown = reload;
+            else _leftGunCooldown = reload;
+        }
+
+        private sealed class SpecialTarget
+        {
+            public CopperThief? Intruder { get; init; }
+            public InterferenceTower? Rf { get; init; }
+            public Point Position { get; init; }
+            public double Hp => Intruder?.Health ?? Rf?.Health ?? 0;
+            public void Damage(double damage)
+            {
+                if (Intruder != null) Intruder.Health -= damage;
+                else if (Rf != null) Rf.Health -= damage;
+            }
+        }
+
+        private List<SpecialTarget> GetSpecialTargets()
+        {
+            var targets = new List<SpecialTarget>(_thieves.Count + _jammers.Count);
+            targets.AddRange(_thieves
+                .Where(t => t.Health > 0)
+                .Select(t => new SpecialTarget
+                {
+                    Intruder = t, Position = ThiefPoint(t)
+                }));
+            targets.AddRange(_jammers
+                .Where(j => j.Health > 0)
+                .Select(j => new SpecialTarget
+                {
+                    Rf = j, Position = new Point(j.X, j.Y)
+                }));
+            return targets;
+        }
+
+        private void FireSpecialWeapons(double now)
+        {
+            if (!Enumerable.Range(0, 4).Any(i =>
+                    _progression.SpecialWeaponLevel(i) > 0 &&
+                    _specialCooldowns[i] <= 0))
+                return;
+
+            var targets = GetSpecialTargets();
+            if (targets.Count == 0) return;
+
+            var center = new Point(TowerX, TowerY - 35);
+
+            // 1. LASER SENTRY: precise high-HP target selection and a short,
+            // high-contrast continuous-looking line. Permanent research only.
+            int laser = _progression.SpecialWeaponLevel(0);
+            if (laser > 0 && _specialCooldowns[0] <= 0)
+            {
+                var target = targets
+                    .Where(t => t.Hp > 0 &&
+                        Distance(center, t.Position) <= 380)
+                    .OrderByDescending(t => t.Hp).FirstOrDefault();
+                if (target != null)
+                {
+                    target.Damage(32 + laser * 18);
+                    _defenseFlashes.Add(new DefenseFlash(
+                        center, target.Position, now + 0.25, Gold,
+                        SpecialType: 0));
+                    _specialCooldowns[0] = Math.Max(0.45, 3.0 - laser * 0.10);
+                }
+            }
+
+            // 2. TESLA COIL: chain arcs to multiple enemies. The number of
+            // chained targets rises gradually as the permanent tier improves.
+            int tesla = _progression.SpecialWeaponLevel(1);
+            if (tesla > 0 && _specialCooldowns[1] <= 0)
+            {
+                int count = Math.Min(targets.Count, 2 + tesla / 3);
+                var previous = center;
+                int chained = 0;
+                foreach (var target in targets
+                    .Where(t => t.Hp > 0 &&
+                        Distance(center, t.Position) <= 275)
+                    .OrderBy(t => Distance(center, t.Position))
+                    .Take(count))
+                {
+                    target.Damage(18 + tesla * 11);
+                    _defenseFlashes.Add(new DefenseFlash(
+                        previous, target.Position, now + 0.35, Cyan,
+                        SpecialType: 1));
+                    previous = target.Position;
+                    chained++;
+                }
+                if (chained > 0)
+                    _specialCooldowns[1] = Math.Max(1.2, 7 - tesla * 0.18);
+            }
+
+            // 3. EMP CANNON: a projected area pulse that especially punishes
+            // illegal RF repeaters, but can also shock approaching intruders.
+            int emp = _progression.SpecialWeaponLevel(2);
+            if (emp > 0 && _specialCooldowns[2] <= 0)
+            {
+                bool struck = false;
+                double radius = Math.Min(410, 230 + emp * 9);
+                foreach (var target in targets)
+                {
+                    if (target.Hp <= 0 ||
+                        Distance(center, target.Position) > radius) continue;
+                    target.Damage((21 + emp * 12) *
+                        (target.Rf != null ? 2.0 : 1.0));
+                    struck = true;
+                }
+                if (struck)
+                {
+                    _empPulseRemaining = 0.65;
+                    _specialCooldowns[2] = Math.Max(2, 11 - emp * 0.23);
+                }
+            }
+
+            // 4. AIRSTRIKE: fast overhead missile traces strike a limited
+            // number of the highest-HP threats each volley.
+            int airstrike = _progression.SpecialWeaponLevel(3);
+            if (airstrike > 0 && _specialCooldowns[3] <= 0)
+            {
+                int count = Math.Min(targets.Count(t => t.Hp > 0),
+                    2 + airstrike / 4);
+                foreach (var target in targets.Where(t => t.Hp > 0)
+                    .OrderByDescending(t => t.Hp).Take(count))
+                {
+                    target.Damage(62 + airstrike * 25);
+                    Point launch = new(target.Position.X + 42,
+                        FieldY + 4);
+                    _defenseFlashes.Add(new DefenseFlash(
+                        launch, target.Position, now + 0.42, Red,
+                        SpecialType: 3));
+                }
+                if (count > 0)
+                    _specialCooldowns[3] = Math.Max(4, 19 - airstrike * 0.47);
+            }
+        }
+
+        private void ResolveDefeatedThreats()
+        {
+            for (int i = _thieves.Count - 1; i >= 0; i--)
+            {
+                if (_thieves[i].Health > 0) continue;
+                int kind = _thieves[i].Kind;
+                _thieves.RemoveAt(i);
+                _thievesStopped++;
+                int bounty = kind == 4 ? 600 : kind == 1 ? 40 : 25;
+                _cash = AddCash(_cash, bounty + _progression.Level(17) * 4);
+                _score = AddCash(_score, kind == 4 ? 1000 : 40);
+            }
+            for (int i = _jammers.Count - 1; i >= 0; i--)
+            {
+                if (_jammers[i].Health > 0) continue;
+                _jammers.RemoveAt(i);
+                _interferenceRemoved++;
+                _cash = AddCash(_cash, 45);
+                _score = AddCash(_score, 65);
+            }
+        }
+
+        private static int AddCash(int value, int delta) =>
+            (int)Math.Min(int.MaxValue, (long)value + Math.Max(0, delta));
+
+        private double MaxTowerHealth =>
+            100 + Math.Min(2500, _progression.Level(8) * 15);
+
+        private void DamageTower(double damage)
+        {
+            double grounded = damage / (1 + _progression.Level(15) * 0.10);
+            _health = Math.Max(0, _health - grounded);
+        }
+
+        private static double Distance(Point a, Point b)
+        {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+            return Math.Sqrt(dx * dx + dy * dy);
+        }
+
+        private void SpawnCopperThief()
+        {
+            double angle = _random.NextDouble() * Math.PI * 2;
+            double radius = BoundaryRadius(angle, 18);
+            int roll = _random.Next(100);
+            // 0: ordinary copper thief; 1: armored tower climber;
+            // 2: parakeet; 3: bee swarm; 4: five-wave Scrap King boss.
+            int kind = roll < 38 ? 0 :
+                roll < 58 && _wave >= 2 ? 1 :
+                roll < 80 && _wave >= 2 ? 2 :
+                roll < 100 && _wave >= 3 ? 3 : 0;
+            double speedScale = kind switch
+            {
+                1 => 0.66,
+                2 => 1.68,
+                3 => 2.03,
+                _ => 0.85 + _random.NextDouble() * 0.65
+            };
+            double health = kind switch
+            {
+                1 => 75 + _wave * 12,
+                2 => 16 + _wave * 3,
+                3 => 13 + _wave * 3,
+                _ => 22 + _wave * 5
+            };
+            _thieves.Add(new CopperThief
+            {
+                Kind = kind,
+                Angle = angle,
+                Distance = radius,
+                Speed = (24 + _wave * 2.45) * speedScale,
+                MaxHealth = health,
+                Health = health
+            });
+        }
+
+        private void SpawnBoss()
+        {
+            double angle = _random.NextDouble() * Math.PI * 2;
+            double health = 250 + _wave * 76;
+            _thieves.Add(new CopperThief
+            {
+                Kind = 4,
+                Angle = angle,
+                Distance = BoundaryRadius(angle, 35),
+                Speed = 15 + _wave * 0.65,
+                Health = health,
+                MaxHealth = health
+            });
+            _message = "BOSS WAVE! THE SCRAP KING IS HEADED FOR THE TOWER!";
+        }
+
+        private void SpawnInterferenceTower()
+        {
+            // These are illegal mini repeaters emerging out of the dirt
+            // OUTSIDE the compound, never inexplicably erected under the
+            // tower's security fence. Keep clearance around other repeaters.
+            Point location = default;
+            for (int attempt = 0; attempt < 18; attempt++)
+            {
+                double angle = _random.NextDouble() * Math.PI * 2;
+                double edge = BoundaryRadius(angle, 51) - 7;
+                double desired = Math.Max(146, FenceRadius + 42) +
+                    _random.NextDouble() * 63;
+                double radius = Math.Min(edge, desired);
+                location = new Point(
+                    TowerX + Math.Cos(angle) * radius,
+                    TowerY + Math.Sin(angle) * radius);
+                if (!TowerDefenseEnvironmentArt.WithinFence(location,
+                        new Point(TowerX, TowerY), Math.Max(FenceRadius, 115))
+                    && !_jammers.Any(j => Distance(location,
+                        new Point(j.X, j.Y)) < 57))
+                    break;
+            }
+
+            double health = 42 + _wave * 9;
+            _jammers.Add(new InterferenceTower
+            {
+                X = location.X,
+                Y = location.Y,
+                MaxHealth = health,
+                Health = health
+            });
+            _message = "ILLEGAL RF REPEATER EMERGING BEYOND THE FENCE!";
+        }
+
+        private static double BoundaryRadius(double angle, double inset)
+        {
+            // Spawn along the real field boundary around the raised site.
+            // The previous half-width/half-height math assumed the tower was
+            // centered and could spawn enemies above the top border.
+            double cos = Math.Cos(angle);
+            double sin = Math.Sin(angle);
+            double horizontal = cos >= 0
+                ? FieldX + FieldWidth - inset - TowerX
+                : TowerX - FieldX - inset;
+            double vertical = sin >= 0
+                ? FieldY + FieldHeight - inset - TowerY
+                : TowerY - FieldY - inset;
+            return Math.Min(horizontal / Math.Max(0.0001, Math.Abs(cos)),
+                vertical / Math.Max(0.0001, Math.Abs(sin)));
+        }
+
+        private Point ThiefPoint(CopperThief thief)
+        {
+            // The scavengers dart from side to side rather than marching in
+            // unnaturally perfect straight lines. Rendering and clicking both
+            // use the same calculated location.
+            double wobble = Math.Sin(
+                (_clock.Elapsed.TotalSeconds + _savedElapsedOffset) *
+                    (thief.Kind == 3 ? 27 : thief.Kind == 2 ? 20 : 14)
+                 + thief.Angle * 6) * (thief.Kind is 2 or 3 ? 8.0 : 3.5);
+            double dx = Math.Cos(thief.Angle);
+            double dy = Math.Sin(thief.Angle);
+            return new Point(
+                TowerX + dx * thief.Distance - dy * wobble,
+                TowerY + dy * thief.Distance + dx * wobble);
+        }
+
+        // Large enough for the actual building footprint at Level 1, with
+        // a shared projected-ellipse hit test matching the visible fence.
+        private double FenceRadius => Math.Min(166, 106 + _fenceLevel * 6);
+
+        private void LightningStrike()
+        {
+            _warningRemaining = -1;
+            _flashRemaining = 0.43;
+
+            // Diminishing returns: protection always remains valuable but
+            // lightning never becomes harmless at high upgrade levels.
+            double damage = (10 + _wave * 1.4) /
+                (1 + _lightningLevel * 0.58) /
+                (1 + _surgeLevel * 0.42);
+            damage = Math.Max(0.5, damage);
+            DamageTower(damage);
+            _message = "LIGHTNING STRIKE! -" +
+                damage.ToString("0.0", MoneyCulture) + " TOWER HP.";
+
+            if (_health <= 0)
+            {
+                _health = 0;
+                EndGame();
+            }
+        }
+
+        private void EndWave()
+        {
+            _waveActive = false;
+            int reward = 120 + _wave * 65 +
+                _progression.Level(16) * (24 + _wave * 3);
+            _cash = AddCash(_cash, reward);
+            _score = AddCash(_score, 90 * _wave + (int)Math.Ceiling(_health));
+            int research = 8 + _wave * 3 + _progression.Level(19) * 5;
+            _progression.AddResearchCredits(research);
+
+            _health = Math.Min(MaxTowerHealth, _health +
+                _progression.Level(23) * 3);
+
+            _message = "WAVE " + _wave + " CLEARED! +$" +
+                reward.ToString("N0", MoneyCulture) + " / +" +
+                research.ToString(MoneyCulture) + " RESEARCH.";
+
+            if (_progression.Level(21) > 0 &&
+                _random.NextDouble() < Math.Min(0.75,
+                    _progression.Level(21) * 0.06))
+            {
+                var choices = Enumerable.Range(0, TowerDefenseProgression.Catalog.Length)
+                    .Where(i => _progression.Unlocked(i, _wave)).ToArray();
+                if (choices.Length > 0)
+                {
+                    int index = choices[_random.Next(choices.Length)];
+                    double previousMaxHp = MaxTowerHealth;
+                    double previousFenceHp = FenceMaxHealth;
+                    _progression.FreeUpgrade(index);
+                    ApplyUpgradeEffects(index, previousMaxHp, previousFenceHp);
+                    _message += " FREE " +
+                        TowerDefenseProgression.Catalog[index].Name.ToUpperInvariant() + "!";
+                }
+            }
+
+            if (_wave % 5 == 0)
+            {
+                _perkPending = true;
+                _message = "MILESTONE BONUS! CHOOSE 1 CASH / 2 REPAIR / 3 RESEARCH.";
+            }
+            QueueAutoNextWave();
+        }
+
+        private void SelectPerk(int option)
+        {
+            if (!_perkPending || option < 1 || option > 3)
+                return;
+
+            _perkPending = false;
+            switch (option)
+            {
+                case 1:
+                    int cash = 380 + _wave * 120;
+                    _cash = AddCash(_cash, cash);
+                    _message = "OVERTIME PAY: +$" +
+                        cash.ToString("N0", MoneyCulture) + ". SPACE FOR NEXT WAVE.";
+                    break;
+                case 2:
+                    double repaired = Math.Min(MaxTowerHealth - _health,
+                        MaxTowerHealth * 0.40);
+                    _health += repaired;
+                    if (_fenceLevel > 0)
+                        _fenceHealth = FenceMaxHealth;
+                    _message = "STORM RECOVERY: RESTORED " +
+                        repaired.ToString("0", MoneyCulture) + " HP + FENCE.";
+                    break;
+                case 3:
+                    int research = 25 + _wave * 8;
+                    _progression.AddResearchCredits(research);
+                    _message = "R&D GRANT: +" +
+                        research.ToString(MoneyCulture) + " RESEARCH CREDITS.";
+                    break;
+            }
+            QueueAutoNextWave();
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private void EndGame()
+        {
+            _gameOver = true;
+            _autoNextRemaining = -1;
+            TowerDefenseSessionStore.Clear();
+            _timer.Stop();
+            _clock.Stop();
+            _message = "RADIO SILENCE. DISPATCH IS NOT HAPPY.";
+            _progression.BankRun(_wave, _score);
+            _ = SubmitScoreAsync();
+            if (_score > _bestScore)
+            {
+                _bestScore = _score;
+                SaveBestScore(_score);
+            }
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private void SetPaused(bool paused)
+        {
+            if (_paused == paused)
+                return;
+            _paused = paused;
+            if (paused)
+                _clock.Stop();
+            else
+                _clock.Start();
+            // Account for stopwatch stopping without a large simulation jump.
+            _lastTickTime = _clock.Elapsed.TotalSeconds;
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private void HandleKey(object sender, KeyEventArgs e)
+        {
+            if (_leaderboardVisible)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat && (e.Key is Key.L or Key.Escape))
+                    ToggleLeaderboard();
+                return;
+            }
+
+            if (e.Key == Key.L && !_progression.WorkshopOpen &&
+                !_resumeDecisionPending)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                {
+                    // The field manual advertises L; allow it to transition
+                    // straight into scores instead of swallowing the key.
+                    if (_showHelp) ToggleHelp();
+                    ToggleLeaderboard();
+                }
+                return;
+            }
+
+            if (_resumeDecisionPending)
+            {
+                e.Handled = true;
+                // Leave the choice onscreen until user selects with a button.
+                // Esc still closes the window while preserving the snapshot.
+                if (e.Key == Key.Escape) Close();
+                else if (e.Key == Key.C) ContinueSuspendedRun();
+                else if (e.Key == Key.N) StartNewInsteadOfResume();
+                return;
+            }
+
+            if (e.Key == Key.Escape)
+            {
+                e.Handled = true;
+                if (_progression.WorkshopOpen)
+                {
+                    _progression.WorkshopOpen = false;
+                    _advancedWorkshopVisible = false;
+                    _lastUpgradeSignature = "";
+                    _surface.InvalidateVisual();
+                    RefreshUpgradeControls();
+                }
+                else
+                    Close();
+                return;
+            }
+
+            if (e.Key == Key.W)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                    ToggleWorkshop();
+                return;
+            }
+
+            if (_gameOver && e.Key == Key.R && !_progression.WorkshopOpen)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                    NewGame();
+                return;
+            }
+
+            if (e.Key == Key.H && !_progression.WorkshopOpen)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                    ToggleHelp();
+                return;
+            }
+
+            if (_showHelp)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            // The Special Research page is permanent-only; number keys must
+            // not accidentally purchase ordinary upgrades behind this page.
+            if (_progression.WorkshopOpen && _advancedWorkshopVisible)
+            {
+                int specialIndex = e.Key switch
+                {
+                    Key.D1 or Key.NumPad1 => 0,
+                    Key.D2 or Key.NumPad2 => 1,
+                    Key.D3 or Key.NumPad3 => 2,
+                    Key.D4 or Key.NumPad4 => 3,
+                    Key.D5 or Key.NumPad5 => 4,
+                    Key.D6 or Key.NumPad6 => 5,
+                    _ => -1
+                };
+                e.Handled = true;
+                if (!e.IsRepeat && specialIndex >= 0)
+                    BuyAdvancedUpgrade(specialIndex);
+                else if (!e.IsRepeat && e.Key == Key.S)
+                {
+                    _progression.ToggleWaveSkip();
+                    SyncPreRunSkip();
+                    _lastUpgradeSignature = "";
+                    RefreshUpgradeControls();
+                }
+                return;
+            }
+
+            // Milestone rewards temporarily take precedence over the normal
+            // 1-8 purchase hotkeys. Space cannot skip a reward decision.
+            if (_perkPending && !_progression.WorkshopOpen)
+            {
+                int choice = e.Key switch
+                {
+                    Key.D1 or Key.NumPad1 => 1,
+                    Key.D2 or Key.NumPad2 => 2,
+                    Key.D3 or Key.NumPad3 => 3,
+                    _ => 0
+                };
+                e.Handled = true;
+                if (!e.IsRepeat && choice != 0)
+                    SelectPerk(choice);
+                return;
+            }
+
+            // 24 upgrades: 3 tab pages x 8 rows. Entirely usable on laptop
+            // keyboards, including purchases within the permanent workshop.
+            if (e.Key is Key.Tab or Key.Left or Key.Right)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                {
+                    int step = e.Key == Key.Left || Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)
+                        ? -1 : 1;
+                    _progression.SelectedCategory =
+                        (_progression.SelectedCategory + step + 3) % 3;
+                    DescribeSelection();
+                }
+                return;
+            }
+
+            if (e.Key is Key.Up or Key.Down)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                {
+                    int step = e.Key == Key.Up ? -1 : 1;
+                    _progression.SelectedRow = (_progression.SelectedRow + step + 8) % 8;
+                    DescribeSelection();
+                }
+                return;
+            }
+
+            int row = e.Key switch
+            {
+                Key.D1 or Key.NumPad1 => 0,
+                Key.D2 or Key.NumPad2 => 1,
+                Key.D3 or Key.NumPad3 => 2,
+                Key.D4 or Key.NumPad4 => 3,
+                Key.D5 or Key.NumPad5 => 4,
+                Key.D6 or Key.NumPad6 => 5,
+                Key.D7 or Key.NumPad7 => 6,
+                Key.D8 or Key.NumPad8 => 7,
+                Key.Enter or Key.B => _progression.SelectedRow,
+                _ => -1
+            };
+
+            if (row >= 0)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                    BuySelected(row);
+                return;
+            }
+
+            if (_progression.WorkshopOpen)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.Space)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                    PrepareOrStartWave();
+                return;
+            }
+
+            if (e.Key == Key.P && _started && !_gameOver)
+            {
+                e.Handled = true;
+                if (!e.IsRepeat)
+                    SetPaused(!_paused);
+                return;
+            }
+
+            if (!_started || _paused || _gameOver)
+                return;
+
+            if (e.Key is Key.T or Key.F)
+            {
+                e.Handled = true;
+                if (e.IsRepeat) return;
+                if (e.Key == Key.T)
+                    RepairTower();
+                else
+                    RepairFence();
+            }
+        }
+
+        private void ToggleHelp()
+        {
+            _showHelp = !_showHelp;
+            if (_showHelp)
+            {
+                _helpAutoPaused = _started && !_paused && !_gameOver;
+                if (_helpAutoPaused)
+                    SetPaused(true);
+            }
+            else if (_helpAutoPaused && !_gameOver)
+            {
+                _helpAutoPaused = false;
+                SetPaused(false);
+            }
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private int IndexOfNearestThief()
+        {
+            int nearestIndex = 0;
+            for (int i = 1; i < _thieves.Count; i++)
+            {
+                if (_thieves[i].Distance < _thieves[nearestIndex].Distance)
+                    nearestIndex = i;
+            }
+            return nearestIndex;
+        }
+
+        private void CallSecuritySweep()
+        {
+            if (_securitySweepCooldown > 0 || _thieves.Count == 0)
+                return;
+
+            // Independent automated response. No Q press or pointer needed.
+            // Damage-based sweeps allow health bars and mounted guns to matter.
+            int count = Math.Min(_thieves.Count,
+                1 + _progression.Level(3) / 2);
+            double damage = 19 + _progression.Level(3) * 11;
+            int dispatched = 0;
+            foreach (var thief in _thieves
+                .Where(t => t.Distance <= 165)
+                .OrderBy(t => t.Distance).Take(count))
+            {
+                thief.Health -= damage;
+                dispatched++;
+            }
+
+            if (dispatched == 0)
+                return;
+
+            _securityRingTime = 0.55;
+            _securitySweepCooldown = Math.Max(1.0,
+                8.0 / (1 + _progression.Level(18) * 0.18));
+            ResolveDefeatedThreats();
+        }
+
+        private void CallRfSweep()
+        {
+            if (_rfSweepCooldown > 0 || _jammers.Count == 0)
+                return;
+
+            // Automated interference suppression damages small RF towers.
+            // The guns and drones finish survivors.
+            int count = Math.Min(_jammers.Count,
+                1 + _progression.Level(4) / 2);
+            double damage = 26 + _progression.Level(4) * 14;
+            foreach (var tower in _jammers.Take(count))
+                tower.Health -= damage;
+
+            _rfRingTime = 0.65;
+            _rfSweepCooldown = Math.Max(1.5,
+                11.0 / (1 + _progression.Level(18) * 0.16));
+            ResolveDefeatedThreats();
+        }
+
+        private void DescribeSelection()
+        {
+            int index = _progression.SelectedCategory * 8 +
+                _progression.SelectedRow;
+            var item = TowerDefenseProgression.Catalog[index];
+            _message = item.Name.ToUpperInvariant() + ": " + item.Detail +
+                (_progression.Unlocked(index, _wave) ? "" :
+                    " (UNLOCK WAVE " + item.UnlockWave + ")");
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private void BuySelected(int row)
+        {
+            int index = _progression.SelectedCategory * 8 + row;
+            if (index < 0 || index >= TowerDefenseProgression.Catalog.Length)
+                return;
+            _progression.SelectedRow = row;
+
+            var upgrade = TowerDefenseProgression.Catalog[index];
+            if (!_progression.Unlocked(index, _wave))
+            {
+                _message = upgrade.Name.ToUpperInvariant() +
+                    " UNLOCKS AFTER WAVE " + upgrade.UnlockWave + ".";
+                _surface.InvalidateVisual();
+                return;
+            }
+
+            double previousMax = MaxTowerHealth;
+            double previousFence = FenceMaxHealth;
+
+            if (_progression.WorkshopOpen)
+            {
+                if (!_progression.BuyWorkshop(index))
+                {
+                    _message = "RESEARCH WORKSHOP: NEED " +
+                        _progression.WorkshopPrice(index).ToString("N0", MoneyCulture) +
+                        " CREDITS.";
+                }
+                else
+                {
+                    ApplyUpgradeEffects(index, previousMax, previousFence);
+                    _message = "PERMANENT RESEARCH: " +
+                        upgrade.Name.ToUpperInvariant() + " LV" +
+                        _progression.PermanentLevel(index) + ".";
+                }
+            }
+            else if (_started && !_gameOver && !_paused)
+            {
+                int price = _progression.RunPrice(index);
+                if (_progression.BuyRun(index, ref _cash, _wave))
+                {
+                    ApplyUpgradeEffects(index, previousMax, previousFence);
+                    _message = upgrade.Name.ToUpperInvariant() + " LV" +
+                        _progression.Level(index) + "  -$" +
+                        price.ToString("N0", MoneyCulture) + ".";
+                }
+                else
+                    _message = "NEED $" + price.ToString("N0", MoneyCulture) +
+                        " FOR " + upgrade.Name.ToUpperInvariant() + ".";
+            }
+            else
+            {
+                _message = "SPACE TO START, OR W FOR THE PERMANENT WORKSHOP.";
+            }
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private void ApplyUpgradeEffects(int index, double oldMaxHealth,
+            double oldFenceHealth)
+        {
+            if (index == 8) // structural tower reinforcement
+                _health = Math.Min(MaxTowerHealth,
+                    _health + (MaxTowerHealth - oldMaxHealth));
+            else if (index == 12 && oldFenceHealth == 0) // install fence
+                _fenceHealth = FenceMaxHealth;
+            else if (index == 12 || index == 13)
+                _fenceHealth = Math.Min(FenceMaxHealth,
+                    _fenceHealth + FenceMaxHealth - oldFenceHealth);
+        }
+
+        // Explicit cost / restored HP metrics drive BOTH repairs and buttons.
+        // Pricing rises by wave and Parts Discount applies to both.
+        private int TowerRepairCost => (int)Math.Clamp(Math.Ceiling(
+            (200 + _wave * 28.0) /
+            (1 + _progression.Level(20) * 0.025)), 1, int.MaxValue);
+
+        private int FenceRepairCost => (int)Math.Clamp(Math.Ceiling(
+            (120 + _wave * 16.0) /
+            (1 + _progression.Level(20) * 0.025)), 1, int.MaxValue);
+
+        private double TowerRepairCapacity =>
+            Math.Min(1000, 100 + 10 * _progression.Level(22));
+
+        private double FenceRepairCapacity =>
+            Math.Min(1000, 100 + 15 * _progression.Level(13));
+
+        private double TowerRepairAvailable =>
+            Math.Max(0, Math.Min(MaxTowerHealth - _health, TowerRepairCapacity));
+
+        private double FenceRepairAvailable =>
+            Math.Max(0, Math.Min(FenceMaxHealth - _fenceHealth, FenceRepairCapacity));
+
+        private void RepairTower()
+        {
+            if (!_started || _paused || _gameOver ||
+                _progression.WorkshopOpen || _showHelp || _perkPending)
+                return;
+
+            double restored = TowerRepairAvailable;
+            if (restored < 0.01)
+                _message = "TOWER HP ALREADY FULL.";
+            else if (_cash < TowerRepairCost)
+                _message = "REPAIR TOWER: NEED " + Money(TowerRepairCost) +
+                    " FOR UP TO " + TowerRepairCapacity.ToString("0", MoneyCulture) + " HP.";
+            else
+            {
+                _cash -= TowerRepairCost;
+                _health = Math.Min(MaxTowerHealth, _health + restored);
+                _message = "TOWER +" + restored.ToString("0", MoneyCulture) +
+                    " HP FOR " + Money(TowerRepairCost) + ".";
+            }
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private void RepairFence()
+        {
+            if (!_started || _paused || _gameOver ||
+                _progression.WorkshopOpen || _showHelp || _perkPending)
+                return;
+
+            double restored = FenceRepairAvailable;
+            if (_fenceLevel == 0)
+                _message = "BUY A SECURITY FENCE BEFORE REPAIRING IT.";
+            else if (restored < 0.01)
+                _message = "FENCE HP ALREADY FULL.";
+            else if (_cash < FenceRepairCost)
+                _message = "REPAIR FENCE: NEED " + Money(FenceRepairCost) +
+                    " FOR UP TO " + FenceRepairCapacity.ToString("0", MoneyCulture) + " HP.";
+            else
+            {
+                _cash -= FenceRepairCost;
+                _fenceHealth = Math.Min(FenceMaxHealth, _fenceHealth + restored);
+                _message = "FENCE +" + restored.ToString("0", MoneyCulture) +
+                    " HP FOR " + Money(FenceRepairCost) + ".";
+            }
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private void ToggleWorkshop()
+        {
+            if (_waveActive || (_started && _wave > 0 && !_gameOver))
+            {
+                _message = "PERMANENT WORKSHOP AVAILABLE BEFORE OR AFTER RUNS.";
+                _surface.InvalidateVisual();
+                return;
+            }
+
+            _progression.WorkshopOpen = !_progression.WorkshopOpen;
+            _advancedWorkshopVisible = false;
+            _lastUpgradeSignature = "";
+            _showHelp = false;
+            _surface.InvalidateVisual();
+            RefreshUpgradeControls();
+        }
+
+        private double FenceMaxHealth => _fenceLevel == 0 ? 0 :
+            Math.Min(3000, 24 + _fenceLevel * 20 +
+                _progression.Level(13) * 16);
+
+        private void Draw(DrawingContext dc, double dpi)
+        {
+            dc.DrawRectangle(Backdrop, null,
+                new Rect(0, 0, DesignWidth, DesignHeight));
+            dc.DrawRectangle(Panel, new Pen(GridInk, 2),
+                new Rect(12, 12, 1296, 735));
+            Text(dc, "GRID UNDER ATTACK", 27, 23, 29, Cyan, dpi, true);
+            Text(dc, "360 DEGREE RADIO TOWER DEFENSE    " +
+                "SPEED " + _progression.GameSpeedMultiplier.ToString("0.00", MoneyCulture) +
+                "x", 28, 64, 13, Muted, dpi);
+            // Reserve the right side of this row for the auto-response
+            // readiness stats instead of letting long events overwrite them.
+            Text(dc, _message, 28, 96, 13.5, Gold, dpi, true, 505, true);
+
+            DrawField(dc, dpi);
+            DrawSidebar(dc, dpi);
+            DrawTowerStats(dc, dpi);
+
+            dc.DrawRectangle(Panel, new Pen(GridInk, 1),
+                new Rect(24, 759, 1274, 47));
+            if (!_started || _paused || _gameOver)
+                DrawOverlay(dc, dpi);
+            if (_perkPending)
+                DrawPerk(dc, dpi);
+            if (_resumeDecisionPending)
+                DrawResumePrompt(dc, dpi);
+            if (_showHelp)
+                DrawHelp(dc, dpi);
+            if (_progression.WorkshopOpen)
+                DrawWorkshop(dc, dpi);
+            if (_leaderboardVisible)
+                DrawLeaderboard(dc, dpi);
+        }
+
+        private void DrawLeaderboard(DrawingContext dc, double dpi)
+        {
+            const double x = 149;
+            const double y = 128;
+            dc.DrawRoundedRectangle(
+                new SolidColorBrush(Color.FromArgb(251, 5, 16, 34)),
+                new Pen(Cyan, 2.5),
+                new Rect(x, y, 1027, 606), 10, 10);
+            Text(dc, "GRID UNDER ATTACK — SHOP LEADERBOARD",
+                188, 158, 27, Gold, dpi, true, 775);
+            Text(dc, "TOP 10 • HIGHEST WAVE FIRST • SCORE BREAKS TIES",
+                192, 203, 14, Cyan, dpi, true);
+
+            dc.DrawRectangle(Panel, null, new Rect(183, 241, 957, 34));
+            Text(dc, "#", 202, 249, 16, Cyan, dpi, true);
+            Text(dc, "TECHNICIAN", 265, 249, 16, Cyan, dpi, true);
+            Text(dc, "WAVE", 816, 249, 16, Cyan, dpi, true);
+            Text(dc, "SCORE", 979, 249, 16, Cyan, dpi, true);
+
+            int index = 0;
+            foreach (var entry in _leaderboard.Take(10))
+            {
+                double rowY = 281 + index * 32;
+                if (index % 2 == 0)
+                    dc.DrawRectangle(ButtonFace, null,
+                        new Rect(183, rowY, 957, 30));
+                Brush ink = index == 0 ? Gold : White;
+                Text(dc, entry.Rank.ToString(MoneyCulture),
+                    203, rowY + 6, 14, ink, dpi, true);
+                Text(dc, entry.TechnicianName,
+                    266, rowY + 6, 14, ink, dpi, true, 470);
+                Text(dc, entry.Wave.ToString("N0", MoneyCulture),
+                    816, rowY + 6, 14, Green, dpi, true);
+                Text(dc, entry.Score.ToString("N0", MoneyCulture),
+                    980, rowY + 6, 14, Gold, dpi, true);
+                index++;
+            }
+
+            Text(dc, _leaderboardStatus,
+                195, 621, 14, Muted, dpi, false, 930);
+            Text(dc, "PLAYER: " + _playerName,
+                195, 653, 13, Cyan, dpi, true, 900);
+            Text(dc, _scoreUploadStatus,
+                195, 680, 13.2, Gold, dpi, false, 900);
+            Text(dc, "Scores upload after End Run or defeat. L / ESC closes.",
+                195, 707, 12.8, Muted, dpi, false, 900);
+        }
+
+        private void DrawTowerStats(DrawingContext dc, double dpi)
+        {
+            const double x = 550;
+            Text(dc, "TOWER  " +
+                Math.Ceiling(_health).ToString("0", MoneyCulture) + "/" +
+                MaxTowerHealth.ToString("0", MoneyCulture) +
+                " HP   REGEN +" +
+                TowerRegenPerSecond.ToString("0.00", MoneyCulture) + " HP/s",
+                x, 24, 14, Green, dpi, true, 740);
+
+            Text(dc, _fenceLevel == 0
+                ? "FENCE  NOT INSTALLED"
+                : "FENCE  " +
+                  Math.Ceiling(_fenceHealth).ToString("0", MoneyCulture) + "/" +
+                  FenceMaxHealth.ToString("0", MoneyCulture) +
+                  " HP   REGEN +" +
+                  FenceRegenPerSecond.ToString("0.00", MoneyCulture) + " HP/s",
+                x, 48, 13.5, Cyan, dpi, true, 740);
+
+            Text(dc, "GUNS " +
+                LeftGunDamage.ToString("0", MoneyCulture) + "/" +
+                RightGunDamage.ToString("0", MoneyCulture) +
+                " DMG  |  RATE " +
+                (1.0 / LeftGunReload).ToString("0.0", MoneyCulture) + "/" +
+                (1.0 / RightGunReload).ToString("0.0", MoneyCulture) +
+                "/s  |  RANGE " + GunRange.ToString("0", MoneyCulture) +
+                "  |  STORM -" +
+                (LightningDamageReduction * 100).ToString("0", MoneyCulture) + "%",
+                x, 72, 12.5, Gold, dpi, true, 740);
+
+            // Keep security/RF readiness with the other tower performance
+            // specs, not down against the footer buttons.
+            string security = _securitySweepCooldown <= 0
+                ? "READY" : Math.Ceiling(_securitySweepCooldown)
+                    .ToString(MoneyCulture) + "s";
+            string rf = _rfSweepCooldown <= 0
+                ? "READY" : Math.Ceiling(_rfSweepCooldown)
+                    .ToString(MoneyCulture) + "s";
+            Text(dc, "AUTO SECURITY: " + security + "   AUTO RF: " + rf,
+                x, 96, 13, Cyan, dpi, true, 740);
+        }
+
+        private void DrawField(DrawingContext dc, double dpi)
+        {
+            // Illustrated overhead radio-site yard: muted terrain, corner
+            // markers, shrubs, gravel service access and equipment compound.
+            // All threats remain free to approach from any direction.
+            TowerDefenseEnvironmentArt.DrawBackground(dc,
+                new Rect(FieldX, FieldY, FieldWidth, FieldHeight));
+
+            if (_fenceLevel > 0)
+                TowerDefenseEnvironmentArt.DrawFence(dc,
+                    new Point(TowerX, TowerY), FenceRadius,
+                    _fenceHealth > 0, _fenceLevel, false);
+
+            // Far-side drones disappear partly behind the tall tower,
+            // reinforcing the elevated viewing angle.
+            DrawOrbitingDrones(dc, false);
+
+            // A cohesive site drawing: tapered four-leg lattice, concrete
+            // foundations, equipment cabinet, microwave dish, sector panels,
+            // lightning rod and blinking obstruction beacon.
+            TowerDefenseTowerArt.DrawSite(dc,
+                new Point(TowerX, TowerY),
+                (_clock.Elapsed.TotalSeconds + _savedElapsedOffset) *
+                    _progression.GameSpeedMultiplier,
+                _lightningLevel, _surgeLevel, _filterLevel);
+            DrawMountedGun(dc, false);
+            DrawMountedGun(dc, true);
+
+            // The front fence rail crosses the compound foreground, not
+            // the full height of the tower sprite.
+            if (_fenceLevel > 0)
+                TowerDefenseEnvironmentArt.DrawFence(dc,
+                    new Point(TowerX, TowerY), FenceRadius,
+                    _fenceHealth > 0, _fenceLevel, true);
+
+            // The tower's integrity can be read directly beneath it.
+            dc.DrawRectangle(DarkSteel, null,
+                new Rect(TowerX - 42, TowerY + 63, 84, 7));
+            dc.DrawRectangle(_health < 28 ? Red : Green, null,
+                new Rect(TowerX - 42, TowerY + 63,
+                    84 * Math.Clamp(_health / MaxTowerHealth, 0, 1), 7));
+
+
+            // Hostile miniature RF repeater rigs erupt from disturbed soil
+            // beyond the compound perimeter. Existing RF attacks and HP
+            // remain unchanged; emergence is visual only.
+            double animationTime = (_clock.Elapsed.TotalSeconds +
+                _savedElapsedOffset) * _progression.GameSpeedMultiplier;
+            foreach (var jammer in _jammers)
+            {
+                var p = new Point(jammer.X, jammer.Y);
+                TowerDefenseEnemyArt.DrawInterferenceTower(dc, p,
+                    jammer.Age, animationTime);
+                if (jammer.Age >= 0.3)
+                    DrawHealthBar(dc, p.X,
+                        p.Y - 58 + 22 * (1 - Math.Clamp(
+                            jammer.Age / 1.35, 0, 1)),
+                        jammer.Health, jammer.MaxHealth, 41);
+            }
+
+            // Dedicated cached-vector sprites. Every enemy has a distinct
+            // silhouette and per-enemy animation phase; gameplay and HP are
+            // still driven by the existing threat simulation.
+            foreach (var enemy in _thieves)
+            {
+                Point p = ThiefPoint(enemy);
+                bool facingRight = p.X < TowerX;
+                double vaultProgress = enemy.FenceVaultDuration > 0 &&
+                    enemy.FenceVaultRemaining > 0
+                    ? Math.Clamp(1 - enemy.FenceVaultRemaining /
+                        enemy.FenceVaultDuration, 0, 1)
+                    : -1;
+                TowerDefenseEnemyArt.Draw(dc, enemy.Kind, p,
+                    animationTime, enemy.Angle,
+                    enemy.ClimbSeconds, facingRight, vaultProgress);
+                double jumpHeight = vaultProgress >= 0
+                    ? Math.Sin(vaultProgress * Math.PI) *
+                        (enemy.Kind == 4 ? 23 : 17)
+                    : 0;
+                DrawHealthBar(dc, p.X,
+                    p.Y + TowerDefenseEnemyArt.HealthBarOffset(enemy.Kind) -
+                        jumpHeight,
+                    enemy.Health, enemy.MaxHealth,
+                    TowerDefenseEnemyArt.HealthBarWidth(enemy.Kind));
+            }
+
+            var boss = _thieves.FirstOrDefault(t => t.Kind == 4);
+            if (boss != null)
+            {
+                Text(dc, "WAVE " + _wave + " BOSS: THE SCRAP KING",
+                    FieldX + 210, FieldY + 10, 20, Red, dpi, true);
+                DrawHealthBar(dc, FieldX + FieldWidth / 2,
+                    FieldY + 41, boss.Health, boss.MaxHealth, 350);
+            }
+
+            // Near-side drone floats in front of the tower; smaller
+            // far-side drone was drawn behind it.
+            DrawOrbitingDrones(dc, true);
+
+            foreach (var flash in _defenseFlashes)
+            {
+                // Shot origin now follows its specific orbiting drone rather
+                // than hanging in mid-air at the point where it fired.
+                Point from = flash.IsDrone && flash.DroneCount > 0
+                    ? OrbPosition(flash.DroneIndex, flash.DroneCount)
+                    : flash.From;
+                if (flash.IsDrone)
+                {
+                    dc.DrawLine(DroneBeamGlowPen, from, flash.To);
+                    dc.DrawLine(new Pen(flash.Ink, 2.8), from, flash.To);
+                    dc.DrawLine(DroneBeamCorePen, from, flash.To);
+                    dc.DrawEllipse(flash.Ink, DroneImpactPen,
+                        flash.To, 3.5, 3.5);
+                }
+                else if (flash.SpecialType >= 0)
+                {
+                    dc.DrawLine(new Pen(flash.Ink,
+                        flash.SpecialType == 3 ? 5.5 : 4.0), from, flash.To);
+                    dc.DrawLine(DroneBeamCorePen, from, flash.To);
+                    dc.DrawEllipse(flash.Ink, DroneImpactPen, flash.To,
+                        flash.SpecialType == 3 ? 9 : 5,
+                        flash.SpecialType == 3 ? 9 : 5);
+                }
+                else
+                    dc.DrawLine(new Pen(flash.Ink, 2.5),
+                        from, flash.To);
+            }
+
+            if (_securityRingTime > 0)
+                TowerDefenseEnvironmentArt.DrawSweep(dc,
+                    new Point(TowerX, TowerY),
+                    _securityRingTime, 0.55, false);
+
+            if (_rfRingTime > 0)
+                TowerDefenseEnvironmentArt.DrawSweep(dc,
+                    new Point(TowerX, TowerY),
+                    _rfRingTime, 0.65, true);
+            if (_empPulseRemaining > 0)
+                TowerDefenseEnvironmentArt.DrawSweep(dc,
+                    new Point(TowerX, TowerY),
+                    _empPulseRemaining, 0.65, true);
+
+            if (_warningRemaining > 0)
+            {
+                TowerDefenseEnvironmentArt.DrawLightningWarning(dc,
+                    new Point(TowerX, TowerY), _warningRemaining);
+                Text(dc, "LIGHTNING IN " +
+                    _warningRemaining.ToString("0.0", MoneyCulture) + "s",
+                    TowerX - 93, TowerY + 85, 15, Gold, dpi, true);
+            }
+            if (_flashRemaining > 0)
+            {
+                dc.DrawRectangle(RedFlash, null,
+                    new Rect(FieldX, FieldY, FieldWidth, FieldHeight));
+                var bolt = new Pen(White, 5);
+                var x = TowerX;
+                var y = FieldY;
+                for (int step = 0; step < 6; step++)
+                {
+                    var nx = x + (step % 2 == 0 ? 22 : -19);
+                    var ny = y + (TowerDefenseTowerArt.MastTipY(
+                        new Point(TowerX, TowerY)) - FieldY) / 6.0;
+                    dc.DrawLine(bolt, new Point(x, y), new Point(nx, ny));
+                    x = nx;
+                    y = ny;
+                }
+                dc.DrawLine(bolt, new Point(x, y),
+                    new Point(TowerX,
+                        TowerDefenseTowerArt.MastTipY(
+                            new Point(TowerX, TowerY)) - 5));
+            }
+            // Compact on-field status chips replace the floating L1/S1
+            // text. Draw last so they remain readable through effects.
+            TowerDefenseEnvironmentArt.DrawStatusBadges(dc,
+                new Rect(FieldX, FieldY, FieldWidth, FieldHeight),
+                _lightningLevel, _surgeLevel, _filterLevel, dpi);
+
+
+        }
+
+        private static void DrawHealthBar(DrawingContext dc,
+            double centerX, double y, double health, double maximum, double width)
+        {
+            double pct = Math.Clamp(health / Math.Max(1, maximum), 0, 1);
+            dc.DrawRectangle(Backdrop, new Pen(White, 0.7),
+                new Rect(centerX - width / 2, y, width, 5));
+            dc.DrawRectangle(pct < 0.3 ? Red : pct < 0.65 ? Gold : Green,
+                null, new Rect(centerX - width / 2, y, width * pct, 5));
+        }
+
+        private void DrawMountedGun(DrawingContext dc, bool right)
+        {
+            Point origin = TowerDefenseTowerArt.TurretOrigin(
+                new Point(TowerX, TowerY), right);
+            TowerDefenseTowerArt.DrawTurret(dc, origin,
+                right ? _rightGunAim : _leftGunAim,
+                right, right ? _rightMuzzleRemaining > 0 :
+                    _leftMuzzleRemaining > 0);
+        }
+
+        private static string Money(long amount)
+        {
+            if (amount >= 1_000_000_000L)
+                return "$" + (amount / 1_000_000_000.0).ToString("0.0", MoneyCulture) + "B";
+            if (amount >= 1_000_000L)
+                return "$" + (amount / 1_000_000.0).ToString("0.0", MoneyCulture) + "M";
+            if (amount >= 100_000L)
+                return "$" + (amount / 1000.0).ToString("0.0", MoneyCulture) + "K";
+            return "$" + amount.ToString("N0", MoneyCulture);
+        }
+
+        private static string ShortLabel(string name, int maxChars = 16) =>
+            name.Length <= maxChars ? name.ToUpperInvariant() :
+                name.Substring(0, maxChars).ToUpperInvariant();
+
+        private static readonly string[] CategoryNames =
+        {
+            "OPERATIONS", "PROTECTION", "LOGISTICS"
+        };
+
+        private void DrawSidebar(DrawingContext dc, double dpi)
+        {
+            dc.DrawRectangle(Panel, new Pen(GridInk, 1.6),
+                new Rect(PanelX, FieldY, PanelWidth, FieldHeight));
+            Text(dc, "UPGRADES", PanelX + 17, 140, 22, Cyan, dpi, true);
+            Text(dc, "TOWER HEALTH", PanelX + 17, 174, 13, Muted, dpi, true);
+            Text(dc, Math.Ceiling(_health).ToString("0", MoneyCulture) +
+                "/" + MaxTowerHealth.ToString("0", MoneyCulture),
+                PanelX + 17, 193, 23, _health < 28 ? Red : Green, dpi, true);
+            Text(dc, "CASH", PanelX + 281, 174, 13, Muted, dpi, true);
+            Text(dc, Money(_cash), PanelX + 281, 193, 22, Gold, dpi, true);
+            double hpFill = Math.Clamp(_health / Math.Max(1, MaxTowerHealth), 0, 1);
+            dc.DrawRectangle(DarkSteel, null,
+                new Rect(PanelX + 17, 216, 208, 7));
+            dc.DrawRectangle(hpFill < 0.3 ? Red : Green, null,
+                new Rect(PanelX + 17, 216, 208 * hpFill, 7));
+            Text(dc, "WAVE " + _wave +
+                (_waveActive ? (_wave % 5 == 0 ? " - BOSS" : " IN PROGRESS") : " READY"),
+                PanelX + 17, 231, 14, _waveActive && _wave % 5 == 0 ?
+                    Red : White, dpi, true);
+            Text(dc, "RESEARCH +" +
+                _progression.PendingCredits.ToString("N0", MoneyCulture),
+                PanelX + 291, 232, 13, Purple, dpi, true);
+            // Category selectors and all eight upgrade cards are actual WPF
+            // Buttons above this drawing surface, not tiny painted rectangles.
+        }
+
+        private void DrawWorkshop(DrawingContext dc, double dpi)
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(248, 5, 14, 31)),
+                new Pen(Purple, 2.6), new Rect(140, 99, 1093, 701));
+            Text(dc, "RADIO SHOP RESEARCH WORKSHOP", 174, 116, 27,
+                Gold, dpi, true);
+            Text(dc, "PERMANENT CREDITS: " + Money(_progression.Credits) +
+                "        BEST WAVE: " + _progression.BestWave,
+                175, 157, 17, White, dpi, true);
+            Text(dc, _advancedWorkshopVisible
+                    ? "PERMANENT SPEED, WAVE SKIPS, AND EXCLUSIVE SPECIAL WEAPONS."
+                    : "SELECT A RESEARCH UPGRADE OR OPEN SPECIAL RESEARCH.",
+                175, 184, 15, Cyan, dpi);
+
+            Text(dc, _advancedWorkshopVisible
+                    ? "S TOGGLE SKIP • 1-6 BUY SPECIAL RESEARCH"
+                    : "SPECIAL RESEARCH: SPEED / WAVE SKIP / FOUR EXCLUSIVE WEAPONS",
+                178, 718, 12.5, Muted, dpi);
+        }
+
+        private void DrawPerk(DrawingContext dc, double dpi)
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(247, 5, 14, 31)),
+                new Pen(Gold, 2.7), new Rect(128, 178, 1010, 435));
+            Text(dc, "MILESTONE: WAVE " + _wave + " SURVIVED!",
+                174, 199, 29, Gold, dpi, true);
+            Text(dc, "CHOOSE YOUR BONUS BEFORE THE NEXT WAVE:",
+                178, 249, 18, White, dpi, true);
+            Text(dc, "CLICK A BONUS CARD OR PRESS 1 / 2 / 3",
+                178, 560, 16, Muted, dpi);
+        }
+
+        private void DrawResumePrompt(DrawingContext dc, double dpi)
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(249, 5, 13, 29)),
+                new Pen(Cyan, 3), new Rect(104, 155, 1122, 380));
+            Text(dc, "SAVED RADIO-SHOP SHIFT FOUND", 165, 190, 32, Cyan, dpi, true);
+            if (_resumeOffer != null)
+            {
+                Text(dc, "WAVE " + _resumeOffer.Wave +
+                    "     CASH " + Money(_resumeOffer.Cash) +
+                    "     RESEARCH +" +
+                    _resumeOffer.PendingResearch.ToString("N0", MoneyCulture),
+                    166, 251, 21, Gold, dpi, true);
+            }
+            Text(dc, "CONTINUE THE EXACT WAVE, OR BANK RESEARCH AND START FRESH?",
+                166, 292, 16, White, dpi, true);
+            Text(dc, "C = CONTINUE     N = NEW RUN     ESC = CLOSE",
+                166, 450, 16, Muted, dpi, true);
+        }
+
+        private void DrawOverlay(DrawingContext dc, double dpi)
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(242, 5, 13, 29)),
+                new Pen(Cyan, 2.5), new Rect(103, 164, 709, 307));
+            Text(dc, _gameOver ? "TOWER DESTROYED" :
+                _paused ? "RADIO SILENCE — PAUSED" : "GRID UNDER ATTACK",
+                151, 191, 29, _gameOver ? Red : Cyan, dpi, true);
+
+            if (!_started)
+            {
+                Text(dc, "ONE RADIO TOWER. UNLIMITED WAYS TO IMPROVE IT.",
+                    151, 245, 17, White, dpi, true);
+                Text(dc, "24 UPGRADES • 3 SYSTEMS • PERSISTENT RESEARCH",
+                    151, 280, 17, Purple, dpi, true);
+                Text(dc, "INVEST IN YOUR SHOP BETWEEN EVERY SHIFT.",
+                    151, 315, 15, Gold, dpi, true);
+                Text(dc, "PRESS SPACE TO PREPARE", 151, 370, 24, Green, dpi, true);
+                Text(dc, "W WORKSHOP  •  H HELP  •  L SHOP LEADERBOARD",
+                    151, 416, 14, Muted, dpi);
+                Text(dc, "SPECIAL RESEARCH: SPEED / SKIPS / 4 WEAPONS",
+                    151, 445, 12.5, Purple, dpi);
+            }
+            else if (_gameOver)
+            {
+                Text(dc, "WAVE " + _wave + "  •  SCORE " +
+                    _score.ToString("N0", MoneyCulture),
+                    151, 275, 20, White, dpi, true);
+                Text(dc, "RESEARCH BANK: " + Money(_progression.Credits) +
+                    "   BEST WAVE: " + _progression.BestWave,
+                    151, 314, 17, Gold, dpi, true);
+                Text(dc, "W FOR PERMANENT UPGRADES  •  R FOR NEXT SHIFT",
+                    151, 366, 16, Green, dpi, true);
+                Text(dc, "L SHOP LEADERBOARD  •  ESC BACK TO ARCADE",
+                    151, 410, 14, Muted, dpi);
+            }
+            else
+            {
+                Text(dc, "WAVE " + _wave + "    TOWER HP " +
+                    Math.Ceiling(_health).ToString(MoneyCulture) +
+                    "/" + MaxTowerHealth.ToString("0", MoneyCulture),
+                    151, 285, 20, Gold, dpi, true);
+                Text(dc, "P RESUME  •  L SHOP LEADERBOARD  •  ESC EXIT",
+                    151, 395, 15, White, dpi);
+            }
+        }
+
+        private void DrawHelp(DrawingContext dc, double dpi)
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromArgb(249, 6, 18, 38)),
+                new Pen(Gold, 2.4), new Rect(112, 143, 698, 369));
+            Text(dc, "GRID UNDER ATTACK — FIELD MANUAL", 143, 160, 22,
+                Gold, dpi, true);
+            Text(dc, "24 UPGRADES: OPERATIONS / PROTECTION / LOGISTICS",
+                143, 203, 15, Cyan, dpi, true);
+            Text(dc, "CLICK A CATEGORY TAB TO VIEW ITS 8 UPGRADES.",
+                143, 231, 14, White, dpi);
+            Text(dc, "CLICK A LARGE UPGRADE CARD TO PURCHASE IT.",
+                143, 259, 14, White, dpi);
+            Text(dc, "GUNS, DRONES, SECURITY, RF & SPECIAL WEAPONS ARE AUTOMATIC.",
+                143, 290, 12.8, White, dpi);
+            Text(dc, "THIEVES, CLIMBERS, PARAKEETS, BEES + RF MINI TOWERS.",
+                143, 318, 13.2, White, dpi);
+            Text(dc, "BOSSES EVERY 5 WAVES • PERMANENT SPEED & SPECIAL WEAPONS.",
+                143, 352, 13.3, Red, dpi, true);
+            Text(dc, "END RUN BANKS RESEARCH; CLOSING SUSPENDS YOUR WAVE.",
+                143, 380, 12.8, Green, dpi, true);
+            Text(dc, "SPECIAL RESEARCH BUYS SPEED, +5 WAVE SKIPS, 4 WEAPONS.",
+                143, 409, 12.6, Muted, dpi);
+            Text(dc, "BUY AUTO NEXT: $650, 5-SECOND BREAK, PAUSES FOR PERKS.",
+                143, 438, 12.8, Cyan, dpi, true);
+            Text(dc, "H CLOSES HELP • L OPENS SHOP SCORES",
+                143, 465, 16, Gold, dpi, true);
+        }
+
+        private static void Text(DrawingContext dc, string value,
+            double x, double y, double size, Brush color, double dpi,
+            bool bold = false, double maxWidth = 0,
+            bool singleLine = false)
+        {
+            var ft = new FormattedText(
+                value, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                new Typeface(new FontFamily("Consolas"), FontStyles.Normal,
+                    bold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal),
+                size, color, dpi);
+            if (maxWidth > 0)
+                ft.MaxTextWidth = maxWidth;
+            if (singleLine)
+            {
+                ft.MaxLineCount = 1;
+                ft.Trimming = TextTrimming.CharacterEllipsis;
+            }
+            dc.DrawText(ft, new Point(x, y));
+        }
+
+        private static Pen FreezePen(Brush brush, double width)
+        {
+            var pen = new Pen(brush, width);
+            pen.Freeze();
+            return pen;
+        }
+
+        private static Brush Paint(string hex)
+        {
+            var brush = (SolidColorBrush)new BrushConverter().ConvertFromString(hex)!;
+            brush.Freeze();
+            return brush;
+        }
+
+        private static string BestFile => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SmartGridSuite", "Arcade", "tower-defense-workshop-score.txt");
+
+        private static int ReadBestScore()
+        {
+            try
+            {
+                return File.Exists(BestFile) &&
+                    int.TryParse(File.ReadAllText(BestFile),
+                        NumberStyles.Integer, MoneyCulture, out var score)
+                    ? Math.Max(0, score) : 0;
+            }
+            catch (IOException) { return 0; }
+            catch (UnauthorizedAccessException) { return 0; }
+        }
+
+        private static void SaveBestScore(int score)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(BestFile)!);
+                File.WriteAllText(BestFile, score.ToString(MoneyCulture));
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+
+        private void HostClosed(object? sender, EventArgs e) => Close();
+
+        private void HostVisibilityChanged(
+            object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (!_host.IsVisible)
+                Close();
+        }
+
+        private void HostStateChanged(object? sender, EventArgs e)
+        {
+            if (_host.WindowState == WindowState.Minimized)
+                Close();
+        }
+
+        private void WindowClosed(object? sender, EventArgs e)
+        {
+            _timer.Stop();
+            _clock.Stop();
+            // Closing the game is a SUSPEND, not a loss. Research is banked
+            // only by End Run or defeat so the wave remains resumable.
+            if (!_gameOver && !_resumeDecisionPending && _started)
+                SaveSuspendedRun();
+            _timer.Tick -= Tick;
+            _timer.Tick -= RefreshControlsOnTick;
+            PreviewKeyDown -= HandleKey;
+            _host.Closed -= HostClosed;
+            _host.IsVisibleChanged -= HostVisibilityChanged;
+            _host.StateChanged -= HostStateChanged;
+            Closed -= WindowClosed;
+            if (ReferenceEquals(_active, this))
+                _active = null;
+        }
+
+        private sealed class CopperThief
+        {
+            public double Angle { get; set; }
+            public double Distance { get; set; }
+            public double Speed { get; set; }
+            public double Health { get; set; }
+            public double MaxHealth { get; set; }
+            public int Kind { get; set; }
+            public bool FenceHitDone { get; set; }
+            public double FenceVaultDuration { get; set; }
+            public double FenceVaultRemaining { get; set; }
+            public double ClimbSeconds { get; set; }
+        }
+
+        private sealed record DefenseFlash(
+            Point From, Point To, double EndTime, Brush Ink,
+            bool IsDrone = false, int DroneIndex = 0, int DroneCount = 0,
+            int SpecialType = -1);
+
+        private sealed class InterferenceTower
+        {
+            public double X { get; set; }
+            public double Y { get; set; }
+            public double Age { get; set; }
+            public double Health { get; set; }
+            public double MaxHealth { get; set; }
+        }
+
+        private sealed class GameSurface : FrameworkElement
+        {
+            private readonly TowerDefenseWindow _game;
+
+            public GameSurface(TowerDefenseWindow game)
+            {
+                _game = game;
+                Focusable = false;
+            }
+
+            protected override Size MeasureOverride(Size availableSize) =>
+                new(DesignWidth, DesignHeight);
+
+            protected override void OnRender(DrawingContext drawingContext)
+            {
+                base.OnRender(drawingContext);
+                _game.Draw(drawingContext,
+                    VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            }
+        }
+    }
+}

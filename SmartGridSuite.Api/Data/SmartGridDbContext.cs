@@ -14,6 +14,8 @@ namespace SmartGridSuite.Api.Data
 
         // Fake-game high scores only; no production ticket/assignment data.
         public DbSet<ArcadeHighScoreEntity> ArcadeHighScores => Set<ArcadeHighScoreEntity>();
+        public DbSet<TowerDefenseHighScoreEntity> TowerDefenseHighScores =>
+            Set<TowerDefenseHighScoreEntity>();
 
         public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
         {
@@ -170,6 +172,20 @@ namespace SmartGridSuite.Api.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            modelBuilder.Entity<TowerDefenseHighScoreEntity>(e =>
+            {
+                e.ToTable("arcade_tower_defense_high_scores");
+                e.HasKey(x => x.TechnicianId);
+                e.Property(x => x.TechnicianId).HasColumnName("technician_id");
+                e.Property(x => x.BestWave).HasColumnName("best_wave");
+                e.Property(x => x.BestScore).HasColumnName("best_score");
+                e.Property(x => x.AchievedAtUtc).HasColumnName("achieved_at_utc");
+                e.HasOne(x => x.Technician)
+                    .WithMany()
+                    .HasForeignKey(x => x.TechnicianId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
             modelBuilder.Entity<TopChangeEntity>(e =>
             {
                 e.ToTable("ticket_top_changes");
@@ -191,6 +207,7 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.Notification).HasColumnName("notification").HasMaxLength(10).IsRequired(false);
                 e.Property(x => x.Status).HasColumnName("status");
                 e.Property(x => x.AssignedTech).HasColumnName("assigned_tech").HasMaxLength(TicketTextLimits.AssignedTech);
+                e.Property(x => x.ManualAssignedTech).HasColumnName("manual_assigned_tech").HasMaxLength(TicketTextLimits.AssignedTech).IsRequired(false);
                 e.Property(x => x.CreatedAt).HasColumnName("created_at");
                 e.Property(x => x.LastActivityAt).HasColumnName("last_activity_at");
                 e.Property(x => x.CurrentWorkOrder).HasColumnName("current_work_order");
