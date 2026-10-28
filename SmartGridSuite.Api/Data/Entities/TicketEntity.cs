@@ -7,6 +7,8 @@
         public string? Notification { get; set; }
         public string Status { get; set; } = "";
         public string AssignedTech { get; set; } = "";
+        // Direct Tickets assignments only. NULL marks older, unclassified records.
+        public string? ManualAssignedTech { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime LastActivityAt { get; set; }
         public string? CurrentWorkOrder { get; set; }

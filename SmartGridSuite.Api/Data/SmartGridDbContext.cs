@@ -207,6 +207,7 @@ namespace SmartGridSuite.Api.Data
                 e.Property(x => x.Notification).HasColumnName("notification").HasMaxLength(10).IsRequired(false);
                 e.Property(x => x.Status).HasColumnName("status");
                 e.Property(x => x.AssignedTech).HasColumnName("assigned_tech").HasMaxLength(TicketTextLimits.AssignedTech);
+                e.Property(x => x.ManualAssignedTech).HasColumnName("manual_assigned_tech").HasMaxLength(TicketTextLimits.AssignedTech).IsRequired(false);
                 e.Property(x => x.CreatedAt).HasColumnName("created_at");
                 e.Property(x => x.LastActivityAt).HasColumnName("last_activity_at");
                 e.Property(x => x.CurrentWorkOrder).HasColumnName("current_work_order");

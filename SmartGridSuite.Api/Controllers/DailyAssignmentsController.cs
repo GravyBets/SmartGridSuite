@@ -1039,6 +1039,10 @@ namespace SmartGridSuite.Api.Controllers
                     ? "Dispatcher"
                     : req.UpdatedBy.Trim();
 
+            // Keep route removal and the ticket's visible assignees atomic.
+            await using var transaction =
+                await _db.Database.BeginTransactionAsync(ct);
+
             foreach (var assignment in assignments)
             {
                 assignment.AssignmentStatus =
@@ -1060,10 +1064,14 @@ namespace SmartGridSuite.Api.Controllers
                     removedBy;
             }
 
-            // Removing work-list membership does not undo the ticket association.
-            // A dispatcher can explicitly edit Assigned To on the ticket if needed.
-
             await _db.SaveChangesAsync(ct);
+
+            // Removed routes are no longer assignees, but explicit Tickets
+            // assignments and other active published routes are preserved.
+            await TicketAssigneeReconciler.ReconcileAsync(
+                _db, removedTicketIds, workDate, ct);
+            await _db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
 
             return Ok(
                 new RemoveDailyTicketAssignmentsResponse
@@ -1663,45 +1671,22 @@ namespace SmartGridSuite.Api.Controllers
                     .OrderBy(x => x.Name)
                     .ToList());
 
+            // Publish the route and rebuild Assigned To in one transaction.
+            await using var publishTransaction =
+                await _db.Database.BeginTransactionAsync(ct);
+
             var publishedRows = new List<DailyTicketAssignmentPublishedEntity>();
 
             foreach (var assignment in draftAssignments)
             {
                 var ticket = ticketsById[assignment.TicketId];
 
-                /*
-                 * Publishing adds the target to Assigned To without replacing
-                 * existing technicians or altering status/write-up participation.
-                 * A field-complete ticket may receive a later Lineman assignment.
-                 */
-                if (!closedStatusNamesForPublish.Contains(ticket.Status ?? ""))
+                // Visible Assigned To is rebuilt from all active published
+                // routes after the save. Never accumulate historic assignees.
+                if (!closedStatusNamesForPublish.Contains(ticket.Status ?? "") &&
+                    assignment.CrewId.HasValue && !ticket.AssignedCrewId.HasValue)
                 {
-                    var incomingNames = BuildPublishedAssignedTechText(
-                        assignment,
-                        trucksById,
-                        truckTechNamesByTruckId,
-                        techniciansById);
-
-                    var mergedNames = TicketAssigneeText.Merge(
-                        ticket.AssignedTech,
-                        incomingNames);
-
-                    if (mergedNames.Length > TicketTextLimits.AssignedTech)
-                    {
-                        return BadRequest(
-                            $"Assigned To exceeds {TicketTextLimits.AssignedTech} characters " +
-                            $"for ticket {ticket.Id}. Remove unused assignees before publishing.");
-                    }
-
-                    if (!string.Equals(ticket.AssignedTech, mergedNames, StringComparison.Ordinal))
-                    {
-                        ticket.AssignedTech = mergedNames;
-                        ticket.LastActivityAt = now;
-                    }
-
-                    // An individual Lineman target must not clear another crew's link.
-                    if (assignment.CrewId.HasValue && !ticket.AssignedCrewId.HasValue)
-                        ticket.AssignedCrewId = assignment.CrewId;
+                    ticket.AssignedCrewId = assignment.CrewId;
                 }
 
                 assignment.IsPublished = true;
@@ -1742,6 +1727,10 @@ namespace SmartGridSuite.Api.Controllers
                  * whether old published rows are still actionable by Field Tech.
                  */
                 await _db.SaveChangesAsync(ct);
+                await TicketAssigneeReconciler.ReconcileAsync(
+                    _db, affectedTicketIds, workDate, ct);
+                await _db.SaveChangesAsync(ct);
+                await publishTransaction.CommitAsync(ct);
 
                 return Ok(new PublishDailyAssignmentTargetResponse
                 {
@@ -1775,6 +1764,10 @@ namespace SmartGridSuite.Api.Controllers
                 publishedRows);
 
             await _db.SaveChangesAsync(ct);
+            await TicketAssigneeReconciler.ReconcileAsync(
+                _db, affectedTicketIds, workDate, ct);
+            await _db.SaveChangesAsync(ct);
+            await publishTransaction.CommitAsync(ct);
 
             var emailResult = await TrySendDailyAssignmentPublishedEmailAsync(
                 rosterDate,
@@ -2099,64 +2092,6 @@ namespace SmartGridSuite.Api.Controllers
                 return "Distribution";
 
             return "";
-        }
-
-        private static string BuildPublishedAssignedTechText(DailyTicketAssignmentEntity assignment, Dictionary<uint, TruckEntity> trucksById,
-            Dictionary<uint, List<string>> truckTechNamesByTruckId, Dictionary<uint, TechnicianEntity> techniciansById)
-        {
-            /*
-             * A Technician target carrying TruckId is a crew assignment anchored to
-             * its lead technician. Assigned To should show the crew names only.
-             *
-             * This also handles any remaining legacy Truck-target assignments.
-             */
-            if (assignment.TruckId.HasValue)
-            {
-                var truckId = assignment.TruckId.Value;
-
-                if (truckTechNamesByTruckId.TryGetValue(truckId, out var techNames) &&
-                    techNames.Count > 0)
-                {
-                    return FormatCrewDisplayText(techNames);
-                }
-
-                /*
-                 * Fallback for an unexpected roster/context issue: prefer the lead
-                 * technician name rather than writing a truck number into Assigned To.
-                 */
-                if (assignment.TechnicianId.HasValue &&
-                    techniciansById.TryGetValue(assignment.TechnicianId.Value, out var crewLead))
-                {
-                    return FormatTechnicianName(
-                        crewLead.FirstName,
-                        crewLead.LastName,
-                        crewLead.EmployeeId);
-                }
-
-                if (trucksById.TryGetValue(truckId, out var truck) &&
-                    !string.IsNullOrWhiteSpace(truck.TruckNumber))
-                {
-                    return $"Truck {truck.TruckNumber.Trim()}";
-                }
-            }
-
-            if (IsTargetType(assignment.TargetType, "Technician") &&
-                assignment.TechnicianId.HasValue)
-            {
-                var technicianId = assignment.TechnicianId.Value;
-
-                if (techniciansById.TryGetValue(technicianId, out var technician))
-                {
-                    return FormatTechnicianName(
-                        technician.FirstName,
-                        technician.LastName,
-                        technician.EmployeeId);
-                }
-
-                return $"Technician {technicianId}";
-            }
-
-            return "(Unassigned)";
         }
 
         private static string FormatCrewDisplayText(IReadOnlyList<string> names)

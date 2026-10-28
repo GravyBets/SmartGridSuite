@@ -3244,6 +3244,7 @@ namespace SmartGridSuite.Api.Controllers
 
                 Status = status,
                 AssignedTech = assignedTech,
+                ManualAssignedTech = assignedTech,
 
                 CreatedAt = now,
                 LastActivityAt = now,
@@ -3362,7 +3363,16 @@ namespace SmartGridSuite.Api.Controllers
             entity.Notification = notif;
 
             entity.Status = status;
-            entity.AssignedTech = assignedTech;
+            // The edit form submits the combined display string even when only
+            // another ticket field changed. Record a manual assignment only when
+            // Dispatch actually changed Assigned To.
+            var manualAssignmentChanged = !string.Equals(
+                originalAssignedTech, assignedTech, StringComparison.Ordinal);
+            if (manualAssignmentChanged)
+            {
+                entity.ManualAssignedTech = assignedTech;
+                entity.AssignedTech = assignedTech;
+            }
 
             entity.CurrentWorkOrder = string.IsNullOrWhiteSpace(wo) ? null : wo;
             entity.WorkOrderClass = NormalizeWorkOrderClassForStorage(req.WorkOrderClass);
@@ -3400,6 +3410,10 @@ namespace SmartGridSuite.Api.Controllers
                     NormalizeWorkOrderType(entity.WorkOrderClass),
                     StringComparison.OrdinalIgnoreCase);
 
+            if (manualAssignmentChanged && !statusEntity.IsClosed)
+                await TicketAssigneeReconciler.ReconcileAsync(
+                    _db, new[] { entity.Id }, DateTime.Today, ct);
+
             /*
              * Dispatch may add a technician or Lineman after a ticket has already
              * been closed so the completed work appears in that person's History
@@ -3415,7 +3429,7 @@ namespace SmartGridSuite.Api.Controllers
                 await AddClosedTicketHistoryForNewAssignmentsAsync(
                     entity.Id,
                     originalAssignedTech,
-                    assignedTech,
+                    entity.AssignedTech,
                     ct);
             }
 
@@ -3646,9 +3660,13 @@ namespace SmartGridSuite.Api.Controllers
 
             foreach (var ticket in tickets)
             {
+                ticket.ManualAssignedTech = assignedTech;
                 ticket.AssignedTech = assignedTech;
                 ticket.LastActivityAt = now;
             }
+
+            await TicketAssigneeReconciler.ReconcileAsync(
+                _db, tickets.Select(ticket => ticket.Id), DateTime.Today, ct);
 
             await _db.SaveChangesAsync(ct);
 
