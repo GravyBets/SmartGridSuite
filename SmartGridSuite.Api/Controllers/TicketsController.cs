@@ -1248,7 +1248,7 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             var normalizedSite =
-                NormalizeSiteIdForFieldDetails(site);
+                NormalizeSiteIdForTicketMatch(site);
 
             /*
              * An explicit TicketId is authoritative.
@@ -1277,7 +1277,7 @@ namespace SmartGridSuite.Api.Controllers
                 }
 
                 var explicitTicketSite =
-                    NormalizeSiteIdForFieldDetails(
+                    NormalizeSiteIdForTicketMatch(
                         explicitTicket.Site);
 
                 if (!string.Equals(
@@ -2862,6 +2862,17 @@ namespace SmartGridSuite.Api.Controllers
             return (siteId ?? string.Empty)
                 .Trim()
                 .ToUpperInvariant();
+        }
+
+        // Ticket lookup treats hyphens, underscores, and spaces as equivalent.
+        // Keep this separate from Site Notes normalization: notes use exact
+        // canonical site IDs and must not have their punctuation removed.
+        private static string NormalizeSiteIdForTicketMatch(string? siteId)
+        {
+            return NormalizeSiteIdForFieldDetails(siteId)
+                .Replace("_", "")
+                .Replace("-", "")
+                .Replace(" ", "");
         }
 
         private static string NormalizeWorkOrderType(string? workOrderClass)
@@ -5884,7 +5895,7 @@ namespace SmartGridSuite.Api.Controllers
              * Site Dashboard site, and never silently substitute another ticket.
              */
             var requestedSite =
-                NormalizeSiteIdForFieldDetails(
+                NormalizeSiteIdForTicketMatch(
                     req.Site);
 
             if (string.IsNullOrWhiteSpace(requestedSite))
@@ -5894,7 +5905,7 @@ namespace SmartGridSuite.Api.Controllers
             }
 
             var ticketSite =
-                NormalizeSiteIdForFieldDetails(
+                NormalizeSiteIdForTicketMatch(
                     entity.Site);
 
             if (!string.Equals(
