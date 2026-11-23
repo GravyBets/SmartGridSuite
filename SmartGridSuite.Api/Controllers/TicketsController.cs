@@ -3381,24 +3381,10 @@ namespace SmartGridSuite.Api.Controllers
                 await TicketAssigneeReconciler.ReconcileAsync(
                     _db, new[] { entity.Id }, DateTime.Today, ct);
 
-            /*
-             * Dispatch may add a technician or Lineman after a ticket has already
-             * been closed so the completed work appears in that person's History
-             * for time entry.
-             *
-             * This deliberately does NOT rewrite the saved write-up narrative or
-             * its technician footer. The original Submit Write-Up selections remain
-             * exactly as submitted; this only grants History visibility to newly
-             * assigned people on a closed ticket.
-             */
-            if (statusEntity.IsClosed)
-            {
-                await AddClosedTicketHistoryForNewAssignmentsAsync(
-                    entity.Id,
-                    originalAssignedTech,
-                    entity.AssignedTech,
-                    ct);
-            }
+            // Editing Assigned To must NEVER retroactively add participants
+            // to an earlier write-up. Only that write-up's checked preview
+            // participants belong in its saved History snapshot.
+
 
             try
             {
@@ -7059,139 +7045,6 @@ namespace SmartGridSuite.Api.Controllers
          * row here does not alter SubmittedNarrative, Site History, PrimaryTech, or
          * SecondaryTech, so the original write-up remains unchanged.
          */
-        private async Task AddClosedTicketHistoryForNewAssignmentsAsync(
-            long ticketId,
-            string? originalAssignedTech,
-            string? updatedAssignedTech,
-            CancellationToken ct)
-        {
-            var originalNames =
-                ParseAssignedTechnicianDisplayNames(
-                    originalAssignedTech);
-
-            var updatedNames =
-                ParseAssignedTechnicianDisplayNames(
-                    updatedAssignedTech);
-
-            var addedNames =
-                updatedNames
-                    .Where(x =>
-                        !originalNames.Contains(x))
-                    .ToHashSet(
-                        StringComparer.OrdinalIgnoreCase);
-
-            if (addedNames.Count == 0)
-                return;
-
-            /*
-             * Completion date in Field Tech History comes from SubmittedAt.
-             * The latest active write-up therefore represents the ticket's most
-             * recent field completion event.
-             */
-            var latestSubmissionId =
-                await _db.TicketWriteUpSubmissions
-                    .AsNoTracking()
-                    .Where(x =>
-                        x.TicketId == ticketId &&
-                        !x.IsDeleted)
-                    .OrderByDescending(x => x.SubmittedAt)
-                    .ThenByDescending(x => x.Id)
-                    .Select(x => (long?)x.Id)
-                    .FirstOrDefaultAsync(ct);
-
-            if (!latestSubmissionId.HasValue)
-                return;
-
-            var activeTechnicians =
-                await ActiveFieldTechniciansQuery()
-                    .ToListAsync(ct);
-
-            var addedTechnicians =
-                activeTechnicians
-                    .Where(technician =>
-                    {
-                        var employeeId =
-                            (technician.EmployeeId ?? string.Empty)
-                                .Trim();
-
-                        var displayName =
-                            FormatTechnicianName(
-                                technician.FirstName,
-                                technician.LastName,
-                                technician.EmployeeId);
-
-                        return
-                            addedNames.Contains(displayName) ||
-                            (!string.IsNullOrWhiteSpace(employeeId) &&
-                             addedNames.Contains(employeeId));
-                    })
-                    .ToList();
-
-            if (addedTechnicians.Count == 0)
-                return;
-
-            var existingParticipants =
-                await _db.TicketWriteUpSubmissionTechnicians
-                    .AsNoTracking()
-                    .Where(x =>
-                        x.SubmissionId ==
-                        latestSubmissionId.Value)
-                    .Select(x => new
-                    {
-                        x.TechnicianId,
-                        x.EmployeeId
-                    })
-                    .ToListAsync(ct);
-
-            foreach (var technician in addedTechnicians)
-            {
-                var employeeId =
-                    (technician.EmployeeId ?? string.Empty)
-                        .Trim();
-
-                var alreadyVisible =
-                    existingParticipants.Any(x =>
-                        x.TechnicianId == technician.Id ||
-                        (
-                            !string.IsNullOrWhiteSpace(employeeId) &&
-                            string.Equals(
-                                x.EmployeeId,
-                                employeeId,
-                                StringComparison.OrdinalIgnoreCase)
-                        ));
-
-                if (alreadyVisible)
-                    continue;
-
-                _db.TicketWriteUpSubmissionTechnicians.Add(
-                    new TicketWriteUpSubmissionTechnicianEntity
-                    {
-                        SubmissionId =
-                            latestSubmissionId.Value,
-
-                        TechnicianId =
-                            technician.Id,
-
-                        EmployeeId =
-                            string.IsNullOrWhiteSpace(employeeId)
-                                ? $"TECH-{technician.Id}"
-                                : employeeId,
-
-                        TechnicianName =
-                            FormatTechnicianName(
-                                technician.FirstName,
-                                technician.LastName,
-                                technician.EmployeeId),
-
-                        IsSubmitter =
-                            false,
-
-                        CreatedAt =
-                            DateTime.Now
-                    });
-            }
-        }
-
         // Splits the AssignedTech display value used for direct or older assignments.
         // Crew strings such as "Alex Smith, Pat Jones & Lee Brown" become exact names.
         private static HashSet<string> ParseAssignedTechnicianDisplayNames(string? assignedTech)
