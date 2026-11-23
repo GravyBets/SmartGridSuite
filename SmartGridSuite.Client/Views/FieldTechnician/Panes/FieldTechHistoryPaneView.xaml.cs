@@ -376,7 +376,7 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
 
             try
             {
-                await Task.Delay(650, token);
+                await Task.Delay(1000, token);
 
                 if (token.IsCancellationRequested)
                     return;
