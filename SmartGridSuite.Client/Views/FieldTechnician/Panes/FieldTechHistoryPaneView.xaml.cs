@@ -168,6 +168,9 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
                 var technician = await CurrentUserService
                     .LoadCurrentTechnicianAsync(forceRefresh: true);
 
+                if (requestCts.IsCancellationRequested || requestVersion != _historyRequestVersion)
+                    return;
+
                 if (technician == null ||
                     string.IsNullOrWhiteSpace(technician.EmployeeId))
                 {
@@ -264,11 +267,11 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
             }
             finally
             {
-                if (requestVersion == _historyRequestVersion)
-                {
+                if (ReferenceEquals(_historyRequestCts, requestCts))
                     _historyRequestCts = null;
+
+                if (requestVersion == _historyRequestVersion)
                     HideBusyOverlay();
-                }
 
                 requestCts.Dispose();
             }
