@@ -602,6 +602,37 @@ namespace SmartGridSuite.Client.Models.Dispatcher
 
         public List<DispatchCloseoutChecklistItem> CloseoutChecklistItems { get; set; } = new();
 
+        private List<DispatchCloseoutChecklistGroup>? _closeoutChecklistGroups;
+
+        public IReadOnlyList<DispatchCloseoutChecklistGroup> CloseoutChecklistGroups
+        {
+            get
+            {
+                if (_closeoutChecklistGroups != null)
+                    return _closeoutChecklistGroups;
+
+                _closeoutChecklistGroups = CloseoutChecklistItems
+                    .GroupBy(x => x.SubmissionId)
+                    .OrderBy(group => group.Min(x => x.SubmittedAt ?? DateTime.MinValue))
+                    .ThenBy(group => group.Key)
+                    .Select((group, index) =>
+                        new DispatchCloseoutChecklistGroup
+                        {
+                            SubmissionId = group.Key,
+                            SubmittedAt = group.First().SubmittedAt,
+                            SubmittedByName = group.First().SubmittedByName,
+                            Sequence = index + 1,
+                            Items = group.OrderBy(x => x.SortOrder)
+                                .ThenBy(x => x.Id)
+                                .ToList()
+                        })
+                    .ToList();
+
+                return _closeoutChecklistGroups;
+            }
+        }
+
+
         public int ChecklistTotalCount => CloseoutChecklistItems?.Count ?? 0;
 
         public int ChecklistCompletedCount =>
@@ -624,6 +655,9 @@ namespace SmartGridSuite.Client.Models.Dispatcher
 
         public void RefreshChecklistProgress()
         {
+            foreach (var group in CloseoutChecklistGroups)
+                group.RefreshProgress();
+
             OnPropertyChanged(
                 nameof(ChecklistTotalCount));
 
