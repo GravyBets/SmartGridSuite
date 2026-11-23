@@ -29,16 +29,17 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             // today's crew list happens to be ordered.
             var crewNames = ParseWriteUpCrewNames(CurrentCnpTechName);
             var currentTechnician = CurrentUserService.CurrentTechnician;
-            if (currentTechnician == null)
+            try
             {
-                try
-                {
-                    currentTechnician = await CurrentUserService.LoadCurrentTechnicianAsync();
-                }
-                catch (ApiClient.ApiConnectionException)
-                {
-                    // The existing offline crew fallback is still useful.
-                }
+                // Also validates the cached identity against the signed-in user.
+                currentTechnician = await CurrentUserService.LoadCurrentTechnicianAsync();
+            }
+            catch (ApiClient.ApiConnectionException)
+            {
+                if (!string.Equals(currentTechnician?.EmployeeId,
+                        CurrentUserService.CurrentEmployeeId,
+                        StringComparison.OrdinalIgnoreCase))
+                    currentTechnician = null;
             }
 
             var submittingTechnician =
@@ -162,7 +163,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 crewPanel.Children.Add(new TextBlock
                 {
                     Text = string.IsNullOrWhiteSpace(submittingTechnician)
-                        ? "Include crew members in this write-up:"
+                        ? "Include assigned technicians in this write-up:"
                         : $"Submitting technician: {submittingTechnician} (always included)",
                     FontWeight = FontWeights.SemiBold,
                     Foreground = TryFindResource("TextPrimary") as Brush
@@ -170,7 +171,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
                 crewPanel.Children.Add(new TextBlock
                 {
-                    Text = "Uncheck another technician to exclude this write-up from their name and personal History.",
+                    Text = "Uncheck an assigned technician to exclude them from this write-up and their History. This does not remove their ticket assignment.",
                     Margin = new Thickness(0, 3, 0, 7),
                     TextWrapping = TextWrapping.Wrap,
                     Foreground = TryFindResource("TextSecondary") as Brush
