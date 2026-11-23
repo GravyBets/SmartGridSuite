@@ -6655,159 +6655,58 @@ namespace SmartGridSuite.Api.Controllers
                         ct);
 
             /*
-             * Prefer the newest published assignment because that represents the route
-             * the field technicians actually received, even if Dispatch has since begun
-             * making unpublished draft changes.
+             * The write-up participant candidates must match the ticket's
+             * CURRENT assignment sources, regardless of whether Dispatch added
+             * a person manually or published a crew route.
+             *
+             * Old published snapshots and completed/removed route rows are
+             * deliberately excluded. Historical participation records remain
+             * immutable; only this new submission gets these candidates.
              */
-            var publishedTarget = await _db.DailyTicketAssignmentPublished
+            var hasCurrentPublishedAssignment = await _db.DailyTicketAssignments
                 .AsNoTracking()
-                .Where(x =>
+                .AnyAsync(x =>
+                    x.TicketId == ticket.Id &&
                     x.AssignmentDate == submittedDate.Date &&
-                    x.TicketId == ticket.Id)
-                .OrderByDescending(x => x.PublishedAt)
-                .ThenByDescending(x => x.PublishedVersion)
-                .ThenByDescending(x => x.Id)
-                .Select(x => new WriteUpAssignmentTargetInfo
-                {
-                    TargetType = x.TargetType,
-                    TruckId = x.TruckId,
-                    TechnicianId = x.TechnicianId
-                })
-                .FirstOrDefaultAsync(ct);
+                    x.AssignmentStatus == "Active" &&
+                    x.IsPublished,
+                    ct);
 
-            /*
-             * A directly assigned ticket may not have a published snapshot. Fall back
-             * to the current active assignment record when necessary.
-             */
-            if (publishedTarget == null)
+            // A null ManualAssignedTech is a legacy unclassified ticket.
+            // Preserve its original AssignedTech display when no live route
+            // exists rather than erasing an older direct assignment.
+            if (ticket.ManualAssignedTech != null || hasCurrentPublishedAssignment)
             {
-                publishedTarget = await _db.DailyTicketAssignments
-                    .AsNoTracking()
-                    .Where(x =>
-                        x.AssignmentDate == submittedDate.Date &&
-                        x.TicketId == ticket.Id)
-                    .OrderByDescending(x => x.IsPublished)
-                    .ThenByDescending(x => x.UpdatedAt)
-                    .ThenByDescending(x => x.Id)
-                    .Select(x => new WriteUpAssignmentTargetInfo
-                    {
-                        TargetType = x.TargetType,
-                        TruckId = x.TruckId,
-                        TechnicianId = x.TechnicianId
-                    })
-                    .FirstOrDefaultAsync(ct);
+                await TicketAssigneeReconciler.ReconcileAsync(
+                    _db, new[] { ticket.Id }, submittedDate, ct);
             }
 
-            /*
-             * Resolve the CURRENT truck context at submission time.
-             *
-             * A published technician-owned assignment may not have TruckId populated
-             * if Dispatch established or changed the crew after the route was originally
-             * published. In that case, recover the assigned technician's truck from the
-             * current roster for the submission date.
-             *
-             * This ensures write-up participants reflect the crew that actually exists
-             * when the write-up is submitted, even if Field Tech has been open all day.
-             */
-            uint? assignedTruckId =
-                publishedTarget?.TruckId;
+            var currentAssignedNames = ParseAssignedTechnicianDisplayNames(
+                ticket.AssignedTech);
 
-            if (!assignedTruckId.HasValue &&
-                publishedTarget?.TechnicianId is uint publishedTechnicianId)
+            if (currentAssignedNames.Count > 0)
             {
-                assignedTruckId =
-                    await _db.TruckRosters
-                        .AsNoTracking()
-                        .Where(x =>
-                            x.WorkDate == submittedDate.Date &&
-                            x.TechnicianId == publishedTechnicianId)
-                        .Select(x => (uint?)x.TruckId)
-                        .FirstOrDefaultAsync(ct);
-            }
-
-            if (assignedTruckId.HasValue)
-            {
-                var crewTruckId =
-                    assignedTruckId.Value;
-
-                var assignedCrew = await (
-                    from roster in _db.TruckRosters.AsNoTracking()
-                    join tech in _db.Technicians.AsNoTracking()
-                        on roster.TechnicianId equals tech.Id
-                    where roster.WorkDate == submittedDate.Date
-                          && roster.TruckId == crewTruckId
-                          && tech.IsActive
-                          && tech.TechnicianRoles.Any(
-                              role => role.Role.Code == TechnicianRoleCode || role.Role.Code == LinemanRoleCode)
-                    select tech)
+                var currentTechnicians = await ActiveFieldTechniciansQuery()
                     .ToListAsync(ct);
 
-                foreach (var technician in assignedCrew)
+                foreach (var technician in currentTechnicians)
                 {
+                    var displayName = FormatTechnicianName(
+                        technician.FirstName,
+                        technician.LastName,
+                        technician.EmployeeId);
+
+                    if (!currentAssignedNames.Contains(displayName) &&
+                        !currentAssignedNames.Contains(
+                            technician.EmployeeId ?? string.Empty))
+                    {
+                        continue;
+                    }
+
                     AddSubmittedParticipant(
                         participants,
                         technician,
                         isSubmitter: false);
-                }
-            }
-
-            /*
-             * A Technician target without truck context is personal work. Add that
-             * assigned technician directly.
-             */
-            if (participants.Count == 0 &&
-                publishedTarget?.TechnicianId is uint assignedTechnicianId)
-            {
-                var assignedTechnician = await _db.Technicians
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(
-                        x => x.Id == assignedTechnicianId &&
-                             x.IsActive,
-                        ct);
-
-                if (assignedTechnician != null)
-                {
-                    AddSubmittedParticipant(
-                        participants,
-                        assignedTechnician,
-                        isSubmitter: false);
-                }
-            }
-
-            /*
-             * Legacy/direct AssignedTech values are a final fallback for tickets that
-             * were assigned without a Daily Assignments record.
-             */
-            if (participants.Count == 0)
-            {
-                var assignedTechNames =
-                    ParseAssignedTechnicianDisplayNames(
-                        ticket.AssignedTech);
-
-                if (assignedTechNames.Count > 0)
-                {
-                    var activeTechnicians = await ActiveFieldTechniciansQuery()
-                        .ToListAsync(ct);
-
-                    foreach (var technician in activeTechnicians)
-                    {
-                        var technicianName = FormatTechnicianName(
-                            technician.FirstName,
-                            technician.LastName,
-                            technician.EmployeeId);
-
-                        if (!assignedTechNames.Contains(technicianName) &&
-                            !assignedTechNames.Contains(
-                                technician.EmployeeId ?? string.Empty))
-                        {
-                            continue;
-                        }
-
-                        AddSubmittedParticipant(
-                            participants,
-                            technician,
-                            isSubmitter: false);
-                    }
                 }
             }
 
