@@ -387,12 +387,85 @@
                                         </Style>
                                     </StackPanel.Style>
 
-                                    <TextBlock Text="Changes"
-                                               Style="{StaticResource TaskExpandedLabelText}"
-                                               Margin="0,4,0,2"/>
+                                    <DockPanel Margin="0,4,0,2">
+                                        <Button DockPanel.Dock="Right"
+                                                Tag="{Binding EquipmentSerialNumbersCopyText}"
+                                                ToolTip="Copy all displayed serial numbers, one per line"
+                                                Click="CopyAllEquipmentSerials_Click">
+                                            <Button.Style>
+                                                <Style TargetType="Button"
+                                                       BasedOn="{StaticResource FlatCopyIconButton}">
+                                                    <Setter Property="Padding" Value="6,2"/>
+                                                    <Setter Property="MinWidth" Value="98"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding EquipmentSerialNumbersCopyText}"
+                                                                     Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Style="{StaticResource CopyGlyph}"
+                                                           Margin="0,0,5,0"/>
+                                                <TextBlock Text="Copy All SNs"
+                                                           Foreground="{DynamicResource TextPrimary}"
+                                                           FontSize="11"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <TextBlock Text="Changes"
+                                                   Style="{StaticResource TaskExpandedLabelText}"
+                                                   Margin="0"/>
+                                    </DockPanel>
 
-                                    <TextBox Text="{Binding DispatchChangesDisplay, Mode=OneWay}"
-                                             Style="{StaticResource TaskSelectableValueText}"/>
+                                    <TextBox Text="{Binding IpChangeLinesDisplay, Mode=OneWay}">
+                                        <TextBox.Style>
+                                            <Style TargetType="TextBox"
+                                                   BasedOn="{StaticResource TaskSelectableValueText}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IpChangeLinesDisplay}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBox.Style>
+                                    </TextBox>
+
+                                    <ItemsControl ItemsSource="{Binding EquipmentChangeLines}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox Grid.Column="0"
+                                                             Text="{Binding DisplayText, Mode=OneWay}"
+                                                             Style="{StaticResource TaskSelectableValueText}"
+                                                             VerticalAlignment="Center"/>
+                                                    <Button Grid.Column="1"
+                                                            Tag="{Binding SerialNumber}"
+                                                            ToolTip="Copy this serial number"
+                                                            Click="CopyEquipmentSerial_Click">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button"
+                                                                   BasedOn="{StaticResource FlatCopyIconButton}">
+                                                                <Setter Property="Width" Value="26"/>
+                                                                <Setter Property="Height" Value="26"/>
+                                                                <Setter Property="Padding" Value="0"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasSerialNumber}" Value="False">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Button.Style>
+                                                        <TextBlock Style="{StaticResource CopyGlyph}"/>
+                                                    </Button>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </StackPanel>
 
                                 <!-- Maintenance / Capital request information -->
@@ -480,10 +553,34 @@
                                        Margin="0"/>
                                 </DockPanel>
 
-                                <ItemsControl ItemsSource="{Binding CloseoutChecklistItems}">
+                                <TextBlock Text="{Binding ChecklistProgressDisplay}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           Margin="0,0,0,8"/>
+
+                                <!-- Checklist requirements are independent for each submission. -->
+                                <ItemsControl ItemsSource="{Binding CloseoutChecklistGroups}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Margin="0,3">
+                                            <StackPanel Margin="0,0,0,12">
+                                                <DockPanel Margin="0,4,0,6">
+                                                    <TextBlock DockPanel.Dock="Right"
+                                                               Text="{Binding ProgressDisplay}"
+                                                               Foreground="{DynamicResource TextSecondary}"
+                                                               FontSize="11"
+                                                               VerticalAlignment="Center"/>
+
+                                                    <TextBlock Text="{Binding Header}"
+                                                               FontSize="12"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextPrimary}"
+                                                               TextWrapping="Wrap"/>
+                                                </DockPanel>
+
+                                                <ItemsControl ItemsSource="{Binding Items}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Margin="0,3">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="8"/>
@@ -546,11 +643,15 @@
                                                            FontWeight="SemiBold"
                                                            Foreground="{DynamicResource TextSecondary}"/>
                                             </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
 
-                                <TextBlock Text="No closeout checklist items were generated for this submission."
+                                <TextBlock Text="No closeout checklist items were generated for this ticket."
                                            Margin="0,5,0,0"
                                            FontSize="12"
                                            FontStyle="Italic"

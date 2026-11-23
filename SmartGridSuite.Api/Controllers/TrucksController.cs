@@ -1193,165 +1193,33 @@ public sealed class TrucksController : ControllerBase
 
     private async Task ReconcilePublishedCrewTicketAssignedTechAsync(DateTime rosterDate, CancellationToken ct)
     {
-        var assignmentDate = new DateTime(2000, 1, 1);
-
         /*
-         * When truck membership changes, crew-route members are added to the
-         * ticket association. Changing today's roster must not erase previously
-         * assigned technicians or Linemen from a shared ticket.
+         * A roster edit changes the CURRENT members of every published crew
+         * assignment on this date. Never union the new roster with AssignedTech:
+         * that would retain technicians who moved off the truck indefinitely.
+         *
+         * TicketAssigneeReconciler already preserves explicit/manual assignees
+         * and other published routes. Saved write-up participant snapshots are
+         * not modified by this operation.
          */
-
-        var statusRows = await _db.TicketStatuses
-            .AsNoTracking()
-            .Where(x => x.IsActive)
-            .Select(x => new
-            {
-                x.Name,
-                x.IsClosed,
-                x.IsFieldComplete
-            })
-            .ToListAsync(ct);
-
-        var protectedStatusNames = statusRows
-            .Where(x => x.IsClosed)
-            .Select(x => x.Name)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var allPublishedRows = await _db.Set<DailyTicketAssignmentPublishedEntity>()
+        var ticketIds = await _db.DailyTicketAssignments
             .AsNoTracking()
             .Where(x =>
-                x.AssignmentDate == assignmentDate &&
-                x.TargetType == "Technician" &&
-                x.TechnicianId.HasValue)
-            .ToListAsync(ct);
-
-        var currentCrewPublishedRows = allPublishedRows
-            .GroupBy(x => x.TechnicianId!.Value)
-            .SelectMany(g =>
-            {
-                var latestVersion = g.Max(x => x.PublishedVersion);
-
-                return g.Where(x =>
-                    x.PublishedVersion == latestVersion &&
-                    x.TruckId.HasValue);
-            })
-            .ToList();
-
-        if (currentCrewPublishedRows.Count == 0)
-            return;
-
-        var truckIds = currentCrewPublishedRows
-            .Select(x => x.TruckId!.Value)
-            .Distinct()
-            .ToList();
-
-        var ownerTechnicianIds = currentCrewPublishedRows
-            .Select(x => x.TechnicianId!.Value)
-            .Distinct()
-            .ToList();
-
-        var ticketIds = currentCrewPublishedRows
+                x.AssignmentDate == rosterDate.Date &&
+                x.AssignmentStatus == "Active" &&
+                x.IsPublished &&
+                x.TruckId.HasValue)
             .Select(x => x.TicketId)
             .Distinct()
-            .ToList();
-
-        var rosterRows = await (
-            from roster in _db.Set<TruckRosterEntity>().AsNoTracking()
-            join tech in ActiveFieldTechniciansQuery()
-                on roster.TechnicianId equals tech.Id
-            where roster.WorkDate == rosterDate.Date &&
-                  truckIds.Contains(roster.TruckId)
-            select new
-            {
-                roster.TruckId,
-                tech.Id,
-                tech.EmployeeId,
-                tech.FirstName,
-                tech.LastName
-            })
             .ToListAsync(ct);
 
-        var assignedTextByTruckId = rosterRows
-            .GroupBy(x => x.TruckId)
-            .ToDictionary(
-                g => g.Key,
-                g => FormatCrewDisplayText(
-                    g.Select(x => FormatTechnicianName(
-                            x.FirstName,
-                            x.LastName,
-                            x.EmployeeId))
-                        .Where(x => !string.IsNullOrWhiteSpace(x))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .OrderBy(x => x)
-                        .ToList()));
+        if (ticketIds.Count == 0)
+            return;
 
-        var ownerTechsById = await ActiveFieldTechniciansQuery()
-            .Where(x => ownerTechnicianIds.Contains(x.Id))
-            .ToDictionaryAsync(
-                x => x.Id,
-                x => FormatTechnicianName(
-                    x.FirstName,
-                    x.LastName,
-                    x.EmployeeId),
-                ct);
+        await TicketAssigneeReconciler.ReconcileAsync(
+            _db, ticketIds, rosterDate, ct);
 
-        var ticketsById = await _db.Set<TicketEntity>()
-            .Where(x => ticketIds.Contains(x.Id))
-            .ToDictionaryAsync(x => x.Id, ct);
-
-        var changed = false;
-
-        foreach (var row in currentCrewPublishedRows)
-        {
-            if (!ticketsById.TryGetValue(row.TicketId, out var ticket))
-                continue;
-
-            if (protectedStatusNames.Contains(ticket.Status ?? string.Empty))
-                continue;
-
-            var newAssignedTech = "";
-
-            if (row.TruckId.HasValue &&
-                assignedTextByTruckId.TryGetValue(row.TruckId.Value, out var crewText) &&
-                !string.IsNullOrWhiteSpace(crewText))
-            {
-                newAssignedTech = crewText;
-            }
-            else if (row.TechnicianId.HasValue &&
-                     ownerTechsById.TryGetValue(row.TechnicianId.Value, out var ownerName))
-            {
-                newAssignedTech = ownerName;
-            }
-
-            if (string.IsNullOrWhiteSpace(newAssignedTech))
-                continue;
-
-            var mergedAssignedTech = TicketAssigneeText.Merge(
-                ticket.AssignedTech, newAssignedTech);
-
-            if (mergedAssignedTech.Length > SmartGridSuite.Contracts.Tickets.TicketTextLimits.AssignedTech)
-                throw new InvalidOperationException(
-                    $"Assigned To exceeds the ticket limit for ticket {ticket.Id}.");
-
-            if (string.Equals(
-                    ticket.AssignedTech ?? "",
-                    mergedAssignedTech,
-                    StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            ticket.AssignedTech = mergedAssignedTech;
-
-            /*
-             * Do not touch LastActivityAt here. This is roster-display cleanup,
-             * not a ticket activity event.
-             */
-            changed = true;
-        }
-
-        if (changed)
-            await _db.SaveChangesAsync(ct);
+        await _db.SaveChangesAsync(ct);
     }
 
     private static string FormatTechnicianName(string? firstName, string? lastName, string? fallbackEmployeeId)

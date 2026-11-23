@@ -1,5 +1,7 @@
 #nullable enable
 using SmartGridSuite.Contracts.Tickets;
+using SmartGridSuite.Client.Services;
+using System.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,21 +21,84 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             public List<SubmitTicketWriteUpTechnician> SelectedTechnicians { get; init; } = new();
         }
 
-        private WriteUpParticipantPreviewResult? ShowWriteUpPreviewWindowWithParticipants(
+        private async Task<WriteUpParticipantPreviewResult?> ShowWriteUpPreviewWindowWithParticipantsAsync(
             string finalWriteUpText,
             string siteHistoryWriteUpText)
         {
-            var crewNames =
-                ParseWriteUpCrewNames(
-                    CurrentCnpTechName);
+            // The signed-in technician is the submitter, regardless of how
+            // today's crew list happens to be ordered.
+            var crewNames = ParseWriteUpCrewNames(CurrentCnpTechName);
+            var currentTechnician = CurrentUserService.CurrentTechnician;
+            try
+            {
+                // Also validates the cached identity against the signed-in user.
+                currentTechnician = await CurrentUserService.LoadCurrentTechnicianAsync();
+            }
+            catch (ApiClient.ApiConnectionException)
+            {
+                if (!string.Equals(currentTechnician?.EmployeeId,
+                        CurrentUserService.CurrentEmployeeId,
+                        StringComparison.OrdinalIgnoreCase))
+                    currentTechnician = null;
+            }
 
             var submittingTechnician =
-                crewNames.FirstOrDefault() ?? string.Empty;
+                !string.IsNullOrWhiteSpace(currentTechnician?.Name)
+                    ? currentTechnician!.Name.Trim()
+                    : (crewNames.FirstOrDefault() ?? CurrentUserService.CurrentEmployeeId);
 
-            var otherCrewMembers =
-                crewNames
-                    .Skip(1)
-                    .ToList();
+            /*
+             * The current ticket's Assigned To already merges published routes
+             * with manual Dispatch additions. Loading it at preview time keeps
+             * added technicians available as checked boxes even if the crew
+             * membership or ticket changed while the dashboard was open.
+             *
+             * When offline, retain the old crew fallback rather than blocking
+             * the technician from preparing a write-up.
+             */
+            try
+            {
+                var ticketsApi = new TicketsApi(
+                    ClientAppSettings.CreateApiClient());
+                var previewTicketId = CurrentTicketId;
+
+                // Site dashboards opened without explicit ticket context may
+                // still have a single active ticket. Resolve it for preview
+                // without changing which ticket the submit handler will validate.
+                if (previewTicketId <= 0 && !string.IsNullOrWhiteSpace(CurrentSiteId))
+                {
+                    var resolution = await ticketsApi.ResolveSiteTicketAsync(
+                        CurrentSiteId,
+                        CurrentUserService.CurrentEmployeeId);
+
+                    if (string.Equals(resolution.Resolution, "Resolved",
+                            StringComparison.OrdinalIgnoreCase) &&
+                        resolution.TicketId is long foundTicketId &&
+                        foundTicketId > 0)
+                    {
+                        previewTicketId = foundTicketId;
+                    }
+                }
+
+                if (previewTicketId > 0)
+                {
+                    var ticket = await ticketsApi.GetTicketByIdAsync(previewTicketId);
+                    if (ticket != null)
+                        crewNames = ParseWriteUpCrewNames(ticket.AssignedTech);
+                }
+            }
+            catch (ApiClient.ApiConnectionException)
+            {
+                // Keep cached crew names when the field link is down.
+            }
+
+            crewNames = new[] { submittingTechnician }
+                .Concat(crewNames)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var otherCrewMembers = crewNames.Skip(1).ToList();
 
             var dialog = new Window
             {
@@ -117,7 +182,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                 crewPanel.Children.Add(new TextBlock
                 {
                     Text = string.IsNullOrWhiteSpace(submittingTechnician)
-                        ? "Include crew members in this write-up:"
+                        ? "Include assigned technicians in this write-up:"
                         : $"Submitting technician: {submittingTechnician} (always included)",
                     FontWeight = FontWeights.SemiBold,
                     Foreground = TryFindResource("TextPrimary") as Brush
@@ -125,7 +190,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
                 crewPanel.Children.Add(new TextBlock
                 {
-                    Text = "Uncheck another technician to exclude this write-up from their name and personal History.",
+                    Text = "Uncheck an assigned technician to exclude them from this write-up and their History. This does not remove their ticket assignment.",
                     Margin = new Thickness(0, 3, 0, 7),
                     TextWrapping = TextWrapping.Wrap,
                     Foreground = TryFindResource("TextSecondary") as Brush

@@ -6,6 +6,10 @@
 
         public long SubmissionId { get; set; }
 
+        public DateTime? SubmittedAt { get; set; }
+
+        public string SubmittedByName { get; set; } = "";
+
         public uint? DefinitionId { get; set; }
 
         public string DisplayName { get; set; } = "";

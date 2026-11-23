@@ -31,6 +31,39 @@ namespace SmartGridSuite.Api.Services
                    " & " + names[^1];
         }
 
+        /// <summary>
+        /// An Edit Ticket form submits the combined visible assignees. Changes to
+        /// that text are MANUAL deltas; unchanged crew members must not be turned
+        /// into permanent manual assignments simply because another name was added.
+        /// NULL manual provenance is legacy: preserve the old display to avoid
+        /// silently deleting pre-migration direct assignments.
+        /// </summary>
+        public static string ApplyManualDelta(
+            string? previousManual,
+            string? previousVisible,
+            string? requestedVisible)
+        {
+            var visibleBefore = Parse(previousVisible);
+            var visibleAfter = Parse(requestedVisible);
+            var manual = previousManual == null
+                ? new List<string>(visibleBefore)
+                : Parse(previousManual);
+
+            manual.RemoveAll(name =>
+                !visibleAfter.Contains(name, StringComparer.OrdinalIgnoreCase));
+
+            foreach (var name in visibleAfter)
+            {
+                if (!visibleBefore.Contains(name, StringComparer.OrdinalIgnoreCase) &&
+                    !manual.Contains(name, StringComparer.OrdinalIgnoreCase))
+                {
+                    manual.Add(name);
+                }
+            }
+
+            return Merge(string.Empty, string.Join(" & ", manual));
+        }
+
         private static List<string> Parse(string? value)
         {
             var text = (value ?? "").Trim();

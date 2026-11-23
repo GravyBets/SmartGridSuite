@@ -66,12 +66,6 @@ namespace SmartGridSuite.Api.Services
                 .ToListAsync(ct);
             var techniciansById = technicians.ToDictionary(tech => tech.Id);
 
-            var trucks = await db.Trucks
-                .AsNoTracking()
-                .Where(truck => truckIds.Contains(truck.Id))
-                .ToListAsync(ct);
-            var trucksById = trucks.ToDictionary(truck => truck.Id);
-
             var rosterRows = await (
                 from roster in db.TruckRosters.AsNoTracking()
                 join tech in db.Technicians.AsNoTracking()
@@ -119,8 +113,7 @@ namespace SmartGridSuite.Api.Services
                     foreach (var route in routes)
                     {
                         var names = BuildRouteNames(
-                            route, namesByTruckId, techniciansById,
-                            trucksById);
+                            route, namesByTruckId, techniciansById);
                         display = TicketAssigneeText.Merge(display, names);
                     }
                 }
@@ -141,23 +134,17 @@ namespace SmartGridSuite.Api.Services
         private static string BuildRouteNames(
             DailyTicketAssignmentEntity assignment,
             IReadOnlyDictionary<uint, List<string>> namesByTruckId,
-            IReadOnlyDictionary<uint, TechnicianEntity> techniciansById,
-            IReadOnlyDictionary<uint, TruckEntity> trucksById)
+            IReadOnlyDictionary<uint, TechnicianEntity> techniciansById)
         {
             if (assignment.TruckId is uint truckId)
             {
+                // Crew membership comes from the current roster, never an old
+                // lead who was removed from this truck.
                 if (namesByTruckId.TryGetValue(truckId, out var names) &&
                     names.Count > 0)
                     return string.Join(" & ", names);
 
-                if (assignment.TechnicianId is uint leadId &&
-                    techniciansById.TryGetValue(leadId, out var lead))
-                    return FormatName(
-                        lead.FirstName, lead.LastName, lead.EmployeeId);
-
-                if (trucksById.TryGetValue(truckId, out var truck) &&
-                    !string.IsNullOrWhiteSpace(truck.TruckNumber))
-                    return $"Truck {truck.TruckNumber.Trim()}";
+                return string.Empty;
             }
 
             if (assignment.TechnicianId is uint technicianId &&

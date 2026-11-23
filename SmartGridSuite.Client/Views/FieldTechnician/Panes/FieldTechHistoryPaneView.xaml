@@ -706,9 +706,10 @@
 
         <!-- Loading overlay -->
         <Border x:Name="BusyOverlay"
-                Grid.Row="0"
-                Grid.RowSpan="8"
+                Grid.Row="6"
                 Panel.ZIndex="100"
+                IsHitTestVisible="False"
+                Focusable="False"
                 Background="#66000000"
                 Visibility="Collapsed">
 
