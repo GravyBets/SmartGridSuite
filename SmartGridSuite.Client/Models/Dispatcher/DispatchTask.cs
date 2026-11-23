@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using SmartGridSuite.Contracts.SiteNotes;
 
 namespace SmartGridSuite.Client.Models.Dispatcher
@@ -358,6 +359,8 @@ namespace SmartGridSuite.Client.Models.Dispatcher
                 OnPropertyChanged(nameof(SubmittedWriteUpCopyText));
                 OnPropertyChanged(nameof(IpChangeLinesDisplay));
                 OnPropertyChanged(nameof(EquipmentReplacementLinesDisplay));
+                OnPropertyChanged(nameof(EquipmentChangeLines));
+                OnPropertyChanged(nameof(EquipmentSerialNumbersCopyText));
                 OnPropertyChanged(nameof(DispatchChangesDisplay));
             }
         }
@@ -485,9 +488,53 @@ namespace SmartGridSuite.Client.Models.Dispatcher
                 ? ""
                 : string.Join(
                     Environment.NewLine,
-                    equipmentLines.Distinct(
-                        StringComparer.OrdinalIgnoreCase));
+                    equipmentLines);
         }
+
+        // Extract only equipment serials already shown under Changes for the
+        // currently selected submission. Duplicates and line order are deliberate.
+        public List<DispatchEquipmentChangeLine> EquipmentChangeLines
+        {
+            get
+            {
+                var rows = new List<DispatchEquipmentChangeLine>();
+                foreach (var line in EquipmentReplacementLinesDisplay.Split(
+                             new[] { "\r\n", "\n" },
+                             StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var cleaned = line.Trim();
+                    if (cleaned.Length == 0)
+                        continue;
+
+                    var serialMatch = Regex.Match(
+                        cleaned,
+                        @"^(?:Found|Left|Bad From Stock)\s+.+?\s+SN:\s*(.+)$",
+                        RegexOptions.IgnoreCase);
+
+                    var serial = serialMatch.Success
+                        ? serialMatch.Groups[1].Value.Trim()
+                        : "";
+
+                    if (serial.Equals("(not recorded)", StringComparison.OrdinalIgnoreCase))
+                        serial = "";
+
+                    rows.Add(new DispatchEquipmentChangeLine
+                    {
+                        DisplayText = cleaned,
+                        SerialNumber = serial
+                    });
+                }
+
+                return rows;
+            }
+        }
+
+        public string EquipmentSerialNumbersCopyText =>
+            string.Join(
+                Environment.NewLine,
+                EquipmentChangeLines
+                    .Where(x => x.HasSerialNumber)
+                    .Select(x => x.SerialNumber));
 
         public string SubmittedWriteUpCopyText => BuildSubmittedWriteUpCopyText(SubmittedWriteUpDisplay, SubmittedAt);
 
