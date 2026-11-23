@@ -1,5 +1,28 @@
 [
   {
+    "version": "3.6.2.5",
+    "date": "November 23, 2026",
+    "title": "Ticket Assignments and Quality of Life Updates",
+    "changes": [
+      "Improved the Dispatch Closeout Checklist for tickets with Multiple write-ups.",
+      "Each Write-up now has its own checklist, keeping previously complete items checked.",
+      "Checklists are organized oldest first, with tech names, submission dates, and individual progress tracking.",
+      "Added individual copy buttons beside equipment serial numbers.",
+      "Added Copy All SNs to copy serial numbers into a vertical stack for easier entry into SAP.",
+      "Copy All includes both removed and installed equipment SNs.",
+      "Improved ticket assignment tracking when techs are moved between crews.",
+      "Fixed issues where removed crew members could remain assigned to tickets.",
+      "Manually assigned techs now remain attached to tickets when crew assignments change.",
+      "Improved handling of tickets reassigned between multiple crews.",
+      "Improved Submit Write-Up Preview to show currently assigned techs, including those manually added by Dispatch.",
+      "Fixed an issue where (Unassigned) could incorrectly appear as a tech in the write-up preview.",
+      "Adjusted Field Tech History Search Bar debounce to 1500ms.",
+      "Fixed an issue where switching between Modules caused windows to jump back to the primary monitor.",
+      "Improved multi-monitor handling for different display arrangements and screen scaling."
+    ]
+  },
+
+  {
     "version": "3.6.2.4",
     "date": "October 28, 2026",
     "title": "Bug Fixes from 3.6.2.3",
