@@ -1009,6 +1009,18 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
             await CopyGridValueAsync(sender as Button);
         }
 
+        // The same copy-to-checkmark feedback is used for single and bulk SNs.
+        // The bulk Tag is already a newline-delimited list from the selected write-up.
+        private async void CopyEquipmentSerial_Click(object sender, RoutedEventArgs e)
+        {
+            await CopyGridValueAsync(sender as Button);
+        }
+
+        private async void CopyAllEquipmentSerials_Click(object sender, RoutedEventArgs e)
+        {
+            await CopyGridValueAsync(sender as Button);
+        }
+
         private async Task CopyGridValueAsync(
             Button? button)
         {
