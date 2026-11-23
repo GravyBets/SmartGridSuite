@@ -146,18 +146,13 @@ namespace SmartGridSuite.Api.Services
         {
             if (assignment.TruckId is uint truckId)
             {
+                // Crew membership comes from the current roster, never an old
+                // lead who was removed from this truck.
                 if (namesByTruckId.TryGetValue(truckId, out var names) &&
                     names.Count > 0)
                     return string.Join(" & ", names);
 
-                if (assignment.TechnicianId is uint leadId &&
-                    techniciansById.TryGetValue(leadId, out var lead))
-                    return FormatName(
-                        lead.FirstName, lead.LastName, lead.EmployeeId);
-
-                if (trucksById.TryGetValue(truckId, out var truck) &&
-                    !string.IsNullOrWhiteSpace(truck.TruckNumber))
-                    return $"Truck {truck.TruckNumber.Trim()}";
+                return string.Empty;
             }
 
             if (assignment.TechnicianId is uint technicianId &&
