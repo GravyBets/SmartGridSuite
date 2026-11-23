@@ -718,6 +718,9 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes
                             SubmissionId =
                                 x.SubmissionId,
 
+                            SubmittedAt = x.SubmittedAt,
+                            SubmittedByName = x.SubmittedByName ?? "",
+
                             DefinitionId =
                                 x.DefinitionId,
 
