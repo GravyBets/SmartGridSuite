@@ -27,7 +27,8 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
         private readonly HashSet<long> _expandedHistorySubmissionIds = new();
 
         private bool _loadedOnce;
-        private bool _busyLoading;
+        private int _historyRequestVersion;
+        private CancellationTokenSource? _historyRequestCts;
         private bool _suppressFilterEvents;
 
         private string _statusMessage = "Ready.";
@@ -152,12 +153,14 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
         // current ticket Work Orders rather than locally filtering stale rows.
         private async Task LoadHistoryAsync()
         {
-            if (_busyLoading)
-                return;
+            // A newer search/filter always wins, even if an older API call finishes later.
+            _historyRequestCts?.Cancel();
+            var requestCts = new CancellationTokenSource();
+            _historyRequestCts = requestCts;
+            var requestVersion = ++_historyRequestVersion;
 
             try
             {
-                _busyLoading = true;
 
                 StatusMessage = "Loading completed write-up history...";
                 ShowBusyOverlay(StatusMessage);
@@ -173,6 +176,9 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
                         "No active technician record was found for the signed-in user.";
                     return;
                 }
+
+                if (requestCts.IsCancellationRequested || requestVersion != _historyRequestVersion)
+                    return;
 
                 var (from, to) = GetRequestedDateRange();
 
@@ -193,7 +199,11 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
                     FieldTechHistoryQueryRequest,
                     FieldTechHistoryQueryResponse>(
                         $"api/tickets/field-tech/history/{employeeId}/query",
-                        request);
+                        request,
+                        requestCts.Token);
+
+                if (requestCts.IsCancellationRequested || requestVersion != _historyRequestVersion)
+                    return;
 
                 ClearHistoryResults();
 
@@ -221,20 +231,27 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
                 StatusMessage =
                     $"Loaded {TotalCompletedCount} completed write-up(s) for {technicianName}.";
             }
+            catch (OperationCanceledException) when (requestCts.IsCancellationRequested)
+            {
+                // A newer query replaced this one. Keep the search box and results untouched.
+            }
             catch (ApiClient.ApiConnectionException)
             {
+                if (requestVersion != _historyRequestVersion) return;
                 StatusMessage =
                     "Offline — showing the last successfully loaded History results. " +
                     "Reconnect and click Refresh to try again.";
             }
             catch (ApiClient.ApiException ex)
             {
+                if (requestVersion != _historyRequestVersion) return;
                 StatusMessage =
                     $"Unable to refresh History. The server returned error " +
                     $"{ex.StatusCode}. Existing results were kept.";
             }
             catch (Exception ex)
             {
+                if (requestVersion != _historyRequestVersion) return;
                 StatusMessage =
                     "An unexpected error occurred while refreshing History. " +
                     "Existing results were kept.";
@@ -247,8 +264,13 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
             }
             finally
             {
-                _busyLoading = false;
-                HideBusyOverlay();
+                if (requestVersion == _historyRequestVersion)
+                {
+                    _historyRequestCts = null;
+                    HideBusyOverlay();
+                }
+
+                requestCts.Dispose();
             }
         }
 
@@ -360,9 +382,8 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
             await LoadHistoryAsync();
         }
 
-        // Debounces search typing, then sends the search expression to the API
-        // so the WPF client does not perform its own History filtering. Search focus
-        // is restored after the refresh so technicians can continue typing naturally.
+        // A new keystroke invalidates any in-flight query immediately.
+        // No loading state may disable the textbox, steal focus, or change its caret.
         private async void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (!_loadedOnce)
@@ -371,32 +392,23 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
             _searchDebounceCts?.Cancel();
             _searchDebounceCts?.Dispose();
 
+            _historyRequestVersion++;
+            _historyRequestCts?.Cancel();
+            HideBusyOverlay();
+
             _searchDebounceCts = new CancellationTokenSource();
             var token = _searchDebounceCts.Token;
 
             try
             {
-                await Task.Delay(650, token);
+                await Task.Delay(1500, token);
 
-                if (token.IsCancellationRequested)
-                    return;
-
-                var restoreSearchFocus =
-                    SearchBox.IsKeyboardFocusWithin;
-
-                await LoadHistoryAsync();
-
-                if (!token.IsCancellationRequested &&
-                    restoreSearchFocus)
-                {
-                    SearchBox.Focus();
-                    SearchBox.CaretIndex = SearchBox.Text.Length;
-                    SearchBox.SelectionLength = 0;
-                }
+                if (!token.IsCancellationRequested)
+                    await LoadHistoryAsync();
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                // Typing continued; only the final search value is sent to the API.
+                // Keep typing; an older search will never overwrite the new one.
             }
         }
 
@@ -735,7 +747,6 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
 
             RefreshHistoryButton.IsEnabled = false;
             ApplyHistoryFiltersButton.IsEnabled = false;
-            SearchBox.IsEnabled = false;
             DateRangeFilter.IsEnabled = false;
             FromDatePicker.IsEnabled = false;
             ToDatePicker.IsEnabled = false;
@@ -750,7 +761,6 @@ namespace SmartGridSuite.Client.Views.FieldTechnician.Panes
 
             RefreshHistoryButton.IsEnabled = true;
             ApplyHistoryFiltersButton.IsEnabled = true;
-            SearchBox.IsEnabled = true;
             DateRangeFilter.IsEnabled = true;
             FromDatePicker.IsEnabled = true;
             ToDatePicker.IsEnabled = true;
