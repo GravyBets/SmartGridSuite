@@ -33,7 +33,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             }
 
             var preview =
-                ShowWriteUpPreviewWindowWithParticipants(
+                await ShowWriteUpPreviewWindowWithParticipantsAsync(
                     finalWriteUpText,
                     siteHistoryWriteUpText);
 
