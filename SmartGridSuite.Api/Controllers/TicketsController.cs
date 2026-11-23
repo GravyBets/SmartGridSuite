@@ -1087,6 +1087,25 @@ namespace SmartGridSuite.Api.Controllers
                                     .ThenBy(x => x.Id)
                                     .ToList());
 
+                    // Every submission owns its checklist and preserves its original
+                    // author, timestamp, and completion state across reassignment.
+                    var submissionInfoById = submissionCandidates
+                        .GroupBy(x => x.Id)
+                        .ToDictionary(g => g.Key, g => g.First());
+
+                    foreach (var checklistItem in submittedCloseoutItems)
+                    {
+                        if (!submissionInfoById.TryGetValue(
+                                checklistItem.SubmissionId, out var owner))
+                            continue;
+
+                        checklistItem.SubmittedAt = owner.SubmittedAt;
+                        checklistItem.SubmittedByName =
+                            string.IsNullOrWhiteSpace(owner.SubmittedByName)
+                                ? "Unknown technician"
+                                : owner.SubmittedByName.Trim();
+                    }
+
                     foreach (var item in items)
                     {
                         if (!latestSubmissionByTicket.TryGetValue(
@@ -1132,79 +1151,21 @@ namespace SmartGridSuite.Api.Controllers
                                 ? referToOptions
                                 : new List<string>();
 
-                        var latestCloseoutItems =
-                            closeoutItemsBySubmission.TryGetValue(
-                                latestSubmission.Id,
-                                out var submissionCloseoutItems)
-                                ? submissionCloseoutItems
-                                : new List<
-                                    DispatchCloseoutChecklistItemDto>();
-
                         /*
-                         * Older completed/optional checklist rows stay historical and
-                         * do not clutter the current task. The only older rows surfaced
-                         * here are unfinished REQUIRED items, because those are exactly
-                         * the rows that can still block ticket closure.
+                         * Return ALL active submission checklists, oldest first.
+                         * Do not collapse equal item names: each occurrence represents
+                         * different work and retains independent completion history.
                          */
-                        var priorOutstandingCloseoutItems =
-                            submissionCandidates
-                                .Where(x =>
-                                    x.TicketId == item.TicketId &&
-                                    x.Id != latestSubmission.Id)
-                                .OrderBy(x => x.SubmittedAt)
-                                .ThenBy(x => x.Id)
-                                .SelectMany(
-                                    priorSubmission =>
-                                    {
-                                        if (!closeoutItemsBySubmission.TryGetValue(
-                                                priorSubmission.Id,
-                                                out var priorItems))
-                                        {
-                                            return Enumerable.Empty<
-                                                DispatchCloseoutChecklistItemDto>();
-                                        }
-
-                                        var priorSubmittedBy =
-                                            string.IsNullOrWhiteSpace(
-                                                priorSubmission.SubmittedByName)
-                                                ? "Unknown technician"
-                                                : priorSubmission
-                                                    .SubmittedByName
-                                                    .Trim();
-
-                                        return priorItems
-                                            .Where(x =>
-                                                x.IsRequired &&
-                                                !x.IsCompleted)
-                                            .Select(x =>
-                                                new DispatchCloseoutChecklistItemDto
-                                                {
-                                                    Id = x.Id,
-                                                    SubmissionId = x.SubmissionId,
-                                                    DefinitionId = x.DefinitionId,
-
-                                                    DisplayName =
-                                                        $"{x.DisplayName} — Prior write-up: " +
-                                                        $"{priorSubmittedBy}, " +
-                                                        $"{priorSubmission.SubmittedAt:MM/dd/yyyy HH:mm}",
-
-                                                    SortOrder = x.SortOrder,
-                                                    IsRequired = x.IsRequired,
-                                                    ConditionType = x.ConditionType,
-                                                    WriteUpFlagId = x.WriteUpFlagId,
-                                                    ReferToOptionId = x.ReferToOptionId,
-                                                    IsCompleted = x.IsCompleted,
-                                                    CompletedBy = x.CompletedBy,
-                                                    CompletedAt = x.CompletedAt
-                                                });
-                                    })
-                                .ToList();
-
-                        var closeoutItems =
-                            latestCloseoutItems
-                                .Concat(
-                                    priorOutstandingCloseoutItems)
-                                .ToList();
+                        var closeoutItems = submissionCandidates
+                            .Where(x => x.TicketId == item.TicketId)
+                            .OrderBy(x => x.SubmittedAt)
+                            .ThenBy(x => x.Id)
+                            .SelectMany(submission =>
+                                closeoutItemsBySubmission.TryGetValue(
+                                    submission.Id, out var rows)
+                                    ? (IEnumerable<DispatchCloseoutChecklistItemDto>)rows
+                                    : Array.Empty<DispatchCloseoutChecklistItemDto>())
+                            .ToList();
 
                         item.CloseoutChecklistItems =
                             closeoutItems;
