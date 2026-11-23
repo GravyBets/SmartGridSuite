@@ -1,4 +1,5 @@
 using SmartGridSuite.Api.Services;
+using SmartGridSuite.Client.Models.Dispatcher;
 
 // Pure offline checks: no database, VM, API, VPN, or WPF required.
 var checks = 0;
@@ -38,4 +39,24 @@ Check(TicketAssigneeText.ApplyManualDelta(
     "Phillip", "Mike & Phillip", "Mike & Phillip") == "Phillip",
     "An unrelated ticket edit does not change manual assignment provenance");
 
-Console.WriteLine($"{checks} offline assignment checks passed.");
+var changes = DispatchEquipmentSerialExtractor.Extract(
+    "Found Enclosure SN: 309831\\n" +
+    "Left Enclosure SN: 4509604227-232\\n" +
+    "Left Enclosure SN: 4509604227-232\\n" +
+    "Bad From Stock P60 SN: (not recorded)\\n" +
+    "Equipment replacement: enclosure");
+
+Check(changes.Count == 5,
+    "All equipment replacement lines, including duplicates and non-serial rows, remain displayed");
+Check(changes.Count(x => x.HasSerialNumber) == 3,
+    "Unrecorded/absent serial values are not treated as copyable");
+Check(changes[0].SerialNumber == "309831" && changes[1].SerialNumber == "4509604227-232",
+    "Found/Left serials retain their full values and order");
+Check(DispatchEquipmentSerialExtractor.CopyAll(changes) ==
+      string.Join(Environment.NewLine, "309831", "4509604227-232", "4509604227-232"),
+    "Copy All preserves duplicate serials in a vertical stack without labels");
+Check(DispatchEquipmentSerialExtractor.CopyAll(
+    DispatchEquipmentSerialExtractor.Extract("Equipment replacement: P60")) == "",
+    "No serials means empty clipboard content");
+
+Console.WriteLine($"{checks} offline assignment and serial copy checks passed.");
