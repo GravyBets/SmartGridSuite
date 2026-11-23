@@ -7,5 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../SmartGridSuite.Api/Services/TicketAssigneeText.cs" Link="TicketAssigneeText.cs"/>
+    <Compile Include="../../SmartGridSuite.Client/Models/Dispatcher/DispatchEquipmentChangeLine.cs" Link="DispatchEquipmentChangeLine.cs"/>
+    <Compile Include="../../SmartGridSuite.Client/Models/Dispatcher/DispatchEquipmentSerialExtractor.cs" Link="DispatchEquipmentSerialExtractor.cs"/>
   </ItemGroup>
 </Project>
