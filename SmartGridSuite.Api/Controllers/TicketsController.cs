@@ -3331,7 +3331,13 @@ namespace SmartGridSuite.Api.Controllers
                 originalAssignedTech, assignedTech, StringComparison.Ordinal);
             if (manualAssignmentChanged)
             {
-                entity.ManualAssignedTech = assignedTech;
+                // AssignedTech is the combined manual + crew display. Only the
+                // names Dispatch added/removed here belong in ManualAssignedTech.
+                entity.ManualAssignedTech = TicketAssigneeText.ApplyManualDelta(
+                    entity.ManualAssignedTech,
+                    originalAssignedTech,
+                    assignedTech);
+
                 entity.AssignedTech = assignedTech;
             }
 
