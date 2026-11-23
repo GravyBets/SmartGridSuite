@@ -56,21 +56,40 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
              * When offline, retain the old crew fallback rather than blocking
              * the technician from preparing a write-up.
              */
-            if (CurrentTicketId > 0)
+            try
             {
-                try
-                {
-                    var ticketsApi = new TicketsApi(
-                        ClientAppSettings.CreateApiClient());
-                    var ticket = await ticketsApi.GetTicketByIdAsync(CurrentTicketId);
+                var ticketsApi = new TicketsApi(
+                    ClientAppSettings.CreateApiClient());
+                var previewTicketId = CurrentTicketId;
 
+                // Site dashboards opened without explicit ticket context may
+                // still have a single active ticket. Resolve it for preview
+                // without changing which ticket the submit handler will validate.
+                if (previewTicketId <= 0 && !string.IsNullOrWhiteSpace(CurrentSiteId))
+                {
+                    var resolution = await ticketsApi.ResolveSiteTicketAsync(
+                        CurrentSiteId,
+                        CurrentUserService.CurrentEmployeeId);
+
+                    if (string.Equals(resolution.Resolution, "Resolved",
+                            StringComparison.OrdinalIgnoreCase) &&
+                        resolution.TicketId is long foundTicketId &&
+                        foundTicketId > 0)
+                    {
+                        previewTicketId = foundTicketId;
+                    }
+                }
+
+                if (previewTicketId > 0)
+                {
+                    var ticket = await ticketsApi.GetTicketByIdAsync(previewTicketId);
                     if (ticket != null)
                         crewNames = ParseWriteUpCrewNames(ticket.AssignedTech);
                 }
-                catch (ApiClient.ApiConnectionException)
-                {
-                    // Keep cached crew names when the field link is down.
-                }
+            }
+            catch (ApiClient.ApiConnectionException)
+            {
+                // Keep cached crew names when the field link is down.
             }
 
             crewNames = new[] { submittingTechnician }
