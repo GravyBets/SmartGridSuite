@@ -480,10 +480,34 @@
                                        Margin="0"/>
                                 </DockPanel>
 
-                                <ItemsControl ItemsSource="{Binding CloseoutChecklistItems}">
+                                <TextBlock Text="{Binding ChecklistProgressDisplay}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           Margin="0,0,0,8"/>
+
+                                <!-- Checklist requirements are independent for each submission. -->
+                                <ItemsControl ItemsSource="{Binding CloseoutChecklistGroups}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Margin="0,3">
+                                            <StackPanel Margin="0,0,0,12">
+                                                <DockPanel Margin="0,4,0,6">
+                                                    <TextBlock DockPanel.Dock="Right"
+                                                               Text="{Binding ProgressDisplay}"
+                                                               Foreground="{DynamicResource TextSecondary}"
+                                                               FontSize="11"
+                                                               VerticalAlignment="Center"/>
+
+                                                    <TextBlock Text="{Binding Header}"
+                                                               FontSize="12"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextPrimary}"
+                                                               TextWrapping="Wrap"/>
+                                                </DockPanel>
+
+                                                <ItemsControl ItemsSource="{Binding Items}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Margin="0,3">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="8"/>
@@ -546,11 +570,15 @@
                                                            FontWeight="SemiBold"
                                                            Foreground="{DynamicResource TextSecondary}"/>
                                             </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
 
-                                <TextBlock Text="No closeout checklist items were generated for this submission."
+                                <TextBlock Text="No closeout checklist items were generated for this ticket."
                                            Margin="0,5,0,0"
                                            FontSize="12"
                                            FontStyle="Italic"
