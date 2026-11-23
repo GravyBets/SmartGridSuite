@@ -31,6 +31,8 @@ API/database and test technicians before updating ClickOnce or the VM.
 - [ ] Remove that crew's Daily Assignment; Assigned To shows **Phillip only**.
 - [ ] Assign Ticket A to another crew; show that crew plus Phillip, no stale prior crew.
 - [ ] Submit a write-up: preview contains current assignees checked by default and the real submitter always included.
+- [ ] **Unassigned ticket regression:** the preview must show only the signed-in submitter, with no `(Unassigned)` checkbox, and the final `CNP Techs:` footer must contain only the actual submitter.
+- [ ] Crew with manual additions regression: retain all real assigned technicians (checked by default), and still allow unchecking individual participants.
 - [ ] Uncheck Phillip: new submission and Site History credit only checked participants; Phillip remains assigned.
 - [ ] Submit again with Phillip checked; new History includes Phillip.
 - [ ] Reassign/remove route after submissions; all older write-ups and their saved participant rows remain unchanged in ticket/Site History/each original technician's Field Tech History.

@@ -94,7 +94,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             crewNames = new[] { submittingTechnician }
                 .Concat(crewNames)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Where(IsActualWriteUpParticipant)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -230,7 +230,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
                     crewCheckBoxes
                         .Where(x => x.IsChecked == true)
                         .Select(x => x.Tag?.ToString() ?? string.Empty)
-                        .Where(x => !string.IsNullOrWhiteSpace(x)));
+                        .Where(IsActualWriteUpParticipant));
 
                 return selected
                     .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -352,10 +352,22 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
 
             return Regex
                 .Split(text, @"\s*(?:,|&)\s*")
-                .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x.Trim())
+                .Where(IsActualWriteUpParticipant)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private static bool IsActualWriteUpParticipant(string? name)
+        {
+            var clean = (name ?? string.Empty).Trim();
+
+            // Assigned To displays this sentinel when no tech is assigned.
+            // It is a ticket state, not a technician; never include it in
+            // checkboxes, selected participants, or the saved CNP Techs footer.
+            return clean.Length > 0 &&
+                   !clean.Equals("(Unassigned)", StringComparison.OrdinalIgnoreCase) &&
+                   !clean.Equals("Unassigned", StringComparison.OrdinalIgnoreCase);
         }
 
         private static SubmitTicketWriteUpTechnician CreateWriteUpTechnicianSelection(
@@ -418,7 +430,7 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
         {
             var cleanNames =
                 names
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Where(IsActualWriteUpParticipant)
                     .Select(x => x.Trim())
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
