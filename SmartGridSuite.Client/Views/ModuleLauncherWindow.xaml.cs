@@ -63,6 +63,10 @@ namespace SmartGridSuite.Client.Views
 
         private bool _isClosingApplication;
 
+        // Captured before a module's HWND is destroyed, including when the
+        // user has moved a maximized module to another display.
+        private IntPtr _lastModuleMonitor;
+
         private sealed record InterfaceScaleChoice(string Label, InterfaceScaleMode Mode)
         {
             public override string ToString()
@@ -462,12 +466,32 @@ namespace SmartGridSuite.Client.Views
 
         private void OpenModuleWindow(Window window)
         {
+            // All module shells normally start maximized. WPF's CenterScreen
+            // startup behavior can send them to the primary display; instead,
+            // first create them in normal state on the launcher's monitor.
+            var targetMonitor = ModuleMonitorPlacement.FindMonitor(this);
+            var shouldMaximize = window.WindowState == WindowState.Maximized;
+
+            window.WindowState = WindowState.Normal;
+            window.WindowStartupLocation = WindowStartupLocation.Manual;
+
+            void PlaceWindow(object? sender, EventArgs e)
+            {
+                window.SourceInitialized -= PlaceWindow;
+                ModuleMonitorPlacement.CenterOnMonitor(window, targetMonitor);
+            }
+
+            window.SourceInitialized += PlaceWindow;
+
             TrackModuleWindow(window);
 
             ClientPresenceService.SetCurrentModule(
                 GetPresenceModuleName(window));
 
             window.Show();
+
+            if (shouldMaximize)
+                window.WindowState = WindowState.Maximized;
 
             Hide();
         }
@@ -498,14 +522,28 @@ namespace SmartGridSuite.Client.Views
             if (!_trackedModuleWindows.Add(window))
                 return;
 
+            window.Closing +=
+                ModuleWindow_Closing;
+
             window.Closed +=
                 ModuleWindow_Closed;
+        }
+
+        private void ModuleWindow_Closing(object? sender, CancelEventArgs e)
+        {
+            if (e.Cancel || sender is not Window window)
+                return;
+
+            _lastModuleMonitor = ModuleMonitorPlacement.FindMonitor(window);
         }
 
         private void ModuleWindow_Closed(object? sender, EventArgs e)
         {
             if (sender is Window window)
             {
+                window.Closing -=
+                    ModuleWindow_Closing;
+
                 window.Closed -=
                     ModuleWindow_Closed;
 
@@ -542,6 +580,12 @@ namespace SmartGridSuite.Client.Views
 
             if (WindowState == WindowState.Minimized)
                 WindowState = WindowState.Normal;
+
+            // Follow the monitor the module actually occupied when closed.
+            // If that monitor has been disconnected, the positioning helper
+            // safely falls back to an available screen.
+            ModuleMonitorPlacement.CenterOnMonitor(this, _lastModuleMonitor);
+            _lastModuleMonitor = IntPtr.Zero;
 
             if (!IsVisible)
                 Show();
@@ -785,6 +829,8 @@ namespace SmartGridSuite.Client.Views
             foreach (var moduleWindow in
                      _trackedModuleWindows.ToList())
             {
+                moduleWindow.Closing -=
+                    ModuleWindow_Closing;
                 moduleWindow.Closed -=
                     ModuleWindow_Closed;
             }
