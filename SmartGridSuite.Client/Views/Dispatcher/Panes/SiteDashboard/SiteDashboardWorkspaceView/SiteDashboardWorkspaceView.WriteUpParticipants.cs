@@ -1,5 +1,7 @@
 #nullable enable
 using SmartGridSuite.Contracts.Tickets;
+using SmartGridSuite.Client.Services;
+using System.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,21 +21,64 @@ namespace SmartGridSuite.Client.Views.Dispatcher.Panes.SiteDashboard
             public List<SubmitTicketWriteUpTechnician> SelectedTechnicians { get; init; } = new();
         }
 
-        private WriteUpParticipantPreviewResult? ShowWriteUpPreviewWindowWithParticipants(
+        private async Task<WriteUpParticipantPreviewResult?> ShowWriteUpPreviewWindowWithParticipantsAsync(
             string finalWriteUpText,
             string siteHistoryWriteUpText)
         {
-            var crewNames =
-                ParseWriteUpCrewNames(
-                    CurrentCnpTechName);
+            // The signed-in technician is the submitter, regardless of how
+            // today's crew list happens to be ordered.
+            var crewNames = ParseWriteUpCrewNames(CurrentCnpTechName);
+            var currentTechnician = CurrentUserService.CurrentTechnician;
+            if (currentTechnician == null)
+            {
+                try
+                {
+                    currentTechnician = await CurrentUserService.LoadCurrentTechnicianAsync();
+                }
+                catch (ApiClient.ApiConnectionException)
+                {
+                    // The existing offline crew fallback is still useful.
+                }
+            }
 
             var submittingTechnician =
-                crewNames.FirstOrDefault() ?? string.Empty;
+                !string.IsNullOrWhiteSpace(currentTechnician?.Name)
+                    ? currentTechnician!.Name.Trim()
+                    : (crewNames.FirstOrDefault() ?? CurrentUserService.CurrentEmployeeId);
 
-            var otherCrewMembers =
-                crewNames
-                    .Skip(1)
-                    .ToList();
+            /*
+             * The current ticket's Assigned To already merges published routes
+             * with manual Dispatch additions. Loading it at preview time keeps
+             * added technicians available as checked boxes even if the crew
+             * membership or ticket changed while the dashboard was open.
+             *
+             * When offline, retain the old crew fallback rather than blocking
+             * the technician from preparing a write-up.
+             */
+            if (CurrentTicketId > 0)
+            {
+                try
+                {
+                    var ticketsApi = new TicketsApi(
+                        ClientAppSettings.CreateApiClient());
+                    var ticket = await ticketsApi.GetTicketByIdAsync(CurrentTicketId);
+
+                    if (ticket != null)
+                        crewNames = ParseWriteUpCrewNames(ticket.AssignedTech);
+                }
+                catch (ApiClient.ApiConnectionException)
+                {
+                    // Keep cached crew names when the field link is down.
+                }
+            }
+
+            crewNames = new[] { submittingTechnician }
+                .Concat(crewNames)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var otherCrewMembers = crewNames.Skip(1).ToList();
 
             var dialog = new Window
             {
