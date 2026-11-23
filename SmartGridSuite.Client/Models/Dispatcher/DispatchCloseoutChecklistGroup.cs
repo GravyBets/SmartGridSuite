@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using System.Runtime.CompilerServices;
 
 namespace SmartGridSuite.Client.Models.Dispatcher
 {
@@ -25,7 +24,7 @@ namespace SmartGridSuite.Client.Models.Dispatcher
         public string ProgressDisplay =>
             $"{Items.Count(x => x.IsCompleted)} of {Items.Count} complete";
 
-        public void RefreshProgress([CallerMemberName] string? _ = null) =>
+        public void RefreshProgress() =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ProgressDisplay)));
     }
 }
